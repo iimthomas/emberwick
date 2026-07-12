@@ -328,6 +328,11 @@ function freshGame() {
   render();
 }
 
+// always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
+function newGame() {
+  if (confirm('Start a new run? Your current run will be lost.')) freshGame();
+}
+
 function nextRegion() {
   if (S.region >= REGIONS.length) { freshGame(); return; }
   // reshuffle everything non-trashed, keep levels
