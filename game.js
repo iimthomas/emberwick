@@ -1289,14 +1289,20 @@ function renderControls() {
     const divertBtn = S.finalMode ? '' :
       `<button onclick="beginDivert()" ${canDivert() ? '' : 'disabled'} title="Burn the top deck card + 1 hand card to swap this encounter for one of a different type">` +
       `Divert to a ${S.encounter.type === 'fight' ? 'journey' : 'fight'} (${MAX_DIVERTS - S.divertsUsed} left${S.deck.length === 0 ? ' — deck empty' : ` — burns ${S.deck[0].def.name}`})</button>`;
+    // the how-to text is tucked into a collapsed toggle at the bottom — out of the way each turn,
+    // still one tap away. The actionable "you're not stuck" warning stays inline.
+    const howto =
+      `<details class="howto"><summary>How to play</summary><div class="hint">` +
+      `Tap a card, then tap a zone (Wick / Spark / Tinder) — or drag, on desktop. The last card slides into your Ember (kept for next turn); tap it back to your hand to rethink.` +
+      ` <b>Fuse</b> (once per encounter): tap a card onto another of the same element — the top card becomes any element you choose, but you get no Ember.` +
+      `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
-      `<div class="hint">Drag cards into the Wick, Spark and Tinder zones — or <b>tap a card, then tap a zone</b>. The last card slides into your Ember (always kept for next turn). Drag or tap back to your hand to rethink.` +
-      ` <b>Fuse</b> (once per encounter): drop or tap a card onto another of the same element — the top card becomes any element you choose, but you get no Ember.</div>` +
       stuckHint +
       boostRow +
       resolveBtn +
-      divertBtn;
+      divertBtn +
+      howto;
   } else if (S.phase === 'reveal') {
     const beat = S.beats[S.beatIndex];
     c.innerHTML =

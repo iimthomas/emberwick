@@ -317,6 +317,19 @@ label.radio { margin-right: 14px; cursor: pointer; }
   .card-sigil, .card:hover .card-sigil, .card-el-wild .card-sigil { animation: none; transition: none; }
 }
 
+/* how-to toggle — collapsed by default, out of the way but one tap away */
+.howto { margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
+.howto > summary {
+  cursor: pointer; list-style: none;
+  font-size: 11px; letter-spacing: 1px; color: #7c776c;
+  padding: 2px 0; user-select: none;
+}
+.howto > summary::-webkit-details-marker { display: none; }
+.howto > summary::before { content: "﹖ "; }
+.howto[open] > summary::before { content: "× "; }
+.howto > summary:hover { color: #b9b4a5; }
+.howto .hint { margin: 6px 0 2px; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 @media (max-width: 900px) {
   main { flex-direction: column; }
