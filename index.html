@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Emberwick — a candlelit puzzle-strategy roguelite card game.">
+<title>Emberwick</title>
+<meta name="theme-color" content="#16140f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Emberwick">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+<header>
+  <h1><span class="mark">🕯️</span> Emberwick</h1>
+  <div id="turn-indicator"></div>
+</header>
+
+<div id="status-bar"></div>
+
+<main>
+  <div id="left-col">
+    <section id="encounter-panel"></section>
+    <section id="controls-panel"></section>
+    <section id="zones-panel"></section>
+    <section id="hand-panel"></section>
+  </div>
+  <div id="right-col">
+    <h2>Turn Log</h2>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script src="game.js"></script>
+</body>
+</html>
