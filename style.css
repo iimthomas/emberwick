@@ -337,12 +337,16 @@ label.radio { margin-right: 14px; cursor: pointer; }
   #log { max-height: 38vh; }
   .card { width: calc(50% - 5px); min-width: 240px; max-width: 100%; }
 
-  /* keep the phase + Resolve/Continue button reachable while you place cards below */
-  #controls-panel {
+  /* pin the fight bar + controls together so you can read the enemy AND reach Resolve
+     while you scroll down to pick cards */
+  #hud {
     position: sticky; top: 0; z-index: 20;
-    max-height: 58vh; overflow-y: auto;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    background: #16181d;
+    max-height: 62vh; overflow-y: auto;
+    margin: 0 -4px 6px; padding: 4px 4px 2px;
+    box-shadow: 0 10px 18px -6px rgba(0,0,0,0.6);
   }
+  #hud section { margin-bottom: 8px; }
 }
 
 /* phones: compact 2×2 zone grid, touch-sized controls, tighter type */
@@ -363,7 +367,18 @@ label.radio { margin-right: 14px; cursor: pointer; }
   /* full-width, thumb-sized buttons */
   #controls-panel button { min-height: 46px; font-size: 15px; padding: 10px 14px; }
   #controls-panel button.primary { display: block; width: 100%; margin: 6px 0 4px; font-weight: 600; }
+  #controls-panel button:not(.primary) { min-height: 38px; font-size: 13px; }
   .card-action button { min-height: 40px; font-size: 13px; }
   .event-opts button, .event-picks button { min-height: 46px; }
   label.radio { display: inline-block; min-height: 34px; line-height: 34px; margin-right: 12px; }
+
+  /* compact the pinned fight bar so the HUD doesn't eat the screen */
+  #encounter-panel { padding: 7px 10px; }
+  .enc-type { font-size: 10px; }
+  .enc-name { font-size: 15px; margin: 1px 0 4px; }
+  .enc-stats { gap: 5px; }
+  .enc-stats span { padding: 2px 6px; font-size: 12px; }
+  .enc-hint { display: none; }            /* the tip line — noise once you know the rules */
+  .enc-mod { margin-top: 5px; padding: 3px 7px; font-size: 12px; }  /* keep Hardship/Ability — tactical */
+  .dragon-shields { font-size: 11px; }
 }
