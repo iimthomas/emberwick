@@ -317,6 +317,24 @@ label.radio { margin-right: 14px; cursor: pointer; }
   .card-sigil, .card:hover .card-sigil, .card-el-wild .card-sigil { animation: none; transition: none; }
 }
 
+/* role buttons — tap a card, then tap where it goes (the easy path) */
+.role-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.rolebtn {
+  flex: 1 1 auto; min-width: 56px; min-height: 40px;
+  margin: 0; padding: 6px 6px; font-size: 12px; font-weight: 600;
+  background: #2a2f3a; border: 1px solid #4a4a4a; border-radius: 6px; color: #d8d3c6;
+}
+.rolebtn.r-Spell   { border-color: #6e3a2a; color: #e6a58e; }
+.rolebtn.r-Element { border-color: #2a566e; color: #8fc4e8; }
+.rolebtn.r-Boost   { border-color: #6e5f2a; color: #dcc86a; }
+.rolebtn.r-Reserve { border-color: #555;    color: #bbbbb5; }
+.rolebtn.r-fuse    { border-color: #6a4a8a; color: #cba6e8; }
+.rolebtn.r-hand    { border-color: #555;    color: #9a968c; flex: 0 1 auto; min-width: 0; }
+.rolebtn.active    { background: #3a4150; box-shadow: inset 0 0 0 2px currentColor; }
+.role-bar.fuse-arm { align-items: center; }
+.fuse-arm-tip { flex: 1 1 100%; font-size: 11.5px; color: #cba6e8; margin-bottom: 4px; }
+.card.fuseable { outline: 2px dashed #b58ee0; outline-offset: 1px; }
+
 /* how-to toggle — collapsed by default, out of the way but one tap away */
 .howto { margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
 .howto > summary {

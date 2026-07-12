@@ -304,6 +304,7 @@ function freshGame() {
     pendingR: null,
     beatTimer: null,
     selectedId: null, // tap-to-place selection (touch)
+    fuseArm: false,   // after tapping the Fuse button: next same-element card completes the fuse
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
     finalPhase: null,     // 'approach' | 'duel'
@@ -536,26 +537,36 @@ function setFuseElement(el) { if (S.fuse && S.phase === 'assign') { S.fuse.eleme
 function unfuse() { if (S.phase === 'assign') { S.fuse = null; render(); } }
 
 // ---------- tap-to-place (touch devices — coexists with drag & drop) ----------
+// Tapping a card selects it and reveals its role buttons (Wick/Spark/Tinder/Ember + Fuse).
 function tapCard(id) {
   if (!isAssignPhase() || S.diverting) return;
-  if (S.selectedId === id) { S.selectedId = null; render(); return; }
-  // tapping a fuseable partner while a card is selected = fuse (same as drag-onto-card)
-  if (S.selectedId != null && canFuse(S.selectedId, id)) {
+  // fuse mode (armed via the Fuse button): the next valid same-element partner completes the fuse
+  if (S.fuseArm && S.selectedId != null && S.selectedId !== id && canFuse(S.selectedId, id)) {
     S.fuse = { topId: id, bottomId: S.selectedId, element: cardById(id).def.element };
     if (S.assign.Reserve) S.assign.Reserve = null;
-    S.selectedId = null;
+    S.selectedId = null; S.fuseArm = false;
     render();
     return;
   }
-  S.selectedId = id;
+  S.fuseArm = false;
+  S.selectedId = (S.selectedId === id) ? null : id; // toggle
   render();
 }
+
+// assign straight from a card's role button (role = 'Spell'|'Element'|'Boost'|'Reserve' or null → hand)
+function assignRole(cardId, role) {
+  if (!isAssignPhase()) return;
+  S.selectedId = null; S.fuseArm = false;
+  assignToZone(cardId, role); // renders
+}
+function armFuse(cardId) { if (isAssignPhase()) { S.selectedId = cardId; S.fuseArm = true; render(); } }
+function cancelFuseArm() { S.fuseArm = false; S.selectedId = null; render(); }
 
 function tapZone(zone) {
   if (!isAssignPhase() || S.selectedId == null) return;
   if (zone === 'Reserve' && S.fuse) return;
   const id = S.selectedId;
-  S.selectedId = null;
+  S.selectedId = null; S.fuseArm = false;
   assignToZone(id, zone);
 }
 
@@ -1293,8 +1304,8 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
-      `Tap a card, then tap a zone (Wick / Spark / Tinder) — or drag, on desktop. The last card slides into your Ember (kept for next turn); tap it back to your hand to rethink.` +
-      ` <b>Fuse</b> (once per encounter): tap a card onto another of the same element — the top card becomes any element you choose, but you get no Ember.` +
+      `<b>Tap a card</b>, then tap where it goes — <b>Wick</b> (your spell), <b>Spark</b> (ignites it), <b>Tinder</b> (fuel), or <b>Ember</b> (kept for next turn). Tap ↩ Hand to pull it back. (On desktop you can also drag.)` +
+      ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Ember.` +
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
@@ -1436,6 +1447,27 @@ const SIGIL = {
 };
 const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Shadow: '#d09eff' };
 
+// role buttons shown on a tapped card — the easy path: tap card → tap a role (no hunting for zones)
+const ROLE_BTNS = [['Spell', 'Wick'], ['Element', 'Spark'], ['Boost', 'Tinder'], ['Reserve', 'Ember']];
+function roleButtons(card) {
+  const cur = zoneOf(card.id);
+  const btns = ROLE_BTNS.map(([role, label]) => {
+    if (role === 'Reserve' && S.fuse) return ''; // no Ember while fused
+    const active = cur === role;
+    return `<button class="rolebtn r-${role} ${active ? 'active' : ''}" onclick="event.stopPropagation(); assignRole(${card.id}, '${role}')">${label}${active ? ' ✓' : ''}</button>`;
+  }).join('');
+  // Fuse — only when this card is unplaced and a same-element partner sits in hand
+  const hasPartner = !cur && !S.fuse && card.def.element &&
+    S.hand.some(o => o.id !== card.id && !zoneOf(o.id) && !isFuseBottom(o.id) && o.def.element === card.def.element);
+  const fuse = hasPartner ? `<button class="rolebtn r-fuse" onclick="event.stopPropagation(); armFuse(${card.id})">Fuse</button>` : '';
+  const back = cur ? `<button class="rolebtn r-hand" onclick="event.stopPropagation(); assignRole(${card.id}, null)">↩ Hand</button>` : '';
+  return `<div class="role-bar">${btns}${fuse}${back}</div>`;
+}
+function fuseArmHint(card) {
+  return `<div class="role-bar fuse-arm"><span class="fuse-arm-tip">Tap another ${elIcon(card.def.element)} ${card.def.element} card to fuse into ${card.def.name}</span>` +
+    `<button class="rolebtn r-hand" onclick="event.stopPropagation(); cancelFuseArm()">Cancel</button></div>`;
+}
+
 function cardHTML(card) {
   const v = eff(card);
   const d = card.def;
@@ -1465,6 +1497,8 @@ function cardHTML(card) {
       ['Fire', 'Water', 'Lightning', 'Shadow'].map(el =>
         `<span class="el el-${el} pick ${S.fuse.element === el ? 'chosen' : ''}" onclick="event.stopPropagation(); setFuseElement('${el}')">${el}</span>`).join(' ') +
       ` <button onclick="event.stopPropagation(); unfuse()">Unfuse</button></div>`;
+  } else if (isAssignPhase() && S.selectedId === card.id) {
+    action = S.fuseArm ? fuseArmHint(card) : roleButtons(card);
   }
   if (S.phase === 'soak') {
     if (!wasDowngraded) {
@@ -1496,8 +1530,10 @@ function cardHTML(card) {
   const sigil = SIGIL[d.name] || '✦';
   const accent = d.wild ? null : (ACCENT[enhElOf(card)] || '#cfc9ba');
   const sigilStyle = accent ? `--accent:${accent};` : '';
+  // while fuse is armed, highlight the valid partners you can tap
+  const fuseable = S.fuseArm && S.selectedId != null && S.selectedId !== card.id && canFuse(S.selectedId, card.id);
 
-  return `<div class="card ${tint} ${wasDowngraded ? 'downgraded' : ''} ${dnd ? 'grabbable' : ''} ${isFusedTop ? 'fused' : ''} ${S.selectedId === card.id ? 'selected' : ''}" style="${sigilStyle}"` +
+  return `<div class="card ${tint} ${wasDowngraded ? 'downgraded' : ''} ${dnd ? 'grabbable' : ''} ${isFusedTop ? 'fused' : ''} ${fuseable ? 'fuseable' : ''} ${S.selectedId === card.id ? 'selected' : ''}" style="${sigilStyle}"` +
     (dnd ? ` draggable="true" ondragstart="dragStart(event, ${card.id})"` +
            ` onclick="event.stopPropagation(); tapCard(${card.id})"` +
            ` ondragover="fuseOver(event, ${card.id})" ondragleave="fuseLeave(event)" ondrop="fuseDrop(event, ${card.id})"` : '') + `>` +
