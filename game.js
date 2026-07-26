@@ -548,9 +548,16 @@ const RESONANCE_MULT = 1.5;
 const EMPOWERS = { Lightning: 'Fire', Fire: 'Stone', Stone: 'Water', Water: 'Lightning' };
 const SEEKS = { Fire: 'Lightning', Stone: 'Fire', Water: 'Stone', Lightning: 'Water' };
 
-// what a card SEEKS to Attune — its own enhEl unless an Event rewired it
+// 🔑 ATTUNE_MODE — what a Spell asks its Catalyst for. Flip in console: ATTUNE_MODE='same'
+//   'cycle' — the elemental cycle: a Fire spell seeks Lightning (SEEKS map).
+//   'same'  — a Fire spell seeks FIRE. Element becomes a plain suit and the grammar becomes
+//             poker: a PAIR attunes, three of a kind resonates. Every card then carries ONE
+//             element fact instead of two, and the attack finally deals the damage type the
+//             spell's own element promises.
+var ATTUNE_MODE = 'cycle';
 function enhElOf(card) {
   if (card.enhElOverride) return card.enhElOverride;
+  if (ATTUNE_MODE === 'same') return card.def.element;
   if (CYCLE_MODE && card.def.element) return SEEKS[card.def.element];
   return card.def.enhEl;
 }
@@ -2152,9 +2159,15 @@ function cardHTML(card) {
     // In the Spell slot this line is an ACTIVE REQUIREMENT ("go find me a Lightning Catalyst"),
     // everywhere else it's just a fact about the card. Phrase it as the instruction where it
     // is one — that's the exact confusion: "you got your spells, but it needs this other element".
-    enhLine = zoneOf(card.id) === 'Spell'
-      ? `needs ${elIcon(seekEl)}${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`
-      : `${elIcon(seekEl)} attuned${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
+    // Under 'same', the sought element IS the card's own, so naming it again is pure noise —
+    // the line drops to the payoff alone and the card carries ONE element symbol.
+    const rewired = card.enhElOverride ? '↺' : '';
+    const sameAsSelf = ATTUNE_MODE === 'same' && !card.enhElOverride;
+    enhLine = sameAsSelf
+      ? `matched → ${parts.join(' · ')}`
+      : zoneOf(card.id) === 'Spell'
+        ? `needs ${elIcon(seekEl)}${rewired} → ${parts.join(' · ')}`
+        : `${elIcon(seekEl)} attuned${rewired} → ${parts.join(' · ')}`;
   }
   const forged = (card.armorMod || card.atkMod) ? ' ◈' : ''; // reforged marker
 
