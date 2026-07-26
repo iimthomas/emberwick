@@ -174,6 +174,52 @@ const dragonWeakness = d => ELEMENTS.filter(el => !d.armor.some(a => a.el === el
 const armorText = list => list.map(a => `${a.v} ${elIcon(a.el)}`).join(' · ');
 
 // ============================================================
+// CHARMS (2026-07-06) — run-long passives, our answer to Spire's relics. They add NO cards,
+// so deck-as-health and legible math survive; they're the prize worth gambling coins for
+// (see 08_Ideas/Addiction_Loop.md). Every effect is a plain numeric mod the engine reads,
+// so adding a charm is data, not code.
+//   mods: armor/atk (optionally element-gated) · init · pace · boost · soak · coin
+// ============================================================
+const CHARMS = [
+  { id: 'emberheart',  name: 'Emberheart',      rarity: 'common', cost: 5,
+    text: '🔥 Fire cards gain +1 armor',            mods: { armor: 1, el: 'Fire' } },
+  { id: 'tideglass',   name: 'Tideglass Bead',   rarity: 'common', cost: 5,
+    text: '💧 Water cards gain +1 armor',           mods: { armor: 1, el: 'Water' } },
+  { id: 'stormpin',    name: 'Storm Pin',        rarity: 'common', cost: 6,
+    text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
+  { id: 'nightveil',   name: 'Nightveil',        rarity: 'common', cost: 6,
+    text: '🌑 Shadow cards strike +1',               mods: { atk: 1, el: 'Shadow' } },
+  { id: 'swiftwick',   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
+    text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
+  { id: 'lanternpace', name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
+    text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
+  { id: 'tinderbox',   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
+    text: '➕ Your Tinder gives +1 more',            mods: { boost: 1 } },
+  { id: 'wardstone',   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
+    text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
+  { id: 'coinpurse',   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
+    text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
+  { id: 'brightwick',  name: 'Brightwick',       rarity: 'rare', cost: 14,
+    text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
+  { id: 'oathstone',   name: 'Oathstone',        rarity: 'rare', cost: 14,
+    text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
+];
+const charmById = id => CHARMS.find(c => c.id === id);
+function hasCharm(id) { return !!(S && S.charms && S.charms.includes(id)); }
+// sum a mod across held charms; `el` restricts element-gated charms to matching cards
+function charmMod(key, el) {
+  if (!S || !S.charms) return 0;
+  let t = 0;
+  for (const id of S.charms) {
+    const c = charmById(id);
+    if (!c || c.mods[key] == null) continue;
+    if (c.mods.el && c.mods.el !== el) continue;   // element-gated and this card doesn't match
+    t += c.mods[key];
+  }
+  return t;
+}
+
+// ============================================================
 // state
 // ============================================================
 let uid = 0;
@@ -214,7 +260,7 @@ function saveGame() {
       hardship: S.hardship, rangedDodge: S.rangedDodge, loseReserve: S.loseReserve,
       poison: S.poison, afterSoak: S.afterSoak,
       assign: S.assign, fuse: S.fuse, divertsUsed: S.divertsUsed,
-      boostTarget: S.boostTarget, xp: S.xp, damage: S.damage, damageEl: S.damageEl,
+      boostTarget: S.boostTarget, coins: S.coins, charms: S.charms, damage: S.damage, damageEl: S.damageEl,
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
       foe: S.foe,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
@@ -246,7 +292,7 @@ function loadGame() {
     const region = REGIONS[d.region - 1];
     if (!region) return false;
     const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
-    const stable = ['summary', 'defeat', 'victory', 'event'];
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -257,7 +303,7 @@ function loadGame() {
       hardship: d.hardship, rangedDodge: d.rangedDodge, loseReserve: d.loseReserve,
       poison: d.poison, afterSoak: d.afterSoak || 'upgrade',
       assign: d.assign, fuse: d.fuse, divertsUsed: d.divertsUsed,
-      diverting: false, boostTarget: d.boostTarget, xp: d.xp,
+      diverting: false, boostTarget: d.boostTarget, coins: d.coins || 0, charms: d.charms || [], wheel: null,
       damage: d.damage, damageEl: d.damageEl,
       downgraded: new Set(d.downgraded), actionSetIds: d.actionSetIds, reserveId: d.reserveId,
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
@@ -313,8 +359,10 @@ function freshGame() {
     divertsUsed: 0,   // resets every time an encounter is actually faced
     diverting: false, // true while choosing which hand card to discard
     boostTarget: 'Attack',
+    coins: 0,          // ROLLS OVER between encounters — the run-layer currency
+    charms: [],        // ids of Charms held this run (run-long passives)
+    wheel: null,       // active Wheel offer set { offers, rich, bought }
     // per-encounter:
-    xp: 0,
     damage: 0,
     damageEl: null,
     downgraded: new Set(),
@@ -380,14 +428,16 @@ function eff(card) {
   const d = card.def;
   const [v, ev, init, boost, armor, armorEl, cost] = d.lv[card.level - 1];
   // run-layer reforge mods (from Events): +armor / −attack, floored at 0. Move is untouched.
-  const am = card.armorMod || 0, at = card.atkMod || 0;
+  // Charms stack on top, element-gated ones only for cards of that element.
+  const am = (card.armorMod || 0) + charmMod('armor', d.element);
+  const at = (card.atkMod || 0) + charmMod('atk', d.element);
   const adj = x => x == null ? null : Math.max(0, x + at);
   return {
     atk:  d.type    !== 'move'   ? adj(v)  : null,
     move: d.type    !== 'attack' ? v  : null,
     enhAtk:  ev != null && d.enhType !== 'move'   ? adj(ev) : null,
     enhMove: ev != null && d.enhType !== 'attack' ? ev : null,
-    init, boost, armor: Math.max(0, armor + am), armorEl, cost,
+    init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), armorEl, cost,
   };
 }
 
@@ -462,7 +512,7 @@ function nextTurn() {
   S.diverting = false;
   S.loseReserve = null;
   S.afterSoak = 'upgrade';
-  S.xp = 0;
+  // coins roll over between turns — deliberately NOT reset
   S.damage = 0;
   S.damageEl = null;
   S.downgraded = new Set();
@@ -698,7 +748,7 @@ function computeAction(reserve) {
   const nightCut = boostVal - boostEff;
 
   if (e.type === 'fight') {
-    const init = elemInit + (S.boostTarget === 'Initiative' ? boostEff : 0);
+    const init = elemInit + (S.boostTarget === 'Initiative' ? boostEff : 0) + charmMod('init');
     const initLost = e.init > init;
     // Ranged deals Early Damage even when you win initiative, unless dodged (Ember cost)
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
@@ -744,7 +794,7 @@ function computeAction(reserve) {
   const value = withBoost + reserveBonus;
   // Pace vs Nightfall: your Spark's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
-  const pace = elemInit + (S.boostTarget === 'Pace' ? boostEff : 0) + paceBless;
+  const pace = elemInit + (S.boostTarget === 'Pace' ? boostEff : 0) + paceBless + charmMod('pace');
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace;
   // Steep peril: the journey's MP grows by your Ember's Boost
@@ -865,7 +915,7 @@ function endMultiFight() {
   const half = Math.ceil(f.maxHp / 2);
   const outcome = f.hp <= 0 ? 'Complete' : f.hp <= half ? 'Narrow' : 'Loss';
   S.results[outcome]++;
-  S.xp = outcome !== 'Loss' ? e.xp : 0;
+  if (outcome !== 'Loss') { const g = e.xp + charmMod('coin'); S.coins += g; log(`+${g} coins (you now hold ${S.coins})`, 'good'); }
   log(`${e.name} — ${f.hp}/${f.maxHp} HP left after ${f.beat} beat${f.beat === 1 ? '' : 's'} → ${outcome.toUpperCase()}` +
       `${outcome === 'Complete' ? ' — it falls' : outcome === 'Narrow' ? ' — it breaks off, wounded' : ' — it still stands; you disengage'}` +
       `${outcome !== 'Loss' ? ` · +${e.xp} XP` : ''}`,
@@ -1030,7 +1080,7 @@ function finishResolve() {
   if (S.finalMode && S.finalPhase === 'approach') S.approachOutcomes.push(r.outcome);
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
-  S.xp = r.outcome !== 'Loss' ? e.xp : 0;
+  if (r.outcome !== 'Loss') { const g = e.xp + charmMod('coin'); S.coins += g; log(`+${g} coins (you now hold ${S.coins})`, 'good'); }
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
@@ -1061,7 +1111,7 @@ function soakValue(card) {
   const armor = eff(card).armor || 0;
   if (armor <= 0) return 0;
   const doubled = eff(card).armorEl && S.damageEl && eff(card).armorEl === S.damageEl;
-  return armor * (doubled ? 2 : 1);
+  return armor * (doubled ? 2 : 1) + charmMod('soak', card.def.element);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -1131,34 +1181,102 @@ function exitSoak() {
   else startUpgrade();
 }
 
-// ---------- Phase 4: upgrade ----------
+// ============================================================
+// THE WHEEL (2026-07-06) — replaces the old spend-XP-on-a-menu step with a slot pull at
+// the same point in the loop. Three offers, buy what you can afford, REROLL for coins, and
+// bank the rest (coins roll over). The gambling lives here, in the acquisition layer —
+// never in the turn itself (Addiction_Loop.md). Camp = the same wheel, richer pool.
+// ============================================================
+const REROLL_COST = 3;
+// The Wheel draws from EVERY card you own, not just your hand: it means any of your 17 can be
+// improved, and — because the pool is 17 wide rather than 4 — rolling the same card twice is
+// genuinely uncommon (~17%), which is what makes the match jackpot feel like a hit.
+function ownedCards() { return [...S.hand, ...S.deck, ...S.discard]; }
+function anyCardById(id) { return ownedCards().find(c => c.id === id) || null; }
+
 function upgradable(card) {
   const cost = eff(card).cost;
-  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && cost != null && cost <= S.xp;
+  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && cost != null && cost <= S.coins;
 }
 
-function startUpgrade() {
-  S.phase = 'upgrade';
-  // only skip when there's no XP at all — with XP but no affordable target,
-  // still show the phase so the player sees the costs they can't meet
-  if (S.xp <= 0) { endTurn(); return; }
+// build one offer; `rich` (camp) leans rarer
+function rollOffer(rich) {
+  const roll = Math.random();
+  const heldCharms = S.charms || [];
+  const pool = CHARMS.filter(c => !heldCharms.includes(c.id) &&
+    (rich ? true : c.rarity !== 'rare'));
+  // a Charm shows up more often at camp
+  if (pool.length && roll < (rich ? 0.5 : 0.28)) {
+    const c = rand(pool);
+    return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost };
+  }
+  // repair: only offered when something is actually damaged
+  const owned = ownedCards();
+  const hurt = owned.filter(c => c.level < MAX_LEVEL && c.level <= 2);
+  if (hurt.length && roll < (rich ? 0.62 : 0.42)) {
+    const c = rand(hurt);
+    return { kind: 'repair', cardId: c.id, name: c.def.name, text: `Mend ${c.def.name} → Lv${c.level + 1}`, rarity: 'common', cost: Math.max(2, c.level) };
+  }
+  const up = owned.filter(c => c.level < MAX_LEVEL);
+  if (!up.length) return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
+  const c = rand(up);
+  return { kind: 'upgrade', cardId: c.id, name: c.def.name, text: `${c.def.name} → Lv${c.level + 1}`, rarity: 'common', cost: eff(c).cost || 2 };
+}
+
+function spinWheel(rich) {
+  const offers = [rollOffer(rich), rollOffer(rich), rollOffer(rich)];
+  // 🎰 THE MATCH JACKPOT (Thomas's idea): the same card twice in one spin = half price
+  const seen = {};
+  for (const o of offers) if (o.cardId) seen[o.cardId] = (seen[o.cardId] || 0) + 1;
+  for (const o of offers) {
+    if (o.cardId && seen[o.cardId] > 1) { o.match = true; o.cost = Math.max(1, Math.floor(o.cost / 2)); }
+  }
+  return offers;
+}
+
+function startUpgrade() { startWheel(false); }
+
+function startWheel(rich) {
+  S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
+  S.phase = 'wheel';
   render();
 }
 
-function upgrade(cardId) {
-  const card = cardById(cardId);
-  if (!card || !upgradable(card)) return;
-  S.xp -= eff(card).cost;
-  card.level++;
-  log(`Upgraded ${card.def.name} to Lv${card.level} (${S.xp} XP left)`, 'good');
-  if (S.xp <= 0) endTurn();
-  else render();
+function wheelBuy(i) {
+  const w = S.wheel; if (!w) return;
+  const o = w.offers[i];
+  if (!o || o.kind === 'none' || o.bought || o.cost > S.coins) return;
+  S.coins -= o.cost;
+  if (o.kind === 'charm') {
+    S.charms.push(o.id);
+    log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
+  } else {
+    const card = anyCardById(o.cardId);
+    if (!card) return;
+    card.level++;
+    log(`${o.kind === 'repair' ? 'Mended' : 'Upgraded'} ${card.def.name} to Lv${card.level}${o.match ? ' (matched pair — half price!)' : ''} (−${o.cost} coins)`, 'good');
+  }
+  o.bought = true;
+  render();
 }
 
-function doneUpgrading() {
-  if (S.xp > 0) log(`${S.xp} leftover XP is lost (does not carry over).`);
+function wheelReroll() {
+  if (!S.wheel || S.coins < REROLL_COST) return;
+  S.coins -= REROLL_COST;
+  S.wheel.offers = spinWheel(S.wheel.rich);
+  log(`Re-spun the wheel (−${REROLL_COST} coins, ${S.coins} left)`);
+  render();
+}
+
+function wheelDone() {
+  const camp = S.wheel && S.wheel.rich;
+  S.wheel = null;
+  if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
   endTurn();
 }
+
+// kept as an alias so the solver/older callers still work — coins now simply roll over
+function doneUpgrading() { wheelDone(); }
 
 // ---------- Phase 5: cleanup (automatic — the Reserve is always kept) ----------
 function endTurn() {
@@ -1461,6 +1579,8 @@ function renderStatus() {
     `<span>Discard: <b>${S.discard.length}</b></span>` +
     `<span>Trashed: <b>${S.trashed.length}</b></span>` +
     `<span>Next draw: <b>${key ? `${key.def.name} Lv${key.level}` : '—'}</b></span>` +
+    `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
+    (S.charms.length ? `<span>🎁 <b>${S.charms.length}</b></span>` : '') +
     `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>`;
 }
 
@@ -1614,11 +1734,30 @@ function renderControls() {
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
       (S.damageEl ? ` (enemy attacks with ${elChip(S.damageEl)} — matching armor soaks double)` : '') +
       `. Click a card to Downgrade it (soaks its Armor value). Level 1 cards are Trashed.</div>`;
-  } else if (S.phase === 'upgrade') {
+  } else if (S.phase === 'wheel') {
+    if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
+    const w = S.wheel;
+    const canReroll = S.coins >= REROLL_COST;
+    const offers = w.offers.map((o, i) => {
+      const afford = o.cost <= S.coins && o.kind !== 'none';
+      const cls = `wheel-offer r-${o.rarity}${o.bought ? ' bought' : ''}${o.match ? ' matched' : ''}`;
+      return `<div class="${cls}">` +
+        `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity : o.kind === 'repair' ? 'MEND' : o.kind === 'none' ? '—' : 'UPGRADE'}` +
+        `${o.match ? ' · 🎰 MATCHED' : ''}</div>` +
+        `<div class="wo-name">${o.name}</div><div class="wo-text">${o.text}</div>` +
+        (o.bought ? `<div class="wo-taken">taken</div>`
+          : o.kind === 'none' ? `<div class="wo-taken">—</div>`
+          : `<button class="wo-buy" onclick="wheelBuy(${i})" ${afford ? '' : 'disabled'}>🪙 ${o.cost}${afford ? '' : ' — short'}</button>`) +
+        `</div>`;
+    }).join('');
     c.innerHTML =
-      `<div class="phase-label">PHASE 4 — UPGRADE</div>` +
-      `<div class="hint">XP to spend: <b style="color:#c9b458">${S.xp}</b>. Every card prints its own cost per level. Cards downgraded this encounter can't be upgraded. Leftover XP is lost.</div>` +
-      `<button onclick="doneUpgrading()">Done — keep remaining XP unspent</button>`;
+      `<div class="phase-label">${w.rich ? '🔥 CAMP — THE LONG WHEEL' : '🎰 THE WHEEL'}</div>` +
+      `<div class="hint">You hold <b style="color:#c9b458">🪙 ${S.coins}</b> — and coins keep. Buy what's worth it, re-spin for something better, or bank it all for a bigger pull later.</div>` +
+      `<div class="wheel-row">${offers}</div>` +
+      `<button onclick="wheelReroll()" ${canReroll ? '' : 'disabled'}>🎲 Re-spin — 🪙 ${REROLL_COST}${canReroll ? '' : ' (short)'}</button>` +
+      `<button class="primary" onclick="wheelDone()">${w.rich ? 'Break camp' : 'Move on'}</button>` +
+      (S.charms.length ? `<div class="charm-tray">${S.charms.map(id => { const ch = charmById(id);
+        return `<span class="charm-chip r-${ch.rarity}" title="${ch.text}">${ch.name}</span>`; }).join('')}</div>` : '');
   } else if (S.phase === 'event') {
     const def = currentEventDef();
     const ev = S.event;
@@ -1671,6 +1810,7 @@ function renderControls() {
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
+      `<button onclick="startWheel(true)">🔥 Make camp — the long wheel (🪙 ${S.coins})</button>` +
       (runDone
         ? `<button class="primary" onclick="beginFinalBattle()">🐉 Face the ${S.dragon.name} — the Dragon Duel</button>` +
           `<button onclick="freshGame()">Restart from scratch</button>`
@@ -1786,7 +1926,7 @@ function cardHTML(card) {
       action = `<div class="card-action muted">downgraded — can't upgrade</div>`;
     } else {
       const cost = eff(card).cost;
-      const ok = cost <= S.xp;
+      const ok = cost <= S.coins;
       action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — ${cost} XP${ok ? '' : ' (not enough)'}</button></div>`;
     }
   }
@@ -1863,7 +2003,7 @@ function startApproachBeat() {
   S.fuse = null; S.boostTarget = 'Move'; S.hardship = null; S.rangedDodge = false;
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
-  S.xp = 0; S.damage = 0; S.damageEl = null;
+  S.damage = 0; S.damageEl = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 The Approach · beat ${beat} of 2 —`);
@@ -1934,7 +2074,7 @@ function startDuelBeat() {
   S.fuse = null; S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
-  S.xp = 0; S.damage = 0; S.damageEl = null;
+  S.damage = 0; S.damageEl = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);

@@ -400,6 +400,32 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .fuse-arm-tip { flex: 1 1 100%; font-size: 11.5px; color: #cba6e8; margin-bottom: 4px; }
 .card.fuseable { outline: 2px dashed #b58ee0; outline-offset: 1px; }
 
+/* ---------- THE WHEEL: three offers, buy / re-spin / bank ---------- */
+.wheel-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 10px; }
+.wheel-offer {
+  border: 1px solid #4a4436; border-radius: 9px; padding: 8px 9px;
+  background: linear-gradient(165deg, #241f16, #1a1610);
+  display: flex; flex-direction: column; gap: 3px; min-height: 118px;
+}
+.wheel-offer.r-uncommon { border-color: #4a6a7a; box-shadow: inset 0 0 16px rgba(88,166,209,.10); }
+.wheel-offer.r-rare     { border-color: #a07a3a; box-shadow: inset 0 0 20px rgba(232,145,60,.18); }
+.wheel-offer.matched    { outline: 2px solid #c9b458; outline-offset: 1px; }
+.wheel-offer.bought     { opacity: .45; }
+.wo-rar  { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #8a8577; }
+.wo-name { font-size: 14px; font-weight: 600; color: #f0e2c6; }
+.wo-text { font-size: 11.5px; color: #b3a488; line-height: 1.35; flex: 1 1 auto; }
+.wo-buy  { width: 100%; margin: 0; font-size: 13px; min-height: 34px; background: #3f3a24; border-color: #c9b458; color: #f3e6c4; }
+.wo-buy:hover:not(:disabled) { background: #554d2c; }
+.wo-taken { font-size: 11px; color: #6a675e; text-align: center; padding: 6px 0; }
+.charm-tray { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.charm-chip {
+  font-size: 10.5px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid #4a4436; color: #cbbf9e; background: rgba(201,180,88,.08); cursor: help;
+}
+.charm-chip.r-uncommon { border-color: #4a6a7a; color: #9ec8dd; }
+.charm-chip.r-rare     { border-color: #a07a3a; color: #f0c07a; }
+@media (max-width: 640px) { .wheel-row { grid-template-columns: 1fr; } }
+
 /* how-to toggle — collapsed by default, out of the way but one tap away */
 .howto { margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
 .howto > summary {
