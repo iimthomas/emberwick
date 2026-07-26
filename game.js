@@ -1990,13 +1990,19 @@ function renderControls() {
       body = `<div class="summary">${ev.lines.map(l => `<p>${l}</p>`).join('')}</div>` +
         `<button class="primary" onclick="eventContinue()">Continue</button>`;
     } else if (ev.step === 'pickCard') {
-      body = `<div class="hint">Choose a card:</div>` +
-        `<div class="event-picks">` + S.hand.map(cd => `<button onclick="eventPickCard(${cd.id})">${cd.def.name} Lv${cd.level}</button>`).join('') + `</div>` +
+      // the choice is made ON the cards below — this panel just states the deal
+      body = `<div class="hint"><b>${def.options[ev.opt].label}</b><br>Pick the card from your hand below — its stats are right there on it.</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else if (ev.step === 'pickElement') {
       const card = cardById(ev.targetId);
-      body = `<div class="hint">${card.def.name} — choose the element it should seek to Attune:</div>` +
-        `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Stone'].map(el => `<button onclick="eventPickElement('${el}')">${elIcon(el)} ${el}</button>`).join('') + `</div>` +
+      const now = enhElOf(card);
+      const v = eff(card);
+      body = `<div class="hint"><b>${displayName(card)} Lv${card.level}</b> currently seeks ` +
+        `${now ? `${elIcon(now)} <b>${now}</b>` : '<b>nothing</b>'}` +
+        `${v.enhAtk != null || v.enhMove != null ? ` → attuned it becomes ${[v.enhAtk != null ? `⚔️ ${v.enhAtk}` : null, v.enhMove != null ? `👣 ${v.enhMove}` : null].filter(Boolean).join(' · ')}` : ''}. ` +
+        `Choose the element it should seek instead — this <b>breaks it out of the cycle</b>, so it no longer follows ${elIcon(card.def.element)} ${card.def.element}'s natural partner.</div>` +
+        `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Stone'].map(el =>
+          `<button onclick="eventPickElement('${el}')" ${el === now ? 'disabled title="already seeks this"' : ''}>${elIcon(el)} ${el}${el === now ? ' (current)' : ''}</button>`).join('') + `</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
       body = `<div class="event-flavor">${def.flavor}</div>` +
@@ -2155,6 +2161,16 @@ function cardHTML(card) {
       action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' (TRASH!)' : ''}</button></div>`;
     } else {
       action = `<div class="card-action muted">already downgraded</div>`;
+    }
+  } else if (S.phase === 'event' && S.event && (S.event.step === 'pickCard' || S.event.step === 'pickElement')) {
+    // Events used to pick a target from a list of bare NAMES — you couldn't see the stats you
+    // were about to change, which on the Rewiring Pool means you couldn't see what the card
+    // already seeks. Choose on the card itself, like soak/stack/upgrade already do.
+    if (S.event.step === 'pickElement') {
+      action = card.id === S.event.targetId
+        ? `<div class="card-action muted">choosing its new element…</div>` : '';
+    } else {
+      action = `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`;
     }
   } else if (S.phase === 'upgrade') {
     // show the cost on EVERY card so the economy is visible, greyed out when blocked
