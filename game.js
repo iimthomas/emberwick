@@ -106,39 +106,39 @@ const REGIONS = [
     { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 8, atk: 1, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],      xp: 7 },
     { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     armor: [{ el: 'Water', v: 2 }],     xp: 5 },
-    { type: 'fight',   name: 'Gloamstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 8 },
+    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 8 },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 3 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 4 },
-    { type: 'journey', name: 'Dusk Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
+    { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
-    { type: 'fight',   name: 'Marsh Wisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
     { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    armor: [{ el: 'Water', v: 2 }],     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 7 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5 },
-    { type: 'journey', name: 'Peatlight Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Scree Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
   ]},
   { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
-    { type: 'fight',   name: 'Gloom Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
+    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
     { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 7, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 2 }],      xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 6 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
-    { type: 'journey', name: 'Gloaming Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
+    { type: 'journey', name: 'Granite Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
   ]},
   { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
-    { type: 'fight',   name: 'Gloomtide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 10, atk: 3, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],                             xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 8,  atk: 4, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }, { el: 'Fire', v: 2 }],  xp: 8, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }, { el: 'Stone', v: 2 }],    xp: 9 },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 7, peril: 'Treacherous' },
-    { type: 'journey', name: 'Nightwood Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 6 },
+    { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 6 },
     { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5 },
     { type: 'journey', name: 'Tempest Ridge',  mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Steep' },
   ]},
@@ -205,6 +205,60 @@ const CHARMS = [
     text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
 ];
 const charmById = id => CHARMS.find(c => c.id === id);
+
+// ============================================================
+// EVOLUTION (2026-07-26) — the marquee system. A card BRANCHES into a new form with a
+// NEW VERB, never a bigger number (the locked bar in 02_Progression/Evolution_System.md).
+// Offered as the rare result on the Wheel, so it lands as a jackpot rather than a menu tick.
+// Each branch sets a flag on the card instance; the engine reads the flags, so adding an
+// evolution is data + one hook, not a system.
+//   pierce    — an Attuned strike ignores enemy armour entirely
+//   bulwark   — this card soaks double
+//   everwild  — counts as WILD in the Catalyst slot (attunes anything)
+//   everecho  — always resonates as the Surge, whatever the element
+//   swift     — as the Catalyst, +3 Initiative
+//   surefooted— never plays at wrong-type 1; falls back to its other value instead
+// The tension is the one already specced: one branch counters the known dragon, the other
+// dominates the run that gets you there.
+// ============================================================
+const EVOLUTIONS = {
+  Sparkstrike: [
+    { id: 'lancet',   name: 'Sparklance',   verb: 'pierce',
+      text: 'Its Attuned strike ignores armour entirely.' },
+    { id: 'stormcall', name: 'Stormcaller', verb: 'swift',
+      text: 'As your Catalyst, it grants +3 Initiative.' },
+  ],
+  Rimeguard: [
+    { id: 'bulwark',  name: 'Rimebulwark',  verb: 'bulwark',
+      text: 'It soaks double when you take damage.' },
+    { id: 'wellspr',  name: 'Rimewell',     verb: 'everecho',
+      text: 'As your Surge it always resonates, whatever the element.' },
+  ],
+  Headlong: [
+    { id: 'surefoot', name: 'Headlong Rush', verb: 'surefooted',
+      text: 'It never plays at 1 — wrong type, it uses its other value.' },
+    { id: 'anyflow',  name: 'Freeflow',      verb: 'everwild',
+      text: 'As your Catalyst it counts as any element.' },
+  ],
+  Trailblaze: [
+    { id: 'blazeon',  name: 'Wildfire Trail', verb: 'everecho',
+      text: 'As your Surge it always resonates, whatever the element.' },
+    { id: 'firstlgt', name: 'Firstlight',     verb: 'swift',
+      text: 'As your Catalyst, it grants +3 Initiative.' },
+  ],
+};
+function evolutionsFor(card) {
+  if (card.evolved) return null;                       // one evolution per card
+  return EVOLUTIONS[card.def.name] || null;
+}
+function hasVerb(card, verb) { return !!(card && card.evolved && card.evolvedVerb === verb); }
+function evolveCard(card, branch) {
+  card.evolved = branch.id;
+  card.evolvedVerb = branch.verb;
+  card.evolvedName = branch.name;
+  return `${card.def.name} evolves into ${branch.name} — ${branch.text}`;
+}
+const displayName = card => (card.evolvedName || card.def.name);
 function hasCharm(id) { return !!(S && S.charms && S.charms.includes(id)); }
 // sum a mod across held charms; `el` restricts element-gated charms to matching cards
 function charmMod(key, el) {
@@ -247,6 +301,7 @@ function saveGame() {
       if (c.armorMod) o.am = c.armorMod;
       if (c.atkMod) o.at = c.atkMod;
       if (c.enhElOverride) o.ee = c.enhElOverride;
+      if (c.evolved) { o.ev = c.evolved; o.evv = c.evolvedVerb; o.evn = c.evolvedName; }
       return o;
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
@@ -285,6 +340,7 @@ function loadGame() {
       if (s.am) c.armorMod = s.am;
       if (s.at) c.atkMod = s.at;
       if (s.ee) c.enhElOverride = s.ee;
+      if (s.ev) { c.evolved = s.ev; c.evolvedVerb = s.evv; c.evolvedName = s.evn; }
       return c;
     };
     const deck = d.deck.map(mk), hand = d.hand.map(mk), discard = d.discard.map(mk), trashed = d.trashed.map(mk);
@@ -757,19 +813,19 @@ function computeAction(reserve) {
   // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
   // (enhEl — often not the card's own element). A wild Catalyst matches anything.
   const enhEl = enhElOf(spell);
-  const isEnh = !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
+  const isEnh = !!(elem && enhEl && (elem.def.wild || hasVerb(elem, 'everwild') || elOf(elem) === enhEl));
   // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
   // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
   // you can manufacture a resonance by fusing an off-element pair into the one you need.
   // Resonance is the SECOND feeding — it requires the spell to already be attuned. Without
   // this, you could double the Surge while feeding the Catalyst something the spell doesn't
   // want, which breaks the escalation ("feed it once to attune, twice to resonate").
-  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
+  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl));
   const boostVal = boostC ? (resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT) : eff(boostC).boost) : 0;
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = elem ? eff(elem).init : 0;
+  const elemInit = elem ? eff(elem).init + (hasVerb(elem, 'swift') ? 3 : 0) : 0;
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
   const nightCut = boostVal - boostEff;
@@ -784,10 +840,12 @@ function computeAction(reserve) {
     // cross-type Attuning: a Move card whose Attuned form is an Attack CAN fight when sparked
     const enhUsed = isEnh && sEff.enhAtk != null;
     const wrongType = !enhUsed && sEff.atk == null;
-    const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : 1);
+    // `surefooted` (evolution): a wrong-type spell falls back to its other value instead of 1
+    const wrongVal = hasVerb(spell, 'surefooted') && sEff.move != null ? sEff.move : 1;
+    const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : wrongVal);
     const withBoost = base + boostEff;
     // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
-    const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
+    const armorHit = (enhUsed && !hasVerb(spell, 'pierce')) ? (e.armor || []).find(a => a.el === enhEl) : null;
     const armorCut = armorHit ? armorHit.v : 0;
     let value = Math.max(0, withBoost - armorCut);
     // Slow: may compare Move instead of Attack — best result is used
@@ -815,7 +873,8 @@ function computeAction(reserve) {
   // journeys: cross-type in reverse — an Attack card whose Attuned form is a Move can travel when sparked
   const enhUsed = isEnh && sEff.enhMove != null;
   const wrongType = !enhUsed && sEff.move == null;
-  const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : 1);
+  const wrongVal = hasVerb(spell, 'surefooted') && sEff.atk != null ? sEff.atk : 1;
+  const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : wrongVal);
   const withBoost = base + boostEff;
   const reserveBonus = enhUsed && e.element && e.element === enhEl && reserve ? eff(reserve).boost : 0;
   const value = withBoost + reserveBonus;
@@ -1138,7 +1197,7 @@ function soakValue(card) {
   const armor = eff(card).armor || 0;
   if (armor <= 0) return 0;
   const doubled = eff(card).armorEl && S.damageEl && eff(card).armorEl === S.damageEl;
-  return armor * (doubled ? 2 : 1) + charmMod('soak', card.def.element);
+  return armor * (doubled ? 2 : 1) * (hasVerb(card, 'bulwark') ? 2 : 1) + charmMod('soak', card.def.element);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -1230,6 +1289,15 @@ function upgradable(card) {
 function rollOffer(rich) {
   const roll = Math.random();
   const heldCharms = S.charms || [];
+  // ✦ EVOLUTION — the rare result, and the jackpot the Wheel was built for. Only offered
+  // to cards that actually have branches and haven't evolved yet.
+  const evolvable = ownedCards().filter(c => evolutionsFor(c));
+  if (evolvable.length && roll < (rich ? 0.22 : 0.10)) {
+    const c = rand(evolvable);
+    const branches = evolutionsFor(c);
+    return { kind: 'evolve', cardId: c.id, name: c.def.name, rarity: 'rare',
+             text: `Evolve ${c.def.name} — choose its new form`, cost: rich ? 10 : 12, branches };
+  }
   const pool = CHARMS.filter(c => !heldCharms.includes(c.id) &&
     (rich ? true : c.rarity !== 'rare'));
   // a Charm shows up more often at camp
@@ -1274,6 +1342,12 @@ function wheelBuy(i) {
   const o = w.offers[i];
   if (!o || o.kind === 'none' || o.bought || o.cost > S.coins) return;
   S.coins -= o.cost;
+  if (o.kind === 'evolve') {
+    S.coins += o.cost;                       // not spent until a branch is chosen
+    w.choosing = i;                          // open the branch picker
+    render();
+    return;
+  }
   if (o.kind === 'charm') {
     S.charms.push(o.id);
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -1286,6 +1360,19 @@ function wheelBuy(i) {
   o.bought = true;
   render();
 }
+
+function wheelPickBranch(bi) {
+  const w = S.wheel; if (!w || w.choosing == null) return;
+  const o = w.offers[w.choosing];
+  const card = anyCardById(o.cardId), branch = o.branches[bi];
+  if (!card || !branch || o.cost > S.coins) return;
+  S.coins -= o.cost;
+  logHeader(`✦ ${card.def.name} EVOLVES`);
+  log(evolveCard(card, branch), 'good result');
+  o.bought = true; w.choosing = null;
+  render();
+}
+function wheelCancelBranch() { if (S.wheel) { S.wheel.choosing = null; render(); } }
 
 function wheelReroll() {
   if (!S.wheel || S.coins < REROLL_COST) return;
@@ -1755,6 +1842,20 @@ function renderControls() {
   } else if (S.phase === 'wheel') {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
+    if (w.choosing != null) {           // ✦ choosing an evolution branch
+      const o = w.offers[w.choosing];
+      const card = anyCardById(o.cardId);
+      c.innerHTML =
+        `<div class="phase-label">✦ ${(card ? card.def.name : '').toUpperCase()} IS READY TO EVOLVE</div>` +
+        `<div class="hint">Choose its new form. This is permanent — and it grants a new <b>ability</b>, not a bigger number.</div>` +
+        `<div class="wheel-row">` + o.branches.map((b, bi) =>
+          `<div class="wheel-offer r-rare"><div class="wo-rar">✦ EVOLUTION</div>` +
+          `<div class="wo-name">${b.name}</div><div class="wo-text">${b.text}</div>` +
+          `<button class="wo-buy" onclick="wheelPickBranch(${bi})" ${o.cost <= S.coins ? '' : 'disabled'}>🪙 ${o.cost}</button></div>`
+        ).join('') + `</div>` +
+        `<button onclick="wheelCancelBranch()">← not yet</button>`;
+      return;
+    }
     const canReroll = S.coins >= REROLL_COST;
     const offers = w.offers.map((o, i) => {
       const afford = o.cost <= S.coins && o.kind !== 'none';
@@ -1983,7 +2084,8 @@ function cardHTML(card) {
            ` onclick="event.stopPropagation(); tapCard(${card.id})"` +
            ` ondragover="fuseOver(event, ${card.id})" ondragleave="fuseLeave(event)" ondrop="fuseDrop(event, ${card.id})"` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
-    `<div class="card-head"><span class="card-name">${d.name}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
+    `<div class="card-head"><span class="card-name${card.evolved ? ' evolved' : ''}">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
+    (card.evolved ? `<div class="evo-verb">✦ ${(EVOLUTIONS[d.name] || []).filter(b => b.id === card.evolved).map(b => b.text)[0] || ''}</div>` : '') +
     `<div>${elChip(shownEl)}</div>` +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span><span class="s-boost">➕ ${v.boost}</span></div>` +
     boostPicker +

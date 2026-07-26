@@ -449,6 +449,13 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   background: #6d5a1f; border-color: #c9b458; color: #f7e8c9; font-weight: bold;
 }
 
+/* evolved cards wear their new name and their new verb */
+.card-name.evolved { color: #f0c07a; text-shadow: 0 0 10px rgba(240,192,122,.35); }
+.evo-verb {
+  font-size: 10.5px; color: #e0b878; line-height: 1.35; margin: 2px 0 1px;
+  border-left: 2px solid rgba(224,184,120,.5); padding-left: 6px;
+}
+
 /* ---------- THE WHEEL: three offers, buy / re-spin / bank ---------- */
 .wheel-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 10px; }
 .wheel-offer {
