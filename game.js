@@ -1865,6 +1865,9 @@ function renderControls() {
       `<div class="phase-label">🃏 STACK THE DECK</div>` +
       `<div class="hint">Your spent cards slide back <b>under the deck</b>. Tap them in the order you want to <b>draw them again</b> — ① comes back soonest. ` +
       `<b>${left}</b> left to place. <span class="note">(${S.deck.length} cards ahead of them)</span></div>` +
+      // There must ALWAYS be a way forward. Without this the phase had no button at all, so a
+      // player who didn't realise every card must be tapped was simply stuck mid-fight.
+      `<button class="primary" onclick="finishStack()">${st.order.length ? 'Done — slide them under' : 'Skip — leave the order as it is'}</button>` +
       (st.order.length ? `<button onclick="stackClear()">↺ start over</button>` : '');
   } else if (S.phase === 'soak') {
     c.innerHTML =
