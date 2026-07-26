@@ -55,31 +55,36 @@ const SOLVER = (() => {
     const plays = [];
     S = { hand, encounter, assign: {}, boostTarget: 'Attack', hardship: null, rangedDodge: false, fuse: null };
 
-    for (let w = 0; w < hand.length; w++) {
-      const rest = hand.filter((_, i) => i !== w);
-      // Catalyst: none, or any non-Spell card
-      const sparkOpts = [null, ...rest];
-      for (const spark of sparkOpts) {
-        const afterSpark = rest.filter(c => c !== spark);
-        const tinderOpts = [null, ...afterSpark];
-        for (const tinder of tinderOpts) {
-          // Arsenal = the leftover most useful as Reserve (highest boost) — journeys use it
-          const leftovers = afterSpark.filter(c => c !== tinder);
-          const ember = leftovers.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
-          for (const bt of boostTargets) {
-            S.assign = {
-              Spell: hand[w].id,
-              Element: spark ? spark.id : null,
-              Boost: tinder ? tinder.id : null,
-              Reserve: ember ? ember.id : null,
-            };
-            S.boostTarget = bt;
-            const r = computeAction(ember);
-            if (!r) continue;
-            plays.push({
-              r, score: scoreOf(r), enhUsed: !!r.enhUsed,
-              wickName: hand[w].def.name, usedTinder: !!tinder, boostTarget: bt,
-            });
+    // THE PILE: enumerate every same-element subset as the Spell, then every arrangement of
+    // what's left across Catalyst / Surge / Arsenal. Depth is the decision, so the bot MUST
+    // explore it - a bot that only ever pours one card would report a game we aren't shipping.
+    const n = hand.length;
+    for (let mask = 1; mask < (1 << n); mask++) {
+      const pile = [], rest = [];
+      for (let i = 0; i < n; i++) ((mask >> i) & 1 ? pile : rest).push(hand[i]);
+      const el = pile[0].def.element;
+      if (pile.some(c => c.def.element !== el)) continue;   // one element per pile
+      const opts = [null, ...rest];
+      for (const spark of opts) {
+        for (const tinder of opts) {
+          if (tinder && tinder === spark) continue;
+          for (const ember of opts) {
+            if (ember && (ember === spark || ember === tinder)) continue;
+            for (const bt of boostTargets) {
+              S.assign = {
+                Spell: pile.map(c => c.id),
+                Element: spark ? spark.id : null,
+                Boost: tinder ? tinder.id : null,
+                Reserve: ember ? ember.id : null,
+              };
+              S.boostTarget = bt;
+              const r = computeAction(ember);
+              if (!r) continue;
+              plays.push({
+                r, score: scoreOf(r), enhUsed: false, depth: pile.length,
+                wickName: pile[0].def.name, usedTinder: !!tinder, boostTarget: bt,
+              });
+            }
           }
         }
       }
@@ -283,17 +288,21 @@ const RUNSIM = (() => {
   function chooseBest() {
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
-    const full = hand.length >= 3; // rolesValid: ≥3 cards must fill all 3 roles
     let best = null;
-    for (let w = 0; w < hand.length; w++) {
-      const rest = hand.filter((_, i) => i !== w);
-      for (const spark of (full ? rest : [null, ...rest])) {
-        const after = rest.filter(c => c !== spark);
-        for (const tinder of (full ? after : [null, ...after])) {
-          const left = after.filter(c => c !== tinder);
-          const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
+    const n = hand.length;
+    for (let mask = 1; mask < (1 << n); mask++) {          // every same-element pile
+      const pile = [], rest = [];
+      for (let i = 0; i < n; i++) ((mask >> i) & 1 ? pile : rest).push(hand[i]);
+      const el = pile[0].def.element;
+      if (pile.some(c => c.def.element !== el)) continue;
+      const opts = [null, ...rest];
+      for (const spark of opts) for (const tinder of opts) {
+        if (tinder && tinder === spark) continue;
+        for (const ember of opts) {
+          if (ember && (ember === spark || ember === tinder)) continue;
           for (const bt of bts) {
-            S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+            S.assign = { Spell: pile.map(c => c.id), Element: spark ? spark.id : null,
+                         Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
             S.boostTarget = bt;
             const r = computeAction(ember); if (!r) continue;
             const sc = scoreOf(r);
@@ -333,7 +342,7 @@ const RUNSIM = (() => {
           const left = after.filter(c => c !== tinder);
           const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
           for (const bt of ['Attack', 'Initiative']) {
-            S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+            S.assign = { Spell: [hand[w].id], Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
             S.boostTarget = bt;
             const r = computeAction(ember); if (!r) continue;
             const sc = evalDuelPlay(r);

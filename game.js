@@ -163,6 +163,30 @@ const REGIONS = [
 
 const ROLES = ['Spell', 'Element', 'Boost'];
 const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
+// 🔑 THE PILE (2026-07-26 redesign). The Spell is no longer a seat, it is a PILE: it holds one
+// card or several, and every card you pour in is a slot left empty. All cards in the pile must
+// share an element. That single rule is the brain-burner - power vs speed vs what you carry,
+// out of the same four cards, EVERY turn instead of only when you happen to hold a pair.
+// S.assign.Spell is an ARRAY of ids; Element/Boost/Reserve stay single ids.
+const SLOTS = ['Element', 'Boost', 'Reserve'];   // the single-card slots
+function pileIds() { return (S.assign.Spell || []).filter(id => cardById(id)); }
+function pileCards() { return pileIds().map(cardById); }
+function pileElement() { const p = pileCards(); return p.length ? p[0].def.element : null; }
+function canPour(id) {
+  const c = cardById(id); if (!c) return false;
+  const pe = pileElement();
+  return pe == null || c.def.element === pe || pileIds().includes(id);
+}
+// a card's contribution: its own value, plus anything buried under it by a Fuse
+function cardValue(card) {
+  if (!card) return 0;
+  const buried = (S.fuse && S.fuse.topId === card.id) ? cardById(S.fuse.bottomId) : null;
+  return eff(card).value + (buried ? eff(buried).value : 0);
+}
+function removeFromZone(id) {
+  S.assign.Spell = pileIds().filter(i => i !== id);
+  for (const z of SLOTS) if (S.assign[z] === id) S.assign[z] = null;
+}
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
 // Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
@@ -457,7 +481,7 @@ function eff(card) {
   // `def.type` / `def.enhType` are now DEAD DATA.
   return {
     value: adj(v),
-    attuned: ev != null ? adj(ev) : null,
+    // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
     init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
   };
 }
@@ -474,7 +498,6 @@ function levelDeltaText(card) {
   const parts = [];
   const cmp = (icon, x, y) => { if (x != null && y != null && y !== x) parts.push(`${icon} ${x}<span class="d-arrow">→</span>${y}`); };
   cmp('⚔️', a.value, b.value);
-  cmp('✨', a.attuned, b.attuned);
   cmp('💨', a.init, b.init);
   cmp('➕', a.boost, b.boost);
   cmp('🛡️', a.armor, b.armor);
@@ -501,10 +524,13 @@ function enhElOf(card) { return elOf(card); }
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
 function activeZones() { return ZONES; }
 function isAssignPhase() { return S.phase === 'assign'; }
-function zoneOf(cardId) { return activeZones().find(z => S.assign[z] === cardId) || null; }
+function zoneOf(cardId) {
+  if (pileIds().includes(cardId)) return 'Spell';
+  return SLOTS.find(z => S.assign[z] === cardId) || null;
+}
 
-// a fused top card counts as the chosen element during the Action Phase
-function elOf(card) { return S.fuse && S.fuse.topId === card.id ? S.fuse.element : card.def.element; }
+// fusing no longer changes an element - it buries a card's VALUE under another (see canFuse)
+function elOf(card) { return card.def.element; }
 function isFuseBottom(cardId) { return !!(S.fuse && S.fuse.bottomId === cardId); }
 
 // ============================================================
@@ -643,13 +669,15 @@ function dropOn(ev, zone) {
   dragId = null;
 }
 
-// ---------- fusing (drag one card onto another of the same element) ----------
-// In the slot-row model every card is always seated, so fusing no longer requires unplaced cards —
-// only that they share an element (and that no fuse is active yet).
+// ---------- fusing: BURY one card under another ----------
+// The top card keeps everything it is - element, Initiative, Boost, armour - and gains the buried
+// card's VALUE. So a fuse smuggles an off-element card's value into the pile, once per encounter.
+// No element requirement any more: that rule existed when fusing CHANGED an element, and under the
+// pile it would forbid the only use fusing has. It self-limits - burying two same-element cards is
+// strictly worse than pouring both into the pile, so the maths makes this a cross-element tool.
 function canFuse(bottomId, topId) {
   if (S.phase !== 'assign' || S.fuse || bottomId === topId) return false;
-  const a = cardById(bottomId), b = cardById(topId);
-  return !!(a && b && a.def.element && a.def.element === b.def.element);
+  return !!(cardById(bottomId) && cardById(topId));
 }
 
 function fuseOver(ev, topId) {
@@ -665,22 +693,20 @@ function fuseDrop(ev, topId) {
   if (dragId == null || !canFuse(dragId, topId)) return;
   ev.preventDefault();
   ev.stopPropagation();
-  S.fuse = { topId, bottomId: dragId, element: cardById(topId).def.element };
+  S.fuse = { topId, bottomId: dragId };
   dragId = null;
   normalizeAssign(); compactSlots(); // the consumed card frees its slot; close the gap
   render();
 }
-
-function setFuseElement(el) { if (S.fuse && S.phase === 'assign') { S.fuse.element = el; render(); } }
 
 function unfuse() { if (S.phase === 'assign') { S.fuse = null; render(); } }
 
 // ---------- the slot row: select a card, then swap it with another (or with a role) ----------
 function tapCard(id) {
   if (!isAssignPhase() || S.diverting) return;
-  // fuse mode (armed via the Fuse button): the next valid same-element partner completes the fuse
+  // fuse mode (armed via the Fuse button): the next card tapped is buried under this one
   if (S.fuseArm && S.selectedId != null && S.selectedId !== id && canFuse(S.selectedId, id)) {
-    S.fuse = { topId: id, bottomId: S.selectedId, element: cardById(id).def.element };
+    S.fuse = { topId: id, bottomId: S.selectedId };
     S.selectedId = null; S.fuseArm = false;
     normalizeAssign(); compactSlots(); // the consumed card frees its slot; close the gap
     render();
@@ -698,23 +724,33 @@ function tapCard(id) {
   render();
 }
 
-// exchange two cards' slots — the labels never move, the cards do
+// tapping two cards sends the first to the second's zone; the displaced card is re-seated by
+// normalizeAssign. One code path, so the pile's one-element rule is enforced in one place.
 function swapCards(idA, idB) {
-  const za = zoneOf(idA), zb = zoneOf(idB);
-  if (!za || !zb) return;
-  S.assign[za] = idB;
-  S.assign[zb] = idA;
+  const zb = zoneOf(idB);
+  if (zb) assignRole(idA, zb);
 }
 
-// send a card to a named role; whoever was there takes the mover's old slot (a swap, never a displace)
 function assignRole(cardId, role) {
   if (!isAssignPhase() || !role) return;
   S.selectedId = null; S.fuseArm = false;
   const from = zoneOf(cardId);
-  if (from === role) { render(); return; }
-  const occupant = S.assign[role] || null;
-  if (from) S.assign[from] = occupant;
-  S.assign[role] = cardId;
+  if (from === role && role !== 'Spell') { render(); return; }
+  if (role === 'Spell') {
+    if (from === 'Spell' || !canPour(cardId)) { render(); return; }  // the pile is one element
+    removeFromZone(cardId);
+    S.assign.Spell.push(cardId);
+  } else {
+    const occupant = S.assign[role] || null;
+    removeFromZone(cardId);
+    S.assign[role] = cardId;
+    // the displaced card takes the mover's old seat if it had one, else normalizeAssign re-seats it
+    if (occupant && occupant !== cardId) {
+      if (from && from !== 'Spell') S.assign[from] = occupant;
+      else removeFromZone(occupant);
+    }
+  }
+  normalizeAssign();
   render();
 }
 function setBoostTarget(t) { if (S.phase === 'assign') { S.boostTarget = t; render(); } }
@@ -750,57 +786,48 @@ function assignToZone(cardId, zone) {
 // hand region (the space the 16:9 scene needs) and makes every card always visible.
 function normalizeAssign() {
   if (!isAssignPhase()) return;
-  for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
-  // a fused bottom card is consumed — it holds no slot (and there's no Arsenal while fused)
-  if (S.fuse) for (const z of ZONES) if (S.assign[z] === S.fuse.bottomId) S.assign[z] = null;
-  // seat any card that isn't in a slot yet, left → right
-  const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
+  if (!Array.isArray(S.assign.Spell)) S.assign.Spell = S.assign.Spell ? [S.assign.Spell] : [];
+  S.assign.Spell = pileIds().filter(id => !isFuseBottom(id));
+  for (const z of SLOTS) if (S.assign[z] && (!cardById(S.assign[z]) || isFuseBottom(S.assign[z]))) S.assign[z] = null;
+  // default seating is WIDE: one card in the pile, the rest across the slots. Pouring deeper
+  // is always the player's deliberate act, never something the layout does for them.
+  const seated = new Set([...pileIds(), ...SLOTS.map(z => S.assign[z]).filter(Boolean)]);
   for (const card of S.hand) {
     if (seated.has(card.id) || isFuseBottom(card.id)) continue;
-    const free = ZONES.find(z => !S.assign[z]);
-    if (!free) break;
-    S.assign[free] = card.id;
     seated.add(card.id);
+    if (!S.assign.Spell.length) { S.assign.Spell = [card.id]; continue; }
+    const free = SLOTS.find(z => !S.assign[z]);
+    if (free) S.assign[free] = card.id;
+    else if (canPour(card.id)) S.assign.Spell.push(card.id);
   }
 }
 
-// pull cards leftward so there's no gap mid-row (used after a fuse consumes a card)
+// pull the single-slot cards leftward so there's no gap mid-row
 function compactSlots() {
-  const ids = ZONES.map(z => S.assign[z]).filter(Boolean);
-  ZONES.forEach((z, i) => { S.assign[z] = ids[i] || null; });
+  const ids = SLOTS.map(z => S.assign[z]).filter(Boolean);
+  SLOTS.forEach((z, i) => { S.assign[z] = ids[i] || null; });
 }
 
-function rolesValid() {
-  const n = S.hand.length;
-  if (n >= 3) return ROLES.every(r => S.assign[r]);
-  return !!S.assign.Spell;
-}
+// the only requirement is that something is in the pile - empty slots are a legal, costly choice
+function rolesValid() { return pileIds().length > 0; }
 
 // ---------- action math (pure) ----------
 // Computes the current Action Set vs the current encounter. Used by BOTH the
 // live preview and resolve() so the two can never disagree.
 function computeAction(reserve) {
-  const spell = cardById(S.assign.Spell);
   const e = S.encounter;
-  if (!spell || !e) return null;
+  const pile = pileCards();
+  if (!pile.length || !e) return null;
+  const spell = pile[0];                       // names the spell; the pile's element is its verb
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  const sEff = eff(spell);
-  const spellEl = elOf(spell);
-  // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
-  // (enhEl — often not the card's own element). A wild Catalyst matches anything.
-  const enhEl = enhElOf(spell);
-  const isEnh = !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
-  // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
-  // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
-  // you can manufacture a resonance by fusing an off-element pair into the one you need.
-  // Resonance is the SECOND feeding — it requires the spell to already be attuned. Without
-  // this, you could double the Surge while feeding the Catalyst something the spell doesn't
-  // want, which breaks the escalation ("feed it once to attune, twice to resonate").
-  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
-  const boostVal = !boostC ? 0
-    : resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT)
-    : eff(boostC).boost;
+  const spellEl = pileElement();
+  // ATTUNING / RESONANCE are GONE. Power comes from DEPTH: every card poured into the pile adds
+  // its value, and a poured card is a slot left empty. That is the whole decision.
+  const depth = pile.length;
+  const pileVal = pile.reduce((t, c) => t + cardValue(c), 0);
+  const enhEl = spellEl, isEnh = false, enhUsed = false, resonant = false;
+  const boostVal = boostC ? eff(boostC).boost : 0;
 
   const h = S.hardship;
   const ability = e.ability || null;
@@ -816,12 +843,11 @@ function computeAction(reserve) {
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
     let early = initLost || rangedHits ? e.atk : 0;
     if (h === 'Ambush') early *= 2;
-    const enhUsed = isEnh && sEff.attuned != null;
-    const wrongType = false;   // one value per card - a card can never be the wrong type now
-    const base = enhUsed ? sEff.attuned : sEff.value;
+    const wrongType = false;
+    const base = pileVal;
     const withBoost = base + boostEff;
-    // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
-    const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
+    // enemy armor is a LIST of elements; it bites the element your PILE is made of
+    const armorHit = (e.armor || []).find(a => a.el === spellEl);
     const armorCut = armorHit ? armorHit.v : 0;
     let value = Math.max(0, withBoost - armorCut);
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
@@ -836,13 +862,12 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, pile, depth, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
-  const enhUsed = isEnh && sEff.attuned != null;
   const wrongType = false;
-  const base = enhUsed ? sEff.attuned : sEff.value;
+  const base = pileVal;
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
@@ -866,7 +891,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, pile, depth, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -882,10 +907,11 @@ function resolveFightBeat() {
   normalizeAssign();
   if (!rolesValid()) return;
   const e = S.encounter, f = S.foe;
-  const spell = cardById(S.assign.Spell);
+  const pile = pileCards();
+  const spell = pile[0];
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
+  S.actionSetIds = [...pile, elem, boostC].filter(Boolean).map(c => c.id);
   if (S.fuse) S.actionSetIds.push(S.fuse.bottomId);
   const reserve = S.fuse ? null : (cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null);
   S.reserveId = reserve ? reserve.id : null;
@@ -903,7 +929,7 @@ function resolveFightBeat() {
   const damage = counter;
   S.beatResult = { value: r.value, hpBefore, kill, struck, counter, damage, ranged: r.rangedHits && !r.initLost };
 
-  log(`Beat ${f.beat}/${f.beats} — Spell: ${spell.def.name} Lv${spell.level} (seeks ${r.enhEl || '—'})` +
+  log(`Beat ${f.beat}/${f.beats} — Spell: ${r.spellEl} ×${r.depth} (${r.pile.map(c => displayName(c)).join(' + ')}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (Init ${eff(elem).init})` : '—'}` +
       ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
 
@@ -1061,10 +1087,11 @@ function resolve() {
   if (S.foe) { resolveFightBeat(); return; }   // multi-beat creature fight
   if (!rolesValid()) return;
   const e = S.encounter;
-  const spell = cardById(S.assign.Spell);
+  const pile = pileCards();
+  const spell = pile[0];
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
+  S.actionSetIds = [...pile, elem, boostC].filter(Boolean).map(c => c.id);
   if (S.fuse) {
     const top = cardById(S.fuse.topId), bottom = cardById(S.fuse.bottomId);
     S.actionSetIds.push(S.fuse.bottomId); // the fused bottom is spent with the Action Set
@@ -1076,7 +1103,7 @@ function resolve() {
 
   const r = computeAction(reserve);
 
-  log(`The weave — Spell: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
+  log(`The weave — Spell: ${r.spellEl} ×${r.depth} (${r.pile.map(x => displayName(x)).join(' + ')}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
       ` · Surge: ${boostC ? `${boostC.def.name} (+${boostVal} → ${S.boostTarget})` : '—'}` +
       ` · Arsenal: ${reserve ? reserve.def.name : '—'}`);
@@ -1811,9 +1838,9 @@ function renderControls() {
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
-      ` <b>Attune:</b> put a card of the <b>same element</b> as your Spell in the Catalyst — your Spell then uses its bigger ✨ value. Feed the Surge that element too and it <b>resonates</b>.` +
+      ` <b>The Spell is a pile:</b> pour in as many cards as you like, but they must all share an <b>element</b>, and every card you pour in is a slot left empty. Deep = a huge hit and no defence; wide = safe and small.` +
       ` A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
-      ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Arsenal.` +
+      ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap any other card — the first is buried under the second, which keeps its own element and gains the buried card's value. That is how an off-element card gets into your pile.` +
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
@@ -1929,10 +1956,10 @@ function renderControls() {
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
-    case 'Spell': return isFight ? 'your Attack' : 'your Move';
+    case 'Spell': return 'pour in — one element, deeper is stronger';
     // under 'surge' the Catalyst is pure speed and the Surge carries the only element check
-    case 'Element': return 'Initiative · same element to Attune';
-    case 'Boost': return '+power · match to amplify';
+    case 'Element': return 'Initiative — strike first';
+    case 'Boost': return '+power to the spell';
     // mid-fight the Arsenal is the ONLY card that survives the exchange — say so, because
     // that is now the most consequential choice on the row.
     case 'Reserve': return S.fuse ? 'consumed by the Fuse'
@@ -1946,14 +1973,19 @@ function renderSlots() {
   const panel = $('slots-panel');
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') { panel.innerHTML = ''; return; }
   const dnd = isAssignPhase();
+  const pile = pileCards();
+  const total = pile.reduce((t, c) => t + cardValue(c), 0);
   panel.innerHTML = ZONES.map(zone => {
-    const card = cardById(S.assign[zone]);
-    return `<div class="slot slot-${zone} ${card ? 'filled' : ''}"` +
+    const isPile = zone === 'Spell';
+    const cards = isPile ? pile : [cardById(S.assign[zone])].filter(Boolean);
+    const head = `<div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}` +
+      (isPile && pile.length > 1 ? ` <span class="pile-depth">×${pile.length} = ${total}</span>` : '') +
+      `</span><span class="slot-hint">${zoneHint(zone)}</span></div>`;
+    return `<div class="slot slot-${zone} ${cards.length ? 'filled' : ''} ${isPile && pile.length > 1 ? 'deep' : ''}"` +
       (dnd ? ` ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event, '${zone}')" onclick="tapZone('${zone}')"` : '') +
-      `><div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}</span>` +
-      `<span class="slot-hint">${zoneHint(zone)}</span></div>` +
-      (card ? cardHTML(card)
-            : `<div class="slot-empty">${zone === 'Reserve' && S.fuse ? 'no Arsenal — fused' : '—'}</div>`) +
+      `>` + head +
+      (cards.length ? `<div class="pile">${cards.map(cardHTML).join('')}</div>`
+                    : `<div class="slot-empty">— empty —</div>`) +
       `</div>`;
   }).join('');
 }
@@ -1971,7 +2003,7 @@ const SIGIL = {
 const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Stone: '#cdbe98' };
 
 // role buttons shown on a tapped card — the easy path: tap card → tap a role (no hunting for zones)
-const ROLE_BTNS = [['Spell', 'Spell'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
+const ROLE_BTNS = [['Spell', 'Pour in'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
 function roleButtons(card) {
   const cur = zoneOf(card.id);
   const btns = ROLE_BTNS.map(([role, label]) => {
@@ -1999,15 +2031,13 @@ function cardHTML(card) {
   const shownEl = isFusedTop ? S.fuse.element : d.element;
 
   // the Attuned line shows what the card becomes when its element is matched
-  const seekEl = enhElOf(card);
-  let enhLine = d.wild ? '🌈 Wild — any element as Catalyst' : '✨ —';
-  if (seekEl) {
-    const parts = [];
-    if (v.attuned != null) parts.push(`<span class="v-attuned">✨ ${v.attuned}</span>`);
-    // The sought element IS the card's own element now, so naming it again is pure noise:
-    // the line drops to the payoff alone and the card carries ONE element symbol.
-    enhLine = parts.length ? `matched → ${parts.join('')}` : '✨ —';
-  }
+  // No attuned line any more - a card has one value, and pouring it into the pile is what
+  // makes it big. If something is buried under it by a Fuse, its value is shown combined.
+  const buriedCard = (S.fuse && S.fuse.topId === card.id) ? cardById(S.fuse.bottomId) : null;
+  const contributes = cardValue(card);
+  const enhLine = buriedCard
+    ? `⧉ ${displayName(buriedCard)} buried — +${eff(buriedCard).value}`
+    : (d.wild ? '🌈 Wild' : '');
   const forged = '';
 
   let action = '';
@@ -2015,9 +2045,7 @@ function cardHTML(card) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
   } else if (isFusedTop) {
     const bottom = cardById(S.fuse.bottomId);
-    action = `<div class="fuse-panel">FUSED — ${bottom.def.name} behind. Element: ` +
-      ['Fire', 'Water', 'Lightning', 'Stone'].map(el =>
-        `<span class="el el-${el} pick ${S.fuse.element === el ? 'chosen' : ''}" onclick="event.stopPropagation(); setFuseElement('${el}')">${el}</span>`).join(' ') +
+    action = `<div class="fuse-panel">⧉ ${displayName(bottom)} buried — +${eff(bottom).value} value` +
       ` <button onclick="event.stopPropagation(); unfuse()">Unfuse</button></div>`;
   } else if (isAssignPhase() && S.selectedId === card.id) {
     action = S.fuseArm ? fuseArmHint(card) : roleButtons(card);
@@ -2063,17 +2091,12 @@ function cardHTML(card) {
   // numbers never leave (legible math), they just stop shouting all at once.
   // ONE value: the encounter decides whether it reads as damage or as progress.
   const valIcon = (S.encounter && S.encounter.type === 'journey') ? '👣' : '⚔️';
-  const vals = `<div class="card-val v-one">${valIcon} ${v.value}</div>`;
+  const vals = `<div class="card-val v-one${contributes > v.value ? ' fused-up' : ''}">${valIcon} ${contributes}</div>`;
 
   const slot = zoneOf(card.id);
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = slot ? `in-${slot}` : '';
-  // RESONANCE readout rides ON the boost value — the old picker had its own row, which made
-  // the Surge slot taller than its neighbours. No extra row now, so all four stay level.
-  const spellCard = cardById(S.assign.Spell);
-  const wantEl = spellCard ? enhElOf(spellCard) : null;
-  const wouldResonate = wantEl && (card.def.wild || elOf(card) === wantEl);
-  const resoOn = slot === 'Boost' && wantEl && wouldResonate;
+  const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
@@ -2226,10 +2249,11 @@ function startDuelBeat() {
 
 function resolveDuel() {
   if (!rolesValid()) return;
-  const spell = cardById(S.assign.Spell);
+  const pile = pileCards();
+  const spell = pile[0];
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
+  S.actionSetIds = [...pile, elem, boostC].filter(Boolean).map(c => c.id);
   if (S.fuse) {
     const top = cardById(S.fuse.topId), bottom = cardById(S.fuse.bottomId);
     S.actionSetIds.push(S.fuse.bottomId);
@@ -2261,7 +2285,7 @@ function resolveDuel() {
   const damage = early + counter;
   S.duelResult = { atk, toHp, kill, early, counter, damage };
 
-  log(`The weave — Spell: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
+  log(`The weave — Spell: ${r.spellEl} ×${r.depth} (${r.pile.map(x => displayName(x)).join(' + ')}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
       ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
 

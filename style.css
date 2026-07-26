@@ -430,6 +430,16 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .card.in-Spell .card-enh { opacity: 1; }
 .card.in-Reserve .card-vals, .card.in-Reserve .card-enh { opacity: .5; }
 
+/* THE PILE (2026-07-26): the Spell slot holds one card or several. Cards inside it sit in a
+   row and shrink as the pile deepens, so a deep commitment READS as a commitment at a glance. */
+.slot .pile { display: flex; gap: 4px; align-items: stretch; }
+.slot .pile > .card { flex: 1 1 0; min-width: 0; }
+.slot-Spell.deep { outline: 1px solid rgba(201,180,88,.35); outline-offset: 2px; }
+.pile-depth { color: #dcc86a; font-weight: bold; font-variant-numeric: tabular-nums; }
+.slot-empty { opacity: .35; font-size: 12px; text-align: center; padding: 14px 0; }
+/* a card carrying a buried card shows its combined value lit */
+.card-val.fused-up { color: #f3e6c4; text-shadow: 0 0 10px rgba(201,180,88,.6); }
+
 /* 🔑 ELEMENT DISCLOSURE BY POSITION (2026-07-26 — "all these element symbols going everywhere").
    A card carries TWO OPPOSITE element facts: what it IS (its fuel, read when it's the Catalyst
    or the Surge) and what it SEEKS (the match you must supply, read when it's the Spell). Both
