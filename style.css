@@ -415,23 +415,21 @@ label.radio { margin-right: 14px; cursor: pointer; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
-/* PC / wide: the whole game fits the window like a real game screen — the fixed parts
-   (enemy bar, card row, controls) keep their size and THE SCENE ABSORBS THE SLACK, so a
-   taller monitor simply gets more art instead of more scrollbar. */
+/* ============================================================
+   IMMERSIVE STAGE (layout Concept 1 as mocked up): the scene is FULL-BLEED behind
+   everything and the UI floats on top of it — enemy vitals top-right, the cards held
+   along the bottom, controls above them on the right. Because the scene and the UI
+   share the same space instead of stacking, small screens gain the most.
+   ============================================================ */
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }
-  #left-col { display: flex; flex-direction: column; min-height: 0; }
-  #scene { flex: 1 1 auto; height: auto; min-height: 96px; }
-  #hud, #slots-panel { flex: none; }
-  #controls-panel { flex: none; max-height: 36vh; overflow-y: auto; }
   #right-col { display: flex; flex-direction: column; min-height: 0; }
   #log { flex: 1 1 auto; max-height: none; }
 }
-/* short landscape (phone held sideways — the forced orientation): keep the scene modest
-   so the card row and Resolve still fit without a fight */
+
+/* short landscape (phone held sideways) — smaller scene caption */
 @media (max-height: 500px) and (orientation: landscape) {
-  #scene { height: 30vh; min-height: 96px; }
   .scene-name { font-size: 10px; top: 6px; left: 9px; }
 }
 
@@ -485,4 +483,113 @@ label.radio { margin-right: 14px; cursor: pointer; }
   .enc-hint { display: none; }            /* the tip line — noise once you know the rules */
   .enc-mod { margin-top: 5px; padding: 3px 7px; font-size: 12px; }  /* keep Hardship/Ability — tactical */
   .dragon-shields { font-size: 11px; }
+}
+
+/* ============================================================
+   IMMERSIVE STAGE — layout Concept 1 as mocked up. The scene is FULL-BLEED behind
+   everything and the UI floats on it: enemy vitals top-right, cards held along the
+   bottom, controls above them on the right. Scene and UI share space instead of
+   stacking, so this actually gives small screens MORE art, not less.
+   MUST STAY LAST IN THE FILE — it overrides the stacked/sticky rules above.
+   ============================================================ */
+@media (min-width: 700px) and (orientation: landscape) {
+  #left-col {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 0;
+    isolation: isolate;
+  }
+  #scene {
+    /* span every row, or an abspos grid child gets confined to one grid area */
+    grid-area: 1 / 1 / -1 / -1;
+    position: absolute; inset: 0; z-index: 0;
+    height: auto; min-height: 0; margin: 0;
+    border-radius: 12px;
+  }
+  #left-col > section, #left-col > #hud { position: relative; z-index: 2; }
+
+  /* enemy vitals — floating top-right on the art */
+  #hud {
+    grid-row: 1; justify-self: end;
+    position: static; width: min(38%, 440px); margin: 10px 10px 0 0;
+    max-height: none; overflow: visible; box-shadow: none; background: none; padding: 0;
+  }
+  #hud section { margin-bottom: 0; }
+  #encounter-panel {
+    background: rgba(10, 8, 6, .74);
+    border-color: rgba(201, 162, 74, .34);
+    backdrop-filter: blur(5px);
+    padding: 8px 11px;
+  }
+  #encounter-panel .enc-hint { display: none; }
+  .enc-name { font-size: 16px; margin: 1px 0 5px; }
+  .enc-stats { gap: 6px; }
+  .enc-stats span { padding: 2px 7px; font-size: 12px; background: rgba(0,0,0,.45); }
+
+  /* controls — bottom-right, just above the cards */
+  #controls-panel {
+    grid-row: 2; align-self: end; justify-self: end;
+    width: min(40%, 460px); margin: 0 10px 8px 0;
+    background: rgba(10, 8, 6, .74);
+    border-color: rgba(201, 162, 74, .3);
+    backdrop-filter: blur(5px);
+    max-height: 44vh; overflow-y: auto;
+  }
+
+  /* the hand, held along the bottom — offset right so the mage stays visible */
+  #slots-panel {
+    grid-row: 3;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 8px 8px 16%;
+    gap: 8px;
+    align-items: end;
+  }
+  .slot { transition: transform .16s ease; }
+  #slots-panel .slot:nth-child(1) { transform: rotate(-2.5deg) translateY(5px); }
+  #slots-panel .slot:nth-child(2) { transform: rotate(-.8deg); }
+  #slots-panel .slot:nth-child(3) { transform: rotate(.8deg); }
+  #slots-panel .slot:nth-child(4) { transform: rotate(2.5deg) translateY(5px); }
+  #slots-panel .slot:hover { transform: translateY(-6px) rotate(0deg); z-index: 3; }
+  .slot-head {
+    background: rgba(10, 8, 6, .6); backdrop-filter: blur(3px);
+    border-radius: 6px 6px 0 0; padding: 3px 7px 4px; border-bottom: 2px solid;
+  }
+  .slot .card { box-shadow: 0 10px 22px -8px rgba(0,0,0,.9); }
+}
+
+/* landscape phone: same stage, log flows below the fold instead of a side column */
+@media (min-width: 700px) and (max-width: 900px) and (orientation: landscape) {
+  #left-col { height: calc(100vh - 74px); }
+  #hud { width: 46%; margin: 6px 6px 0 0; }
+  #controls-panel { width: 46%; margin: 0 6px 6px 0; }
+  #slots-panel { margin: 0 6px 6px 13%; gap: 6px; }
+  .slot-hint { display: none; }   /* tight row — the label alone carries it */
+}
+
+/* SHORT landscape (a phone on its side is only ~375px tall): everything must shrink or the
+   stage overflows and the scene gets pushed out. Compact cards + chrome to buy that back. */
+@media (max-height: 520px) and (orientation: landscape) and (min-width: 700px) {
+  .card { padding: 5px 7px; }
+  .card-name { font-size: 12px; }
+  .card-level { font-size: 11px; }
+  .card-row { margin-top: 3px; font-size: 11.5px; }
+  .card-vals { margin: 4px 0 1px; }
+  .card-val { font-size: 15px; line-height: 1.12; }
+  .card-foot { font-size: 10px; padding-top: 3px; margin-top: 4px; gap: 1px 7px; }
+  .card-sigil { font-size: 52px; bottom: -10px; }
+  .el { font-size: 10px; padding: 0 5px; }
+  .slot-head { padding: 2px 6px 3px; }
+  .slot-name { font-size: 9.5px; letter-spacing: 1.4px; }
+  #controls-panel { padding: 6px 9px; max-height: 38vh; }
+  #controls-panel .howto { display: none; }   /* reachable on desktop; pure cost here */
+  #controls-panel .hint { font-size: 11.5px; margin-bottom: 5px; }
+  #controls-panel button { min-height: 34px; font-size: 12.5px; padding: 5px 10px; }
+  .phase-label { font-size: 10px; margin-bottom: 2px; }
+  #encounter-panel { padding: 5px 8px; }
+  .enc-name { font-size: 13.5px; margin: 0 0 3px; }
+  .enc-type { font-size: 9px; }
+  .enc-stats span { font-size: 11px; padding: 1px 5px; }
+  .dragon-hp { height: 20px; }
+  .dragon-hp-label { line-height: 20px; font-size: 11.5px; }
 }
