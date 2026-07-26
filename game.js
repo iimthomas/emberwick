@@ -224,20 +224,6 @@ const CHARMS = [
 const charmById = id => CHARMS.find(c => c.id === id);
 
 // ============================================================
-// EVOLUTION (2026-07-26) — the marquee system. A card BRANCHES into a new form with a
-// NEW VERB, never a bigger number (the locked bar in 02_Progression/Evolution_System.md).
-// Offered as the rare result on the Wheel, so it lands as a jackpot rather than a menu tick.
-// Each branch sets a flag on the card instance; the engine reads the flags, so adding an
-// evolution is data + one hook, not a system.
-//   pierce    — an Attuned strike ignores enemy armour entirely
-//   bulwark   — this card soaks double
-//   everwild  — counts as WILD in the Catalyst slot (attunes anything)
-//   everecho  — always resonates as the Surge, whatever the element
-//   swift     — as the Catalyst, +3 Initiative
-//   surefooted— never plays at wrong-type 1; falls back to its other value instead
-// The tension is the one already specced: one branch counters the known dragon, the other
-// dominates the run that gets you there.
-// ============================================================
 // EVOLUTION CUT 2026-07-26 - it solved a symptom (flat/duplicate cards are a DATA problem),
 // every verb was an exception fighting the legibility pillar, and at ~10% a spin it was too
 // rare to be felt. Replaced by levelling-as-sharpening (02_Progression/).
@@ -1796,12 +1782,10 @@ function renderControls() {
   }
   if (S.phase === 'assign') {
     const isFight = S.encounter.type === 'fight';
-    // escape-hatch hint: when no card has the native value this encounter needs, make
-    // clear you're not stuck — any card can be the Spell (acts at 1), or Divert.
-    const needKey = isFight ? 'atk' : 'move';
-    const hasNative = S.hand.some(c => eff(c)[needKey] != null);
-    const stuckHint = hasNative ? '' :
-      `<div class="hint warn">⚠️ No card has ${isFight ? 'an Attack' : 'a Move'} value this turn — but you're not stuck. Place <b>any</b> card in the Spell (it acts at value <b>1</b>), or <b>Divert</b> for a new encounter. A rough turn costs a little; it can't trap you.</div>`;
+    // The "no card has an Attack/Move value" escape-hatch warning is GONE with the Attack/Move
+    // split (redesign step 2) — every card always has its one value, so a hand can never be
+    // wrong-typed and there is nothing to warn about. (It was also silently firing every turn:
+    // it probed eff(c).atk, which no longer exists, so the check read false for every card.)
     // the Surge target now lives ON the Surge card (see boostPicker in cardHTML) — no radio row
     let boostRow = '';
     if (S.encounter.ability === 'Ranged') {
@@ -1826,12 +1810,13 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
-      `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (ignites it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>. A creature takes several <b>beats</b> — between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
+      `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
+      ` <b>Attune:</b> put a card of the <b>same element</b> as your Spell in the Catalyst — your Spell then uses its bigger ✨ value. Feed the Surge that element too and it <b>resonates</b>.` +
+      ` A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
       ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Arsenal.` +
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
-      stuckHint +
       boostRow +
       resolveBtn +
       divertBtn +
