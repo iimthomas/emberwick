@@ -496,18 +496,23 @@ label.radio { margin-right: 14px; cursor: pointer; }
   #left-col {
     position: relative;
     display: grid;
+    /* the explicit column is REQUIRED: without it, `-1` in #scene's grid-area resolves
+       back to line 1 and the scene collapses to a zero-width sliver */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr auto;
     min-height: 0;
     isolation: isolate;
   }
   #scene {
-    /* span every row, or an abspos grid child gets confined to one grid area */
+    /* span every row/column, or an abspos grid child is confined to one grid area */
     grid-area: 1 / 1 / -1 / -1;
     position: absolute; inset: 0; z-index: 0;
     height: auto; min-height: 0; margin: 0;
     border-radius: 12px;
   }
-  #left-col > section, #left-col > #hud { position: relative; z-index: 2; }
+  /* lift the UI above the scene. Target these by ID only — a `#left-col > section`
+     selector outranks `#scene` and would knock the scene out of position:absolute. */
+  #hud, #slots-panel, #controls-panel { position: relative; z-index: 2; }
 
   /* enemy vitals — floating top-right on the art */
   #hud {
