@@ -169,7 +169,7 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .card.card-el-Fire      { background: linear-gradient(160deg, #33201a, #241a18); border-color: #7a4432; }
 .card.card-el-Water     { background: linear-gradient(160deg, #182735, #161d26); border-color: #33587a; }
 .card.card-el-Lightning { background: linear-gradient(160deg, #302b16, #221f16); border-color: #7a6b32; }
-.card.card-el-Shadow    { background: linear-gradient(160deg, #281d33, #1d1824); border-color: #5c4180; }
+.card.card-el-Stone    { background: linear-gradient(160deg, #2b2820, #1e1c17); border-color: #6b6350; }
 .card.card-el-wild      { background: linear-gradient(160deg, #2a2233 20%, #1a2430 80%); border-color: #7a6b9a; }
 .card.card-el-none      { background: #262b34; }
 .card-action { margin-top: 6px; }
@@ -180,7 +180,7 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .el-Fire { background: #7a2e1c; color: #ffb59e; }
 .el-Water { background: #1c4a7a; color: #9ecfff; }
 .el-Lightning { background: #7a6a1c; color: #fff29e; }
-.el-Shadow { background: #4a1c7a; color: #d09eff; }
+.el-Stone { background: #4a4438; color: #d8c9a8; }
 .el-none { background: #3a3a3a; color: #bbb; }
 
 /* ---------- log ---------- */

@@ -38,8 +38,8 @@ function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 // type = what the base Value is (attack/move/hybrid). enhEl = the element the Attuned form SEEKS
 // (often NOT the card's own element). enhType may DIFFER from type — a Move card can Attune into an Attack.
 const CARD_DEFS = [
-  { name: 'Flicker',       element: 'Lightning', type: 'hybrid', enhType: 'hybrid', enhEl: 'Shadow',
-    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Shadow',null]] },
+  { name: 'Flicker',       element: 'Lightning', type: 'hybrid', enhType: 'hybrid', enhEl: 'Stone',
+    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Stone',null]] },
   { name: 'Sparkstrike',   element: 'Lightning', type: 'attack', enhType: 'attack', enhEl: 'Fire',
     lv: [[3,6,2,1,2,null,1],[5,8,3,1,2,null,3],[6,11,3,2,3,null,4],[7,14,4,3,5,null,null]] },
   { name: 'Stormstep',     element: 'Lightning', type: 'move',   enhType: 'move',   enhEl: 'Lightning',
@@ -50,17 +50,17 @@ const CARD_DEFS = [
     lv: [[2,6,1,1,1,null,2],[3,8,1,2,1,null,4],[5,10,2,2,2,'Fire',5],[6,13,3,3,3,'Fire',null]] },
   { name: 'Rimeguard',     element: 'Water',     type: 'attack', enhType: 'attack', enhEl: 'Water',
     lv: [[2,3,4,1,3,null,1],[3,5,5,2,4,'Water',3],[4,7,6,4,4,'Water',4],[6,10,7,5,6,'Water',null]] },
-  { name: 'Headlong',      element: 'Water',     type: 'move',   enhType: 'attack', enhEl: 'Shadow',
-    lv: [[2,4,1,2,1,null,1],[3,5,1,3,2,null,3],[5,9,2,4,2,'Shadow',4],[6,11,3,5,3,'Shadow',null]] },
+  { name: 'Headlong',      element: 'Water',     type: 'move',   enhType: 'attack', enhEl: 'Stone',
+    lv: [[2,4,1,2,1,null,1],[3,5,1,3,2,null,3],[5,9,2,4,2,'Stone',4],[6,11,3,5,3,'Stone',null]] },
   { name: 'Stormglass',    element: 'Water',     type: 'attack', enhType: 'attack', enhEl: 'Lightning',
     lv: [[2,4,4,2,1,null,2],[3,6,6,2,2,null,3],[4,7,8,3,3,null,4],[6,10,10,4,4,null,null]] },
-  { name: 'Nightmarch',    element: 'Shadow',    type: 'attack', enhType: 'move',   enhEl: 'Shadow',
-    lv: [[3,5,2,2,2,null,2],[4,7,3,3,3,null,3],[5,9,4,5,3,null,5],[5,12,5,6,4,'Shadow',null]] },
-  { name: 'Shadewake',     element: 'Shadow',    type: 'move',   enhType: 'move',   enhEl: 'Water',
+  { name: 'Stonemarch',    element: 'Stone',    type: 'attack', enhType: 'move',   enhEl: 'Stone',
+    lv: [[3,5,2,2,2,null,2],[4,7,3,3,3,null,3],[5,9,4,5,3,null,5],[5,12,5,6,4,'Stone',null]] },
+  { name: 'Shalewake',     element: 'Stone',    type: 'move',   enhType: 'move',   enhEl: 'Water',
     lv: [[2,4,5,1,2,null,2],[3,6,6,2,2,null,4],[5,9,8,3,5,null,5],[8,12,9,5,5,'Water',null]] },
-  { name: 'Duskdart',      element: 'Shadow',    type: 'move',   enhType: 'move',   enhEl: 'Lightning',
+  { name: 'Flintdart',      element: 'Stone',    type: 'move',   enhType: 'move',   enhEl: 'Lightning',
     lv: [[3,5,5,1,2,null,2],[5,6,5,2,3,null,4],[6,11,6,4,3,'Lightning',6],[8,14,7,5,4,'Lightning',null]] },
-  { name: 'Ashfall',       element: 'Shadow',    type: 'attack', enhType: 'attack', enhEl: 'Fire',
+  { name: 'Rockfall',       element: 'Stone',    type: 'attack', enhType: 'attack', enhEl: 'Fire',
     lv: [[3,6,2,1,2,null,1],[5,8,3,1,2,null,3],[6,11,3,2,3,null,4],[7,14,4,3,5,null,null]] },
   { name: 'Trailblaze',    element: 'Fire',      type: 'move',   enhType: 'move',   enhEl: 'Fire',
     lv: [[2,4,1,1,1,null,2],[3,5,1,2,1,null,4],[4,7,2,2,2,'Fire',5],[5,9,3,3,3,'Fire',null]] },
@@ -68,8 +68,8 @@ const CARD_DEFS = [
     lv: [[2,3,4,1,3,null,1],[3,5,5,2,4,'Water',3],[4,7,6,4,4,'Water',4],[6,10,7,5,6,'Water',null]] },
   { name: 'Updraft',       element: 'Fire',      type: 'move',   enhType: 'move',   enhEl: 'Lightning',
     lv: [[2,4,4,1,2,null,1],[4,8,5,2,2,'Lightning',3],[5,10,7,3,3,'Lightning',4],[6,12,9,5,5,'Lightning',null]] },
-  { name: 'Smoulder',      element: 'Fire',      type: 'hybrid', enhType: 'hybrid', enhEl: 'Shadow',
-    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Shadow',null]] },
+  { name: 'Smoulder',      element: 'Fire',      type: 'hybrid', enhType: 'hybrid', enhEl: 'Stone',
+    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Stone',null]] },
   // OURS — colorless wildcard; matches ANY enhEl when played as the Catalyst (stats synthesized in-grammar)
   { name: 'Wander Light',     element: null, wild: true, type: 'hybrid', enhType: null, enhEl: null,
     lv: [[2,null,2,3,1,null,2],[3,null,3,4,2,null,3],[4,null,4,5,2,null,4],[5,null,5,6,3,null,null]] },
@@ -106,39 +106,39 @@ const REGIONS = [
     { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 8, atk: 1, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],      xp: 7 },
     { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     armor: [{ el: 'Water', v: 2 }],     xp: 5 },
-    { type: 'fight',   name: 'Gloamstag',  hp: 13, init: 2, atk: 3, atkEl: 'Shadow',    armor: [{ el: 'Shadow', v: 3 }],    xp: 8 },
+    { type: 'fight',   name: 'Gloamstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 8 },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 3 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 4 },
-    { type: 'journey', name: 'Dusk Hollow',    mp: 10, timePenalty: 1, element: 'Shadow',    nightfall: 3, xp: 3 },
+    { type: 'journey', name: 'Dusk Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
-    { type: 'fight',   name: 'Marsh Wisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Shadow',    armor: [{ el: 'Shadow', v: 1 }],    xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Marsh Wisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
     { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    armor: [{ el: 'Water', v: 2 }],     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 7 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5 },
-    { type: 'journey', name: 'Peatlight Track', mp: 9,  timePenalty: 2, element: 'Shadow',    nightfall: 4, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Peatlight Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
   ]},
   { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
-    { type: 'fight',   name: 'Gloom Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Shadow',    armor: [{ el: 'Shadow', v: 3 }],    xp: 9 },
+    { type: 'fight',   name: 'Gloom Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
     { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 7, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 2 }],      xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 6 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
-    { type: 'journey', name: 'Gloaming Cut',    mp: 11, timePenalty: 2, element: 'Shadow',    nightfall: 6, xp: 5 },
+    { type: 'journey', name: 'Gloaming Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
   ]},
   { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
-    { type: 'fight',   name: 'Gloomtide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Shadow',    armor: [{ el: 'Shadow', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Gloomtide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 10, atk: 3, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],                             xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 8,  atk: 4, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }, { el: 'Fire', v: 2 }],  xp: 8, ability: 'Freeze' },
-    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }, { el: 'Shadow', v: 2 }],    xp: 9 },
+    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }, { el: 'Stone', v: 2 }],    xp: 9 },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 7, peril: 'Treacherous' },
-    { type: 'journey', name: 'Nightwood Road', mp: 13, timePenalty: 3, element: 'Shadow',    nightfall: 6, xp: 6 },
+    { type: 'journey', name: 'Nightwood Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 6 },
     { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5 },
     { type: 'journey', name: 'Tempest Ridge',  mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Steep' },
   ]},
@@ -163,13 +163,13 @@ const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith
 const DRAGONS = [
   { name: 'Cindermaw',  element: 'Fire',      init: 9,  breath: 8, hp: 44, armor: [{ el: 'Fire', v: 4 }] },
   { name: 'Skyrender',  element: 'Lightning', init: 13, breath: 7, hp: 40, armor: [{ el: 'Lightning', v: 4 }, { el: 'Fire', v: 1 }] },
-  { name: 'Fathomdread', element: 'Water',    init: 10, breath: 6, hp: 44, armor: [{ el: 'Water', v: 5 }, { el: 'Lightning', v: 3 }, { el: 'Shadow', v: 2 }] },
-  { name: 'Nightmourn', element: 'Shadow',    init: 12, breath: 7, hp: 42, armor: [{ el: 'Shadow', v: 4 }, { el: 'Water', v: 3 }] },
+  { name: 'Fathomdread', element: 'Water',    init: 10, breath: 6, hp: 44, armor: [{ el: 'Water', v: 5 }, { el: 'Lightning', v: 3 }, { el: 'Stone', v: 2 }] },
+  { name: 'Cragmourn', element: 'Stone',    init: 12, breath: 7, hp: 42, armor: [{ el: 'Stone', v: 4 }, { el: 'Water', v: 3 }] },
 ];
 // THE APPROACH — two ordinary journey-beats racing to the lair (element = the dragon's
 // weakness, so you can Attune toward the crack). Complete both → shatter its weakest shield.
 const APPROACH = { mp: 13, timePenalty: 2, nightfall: 6 };
-const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Shadow'];
+const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 const dragonWeakness = d => ELEMENTS.filter(el => !d.armor.some(a => a.el === el));
 const armorText = list => list.map(a => `${a.v} ${elIcon(a.el)}`).join(' · ');
 
@@ -188,7 +188,7 @@ const CHARMS = [
   { id: 'stormpin',    name: 'Storm Pin',        rarity: 'common', cost: 6,
     text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
   { id: 'nightveil',   name: 'Nightveil',        rarity: 'common', cost: 6,
-    text: '🌑 Shadow cards strike +1',               mods: { atk: 1, el: 'Shadow' } },
+    text: '🌑 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
   { id: 'swiftwick',   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
     text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
   { id: 'lanternpace', name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
@@ -250,7 +250,7 @@ function saveGame() {
       return o;
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 2, uid, dragon: S.dragon ? S.dragon.name : null,
+      v: 3, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn,
       deck: S.deck.map(card), hand: S.hand.map(card),
       discard: S.discard.map(card), trashed: S.trashed.map(card),
@@ -277,7 +277,7 @@ function loadGame() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     const d = JSON.parse(raw);
-    if (d.v !== 2) return false;
+    if (d.v !== 3) return false;
     const mk = s => {
       const def = CARD_DEFS[s.n];
       if (!def) return null;
@@ -443,8 +443,24 @@ function eff(card) {
 
 function cardById(id) { return S.hand.find(c => c.id === id) || null; }
 
+// ============================================================
+// THE ELEMENTAL CYCLE (2026-07-26, testing behind CYCLE_MODE)
+// Each element is empowered by the one before it, so what a card SEEKS is DERIVED from
+// a single rule instead of being an arbitrary per-card fact you can only look up:
+//     Lightning kindles Fire · Fire forges Stone · Stone springs Water · Water carries Lightning
+// (Stone currently still wears its old name "Stone" — the rename is a separate flavour pass.)
+// Difficulty moves from "what does this card even want?" (memory) to "do I hold it?" (decision).
+// ============================================================
+var CYCLE_MODE = true;
+const EMPOWERS = { Lightning: 'Fire', Fire: 'Stone', Stone: 'Water', Water: 'Lightning' };
+const SEEKS = { Fire: 'Lightning', Stone: 'Fire', Water: 'Stone', Lightning: 'Water' };
+
 // what a card SEEKS to Attune — its own enhEl unless an Event rewired it
-function enhElOf(card) { return card.enhElOverride || card.def.enhEl; }
+function enhElOf(card) {
+  if (card.enhElOverride) return card.enhElOverride;
+  if (CYCLE_MODE && card.def.element) return SEEKS[card.def.element];
+  return card.def.enhEl;
+}
 
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
 function activeZones() { return ZONES; }
@@ -1489,7 +1505,7 @@ function eventContinue() { S.event = null; finishRegionCheck(); }
 const $ = id => document.getElementById(id);
 
 // iconography (2026-07-01): ⚔️ Attack · 👣 Move · 💨 Initiative · ➕ Boost · 🛡️ Armor · ✨ Enhanced · ⭐ XP · ❤️ HP · ⏳ Time Penalty
-const EL_ICON = { Fire: '🔥', Water: '💧', Lightning: '⚡', Shadow: '🌑' };
+const EL_ICON = { Fire: '🔥', Water: '💧', Lightning: '⚡', Stone: '🪨' };
 const elIcon = el => EL_ICON[el] || '';
 
 function elChip(el) {
@@ -1764,7 +1780,7 @@ function renderControls() {
     } else if (ev.step === 'pickElement') {
       const card = cardById(ev.targetId);
       body = `<div class="hint">${card.def.name} — choose the element it should seek to Attune:</div>` +
-        `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Shadow'].map(el => `<button onclick="eventPickElement('${el}')">${elIcon(el)} ${el}</button>`).join('') + `</div>` +
+        `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Stone'].map(el => `<button onclick="eventPickElement('${el}')">${elIcon(el)} ${el}</button>`).join('') + `</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
       body = `<div class="event-flavor">${def.flavor}</div>` +
@@ -1845,11 +1861,11 @@ function renderSlots() {
 const SIGIL = {
   'Flicker': '✦', 'Sparkstrike': '✷', 'Stormstep': '✥', 'Streamdart': '➶',
   'Unmaking': '⊘', 'Rimeguard': '❈', 'Headlong': '➤', 'Stormglass': '◈',
-  'Nightmarch': '⬗', 'Shadewake': '∿', 'Duskdart': '➹', 'Ashfall': '⁂',
+  'Stonemarch': '⬗', 'Shalewake': '∿', 'Flintdart': '➹', 'Rockfall': '⁂',
   'Trailblaze': '➷', 'Hearthwall': '⌂', 'Updraft': '⇡', 'Smoulder': '✱',
   'Wander Light': '✺',
 };
-const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Shadow: '#d09eff' };
+const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Stone: '#cdbe98' };
 
 // role buttons shown on a tapped card — the easy path: tap card → tap a role (no hunting for zones)
 const ROLE_BTNS = [['Spell', 'Spell'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
@@ -1897,7 +1913,7 @@ function cardHTML(card) {
   } else if (isFusedTop) {
     const bottom = cardById(S.fuse.bottomId);
     action = `<div class="fuse-panel">FUSED — ${bottom.def.name} behind. Element: ` +
-      ['Fire', 'Water', 'Lightning', 'Shadow'].map(el =>
+      ['Fire', 'Water', 'Lightning', 'Stone'].map(el =>
         `<span class="el el-${el} pick ${S.fuse.element === el ? 'chosen' : ''}" onclick="event.stopPropagation(); setFuseElement('${el}')">${el}</span>`).join(' ') +
       ` <button onclick="event.stopPropagation(); unfuse()">Unfuse</button></div>`;
   } else if (isAssignPhase() && S.selectedId === card.id) {
