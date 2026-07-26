@@ -2149,7 +2149,12 @@ function cardHTML(card) {
     const parts = [];
     if (v.enhAtk != null) parts.push(`<span class="v-atk">⚔️ ${v.enhAtk}</span>`);
     if (v.enhMove != null) parts.push(`<span class="v-move">👣 ${v.enhMove}</span>`);
-    enhLine = `${elIcon(seekEl)} when attuned${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
+    // In the Spell slot this line is an ACTIVE REQUIREMENT ("go find me a Lightning Catalyst"),
+    // everywhere else it's just a fact about the card. Phrase it as the instruction where it
+    // is one — that's the exact confusion: "you got your spells, but it needs this other element".
+    enhLine = zoneOf(card.id) === 'Spell'
+      ? `needs ${elIcon(seekEl)}${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`
+      : `${elIcon(seekEl)} attuned${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
   }
   const forged = (card.armorMod || card.atkMod) ? ' ◈' : ''; // reforged marker
 
@@ -2239,7 +2244,7 @@ function cardHTML(card) {
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name${card.evolved ? ' evolved' : ''}">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (card.evolved ? `<div class="evo-verb">✦ ${(EVOLUTIONS[d.name] || []).filter(b => b.id === card.evolved).map(b => b.text)[0] || ''}</div>` : '') +
-    `<div>${elChip(shownEl)}</div>` +
+    `<div class="el-identity">${elChip(shownEl)}</div>` +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
     `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
     `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +

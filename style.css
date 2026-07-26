@@ -430,6 +430,23 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .card.in-Spell .card-enh { opacity: 1; }
 .card.in-Reserve .card-vals, .card.in-Reserve .card-enh { opacity: .5; }
 
+/* 🔑 ELEMENT DISCLOSURE BY POSITION (2026-07-26 — "all these element symbols going everywhere").
+   A card carries TWO OPPOSITE element facts: what it IS (its fuel, read when it's the Catalyst
+   or the Surge) and what it SEEKS (the match you must supply, read when it's the Spell). Both
+   were drawn in the same glyph language, so up to ~16 element icons shared one screen and the
+   eye couldn't tell a requirement from an identity.
+   The slot already decides which fact you need — exactly like the slot row itself, position IS
+   the role. So: the SPELL shows what it SEEKS; every other slot shows what it IS. Nothing is
+   deleted (legible math), and identity is never actually lost because the card's whole tint
+   already encodes its element. */
+.card .el-identity { transition: opacity .18s ease; }
+.card.in-Spell   .el-identity { opacity: .22; }
+.card.in-Element .el-identity, .card.in-Boost .el-identity { opacity: 1; }
+.card.in-Element .el-identity .el, .card.in-Boost .el-identity .el { font-weight: bold; }
+.card.in-Reserve .el-identity { opacity: .55; }
+/* ...and the mirror: the seek-line's icon recedes wherever the seek isn't the question */
+.card.in-Element .card-enh, .card.in-Boost .card-enh { opacity: .28; }
+
 /* the Tinder card carries its own target picker — no separate row of radios */
 .bt-row { display: flex; gap: 4px; margin: 5px 0 1px; }
 /* resonance rides on the boost value itself — no extra row, so every slot stays level */
