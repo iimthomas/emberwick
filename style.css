@@ -400,6 +400,47 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .fuse-arm-tip { flex: 1 1 100%; font-size: 11.5px; color: #cba6e8; margin-bottom: 4px; }
 .card.fuseable { outline: 2px dashed #b58ee0; outline-offset: 1px; }
 
+/* ---------- CONTEXTUAL EMPHASIS: quiet whatever this moment doesn't use ----------
+   ~12 numbers per card × 4 cards is too loud, but half are irrelevant at any instant:
+   Move means nothing in a fight, Attack means nothing on a journey, Armor only matters
+   while soaking, Init only for your Spark, Boost only for your Tinder. Nothing is hidden
+   (legible math stays) — it just stops competing for attention. */
+.card .card-val, .card .s-init, .card .s-boost, .card .s-armor,
+.card .card-enh .v-atk, .card .card-enh .v-move { transition: opacity .18s ease, color .18s ease; }
+
+/* the encounter decides which half of the card is live */
+.card.ctx-fight   .v-move { opacity: .26; }
+.card.ctx-journey .v-atk  { opacity: .26; }
+
+/* armor is a soak-phase decision, so it stays quiet until then */
+.card .s-armor { opacity: .45; }
+body.phase-soak .card .s-armor { opacity: 1; color: #ffcf94; font-weight: bold; }
+body.phase-soak .card .card-val, body.phase-soak .card .s-init,
+body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
+
+/* the slot a card sits in promotes the one stat that slot actually uses */
+.card.in-Element .s-init  { color: #8fc4e8; font-weight: bold; font-size: 16px; }
+.card.in-Boost   .s-boost { color: #dcc86a; font-weight: bold; font-size: 16px; }
+.card.in-Element .s-boost, .card.in-Boost .s-init { opacity: .35; }
+.card.in-Element .card-vals, .card.in-Boost .card-vals { opacity: .38; }
+.card.in-Element .card-enh, .card.in-Boost .card-enh { opacity: .5; }
+.card.in-Spell .card-vals .v-atk, .card.in-Spell .card-vals .v-move { font-size: 21px; }
+.card.in-Spell .card-enh { opacity: 1; }
+.card.in-Reserve .card-vals, .card.in-Reserve .card-enh { opacity: .5; }
+
+/* the Tinder card carries its own target picker — no separate row of radios */
+.bt-row { display: flex; gap: 4px; margin: 5px 0 1px; }
+.bt {
+  flex: 1 1 0; text-align: center; cursor: pointer; user-select: none;
+  font-size: 11px; letter-spacing: .04em; padding: 5px 4px; min-height: 30px;
+  line-height: 20px; border-radius: 6px;
+  border: 1px solid #5a5346; color: #9a927f; background: rgba(0,0,0,.25);
+}
+.bt:hover { color: #d8d3c6; border-color: #7a7360; }
+.bt.on {
+  background: #6d5a1f; border-color: #c9b458; color: #f7e8c9; font-weight: bold;
+}
+
 /* ---------- THE WHEEL: three offers, buy / re-spin / bank ---------- */
 .wheel-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 10px; }
 .wheel-offer {

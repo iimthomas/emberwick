@@ -665,6 +665,7 @@ function assignRole(cardId, role) {
   S.assign[role] = cardId;
   render();
 }
+function setBoostTarget(t) { if (S.phase === 'assign') { S.boostTarget = t; render(); } }
 function armFuse(cardId) { if (isAssignPhase()) { S.selectedId = cardId; S.fuseArm = true; render(); } }
 function cancelFuseArm() { S.fuseArm = false; S.selectedId = null; render(); }
 
@@ -1561,6 +1562,7 @@ function renderScene() {
 function render() {
   normalizeAssign();
   saveGame();
+  document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
   $('turn-indicator').textContent = S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`;
   renderStatus();
   renderScene();
@@ -1674,18 +1676,8 @@ function renderControls() {
     const hasNative = S.hand.some(c => eff(c)[needKey] != null);
     const stuckHint = hasNative ? '' :
       `<div class="hint warn">⚠️ No card has ${isFight ? 'an Attack' : 'a Move'} value this turn — but you're not stuck. Place <b>any</b> card in the Wick (it acts at value <b>1</b>), or <b>Divert</b> for a new encounter. A rough turn costs a little; it can't trap you.</div>`;
+    // the Tinder target now lives ON the Tinder card (see boostPicker in cardHTML) — no radio row
     let boostRow = '';
-    if (isFight) {
-      boostRow = `<div style="margin:6px 0">Tinder goes to: ` +
-        ['Attack', 'Initiative'].map(t =>
-          `<label class="radio"><input type="radio" name="bt" value="${t}" ${S.boostTarget === t ? 'checked' : ''} onchange="S.boostTarget=this.value; render()"> ${t}</label>`).join('') +
-        `</div>`;
-    } else {
-      boostRow = `<div style="margin:6px 0">Tinder goes to: ` +
-        ['Move', 'Pace'].map(t =>
-          `<label class="radio"><input type="radio" name="bt" value="${t}" ${S.boostTarget === t ? 'checked' : ''} onchange="S.boostTarget=this.value; render()"> ${t}</label>`).join('') +
-        `<span class="hint"> (Pace = your Spark's Initiative, racing 🌙 Nightfall)</span></div>`;
-    }
     if (S.encounter.ability === 'Ranged') {
       boostRow += `<div style="margin:6px 0"><label class="radio"><input type="checkbox" ${S.rangedDodge ? 'checked' : ''} ` +
         `onchange="S.rangedDodge=this.checked; render()"> ☠️ Dodge the Ranged attack — your Ember is discarded in Cleanup</label></div>`;
@@ -1893,8 +1885,8 @@ function cardHTML(card) {
   let enhLine = d.wild ? '🌈 Wild — any element as Spark' : '✨ —';
   if (seekEl) {
     const parts = [];
-    if (v.enhAtk != null) parts.push(`⚔️ ${v.enhAtk}`);
-    if (v.enhMove != null) parts.push(`👣 ${v.enhMove}`);
+    if (v.enhAtk != null) parts.push(`<span class="v-atk">⚔️ ${v.enhAtk}</span>`);
+    if (v.enhMove != null) parts.push(`<span class="v-move">👣 ${v.enhMove}</span>`);
     enhLine = `${elIcon(seekEl)} when lit${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
   }
   const forged = (card.armorMod || card.atkMod) ? ' ◈' : ''; // reforged marker
@@ -1931,10 +1923,23 @@ function cardHTML(card) {
     }
   }
 
-  // Attack/Move centerpiece: always two rows, consistent across all cards
+  // Attack/Move centerpiece: always two rows, consistent across all cards.
+  // Each stat is TAGGED so CSS can quiet whatever this encounter/slot doesn't use — the
+  // numbers never leave (legible math), they just stop shouting all at once.
   const vals =
-    `<div class="card-val">⚔️ ${v.atk != null ? v.atk : '<span class="dim">—</span>'}</div>` +
-    `<div class="card-val">👣 ${v.move != null ? v.move : '<span class="dim">—</span>'}</div>`;
+    `<div class="card-val v-atk">⚔️ ${v.atk != null ? v.atk : '<span class="dim">—</span>'}</div>` +
+    `<div class="card-val v-move">👣 ${v.move != null ? v.move : '<span class="dim">—</span>'}</div>`;
+
+  const slot = zoneOf(card.id);
+  const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
+  const slotCls = slot ? `in-${slot}` : '';
+  // the Tinder card carries its OWN target picker — no separate row of radios to hunt for
+  const btOpts = (S.encounter && S.encounter.type === 'journey') ? ['Move', 'Pace'] : ['Attack', 'Initiative'];
+  const boostPicker = (slot === 'Boost' && S.phase === 'assign')
+    ? `<div class="bt-row">${btOpts.map(t =>
+        `<span class="bt ${S.boostTarget === t ? 'on' : ''}" onclick="event.stopPropagation(); setBoostTarget('${t}')">${t}</span>`
+      ).join('')}</div>`
+    : '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
   // sigil watermark + seek-element accent glow (wild gets its own prismatic aura via .card-el-wild)
@@ -1944,17 +1949,18 @@ function cardHTML(card) {
   // while fuse is armed, highlight the valid partners you can tap
   const fuseable = S.fuseArm && S.selectedId != null && S.selectedId !== card.id && canFuse(S.selectedId, card.id);
 
-  return `<div class="card ${tint} ${wasDowngraded ? 'downgraded' : ''} ${dnd ? 'grabbable' : ''} ${isFusedTop ? 'fused' : ''} ${fuseable ? 'fuseable' : ''} ${S.selectedId === card.id ? 'selected' : ''}" style="${sigilStyle}"` +
+  return `<div class="card ${tint} ${ctx} ${slotCls} ${wasDowngraded ? 'downgraded' : ''} ${dnd ? 'grabbable' : ''} ${isFusedTop ? 'fused' : ''} ${fuseable ? 'fuseable' : ''} ${S.selectedId === card.id ? 'selected' : ''}" style="${sigilStyle}"` +
     (dnd ? ` draggable="true" ondragstart="dragStart(event, ${card.id})"` +
            ` onclick="event.stopPropagation(); tapCard(${card.id})"` +
            ` ondragover="fuseOver(event, ${card.id})" ondragleave="fuseLeave(event)" ondrop="fuseDrop(event, ${card.id})"` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${d.name}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     `<div>${elChip(shownEl)}</div>` +
-    `<div class="card-row"><span>💨 ${v.init}</span><span>➕ ${v.boost}</span></div>` +
+    `<div class="card-row"><span class="s-init">💨 ${v.init}</span><span class="s-boost">➕ ${v.boost}</span></div>` +
+    boostPicker +
     `<div class="card-vals">${vals}</div>` +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
-    `<span>🛡️ ${v.armor > 0 ? v.armor + (v.armorEl ? ' ' + elIcon(v.armorEl) : '') : '—'}</span></div>` +
+    `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor + (v.armorEl ? ' ' + elIcon(v.armorEl) : '') : '—'}</span></div>` +
     action + `</div>`;
 }
 
