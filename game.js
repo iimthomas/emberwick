@@ -452,6 +452,9 @@ function cardById(id) { return S.hand.find(c => c.id === id) || null; }
 // Difficulty moves from "what does this card even want?" (memory) to "do I hold it?" (decision).
 // ============================================================
 var CYCLE_MODE = true;
+// How much a resonant Surge is worth. ×2 pushed journey obligation to exactly 60% (our
+// attuned-or-bust line), because resonance is reachable ~83% of the time. Tunable.
+const RESONANCE_MULT = 1.5;
 const EMPOWERS = { Lightning: 'Fire', Fire: 'Stone', Stone: 'Water', Water: 'Lightning' };
 const SEEKS = { Fire: 'Lightning', Stone: 'Fire', Water: 'Stone', Lightning: 'Water' };
 
@@ -749,13 +752,20 @@ function computeAction(reserve) {
   if (!spell || !e) return null;
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  const boostVal = boostC ? eff(boostC).boost : 0;
   const sEff = eff(spell);
   const spellEl = elOf(spell);
   // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
   // (enhEl — often not the card's own element). A wild Catalyst matches anything.
   const enhEl = enhElOf(spell);
   const isEnh = !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
+  // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
+  // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
+  // you can manufacture a resonance by fusing an off-element pair into the one you need.
+  // Resonance is the SECOND feeding — it requires the spell to already be attuned. Without
+  // this, you could double the Surge while feeding the Catalyst something the spell doesn't
+  // want, which breaks the escalation ("feed it once to attune, twice to resonate").
+  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
+  const boostVal = boostC ? (resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT) : eff(boostC).boost) : 0;
 
   const h = S.hardship;
   const ability = e.ability || null;
@@ -765,7 +775,7 @@ function computeAction(reserve) {
   const nightCut = boostVal - boostEff;
 
   if (e.type === 'fight') {
-    const init = elemInit + (S.boostTarget === 'Initiative' ? boostEff : 0) + charmMod('init');
+    const init = elemInit + charmMod('init');   // Initiative belongs to the Catalyst alone
     const initLost = e.init > init;
     // Ranged deals Early Damage even when you win initiative, unless dodged (Arsenal cost)
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
@@ -775,7 +785,7 @@ function computeAction(reserve) {
     const enhUsed = isEnh && sEff.enhAtk != null;
     const wrongType = !enhUsed && sEff.atk == null;
     const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : 1);
-    const withBoost = base + (S.boostTarget === 'Attack' ? boostEff : 0);
+    const withBoost = base + boostEff;
     // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
     const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
     const armorCut = armorHit ? armorHit.v : 0;
@@ -785,7 +795,7 @@ function computeAction(reserve) {
     if (ability === 'Slow') {
       const mEnh = isEnh && sEff.enhMove != null;
       const mBase = mEnh ? sEff.enhMove : (sEff.move != null ? sEff.move : 1);
-      const mValue = mBase + (S.boostTarget === 'Attack' ? boostEff : 0);
+      const mValue = mBase + boostEff;
       if (mValue > value) { value = mValue; usedMove = true; }
     }
     const half = Math.ceil(e.hp / 2);
@@ -798,7 +808,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, elem, boostC, boostVal, boostEff, nightCut, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, usedMove, ability, hardship: h };
   }
@@ -806,12 +816,12 @@ function computeAction(reserve) {
   const enhUsed = isEnh && sEff.enhMove != null;
   const wrongType = !enhUsed && sEff.move == null;
   const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : 1);
-  const withBoost = base + (S.boostTarget === 'Move' ? boostEff : 0);
+  const withBoost = base + boostEff;
   const reserveBonus = enhUsed && e.element && e.element === enhEl && reserve ? eff(reserve).boost : 0;
   const value = withBoost + reserveBonus;
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
-  const pace = elemInit + (S.boostTarget === 'Pace' ? boostEff : 0) + paceBless + charmMod('pace');
+  const pace = elemInit + paceBless + charmMod('pace');   // Pace belongs to the Catalyst alone
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace;
   // Steep peril: the journey's MP grows by your Arsenal's Boost
@@ -826,7 +836,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, elem, boostC, boostVal, boostEff, nightCut, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -873,7 +883,7 @@ function resolveFightBeat() {
   if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at 1`));
   else if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
   else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
-  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → ${r.withBoost}`));
+  if (boostC) b1.push(L(`Surge: +${r.boostEff}${r.resonant ? ` (${elIcon(r.enhEl)} RESONANCE!)` : ''} → ${r.withBoost}`, r.resonant ? 'good' : ''));
   if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} → −${r.armorCut} = ${r.value}`, 'bad'));
   if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) — better result`, 'good'));
   b1.push(L(`${e.name}: ${hpBefore} → ${f.hp} HP`, f.hp < hpBefore ? 'good' : ''));
@@ -1833,7 +1843,7 @@ function zoneHint(zone) {
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
     case 'Element': return 'Initiative · match the Spell to Attune';
-    case 'Boost': return `+value → ${S.boostTarget}`;
+    case 'Boost': return `+value · doubles if it matches what the Spell seeks`;
     case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn';
   }
 }
@@ -1950,11 +1960,14 @@ function cardHTML(card) {
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = slot ? `in-${slot}` : '';
   // the Surge card carries its OWN target picker — no separate row of radios to hunt for
-  const btOpts = (S.encounter && S.encounter.type === 'journey') ? ['Move', 'Pace'] : ['Attack', 'Initiative'];
-  const boostPicker = (slot === 'Boost' && S.phase === 'assign')
-    ? `<div class="bt-row">${btOpts.map(t =>
-        `<span class="bt ${S.boostTarget === t ? 'on' : ''}" onclick="event.stopPropagation(); setBoostTarget('${t}')">${t}</span>`
-      ).join('')}</div>`
+  // RESONANCE readout: light the Surge card when it feeds the element the Spell seeks
+  const spellCard = cardById(S.assign.Spell);
+  const wantEl = spellCard ? enhElOf(spellCard) : null;
+  const wouldResonate = wantEl && (card.def.wild || elOf(card) === wantEl);
+  const boostPicker = (slot === 'Boost' && S.phase === 'assign' && wantEl)
+    ? `<div class="bt-row"><span class="reso ${wouldResonate ? 'on' : ''}">` +
+      (wouldResonate ? `${elIcon(wantEl)} RESONATES — Surge amplified` : `needs ${elIcon(wantEl)} to resonate`) +
+      `</span></div>`
     : '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
