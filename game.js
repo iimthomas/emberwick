@@ -1212,11 +1212,73 @@ function elChip(el) {
 }
 
 
+// ============================================================
+// THE SCENE (2026-07-06) — layout Concept 1 "Over the Shoulder", clean-band variant:
+// art on top, the card row in a clean band below. See 00_Overview/Animation_Direction.md.
+// Every figure here is a PLACEHOLDER SILHOUETTE occupying the slot that pre-rendered
+// 3D animation frames will replace: #mage-slot and #foe-slot. Swap the innerHTML for an
+// <img>/<canvas> playing a sprite sequence and the layout does not change.
+// ============================================================
+const ART = {
+  // the mage, seen from behind — the pointed hat is the readable shape (and the brand)
+  mage: `<svg viewBox="0 0 500 400" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <path d="M330 40 C280 110 250 175 238 232 L142 232 C158 160 210 80 330 40 Z"/>
+    <ellipse cx="196" cy="238" rx="128" ry="27"/>
+    <path d="M60 400 C78 320 130 268 196 268 C262 268 314 320 332 400 Z"/>
+  </svg>`,
+  dragon: `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <defs><radialGradient id="dEye"><stop offset="0%" stop-color="#fff3d0"/>
+      <stop offset="45%" stop-color="#ffb547"/><stop offset="100%" stop-color="#e8913c" stop-opacity="0"/></radialGradient></defs>
+    <path d="M400 300 L140 120 L200 210 L90 180 L190 280 L120 300 L400 340 Z"/>
+    <path d="M400 300 L660 120 L600 210 L710 180 L610 280 L680 300 L400 340 Z"/>
+    <path d="M330 480 L360 330 Q400 300 440 330 L470 480 Z"/>
+    <path d="M362 180 Q320 120 274 100 Q312 140 336 196 Z"/>
+    <path d="M438 180 Q480 120 526 100 Q488 140 464 196 Z"/>
+    <path d="M400 150 C360 150 336 180 333 220 C330 262 352 300 400 326 C448 300 470 262 467 220 C464 180 440 150 400 150 Z"/>
+    <ellipse cx="372" cy="222" rx="12" ry="8" fill="url(#dEye)"/>
+    <ellipse cx="428" cy="222" rx="12" ry="8" fill="url(#dEye)"/>
+  </svg>`,
+  // a generic beast for ordinary fights (per-creature art comes much later)
+  beast: `<svg viewBox="0 0 600 420" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <defs><radialGradient id="bEye"><stop offset="0%" stop-color="#fff3d0"/>
+      <stop offset="50%" stop-color="#ffb547"/><stop offset="100%" stop-color="#e8913c" stop-opacity="0"/></radialGradient></defs>
+    <path d="M150 420 C160 330 200 280 300 272 C400 280 440 330 450 420 Z"/>
+    <path d="M300 272 C250 268 224 232 228 196 C232 162 264 140 300 140 C336 140 368 162 372 196 C376 232 350 268 300 272 Z"/>
+    <path d="M240 156 Q214 108 190 92 Q214 126 228 172 Z"/>
+    <path d="M360 156 Q386 108 410 92 Q386 126 372 172 Z"/>
+    <ellipse cx="278" cy="198" rx="10" ry="7" fill="url(#bEye)"/>
+    <ellipse cx="322" cy="198" rx="10" ry="7" fill="url(#bEye)"/>
+  </svg>`,
+};
+
+function renderScene() {
+  const el = $('scene');
+  if (!el) return;
+  if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') {
+    el.innerHTML = ''; el.hidden = true; return;
+  }
+  el.hidden = false;
+  const e = S.encounter;
+  const duel = S.finalMode && S.finalPhase === 'duel';
+  const isFight = duel || (e && e.type === 'fight');
+  let foe;
+  if (duel) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}</div>`;
+  else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}</div>`;
+  else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
+  el.className = isFight ? 'is-fight' : 'is-journey';
+  el.innerHTML =
+    foe +
+    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
+    `<div class="scene-name">${duel ? S.dragon.name : e ? e.name : ''}</div>` +
+    `<div class="scene-vig"></div>`;
+}
+
 function render() {
   normalizeAssign();
   saveGame();
   $('turn-indicator').textContent = S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`;
   renderStatus();
+  renderScene();
   renderEncounter();
   renderControls();
   renderSlots();

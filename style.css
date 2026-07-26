@@ -285,6 +285,44 @@ label.radio { margin-right: 14px; cursor: pointer; }
   .card-sigil, .card:hover .card-sigil, .card-el-wild .card-sigil { animation: none; transition: none; }
 }
 
+/* ---------- THE SCENE (layout Concept 1 — over the shoulder, clean band below) ----------
+   #mage-slot and #foe-slot are the animation slots: swap their contents for a sprite
+   sequence and nothing else about the layout has to change. */
+#scene {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #3a3126;
+  border-radius: 10px;
+  height: 22vh;
+  min-height: 130px;
+  background:
+    radial-gradient(58% 46% at 64% 60%, rgba(208,96,58,.24), transparent 72%),
+    radial-gradient(74% 52% at 38% 106%, rgba(232,145,60,.26), transparent 70%),
+    linear-gradient(180deg, #0d0b09 0%, #17110c 64%, #241811 100%);
+}
+#scene[hidden] { display: none; }
+#scene.is-journey {
+  background:
+    radial-gradient(46% 40% at 64% 56%, rgba(127,176,196,.13), transparent 72%),
+    radial-gradient(74% 52% at 38% 106%, rgba(232,145,60,.22), transparent 70%),
+    linear-gradient(180deg, #0a0c10 0%, #121513 60%, #1f1a12 100%);
+}
+#scene svg { width: 100%; height: 100%; display: block; }
+.mage { position: absolute; left: 2%; bottom: 0; width: 21%; height: 78%; fill: #070605; }
+.foe { position: absolute; bottom: 0; }
+.foe-dragon { right: 5%; width: 44%; height: 92%; fill: #0a0806; }
+.foe-beast  { right: 12%; width: 28%; height: 62%; fill: #0a0806; }
+.foe-road   {
+  right: 17%; bottom: 10%; width: 26%; height: 42%;
+  background: radial-gradient(50% 58% at 50% 60%, rgba(255,214,150,.22), transparent 72%);
+}
+.scene-name {
+  position: absolute; left: 12px; top: 9px;
+  font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+  color: rgba(234,217,186,.55);
+}
+.scene-vig { position: absolute; inset: 0; box-shadow: inset 0 0 70px rgba(0,0,0,.7); pointer-events: none; }
+
 /* ---------- THE SLOT ROW: four fixed roles, cards swap between them ----------
    Replaces the old zones + hand panels. The labels never move; the cards do. */
 #slots-panel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start; }
@@ -303,7 +341,7 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .slot-Element .slot-head { border-bottom-color: rgba(88,166,209,.45); }
 .slot-Boost   .slot-head { border-bottom-color: rgba(201,180,88,.45); }
 .slot-Reserve .slot-head { border-bottom-color: rgba(154,150,140,.3); }
-.slot .card { width: 100%; }
+.slot .card { width: 100%; min-width: 0; }  /* min-width:0 or the 240px card floor breaks the row */
 .slot-empty {
   border: 2px dashed #333; border-radius: 10px;
   color: #5a5a5a; font-size: 12px; text-align: center; padding: 38px 0;
@@ -342,6 +380,27 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .howto .hint { margin: 6px 0 2px; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
+
+/* PC / wide: the whole game fits the window like a real game screen — the fixed parts
+   (enemy bar, card row, controls) keep their size and THE SCENE ABSORBS THE SLACK, so a
+   taller monitor simply gets more art instead of more scrollbar. */
+@media (min-width: 901px) {
+  body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }
+  #left-col { display: flex; flex-direction: column; min-height: 0; }
+  #scene { flex: 1 1 auto; height: auto; min-height: 96px; }
+  #hud, #slots-panel { flex: none; }
+  #controls-panel { flex: none; max-height: 36vh; overflow-y: auto; }
+  #right-col { display: flex; flex-direction: column; min-height: 0; }
+  #log { flex: 1 1 auto; max-height: none; }
+}
+/* short landscape (phone held sideways — the forced orientation): keep the scene modest
+   so the card row and Resolve still fit without a fight */
+@media (max-height: 500px) and (orientation: landscape) {
+  #scene { height: 30vh; min-height: 96px; }
+  .scene-name { font-size: 10px; top: 6px; left: 9px; }
+}
+
 @media (max-width: 900px) {
   main { flex-direction: column; }
   #left-col, #right-col { flex: none; width: 100%; min-width: 0; }
