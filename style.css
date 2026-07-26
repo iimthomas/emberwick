@@ -364,6 +364,8 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .slot-head {
   display: flex; flex-direction: column; gap: 1px;
   padding: 0 2px 4px; border-bottom: 1px solid rgba(255,255,255,.08);
+  height: 46px;   /* FIXED, not min: a 2-line hint would otherwise stagger the row */
+  justify-content: flex-end;
 }
 .slot-name { font-size: 11px; letter-spacing: 2px; font-weight: bold; }
 .slot-hint { font-size: 10.5px; color: #8a8577; line-height: 1.3; }
@@ -430,14 +432,8 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 
 /* the Tinder card carries its own target picker — no separate row of radios */
 .bt-row { display: flex; gap: 4px; margin: 5px 0 1px; }
-.reso {
-  flex: 1 1 0; text-align: center; font-size: 10px; letter-spacing: .06em;
-  padding: 4px; border-radius: 6px; border: 1px dashed #5a5346; color: #7f7869;
-}
-.reso.on {
-  border-style: solid; border-color: #c9b458; background: rgba(201,180,88,.16);
-  color: #f3e6c4; font-weight: bold;
-}
+/* resonance rides on the boost value itself — no extra row, so every slot stays level */
+.s-boost.resonating { color: #f3e6c4; font-weight: bold; text-shadow: 0 0 10px rgba(201,180,88,.75); }
 .bt {
   flex: 1 1 0; text-align: center; cursor: pointer; user-select: none;
   font-size: 11px; letter-spacing: .04em; padding: 5px 4px; min-height: 30px;

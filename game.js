@@ -1943,8 +1943,8 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
-    case 'Element': return 'Initiative · match the Spell to Attune';
-    case 'Boost': return `+value · doubles if it matches what the Spell seeks`;
+    case 'Element': return 'Initiative · match to Attune';
+    case 'Boost': return '+power · match to amplify';
     case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn';
   }
 }
@@ -2060,16 +2060,13 @@ function cardHTML(card) {
   const slot = zoneOf(card.id);
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = slot ? `in-${slot}` : '';
-  // the Surge card carries its OWN target picker — no separate row of radios to hunt for
-  // RESONANCE readout: light the Surge card when it feeds the element the Spell seeks
+  // RESONANCE readout rides ON the boost value — the old picker had its own row, which made
+  // the Surge slot taller than its neighbours. No extra row now, so all four stay level.
   const spellCard = cardById(S.assign.Spell);
   const wantEl = spellCard ? enhElOf(spellCard) : null;
-  const wouldResonate = wantEl && (card.def.wild || elOf(card) === wantEl);
-  const boostPicker = (slot === 'Boost' && S.phase === 'assign' && wantEl)
-    ? `<div class="bt-row"><span class="reso ${wouldResonate ? 'on' : ''}">` +
-      (wouldResonate ? `${elIcon(wantEl)} RESONATES — Surge amplified` : `needs ${elIcon(wantEl)} to resonate`) +
-      `</span></div>`
-    : '';
+  const wouldResonate = wantEl && (card.def.wild || hasVerb(card, 'everecho') || elOf(card) === wantEl);
+  const resoOn = slot === 'Boost' && wantEl && wouldResonate;
+  const boostPicker = '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
   // sigil watermark + seek-element accent glow (wild gets its own prismatic aura via .card-el-wild)
@@ -2087,8 +2084,9 @@ function cardHTML(card) {
     `<div class="card-head"><span class="card-name${card.evolved ? ' evolved' : ''}">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (card.evolved ? `<div class="evo-verb">✦ ${(EVOLUTIONS[d.name] || []).filter(b => b.id === card.evolved).map(b => b.text)[0] || ''}</div>` : '') +
     `<div>${elChip(shownEl)}</div>` +
-    `<div class="card-row"><span class="s-init">💨 ${v.init}</span><span class="s-boost">➕ ${v.boost}</span></div>` +
-    boostPicker +
+    `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
+    `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
+    `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
     `<div class="card-vals">${vals}</div>` +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
     `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor + (v.armorEl ? ' ' + elIcon(v.armorEl) : '') : '—'}</span></div>` +
