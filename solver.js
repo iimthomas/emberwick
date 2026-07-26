@@ -345,6 +345,8 @@ const RUNSIM = (() => {
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; }
   }
   const allCards = () => [...S.hand, ...S.deck, ...S.discard];
+  // crude "how much card is this" for the stack heuristic — its best single number
+  const bigness = c => { const e = eff(c); return Math.max(e.enhAtk || 0, e.atk || 0, e.enhMove || 0, e.move || 0); };
 
   function autoRun(withEvents) {
     freshGame();
@@ -359,6 +361,16 @@ const RUNSIM = (() => {
         m.turns++;
       }
       else if (p === 'reveal') advanceBeat();
+      // 🃏 THE STACK — order the spent set under the deck. Bot heuristic: send the BIGGEST
+      // cards back first so they return soonest (a human stacks for a plan; this is the
+      // simplest defensible proxy, and it at least beats leaving the order to chance).
+      else if (p === 'stack') {
+        const st = S.stack;
+        const next = st.ids.filter(id => !st.order.includes(id))
+          .map(id => cardById(id)).filter(Boolean)
+          .sort((a, b) => bigness(b) - bigness(a))[0];
+        if (next) stackPick(next.id); else break;
+      }
       else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
       else if (p === 'upgrade') { const up = S.hand.filter(c => upgradable(c)).sort((a, b) => b.level - a.level)[0]; if (up) upgrade(up.id); else doneUpgrading(); }
       // THE WHEEL (replaced the upgrade menu). Bot policy: never re-spin (coins bank fine),

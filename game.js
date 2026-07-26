@@ -111,12 +111,16 @@ const PERILS = {
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
 // Enemy armor is a LIST (R4 creatures shield multiple elements). atkEl = the element its
 // damage carries (soak-doubling). Nightfall values are OURS (source has none).
+// `beats` = how many exchanges the creature takes (default 2). SKIRMISHERS — low HP, high
+// Init — are ONE beat: they're a tempo change, a fight you win or lose in a single breath,
+// and they keep the rhythm from flattening. Note a 1-beat creature has no exchange, so no
+// STACK either; the deck-scheduling skill belongs to the fights that actually last.
 // R4 XP values are INFERRED from the source's XP≈0.6×HP pattern — flag for tuning.
 const REGIONS = [
   { name: 'Verdant Edge', hardshipChance: 0, encounters: [
-    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 8, atk: 1, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
+    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 8, atk: 1, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], beats: 1, xp: 4 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],      xp: 7 },
-    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     armor: [{ el: 'Water', v: 2 }],     xp: 5 },
+    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     armor: [{ el: 'Water', v: 2 }],     beats: 1, xp: 5 },
     { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 8 },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 3 },
@@ -124,8 +128,8 @@ const REGIONS = [
     { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
-    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
+    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    beats: 1, xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], beats: 1, xp: 4 },
     { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    armor: [{ el: 'Water', v: 2 }],     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
@@ -137,7 +141,7 @@ const REGIONS = [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
     { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8, ability: 'Slow' },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 7, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 2 }],      xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], beats: 1, xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 6 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
@@ -145,7 +149,7 @@ const REGIONS = [
   ]},
   { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
     { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 10, atk: 3, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],                             xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 10, atk: 3, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],                             beats: 1, xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 8,  atk: 4, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }, { el: 'Fire', v: 2 }],  xp: 8, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }, { el: 'Stone', v: 2 }],    xp: 9 },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 7, peril: 'Treacherous' },
@@ -328,7 +332,7 @@ function saveGame() {
       assign: S.assign, fuse: S.fuse, divertsUsed: S.divertsUsed,
       boostTarget: S.boostTarget, coins: S.coins, charms: S.charms, damage: S.damage, damageEl: S.damageEl,
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
-      foe: S.foe,
+      foe: S.foe, stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
@@ -374,7 +378,7 @@ function loadGame() {
       damage: d.damage, damageEl: d.damageEl,
       downgraded: new Set(d.downgraded), actionSetIds: d.actionSetIds, reserveId: d.reserveId,
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
-      foe: d.foe || null, beatResult: null,
+      foe: d.foe || null, beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
       approachOutcomes: d.approachOutcomes || [], duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
@@ -443,6 +447,7 @@ function freshGame() {
     selectedId: null, // tap-to-place selection (touch)
     fuseArm: false,   // after tapping the Fuse button: next same-element card completes the fuse
     foe: null,            // multi-beat creature fight: { hp, maxHp, beat, beats, tookDamage }
+    stack: null,          // 🃏 mid-exchange: { ids, order } while you stack the deck
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
     finalPhase: null,     // 'approach' | 'duel'
@@ -1005,15 +1010,62 @@ function nextFightBeat() {
   // no matter how many beats it takes. Zero net card loss, but the puzzle is fresh each beat.
   // What carries across is the ARSENAL: the card you hold back is your only continuity, which
   // is finally a real job for the universal fourth slot.
-  let kept = [], drew = 0;
   if (MB_EXCHANGE) {
+    // note what survives the exchange BEFORE we touch the hand — once the new cards arrive
+    // there's no way to tell the carried Arsenal from a fresh draw.
+    f.carried = S.hand.filter(c => !S.actionSetIds.includes(c.id)).map(c => displayName(c));
     const spent = S.hand.filter(c => S.actionSetIds.includes(c.id));
+    if (spent.length > 1) { startStack(spent); return; }   // 🃏 order them first
     S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
     S.deck.push(...spent);
-    kept = S.hand.slice();
-    drew = Math.min(HAND_SIZE - S.hand.length, S.deck.length);
+    f.drew = Math.min(HAND_SIZE - S.hand.length, S.deck.length);
     draw(HAND_SIZE - S.hand.length);
   }
+  finishExchange();
+}
+
+// 🃏 THE STACK (2026-07-26, Thomas — Flesh and Blood's pitch stacking). The spent set doesn't
+// just fall under the deck in whatever order it happened to sit: YOU choose the order it
+// returns in. That's what turns the exchange from a randomiser into a schedule — you're not
+// being dealt a hand, you're deciding when your bombs come back. Pure execution skill: same
+// seventeen cards, better play. It also gets STRONGER as a region drains (the deck shortens,
+// so the payoff arrives sooner) — tension and reward rising together, for free.
+function startStack(spent) {
+  S.stack = { ids: spent.map(c => c.id), order: [] };
+  S.phase = 'stack';
+  render();
+}
+
+function stackPick(id) {
+  const st = S.stack; if (!st) return;
+  if (!st.ids.includes(id) || st.order.includes(id)) return;
+  st.order.push(id);
+  if (st.order.length >= st.ids.length) { finishStack(); return; }
+  render();
+}
+
+function stackClear() { if (S.stack) { S.stack.order = []; render(); } }
+
+// order first → drawn first. They slide under the deck in the order you picked, so the card
+// you tapped ① is the one that comes back to you soonest.
+function finishStack() {
+  const st = S.stack; if (!st) return;
+  const rest = st.ids.filter(id => !st.order.includes(id));
+  const ordered = [...st.order, ...rest].map(id => cardById(id)).filter(Boolean);
+  S.hand = S.hand.filter(c => !ordered.includes(c));
+  S.deck.push(...ordered);
+  S.stack = null;
+  log(`Stacked under the deck — they return in this order: ${ordered.map((c, i) => `${'①②③④'[i]} ${displayName(c)}`).join(' · ')}`);
+  if (S.foe) S.foe.drew = Math.min(HAND_SIZE - S.hand.length, S.deck.length);
+  draw(HAND_SIZE - S.hand.length);
+  finishExchange();
+}
+
+function finishExchange() {
+  const f = S.foe;
+  if (!f) return;
+  const kept = f.carried || [];
+  const drew = f.drew || 0;
   S.actionSetIds = [];
   S.reserveId = null;
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
@@ -1028,7 +1080,7 @@ function nextFightBeat() {
   S.phase = 'assign';
   log(MB_EXCHANGE
     ? `Beat ${f.beat} of ${f.beats} — the exchange: your spent cards slide back under the deck` +
-      `${kept.length ? `, your Arsenal ${kept.map(c => displayName(c)).join(' & ')} carries over` : ''}` +
+      `${kept.length ? `, your Arsenal ${kept.join(' & ')} carries over` : ''}` +
       `, you draw ${drew}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`
     : `You reset your stance — beat ${f.beat} of ${f.beats}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`);
   render();
@@ -1878,6 +1930,14 @@ function renderControls() {
       (beat.final
         ? `<button class="primary" onclick="advanceBeat()">Continue</button>`
         : `<div class="hint">click to hurry…</div>`);
+  } else if (S.phase === 'stack') {
+    const st = S.stack || { ids: [], order: [] };
+    const left = st.ids.length - st.order.length;
+    c.innerHTML =
+      `<div class="phase-label">🃏 STACK THE DECK</div>` +
+      `<div class="hint">Your spent cards slide back <b>under the deck</b>. Tap them in the order you want to <b>draw them again</b> — ① comes back soonest. ` +
+      `<b>${left}</b> left to place. <span class="note">(${S.deck.length} cards ahead of them)</span></div>` +
+      (st.order.length ? `<button onclick="stackClear()">↺ start over</button>` : '');
   } else if (S.phase === 'soak') {
     c.innerHTML =
       `<div class="phase-label">PHASE 3 — PENALTY</div>` +
@@ -2079,7 +2139,17 @@ function cardHTML(card) {
   } else if (isAssignPhase() && S.selectedId === card.id) {
     action = S.fuseArm ? fuseArmHint(card) : roleButtons(card);
   }
-  if (S.phase === 'soak') {
+  if (S.phase === 'stack') {
+    const st = S.stack;
+    if (st && st.ids.includes(card.id)) {
+      const pos = st.order.indexOf(card.id);
+      action = pos >= 0
+        ? `<div class="card-action muted">${'①②③④'[pos]} returns ${pos === 0 ? 'first' : pos === st.ids.length - 1 ? 'last' : 'next'}</div>`
+        : `<div class="card-action"><button onclick="stackPick(${card.id})">Place ${'①②③④'[st.order.length]} — draw this back ${st.order.length === 0 ? 'soonest' : 'after'}</button></div>`;
+    } else {
+      action = `<div class="card-action muted">stays in hand</div>`;
+    }
+  } else if (S.phase === 'soak') {
     if (!wasDowngraded) {
       const soak = soakValue(card);
       action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' (TRASH!)' : ''}</button></div>`;
