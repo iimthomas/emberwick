@@ -33,7 +33,15 @@ const MB_DMG = 0.5;
 // THE EXCHANGE: redraw between beats (spent cards go UNDER the deck, never the discard, so a
 // creature still costs exactly one set of fatigue). Off = the old "replay the same four".
 var MB_EXCHANGE = true;
-function foeBeatsForRegion() { return S.region >= 4 ? 4 : S.region >= 2 ? 3 : 2; }
+// TWO BEATS, EVERYWHERE (2026-07-26). A fight wants a shape — an opening and a closer.
+// Three or four EQUAL chunks have no climax, and measured, the extra beats bought difficulty
+// of the wrong kind: the pool scales with beats so the damage bar is unchanged, but the
+// incoming hits scale too, so region 4 was hard by GRINDING (soak is quantised — hit count
+// shreds the deck), not by posing a harder problem. Region ramp lives in HP/Atk/hardships/
+// abilities/perils instead. Beat count now hangs off the CREATURE, so a brute can declare 3
+// or a skirmisher 1 later without touching this again — variety of pacing, not a raised ceiling.
+const DEFAULT_BEATS = 2;
+function foeBeatsForRegion() { return S.encounter && S.encounter.beats ? S.encounter.beats : DEFAULT_BEATS; }
 function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 
 // ---------- starter deck (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
