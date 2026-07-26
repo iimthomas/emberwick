@@ -30,6 +30,9 @@ const MB_HP_MULT = 1.0;          // fine-tuning knob on top of hp × beats
 // shredded the deck (measured: 8.3 of 17 cards trashed per run). This scales each blow so
 // the TOTAL across a fight lands near the old single-exchange cost.
 const MB_DMG = 0.5;
+// THE EXCHANGE: redraw between beats (spent cards go UNDER the deck, never the discard, so a
+// creature still costs exactly one set of fatigue). Off = the old "replay the same four".
+var MB_EXCHANGE = true;
 function foeBeatsForRegion() { return S.region >= 4 ? 4 : S.region >= 2 ? 3 : 2; }
 function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 
@@ -603,7 +606,7 @@ function nextTurn() {
   S.phase = 'assign';
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
   logChallenge();
-  if (S.foe) log(`It has ${S.foe.hp} HP and you have ${S.foe.beats} beats — wear it down. Your set returns to hand between beats; only its counterattacks cost you.`);
+  if (S.foe) log(`It has ${S.foe.hp} HP and you have ${S.foe.beats} beats — wear it down. Between beats your spent cards slide back under the deck and you draw fresh; whatever sits in ARSENAL is the one card you carry into the next exchange.`);
   render();
 }
 
@@ -989,9 +992,37 @@ function nextFightBeat() {
   if (!f) return;
   if (f.beat >= f.beats) { endMultiFight(); return; }
   f.beat++;
-  S.actionSetIds = [];            // the set RETURNS to hand — nothing is discarded mid-fight
+  // 🔑 THE EXCHANGE (2026-07-26): every beat is a NEW HAND. The spent set slides back UNDER
+  // the deck — never into the discard — so a creature still costs exactly ONE set of fatigue
+  // no matter how many beats it takes. Zero net card loss, but the puzzle is fresh each beat.
+  // What carries across is the ARSENAL: the card you hold back is your only continuity, which
+  // is finally a real job for the universal fourth slot.
+  let kept = [], drew = 0;
+  if (MB_EXCHANGE) {
+    const spent = S.hand.filter(c => S.actionSetIds.includes(c.id));
+    S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
+    S.deck.push(...spent);
+    kept = S.hand.slice();
+    drew = Math.min(HAND_SIZE - S.hand.length, S.deck.length);
+    draw(HAND_SIZE - S.hand.length);
+  }
+  S.actionSetIds = [];
+  S.reserveId = null;
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.fuse = null;
+  normalizeAssign();
+  // nothing left to fight with (deck ran dry late in a region) — the exchange ends the fight
+  if (S.hand.length === 0) {
+    log(`You have nothing left in hand — you break off.`, 'bad');
+    endMultiFight();
+    return;
+  }
   S.phase = 'assign';
-  log(`You reset your stance — beat ${f.beat} of ${f.beats}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`);
+  log(MB_EXCHANGE
+    ? `Beat ${f.beat} of ${f.beats} — the exchange: your spent cards slide back under the deck` +
+      `${kept.length ? `, your Arsenal ${kept.map(c => displayName(c)).join(' & ')} carries over` : ''}` +
+      `, you draw ${drew}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`
+    : `You reset your stance — beat ${f.beat} of ${f.beats}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`);
   render();
 }
 
@@ -1341,6 +1372,12 @@ function wheelBuy(i) {
   const w = S.wheel; if (!w) return;
   const o = w.offers[i];
   if (!o || o.kind === 'none' || o.bought || o.cost > S.coins) return;
+  // The match jackpot deliberately offers the SAME card twice — buying both would push it past
+  // Lv4 and off the end of its level table. Validate BEFORE the coins leave your hand.
+  if (o.kind === 'upgrade' || o.kind === 'repair') {
+    const c = anyCardById(o.cardId);
+    if (!c || c.level >= MAX_LEVEL) { o.bought = true; log(`${o.name} is already at its peak — nothing to buy.`); render(); return; }
+  }
   S.coins -= o.cost;
   if (o.kind === 'evolve') {
     S.coins += o.cost;                       // not spent until a branch is chosen
@@ -1813,7 +1850,7 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
-      `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (ignites it), <b>Surge</b> (fuel), <b>Arsenal</b> (kept for next turn). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
+      `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (ignites it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>. A creature takes several <b>beats</b> — between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
       ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Arsenal.` +
       `</div></details>`;
     c.innerHTML =
@@ -1945,7 +1982,11 @@ function zoneHint(zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
     case 'Element': return 'Initiative · match to Attune';
     case 'Boost': return '+power · match to amplify';
-    case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn';
+    // mid-fight the Arsenal is the ONLY card that survives the exchange — say so, because
+    // that is now the most consequential choice on the row.
+    case 'Reserve': return S.fuse ? 'consumed by the Fuse'
+      : (S.foe && MB_EXCHANGE && S.foe.beat < S.foe.beats) ? 'the one card you keep next beat'
+      : 'kept for next turn';
   }
 }
 
