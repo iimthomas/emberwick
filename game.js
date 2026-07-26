@@ -48,7 +48,8 @@ function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 // Per-level stat tables: lv[level-1] = [value, enhValue, init, boost, armor, (dead), upgradeCostToNext].
 // Column 6 held armorEl; DEAD DATA since soak doubling was cut 2026-07-26. Array shape kept so
 // the 68 hand-transcribed rows did not need rewriting in the same pass.
-// type = what the base Value is (attack/move/hybrid). enhEl = the element the Attuned form SEEKS
+// `type` / `enhType` / `enhEl` are DEAD DATA since redesign step 2 (one value per card, and a
+// card seeks its own element). Left in place; the whole table is re-authored at step 3.
 // (often NOT the card's own element). enhType may DIFFER from type — a Move card can Attune into an Attack.
 const CARD_DEFS = [
   { name: 'Flicker',       element: 'Lightning', type: 'hybrid', enhType: 'hybrid', enhEl: 'Stone',
@@ -102,7 +103,6 @@ const ABILITIES = {
   'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
   'Poison': 'If it damages you, +1 damage to your next drawn hand (+2 if both Early and Combat).',
   'Ranged': 'Deals Early Damage even if you win Initiative — unless you discard your Arsenal in Cleanup (decide now).',
-  'Slow':   'You may compare your Move instead of Attack against its HP (best result is used).',
 };
 
 const PERILS = {
@@ -132,7 +132,7 @@ const REGIONS = [
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
     { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    beats: 1, xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], beats: 1, xp: 4 },
-    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8, ability: 'Slow' },
+    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8 },
     { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    armor: [{ el: 'Water', v: 2 }],     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 7 },
@@ -141,7 +141,7 @@ const REGIONS = [
   ]},
   { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8, ability: 'Slow' },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8 },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 7, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 2 }],      xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], beats: 1, xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
@@ -464,11 +464,14 @@ function eff(card) {
   const am = charmMod('armor', d.element);
   const at = charmMod('atk', d.element);
   const adj = x => x == null ? null : Math.max(0, x + at);
+  // ONE VALUE (2026-07-26, redesign step 2). A card no longer prints a separate Attack and
+  // Move: it prints how much it ACCOMPLISHES. In a fight that is damage, on a journey it is
+  // progress - the fiction changes, the number does not. This deleted the wrong-type rule,
+  // cross-type attuning, the second attuned number, and card types altogether.
+  // `def.type` / `def.enhType` are now DEAD DATA.
   return {
-    atk:  d.type    !== 'move'   ? adj(v)  : null,
-    move: d.type    !== 'attack' ? v  : null,
-    enhAtk:  ev != null && d.enhType !== 'move'   ? adj(ev) : null,
-    enhMove: ev != null && d.enhType !== 'attack' ? ev : null,
+    value: adj(v),
+    attuned: ev != null ? adj(ev) : null,
     init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
   };
 }
@@ -484,9 +487,8 @@ function levelDeltaText(card) {
   const a = eff(card), b = eff({ ...card, level: card.level + 1 });
   const parts = [];
   const cmp = (icon, x, y) => { if (x != null && y != null && y !== x) parts.push(`${icon} ${x}<span class="d-arrow">→</span>${y}`); };
-  cmp('⚔️', a.atk, b.atk);
-  cmp('👣', a.move, b.move);
-  cmp('✨', a.enhAtk != null ? a.enhAtk : a.enhMove, b.enhAtk != null ? b.enhAtk : b.enhMove);
+  cmp('⚔️', a.value, b.value);
+  cmp('✨', a.attuned, b.attuned);
   cmp('💨', a.init, b.init);
   cmp('➕', a.boost, b.boost);
   cmp('🛡️', a.armor, b.armor);
@@ -494,34 +496,21 @@ function levelDeltaText(card) {
 }
 
 // ============================================================
-// THE ELEMENTAL CYCLE (2026-07-26, testing behind CYCLE_MODE)
-// Each element is empowered by the one before it, so what a card SEEKS is DERIVED from
-// a single rule instead of being an arbitrary per-card fact you can only look up:
-//     Lightning kindles Fire · Fire forges Stone · Stone springs Water · Water carries Lightning
-// (Stone currently still wears its old name "Stone" — the rename is a separate flavour pass.)
-// Difficulty moves from "what does this card even want?" (memory) to "do I hold it?" (decision).
+// ATTUNING (collapsed to ONE rule 2026-07-26 - redesign step 2)
+//     Your CATALYST must share your SPELL's element. That is the whole rule.
+// The elemental cycle (a Fire spell seeking Lightning) is gone: it fixed the ARBITRARINESS of
+// 17 printed enhEl facts but never the STRANGENESS - a fire spell wanting lightning contradicts
+// the only intuition anyone brings to elements, and it made an attuned Fire spell deal Lightning
+// damage to armour. Measured best headroom of four candidates (fights obligation 35%, journeys
+// 50%, vs 40%/58% for the cycle). Element is now a plain suit: a PAIR attunes.
+// `def.enhEl` on every card is now DEAD DATA (cleared wholesale when the deck is re-authored).
 // ============================================================
-var CYCLE_MODE = true;
-// How much a resonant Surge is worth. ×2 pushed journey obligation to exactly 60% (our
-// attuned-or-bust line), because resonance is reachable ~83% of the time. Tunable.
+// How much a resonant Surge is worth - the Surge feeding the same element as the pair.
 const RESONANCE_MULT = 1.5;
-const EMPOWERS = { Lightning: 'Fire', Fire: 'Stone', Stone: 'Water', Water: 'Lightning' };
-const SEEKS = { Fire: 'Lightning', Stone: 'Fire', Water: 'Stone', Lightning: 'Water' };
 
-// 🔑 ATTUNE_MODE — what a Spell asks its Catalyst for. Flip in console: ATTUNE_MODE='same'
-//   'cycle' — the elemental cycle: a Fire spell seeks Lightning (SEEKS map).
-//   'same'  — a Fire spell seeks FIRE. Element becomes a plain suit and the grammar becomes
-//             poker: a PAIR attunes, three of a kind resonates. Every card then carries ONE
-//             element fact instead of two, and the attack finally deals the damage type the
-//             spell's own element promises.
-var ATTUNE_MODE = 'cycle';
-// under 'surge': is a matching Surge SPENT on the transformation (no boost on top)?
-var SURGE_SPENT = true;
-function enhElOf(card) {
-  if (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge') return card.def.element;
-  if (CYCLE_MODE && card.def.element) return SEEKS[card.def.element];
-  return card.def.enhEl;
-}
+// What a card seeks = its OWN element. Reads the FUSED element, so fusing can change either
+// side of the pair: fuse your Spell to want what you hold, or fuse a card to become the match.
+function enhElOf(card) { return elOf(card); }
 
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
 function activeZones() { return ZONES; }
@@ -815,31 +804,15 @@ function computeAction(reserve) {
   // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
   // (enhEl — often not the card's own element). A wild Catalyst matches anything.
   const enhEl = enhElOf(spell);
-  // 🔮 ATTUNE_MODE 'surge' — THE STREAMLINED MAGE. The element check moves OFF the Catalyst and
-  // onto the SURGE, and it's same-element: your Surge shares the Spell's element → it Attunes.
-  // Each slot then asks exactly ONE question — Spell: what? · Catalyst: how fast? · Surge: how
-  // hard? · Arsenal: what next? — and elements appear in exactly one place on the whole turn.
-  // Resonance disappears as a separate idea because the Surge match IS the attune.
-  const surgeMode = ATTUNE_MODE === 'surge';
-  const isEnh = surgeMode
-    ? !!(boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl))
-    : !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
+  const isEnh = !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
   // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
   // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
   // you can manufacture a resonance by fusing an off-element pair into the one you need.
   // Resonance is the SECOND feeding — it requires the spell to already be attuned. Without
   // this, you could double the Surge while feeding the Catalyst something the spell doesn't
   // want, which breaks the escalation ("feed it once to attune, twice to resonate").
-  // under 'surge' the match IS the attune, so there is no second feeding to resonate — the
-  // concept folds away entirely rather than sitting on top as a bonus-on-a-bonus.
-  const resonant = surgeMode ? false
-    : !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
-  // 🔑 THE SURGE FORK. If a matching Surge granted the Attune *and* its boost, one card would
-  // solve two problems and attuning would be near-automatic (measured: obligation 39→44%).
-  // So a matching Surge is SPENT on the transformation — it gives the Attuned value, not its
-  // number. That makes the slot a real either/or: a big flat boost, or the Attune.
+  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
   const boostVal = !boostC ? 0
-    : (surgeMode && isEnh) ? (SURGE_SPENT ? 0 : eff(boostC).boost)
     : resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT)
     : eff(boostC).boost;
 
@@ -857,25 +830,16 @@ function computeAction(reserve) {
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
     let early = initLost || rangedHits ? e.atk : 0;
     if (h === 'Ambush') early *= 2;
-    // cross-type Attuning: a Move card whose Attuned form is an Attack CAN fight when sparked
-    const enhUsed = isEnh && sEff.enhAtk != null;
-    const wrongType = !enhUsed && sEff.atk == null;
-    // `surefooted` (evolution): a wrong-type spell falls back to its other value instead of 1
-    const wrongVal = 1;
-    const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : wrongVal);
+    const enhUsed = isEnh && sEff.attuned != null;
+    const wrongType = false;   // one value per card - a card can never be the wrong type now
+    const base = enhUsed ? sEff.attuned : sEff.value;
     const withBoost = base + boostEff;
     // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
     const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
     const armorCut = armorHit ? armorHit.v : 0;
     let value = Math.max(0, withBoost - armorCut);
-    // Slow: may compare Move instead of Attack — best result is used
-    let usedMove = false;
-    if (ability === 'Slow') {
-      const mEnh = isEnh && sEff.enhMove != null;
-      const mBase = mEnh ? sEff.enhMove : (sEff.move != null ? sEff.move : 1);
-      const mValue = mBase + boostEff;
-      if (mValue > value) { value = mValue; usedMove = true; }
-    }
+    // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
+    // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
     const outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
     const combatDmg = outcome !== 'Complete' ? e.atk : 0;
@@ -888,13 +852,11 @@ function computeAction(reserve) {
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     return { type: 'fight', spell, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
-             combatDmg, timePenalty, stormDmg, loseReserve, poison, usedMove, ability, hardship: h };
+             combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
-  // journeys: cross-type in reverse — an Attack card whose Attuned form is a Move can travel when sparked
-  const enhUsed = isEnh && sEff.enhMove != null;
-  const wrongType = !enhUsed && sEff.move == null;
-  const wrongVal = 1;
-  const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : wrongVal);
+  const enhUsed = isEnh && sEff.attuned != null;
+  const wrongType = false;
+  const base = enhUsed ? sEff.attuned : sEff.value;
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
@@ -962,12 +924,10 @@ function resolveFightBeat() {
   const L = (t, c = '') => ({ text: t, cls: c });
   const beats = [];
   const b1 = [];
-  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at 1`));
-  else if (r.enhUsed) b1.push(L(`${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
-  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
+  if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
+  else b1.push(L(`Basic strike ${r.base}`));
   if (boostC) b1.push(L(`Surge: +${r.boostEff}${r.resonant ? ` (${elIcon(r.enhEl)} RESONANCE!)` : ''} → ${r.withBoost}`, r.resonant ? 'good' : ''));
   if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} → −${r.armorCut} = ${r.value}`, 'bad'));
-  if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) — better result`, 'good'));
   b1.push(L(`${e.name}: ${hpBefore} → ${f.hp} HP`, f.hp < hpBefore ? 'good' : ''));
   beats.push({ label: '⚔️ STRIKE', big: r.value, vs: `· ${e.name} ${hpBefore}→${f.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
@@ -1142,13 +1102,11 @@ function resolve() {
   if (r.type === 'fight') {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.wrongType) b1.push(L(`Attack: ${spell.def.name} has no Attack — wrong-type Spell plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Attack: ${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
-    else b1.push(L(`Attack: basic Atk ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
+    if (r.enhUsed) b1.push(L(`Attack: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
+    else b1.push(L(`Attack: basic Atk ${r.base}`));
     if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Boost: +${r.boostEff} → Attack ${r.withBoost}`));
     if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} — your Attuned strike is turned → −${r.armorCut} = ${r.value}`, 'bad'));
-    if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) instead of Attack — better result`, 'good'));
-    beats.push({ label: r.usedMove ? '👣 MOVE' : '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
+    beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
@@ -1158,16 +1116,15 @@ function resolve() {
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
 
     beats.push({ outcomeBeat: true, final: true, lines: [
-      L(`${r.usedMove ? 'Move' : 'Attack'} ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· +${e.xp} XP` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
+      L(`Attack ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· +${e.xp} XP` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
         r.outcome === 'Loss' ? 'bad result' : r.outcome === 'Narrow' ? 'result' : 'good result'),
     ] });
   } else {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.wrongType) b1.push(L(`Move: ${spell.def.name} has no Move — wrong-type Spell plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Move: ${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
-    else b1.push(L(`Move: basic Move ${r.base}${r.isEnh ? ' (its Attuned form is an Attack)' : ''}`));
+    if (r.enhUsed) b1.push(L(`Move: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
+    else b1.push(L(`Move: basic Move ${r.base}`));
     if (boostC && S.boostTarget === 'Move') b1.push(L(`Boost: +${r.boostEff} → Move ${r.withBoost}`));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
@@ -1634,16 +1591,13 @@ function eventChoose(i) {
   const opt = currentEventDef().options[i];
   S.event.opt = i;
   if (opt.need === 'card') { S.event.step = 'pickCard'; render(); return; }
-  if (opt.need === 'cardElement') { S.event.step = 'pickCard'; S.event.wantElement = true; render(); return; }
   resolveEvent(opt, null, null);
 }
 function eventPickCard(id) {
   const card = cardById(id); if (!card) return;
   S.event.targetId = id;
-  if (S.event.wantElement) { S.event.step = 'pickElement'; render(); return; }
   resolveEvent(currentEventDef().options[S.event.opt], card, null);
 }
-function eventPickElement(el) { resolveEvent(currentEventDef().options[S.event.opt], cardById(S.event.targetId), el); }
 function eventCancelPick() { S.event.step = 'options'; S.event.opt = null; S.event.wantElement = false; render(); }
 function resolveEvent(opt, card, el) {
   const out = opt.apply({ card, element: el });
@@ -1941,17 +1895,6 @@ function renderControls() {
       // the choice is made ON the cards below — this panel just states the deal
       body = `<div class="hint"><b>${def.options[ev.opt].label}</b><br>Pick the card from your hand below — its stats are right there on it.</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
-    } else if (ev.step === 'pickElement') {
-      const card = cardById(ev.targetId);
-      const now = enhElOf(card);
-      const v = eff(card);
-      body = `<div class="hint"><b>${displayName(card)} Lv${card.level}</b> currently seeks ` +
-        `${now ? `${elIcon(now)} <b>${now}</b>` : '<b>nothing</b>'}` +
-        `${v.enhAtk != null || v.enhMove != null ? ` → attuned it becomes ${[v.enhAtk != null ? `⚔️ ${v.enhAtk}` : null, v.enhMove != null ? `👣 ${v.enhMove}` : null].filter(Boolean).join(' · ')}` : ''}. ` +
-        `Choose the element it should seek instead — this <b>breaks it out of the cycle</b>, so it no longer follows ${elIcon(card.def.element)} ${card.def.element}'s natural partner.</div>` +
-        `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Stone'].map(el =>
-          `<button onclick="eventPickElement('${el}')" ${el === now ? 'disabled title="already seeks this"' : ''}>${elIcon(el)} ${el}${el === now ? ' (current)' : ''}</button>`).join('') + `</div>` +
-        `<button onclick="eventCancelPick()">← back</button>`;
     } else {
       body = `<div class="event-flavor">${def.flavor}</div>` +
         `<div class="event-opts">` + def.options.map((o, i) => `<button onclick="eventChoose(${i})">${o.label}</button>`).join('') + `</div>`;
@@ -2003,10 +1946,8 @@ function zoneHint(zone) {
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
     // under 'surge' the Catalyst is pure speed and the Surge carries the only element check
-    case 'Element': return ATTUNE_MODE === 'surge'
-      ? (isFight ? 'how fast you cast' : 'your Pace') : 'Initiative · match to Attune';
-    case 'Boost': return ATTUNE_MODE === 'surge'
-      ? '+power · same element = Attune' : '+power · match to amplify';
+    case 'Element': return 'Initiative · same element to Attune';
+    case 'Boost': return '+power · match to amplify';
     // mid-fight the Arsenal is the ONLY card that survives the exchange — say so, because
     // that is now the most consequential choice on the row.
     case 'Reserve': return S.fuse ? 'consumed by the Fuse'
@@ -2072,26 +2013,15 @@ function cardHTML(card) {
   const isFusedTop = S.phase === 'assign' && S.fuse && S.fuse.topId === card.id;
   const shownEl = isFusedTop ? S.fuse.element : d.element;
 
-  // the Attuned line shows what the card SEEKS (often not its own element) and
-  // what it becomes — including cross-type transforms (a Move that Attunes into an Attack)
-  const seekEl = enhElOf(card); // may be rewired by an Event
+  // the Attuned line shows what the card becomes when its element is matched
+  const seekEl = enhElOf(card);
   let enhLine = d.wild ? '🌈 Wild — any element as Catalyst' : '✨ —';
   if (seekEl) {
     const parts = [];
-    if (v.enhAtk != null) parts.push(`<span class="v-atk">⚔️ ${v.enhAtk}</span>`);
-    if (v.enhMove != null) parts.push(`<span class="v-move">👣 ${v.enhMove}</span>`);
-    // In the Spell slot this line is an ACTIVE REQUIREMENT ("go find me a Lightning Catalyst"),
-    // everywhere else it's just a fact about the card. Phrase it as the instruction where it
-    // is one — that's the exact confusion: "you got your spells, but it needs this other element".
-    // Under 'same', the sought element IS the card's own, so naming it again is pure noise —
+    if (v.attuned != null) parts.push(`<span class="v-attuned">✨ ${v.attuned}</span>`);
+    // The sought element IS the card's own element now, so naming it again is pure noise:
     // the line drops to the payoff alone and the card carries ONE element symbol.
-    const rewired = '';
-    const sameAsSelf = (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge');
-    enhLine = sameAsSelf
-      ? `matched → ${parts.join(' · ')}`
-      : zoneOf(card.id) === 'Spell'
-        ? `needs ${elIcon(seekEl)}${rewired} → ${parts.join(' · ')}`
-        : `${elIcon(seekEl)} attuned${rewired} → ${parts.join(' · ')}`;
+    enhLine = parts.length ? `matched → ${parts.join('')}` : '✨ —';
   }
   const forged = '';
 
@@ -2124,16 +2054,11 @@ function cardHTML(card) {
     } else {
       action = `<div class="card-action muted">already downgraded</div>`;
     }
-  } else if (S.phase === 'event' && S.event && (S.event.step === 'pickCard' || S.event.step === 'pickElement')) {
+  } else if (S.phase === 'event' && S.event && S.event.step === 'pickCard') {
     // Events used to pick a target from a list of bare NAMES — you couldn't see the stats you
     // were about to change, which on the Rewiring Pool means you couldn't see what the card
     // already seeks. Choose on the card itself, like soak/stack/upgrade already do.
-    if (S.event.step === 'pickElement') {
-      action = card.id === S.event.targetId
-        ? `<div class="card-action muted">choosing its new element…</div>` : '';
-    } else {
-      action = `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`;
-    }
+    action = `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`;
   } else if (S.phase === 'upgrade') {
     // show the cost on EVERY card so the economy is visible, greyed out when blocked
     if (card.level >= MAX_LEVEL) {
@@ -2151,9 +2076,9 @@ function cardHTML(card) {
   // Attack/Move centerpiece: always two rows, consistent across all cards.
   // Each stat is TAGGED so CSS can quiet whatever this encounter/slot doesn't use — the
   // numbers never leave (legible math), they just stop shouting all at once.
-  const vals =
-    `<div class="card-val v-atk">⚔️ ${v.atk != null ? v.atk : '<span class="dim">—</span>'}</div>` +
-    `<div class="card-val v-move">👣 ${v.move != null ? v.move : '<span class="dim">—</span>'}</div>`;
+  // ONE value: the encounter decides whether it reads as damage or as progress.
+  const valIcon = (S.encounter && S.encounter.type === 'journey') ? '👣' : '⚔️';
+  const vals = `<div class="card-val v-one">${valIcon} ${v.value}</div>`;
 
   const slot = zoneOf(card.id);
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
@@ -2359,8 +2284,7 @@ function resolveDuel() {
   const L = (text, cls = '') => ({ text, cls });
   const beats = [];
   const b1 = [];
-  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at value 1`));
-  else if (r.enhUsed) b1.push(L(`${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
+  if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
   else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' — unattuned, it will slip past the shields' : ''}`));
   if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → strike ${atk}`));
   if (shield) {

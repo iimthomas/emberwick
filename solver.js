@@ -346,7 +346,7 @@ const RUNSIM = (() => {
   }
   const allCards = () => [...S.hand, ...S.deck, ...S.discard];
   // crude "how much card is this" for the stack heuristic — its best single number
-  const bigness = c => { const e = eff(c); return Math.max(e.enhAtk || 0, e.atk || 0, e.enhMove || 0, e.move || 0); };
+  const bigness = c => { const e = eff(c); return Math.max(e.attuned || 0, e.value || 0); };
 
   function autoRun(withEvents) {
     freshGame();
@@ -394,7 +394,6 @@ const RUNSIM = (() => {
           const t = S.hand.slice().sort((a, b) => sacrifice ? a.level - b.level : b.level - a.level)[0];
           eventPickCard(t.id);
         }
-        else if (ev.step === 'pickElement') eventPickElement(dragonWeakness(S.dragon)[0] || 'Fire');
         else eventChoose(0);
       }
       else if (p === 'summary') {
