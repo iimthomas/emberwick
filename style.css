@@ -308,13 +308,47 @@ label.radio { margin-right: 14px; cursor: pointer; }
     linear-gradient(180deg, #0a0c10 0%, #121513 60%, #1f1a12 100%);
 }
 #scene svg { width: 100%; height: 100%; display: block; }
-.mage { position: absolute; left: 2%; bottom: 0; width: 21%; height: 78%; fill: #070605; }
-.foe { position: absolute; bottom: 0; }
-.foe-dragon { right: 5%; width: 44%; height: 92%; fill: #0a0806; }
-.foe-beast  { right: 12%; width: 28%; height: 62%; fill: #0a0806; }
+/* DEPTH: the mage is FOREGROUND (large, anchored to the very bottom edge); the foe is in the
+   MIDDLE DISTANCE, so it sits HIGHER in frame — further away reads as further up the ground
+   plane. Anchoring both to bottom:0 made them look like they stood on the same line. */
+.mage { position: absolute; left: 2%; bottom: -2%; width: 22%; height: 82%; fill: #070605; z-index: 2; }
+.foe { position: absolute; z-index: 1; }
+.foe-dragon { right: 4%; top: 2%; width: 46%; height: 84%; fill: #0a0806; }
+.foe-beast  { right: 9%;  top: 10%; width: 27%; height: 58%; fill: #0a0806; }
 .foe-road   {
-  right: 17%; bottom: 10%; width: 26%; height: 42%;
+  right: 14%; top: 26%; width: 26%; height: 38%;
   background: radial-gradient(50% 58% at 50% 60%, rgba(255,214,150,.22), transparent 72%);
+}
+
+/* ambient life so the scene reads as a PLACE, not a flat image (all cheap, no art needed):
+   a light pool grounding both figures, a breathing glow, and embers drifting up */
+.scene-floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 36%; pointer-events: none;
+  background: radial-gradient(58% 100% at 40% 104%, rgba(232,145,60,.22), transparent 72%);
+}
+.scene-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(40% 46% at 74% 44%, rgba(208,96,58,.20), transparent 74%);
+  animation: scene-breathe 7s ease-in-out infinite;
+}
+#scene.is-journey .scene-glow {
+  background: radial-gradient(44% 46% at 70% 40%, rgba(127,176,196,.14), transparent 74%);
+}
+#scene::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -20%; bottom: -20%;
+  pointer-events: none;
+  background-image:
+    radial-gradient(2px 2px at 18% 86%, rgba(255,198,112,.55), transparent 62%),
+    radial-gradient(2px 2px at 34% 94%, rgba(255,198,112,.40), transparent 62%),
+    radial-gradient(1.5px 1.5px at 52% 78%, rgba(255,198,112,.50), transparent 62%),
+    radial-gradient(2px 2px at 68% 90%, rgba(255,198,112,.35), transparent 62%),
+    radial-gradient(1.5px 1.5px at 82% 82%, rgba(255,198,112,.45), transparent 62%);
+  animation: motes-rise 17s linear infinite;
+}
+@keyframes scene-breathe { 0%, 100% { opacity: .72; } 50% { opacity: 1; } }
+@keyframes motes-rise { from { transform: translateY(12%); } to { transform: translateY(-24%); } }
+@media (prefers-reduced-motion: reduce) {
+  .scene-glow, #scene::after { animation: none; }
 }
 .scene-name {
   position: absolute; left: 12px; top: 9px;

@@ -1267,6 +1267,7 @@ function renderScene() {
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
   el.className = isFight ? 'is-fight' : 'is-journey';
   el.innerHTML =
+    `<div class="scene-glow"></div><div class="scene-floor"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
     `<div class="scene-name">${duel ? S.dragon.name : e ? e.name : ''}</div>` +
