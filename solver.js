@@ -374,11 +374,10 @@ const RUNSIM = (() => {
       else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
       else if (p === 'upgrade') { const up = S.hand.filter(c => upgradable(c)).sort((a, b) => b.level - a.level)[0]; if (up) upgrade(up.id); else doneUpgrading(); }
       // THE WHEEL (replaced the upgrade menu). Bot policy: never re-spin (coins bank fine),
-      // buy the best affordable offer — evolve > upgrade > charm — then close.
+      // buy the best affordable offer — upgrade > repair > charm — then close.
       else if (p === 'wheel') {
         const w = S.wheel;
-        if (w.choosing != null) { m.evolves = (m.evolves || 0) + 1; wheelPickBranch(0); continue; }
-        const rank = { evolve: 3, upgrade: 2, charm: 1 };
+        const rank = { upgrade: 3, repair: 2, charm: 1 };
         const buyable = w.offers
           .map((o, i) => ({ o, i }))
           .filter(x => x.o && x.o.kind !== 'none' && !x.o.bought && x.o.cost <= S.coins)

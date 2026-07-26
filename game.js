@@ -45,7 +45,9 @@ function foeBeatsForRegion() { return S.encounter && S.encounter.beats ? S.encou
 function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 
 // ---------- starter deck (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
-// Per-level stat tables: lv[level-1] = [value, enhValue, init, boost, armor, armorEl, upgradeCostToNext].
+// Per-level stat tables: lv[level-1] = [value, enhValue, init, boost, armor, (dead), upgradeCostToNext].
+// Column 6 held armorEl; DEAD DATA since soak doubling was cut 2026-07-26. Array shape kept so
+// the 68 hand-transcribed rows did not need rewriting in the same pass.
 // type = what the base Value is (attack/move/hybrid). enhEl = the element the Attuned form SEEKS
 // (often NOT the card's own element). enhType may DIFFER from type — a Move card can Attune into an Attack.
 const CARD_DEFS = [
@@ -236,44 +238,10 @@ const charmById = id => CHARMS.find(c => c.id === id);
 // The tension is the one already specced: one branch counters the known dragon, the other
 // dominates the run that gets you there.
 // ============================================================
-const EVOLUTIONS = {
-  Sparkstrike: [
-    { id: 'lancet',   name: 'Sparklance',   verb: 'pierce',
-      text: 'Its Attuned strike ignores armour entirely.' },
-    { id: 'stormcall', name: 'Stormcaller', verb: 'swift',
-      text: 'As your Catalyst, it grants +3 Initiative.' },
-  ],
-  Rimeguard: [
-    { id: 'bulwark',  name: 'Rimebulwark',  verb: 'bulwark',
-      text: 'It soaks double when you take damage.' },
-    { id: 'wellspr',  name: 'Rimewell',     verb: 'everecho',
-      text: 'As your Surge it always resonates, whatever the element.' },
-  ],
-  Headlong: [
-    { id: 'surefoot', name: 'Headlong Rush', verb: 'surefooted',
-      text: 'It never plays at 1 — wrong type, it uses its other value.' },
-    { id: 'anyflow',  name: 'Freeflow',      verb: 'everwild',
-      text: 'As your Catalyst it counts as any element.' },
-  ],
-  Trailblaze: [
-    { id: 'blazeon',  name: 'Wildfire Trail', verb: 'everecho',
-      text: 'As your Surge it always resonates, whatever the element.' },
-    { id: 'firstlgt', name: 'Firstlight',     verb: 'swift',
-      text: 'As your Catalyst, it grants +3 Initiative.' },
-  ],
-};
-function evolutionsFor(card) {
-  if (card.evolved) return null;                       // one evolution per card
-  return EVOLUTIONS[card.def.name] || null;
-}
-function hasVerb(card, verb) { return !!(card && card.evolved && card.evolvedVerb === verb); }
-function evolveCard(card, branch) {
-  card.evolved = branch.id;
-  card.evolvedVerb = branch.verb;
-  card.evolvedName = branch.name;
-  return `${card.def.name} evolves into ${branch.name} — ${branch.text}`;
-}
-const displayName = card => (card.evolvedName || card.def.name);
+// EVOLUTION CUT 2026-07-26 - it solved a symptom (flat/duplicate cards are a DATA problem),
+// every verb was an exception fighting the legibility pillar, and at ~10% a spin it was too
+// rare to be felt. Replaced by levelling-as-sharpening (02_Progression/).
+const displayName = card => card.def.name;
 function hasCharm(id) { return !!(S && S.charms && S.charms.includes(id)); }
 // sum a mod across held charms; `el` restricts element-gated charms to matching cards
 function charmMod(key, el) {
@@ -313,14 +281,10 @@ function saveGame() {
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
       const o = { id: c.id, n: CARD_DEFS.indexOf(c.def), lv: c.level };
-      if (c.armorMod) o.am = c.armorMod;
-      if (c.atkMod) o.at = c.atkMod;
-      if (c.enhElOverride) o.ee = c.enhElOverride;
-      if (c.evolved) { o.ev = c.evolved; o.evv = c.evolvedVerb; o.evn = c.evolvedName; }
       return o;
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 3, uid, dragon: S.dragon ? S.dragon.name : null,
+      v: 4, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn,
       deck: S.deck.map(card), hand: S.hand.map(card),
       discard: S.discard.map(card), trashed: S.trashed.map(card),
@@ -352,10 +316,6 @@ function loadGame() {
       const def = CARD_DEFS[s.n];
       if (!def) return null;
       const c = { id: s.id, def, level: s.lv };
-      if (s.am) c.armorMod = s.am;
-      if (s.at) c.atkMod = s.at;
-      if (s.ee) c.enhElOverride = s.ee;
-      if (s.ev) { c.evolved = s.ev; c.evolvedVerb = s.evv; c.evolvedName = s.evn; }
       return c;
     };
     const deck = d.deck.map(mk), hand = d.hand.map(mk), discard = d.discard.map(mk), trashed = d.trashed.map(mk);
@@ -501,15 +461,15 @@ function eff(card) {
   const [v, ev, init, boost, armor, armorEl, cost] = d.lv[card.level - 1];
   // run-layer reforge mods (from Events): +armor / −attack, floored at 0. Move is untouched.
   // Charms stack on top, element-gated ones only for cards of that element.
-  const am = (card.armorMod || 0) + charmMod('armor', d.element);
-  const at = (card.atkMod || 0) + charmMod('atk', d.element);
+  const am = charmMod('armor', d.element);
+  const at = charmMod('atk', d.element);
   const adj = x => x == null ? null : Math.max(0, x + at);
   return {
     atk:  d.type    !== 'move'   ? adj(v)  : null,
     move: d.type    !== 'attack' ? v  : null,
     enhAtk:  ev != null && d.enhType !== 'move'   ? adj(ev) : null,
     enhMove: ev != null && d.enhType !== 'attack' ? ev : null,
-    init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), armorEl, cost,
+    init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
   };
 }
 
@@ -558,7 +518,6 @@ var ATTUNE_MODE = 'cycle';
 // under 'surge': is a matching Surge SPENT on the transformation (no boost on top)?
 var SURGE_SPENT = true;
 function enhElOf(card) {
-  if (card.enhElOverride) return card.enhElOverride;
   if (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge') return card.def.element;
   if (CYCLE_MODE && card.def.element) return SEEKS[card.def.element];
   return card.def.enhEl;
@@ -863,8 +822,8 @@ function computeAction(reserve) {
   // Resonance disappears as a separate idea because the Surge match IS the attune.
   const surgeMode = ATTUNE_MODE === 'surge';
   const isEnh = surgeMode
-    ? !!(boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everwild') || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl))
-    : !!(elem && enhEl && (elem.def.wild || hasVerb(elem, 'everwild') || elOf(elem) === enhEl));
+    ? !!(boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl))
+    : !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
   // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
   // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
   // you can manufacture a resonance by fusing an off-element pair into the one you need.
@@ -874,7 +833,7 @@ function computeAction(reserve) {
   // under 'surge' the match IS the attune, so there is no second feeding to resonate — the
   // concept folds away entirely rather than sitting on top as a bonus-on-a-bonus.
   const resonant = surgeMode ? false
-    : !!(isEnh && boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl));
+    : !!(isEnh && boostC && enhEl && (boostC.def.wild || elOf(boostC) === enhEl));
   // 🔑 THE SURGE FORK. If a matching Surge granted the Attune *and* its boost, one card would
   // solve two problems and attuning would be near-automatic (measured: obligation 39→44%).
   // So a matching Surge is SPENT on the transformation — it gives the Attuned value, not its
@@ -886,7 +845,7 @@ function computeAction(reserve) {
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = elem ? eff(elem).init + (hasVerb(elem, 'swift') ? 3 : 0) : 0;
+  const elemInit = elem ? eff(elem).init : 0;
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
   const nightCut = boostVal - boostEff;
@@ -902,11 +861,11 @@ function computeAction(reserve) {
     const enhUsed = isEnh && sEff.enhAtk != null;
     const wrongType = !enhUsed && sEff.atk == null;
     // `surefooted` (evolution): a wrong-type spell falls back to its other value instead of 1
-    const wrongVal = hasVerb(spell, 'surefooted') && sEff.move != null ? sEff.move : 1;
+    const wrongVal = 1;
     const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : wrongVal);
     const withBoost = base + boostEff;
     // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
-    const armorHit = (enhUsed && !hasVerb(spell, 'pierce')) ? (e.armor || []).find(a => a.el === enhEl) : null;
+    const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
     const armorCut = armorHit ? armorHit.v : 0;
     let value = Math.max(0, withBoost - armorCut);
     // Slow: may compare Move instead of Attack — best result is used
@@ -934,10 +893,13 @@ function computeAction(reserve) {
   // journeys: cross-type in reverse — an Attack card whose Attuned form is a Move can travel when sparked
   const enhUsed = isEnh && sEff.enhMove != null;
   const wrongType = !enhUsed && sEff.move == null;
-  const wrongVal = hasVerb(spell, 'surefooted') && sEff.atk != null ? sEff.atk : 1;
+  const wrongVal = 1;
   const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : wrongVal);
   const withBoost = base + boostEff;
-  const reserveBonus = enhUsed && e.element && e.element === enhEl && reserve ? eff(reserve).boost : 0;
+  // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
+  // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
+  // Pace and perils. Kept as a zeroed field so the log/solver result shapes do not change.
+  const reserveBonus = 0;
   const value = withBoost + reserveBonus;
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
@@ -1207,7 +1169,7 @@ function resolve() {
     else if (r.enhUsed) b1.push(L(`Move: ${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
     else b1.push(L(`Move: basic Move ${r.base}${r.isEnh ? ' (its Attuned form is an Attack)' : ''}`));
     if (boostC && S.boostTarget === 'Move') b1.push(L(`Boost: +${r.boostEff} → Move ${r.withBoost}`));
-    if (r.reserveBonus) b1.push(L(`Attuned Move matches journey element (${e.element}) → your Arsenal ${reserve.def.name} adds its Boost +${r.reserveBonus} = ${r.value}`, 'good'));
+
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
@@ -1330,10 +1292,11 @@ function finishResolve() {
 
 // ---------- Phase 3: soak damage by downgrading ----------
 function soakValue(card) {
+  // SOAK DOUBLING CUT 2026-07-26 - an element check in the most stressful phase in the game,
+  // and a rule no non-elemental class could ever join. Armour simply soaks its printed value.
   const armor = eff(card).armor || 0;
   if (armor <= 0) return 0;
-  const doubled = eff(card).armorEl && S.damageEl && eff(card).armorEl === S.damageEl;
-  return armor * (doubled ? 2 : 1) * (hasVerb(card, 'bulwark') ? 2 : 1) + charmMod('soak', card.def.element);
+  return armor + charmMod('soak', card.def.element);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -1425,15 +1388,6 @@ function upgradable(card) {
 function rollOffer(rich) {
   const roll = Math.random();
   const heldCharms = S.charms || [];
-  // ✦ EVOLUTION — the rare result, and the jackpot the Wheel was built for. Only offered
-  // to cards that actually have branches and haven't evolved yet.
-  const evolvable = ownedCards().filter(c => evolutionsFor(c));
-  if (evolvable.length && roll < (rich ? 0.22 : 0.10)) {
-    const c = rand(evolvable);
-    const branches = evolutionsFor(c);
-    return { kind: 'evolve', cardId: c.id, name: c.def.name, rarity: 'rare',
-             text: `Evolve ${c.def.name} — choose its new form`, cost: rich ? 10 : 12, branches };
-  }
   const pool = CHARMS.filter(c => !heldCharms.includes(c.id) &&
     (rich ? true : c.rarity !== 'rare'));
   // a Charm shows up more often at camp
@@ -1486,12 +1440,6 @@ function wheelBuy(i) {
     if (!c || c.level >= MAX_LEVEL) { o.bought = true; log(`${o.name} is already at its peak — nothing to buy.`); render(); return; }
   }
   S.coins -= o.cost;
-  if (o.kind === 'evolve') {
-    S.coins += o.cost;                       // not spent until a branch is chosen
-    w.choosing = i;                          // open the branch picker
-    render();
-    return;
-  }
   if (o.kind === 'charm') {
     S.charms.push(o.id);
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -1504,19 +1452,6 @@ function wheelBuy(i) {
   o.bought = true;
   render();
 }
-
-function wheelPickBranch(bi) {
-  const w = S.wheel; if (!w || w.choosing == null) return;
-  const o = w.offers[w.choosing];
-  const card = anyCardById(o.cardId), branch = o.branches[bi];
-  if (!card || !branch || o.cost > S.coins) return;
-  S.coins -= o.cost;
-  logHeader(`✦ ${card.def.name} EVOLVES`);
-  log(evolveCard(card, branch), 'good result');
-  o.bought = true; w.choosing = null;
-  render();
-}
-function wheelCancelBranch() { if (S.wheel) { S.wheel.choosing = null; render(); } }
 
 function wheelReroll() {
   if (!S.wheel || S.coins < REROLL_COST) return;
@@ -1605,16 +1540,8 @@ function evLevel(card, delta) {
   }
   card.level--; return `${card.def.name} dims to Lv${card.level}.`;
 }
-function evReforge(card, armor, atk) {
-  card.armorMod = (card.armorMod || 0) + armor;
-  card.atkMod = (card.atkMod || 0) + atk;
-  const v = eff(card);
-  return `${card.def.name} is reforged (🛡️ ${v.armor} · ⚔️ ${v.atk != null ? v.atk : '—'}).`;
-}
-function evRewire(card, el) {
-  card.enhElOverride = el;
-  return `${card.def.name} now seeks ${elIcon(el)} ${el} to Attune.`;
-}
+// evReforge / evRewire CUT 2026-07-26 - permanently rewriting a card makes it stop being the
+// card you learned. Events that only change LEVEL survive (Chandler, Kiln, Toll).
 // upgrade up to n random still-upgradeable hand cards (a "windfall"/"chunk of XP" expressed as levels)
 function evUpgradeRandom(n, excludeId) {
   const pool = shuffle(S.hand.filter(c => c.level < MAX_LEVEL && c.id !== excludeId));
@@ -1644,18 +1571,6 @@ const EVENTS = [
     flavor: "A woodcutter's hut, the hearth still warm. A night here is enough to mend a frayed tool.",
     options: [
       { label: 'Mend a card — +1 level', need: 'card', apply: ({ card }) => evLevel(card, +1) },
-    ] },
-  { id: 'warden', name: 'The Moss Warden',
-    flavor: "A stone warden half-sunk in moss hums as you pass. It will lend its guard — for a measure of your speed.",
-    options: [
-      { label: 'Take its guard — a card gains +2 armor, −1 attack', need: 'card', apply: ({ card }) => evReforge(card, +2, -1) },
-      { label: 'Refuse — nothing', need: 'none', apply: () => ['You bow to the warden and pass by.'] },
-    ] },
-  { id: 'rewiring', name: 'The Rewiring Pool',
-    flavor: "A still pool shows not your face but your craft, rearranged. Reach in, and something changes what it reaches for.",
-    options: [
-      { label: 'Reach in — rewire a card to seek a new element', need: 'cardElement', apply: ({ card, element }) => evRewire(card, element) },
-      { label: 'Leave it still — nothing', need: 'none', apply: () => ['You let the water settle and move on.'] },
     ] },
   { id: 'kiln', name: 'The Kiln of Trials',
     flavor: "An old firing-kiln, its coals banked low. Temper a card here and it comes out changed — hardened, or cracked.",
@@ -1699,7 +1614,7 @@ const EVENTS = [
         apply: () => { const roll = Math.floor(Math.random() * 4);
           if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
           if (roll === 1) return ['The fen takes. ' + evCurseNextFight()];
-          if (roll === 2) { const c = rand(S.hand); const w = dragonWeakness(S.dragon)[0] || 'Fire'; return ['The fen reshapes. ' + evRewire(c, w)]; }
+          if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
           S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; } },
       { label: 'Look away — nothing', need: 'none', apply: () => ['You look away before it shows you too much.'] },
     ] },
@@ -1989,25 +1904,11 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">PHASE 3 — PENALTY</div>` +
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
-      (S.damageEl ? ` (enemy attacks with ${elChip(S.damageEl)} — matching armor soaks double)` : '') +
+      (S.damageEl ? ` (${elChip(S.damageEl)} damage)` : '') +
       `. Click a card to Downgrade it (soaks its Armor value). Level 1 cards are Trashed.</div>`;
   } else if (S.phase === 'wheel') {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
-    if (w.choosing != null) {           // ✦ choosing an evolution branch
-      const o = w.offers[w.choosing];
-      const card = anyCardById(o.cardId);
-      c.innerHTML =
-        `<div class="phase-label">✦ ${(card ? card.def.name : '').toUpperCase()} IS READY TO EVOLVE</div>` +
-        `<div class="hint">Choose its new form. This is permanent — and it grants a new <b>ability</b>, not a bigger number.</div>` +
-        `<div class="wheel-row">` + o.branches.map((b, bi) =>
-          `<div class="wheel-offer r-rare"><div class="wo-rar">✦ EVOLUTION</div>` +
-          `<div class="wo-name">${b.name}</div><div class="wo-text">${b.text}</div>` +
-          `<button class="wo-buy" onclick="wheelPickBranch(${bi})" ${o.cost <= S.coins ? '' : 'disabled'}>🪙 ${o.cost}</button></div>`
-        ).join('') + `</div>` +
-        `<button onclick="wheelCancelBranch()">← not yet</button>`;
-      return;
-    }
     const canReroll = S.coins >= REROLL_COST;
     const offers = w.offers.map((o, i) => {
       const afford = o.cost <= S.coins && o.kind !== 'none';
@@ -2184,15 +2085,15 @@ function cardHTML(card) {
     // is one — that's the exact confusion: "you got your spells, but it needs this other element".
     // Under 'same', the sought element IS the card's own, so naming it again is pure noise —
     // the line drops to the payoff alone and the card carries ONE element symbol.
-    const rewired = card.enhElOverride ? '↺' : '';
-    const sameAsSelf = (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge') && !card.enhElOverride;
+    const rewired = '';
+    const sameAsSelf = (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge');
     enhLine = sameAsSelf
       ? `matched → ${parts.join(' · ')}`
       : zoneOf(card.id) === 'Spell'
         ? `needs ${elIcon(seekEl)}${rewired} → ${parts.join(' · ')}`
         : `${elIcon(seekEl)} attuned${rewired} → ${parts.join(' · ')}`;
   }
-  const forged = (card.armorMod || card.atkMod) ? ' ◈' : ''; // reforged marker
+  const forged = '';
 
   let action = '';
   if (S.diverting) {
@@ -2261,7 +2162,7 @@ function cardHTML(card) {
   // the Surge slot taller than its neighbours. No extra row now, so all four stay level.
   const spellCard = cardById(S.assign.Spell);
   const wantEl = spellCard ? enhElOf(spellCard) : null;
-  const wouldResonate = wantEl && (card.def.wild || hasVerb(card, 'everecho') || elOf(card) === wantEl);
+  const wouldResonate = wantEl && (card.def.wild || elOf(card) === wantEl);
   const resoOn = slot === 'Boost' && wantEl && wouldResonate;
   const boostPicker = '';
 
@@ -2278,15 +2179,14 @@ function cardHTML(card) {
            ` onclick="event.stopPropagation(); tapCard(${card.id})"` +
            ` ondragover="fuseOver(event, ${card.id})" ondragleave="fuseLeave(event)" ondrop="fuseDrop(event, ${card.id})"` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
-    `<div class="card-head"><span class="card-name${card.evolved ? ' evolved' : ''}">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
-    (card.evolved ? `<div class="evo-verb">✦ ${(EVOLUTIONS[d.name] || []).filter(b => b.id === card.evolved).map(b => b.text)[0] || ''}</div>` : '') +
+    `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     `<div class="el-identity">${elChip(shownEl)}</div>` +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
     `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
     `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
     `<div class="card-vals">${vals}</div>` +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
-    `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor + (v.armorEl ? ' ' + elIcon(v.armorEl) : '') : '—'}</span></div>` +
+    `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
     action + `</div>`;
 }
 
