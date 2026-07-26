@@ -555,9 +555,11 @@ const SEEKS = { Fire: 'Lightning', Stone: 'Fire', Water: 'Stone', Lightning: 'Wa
 //             element fact instead of two, and the attack finally deals the damage type the
 //             spell's own element promises.
 var ATTUNE_MODE = 'cycle';
+// under 'surge': is a matching Surge SPENT on the transformation (no boost on top)?
+var SURGE_SPENT = true;
 function enhElOf(card) {
   if (card.enhElOverride) return card.enhElOverride;
-  if (ATTUNE_MODE === 'same') return card.def.element;
+  if (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge') return card.def.element;
   if (CYCLE_MODE && card.def.element) return SEEKS[card.def.element];
   return card.def.enhEl;
 }
@@ -854,15 +856,33 @@ function computeAction(reserve) {
   // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
   // (enhEl — often not the card's own element). A wild Catalyst matches anything.
   const enhEl = enhElOf(spell);
-  const isEnh = !!(elem && enhEl && (elem.def.wild || hasVerb(elem, 'everwild') || elOf(elem) === enhEl));
+  // 🔮 ATTUNE_MODE 'surge' — THE STREAMLINED MAGE. The element check moves OFF the Catalyst and
+  // onto the SURGE, and it's same-element: your Surge shares the Spell's element → it Attunes.
+  // Each slot then asks exactly ONE question — Spell: what? · Catalyst: how fast? · Surge: how
+  // hard? · Arsenal: what next? — and elements appear in exactly one place on the whole turn.
+  // Resonance disappears as a separate idea because the Surge match IS the attune.
+  const surgeMode = ATTUNE_MODE === 'surge';
+  const isEnh = surgeMode
+    ? !!(boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everwild') || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl))
+    : !!(elem && enhEl && (elem.def.wild || hasVerb(elem, 'everwild') || elOf(elem) === enhEl));
   // RESONANCE (2026-07-26): the Surge doubles when it feeds the SAME element the Spell seeks.
   // Feed the spell once to attune, twice to resonate. Reads the FUSED element via elOf(), so
   // you can manufacture a resonance by fusing an off-element pair into the one you need.
   // Resonance is the SECOND feeding — it requires the spell to already be attuned. Without
   // this, you could double the Surge while feeding the Catalyst something the spell doesn't
   // want, which breaks the escalation ("feed it once to attune, twice to resonate").
-  const resonant = !!(isEnh && boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl));
-  const boostVal = boostC ? (resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT) : eff(boostC).boost) : 0;
+  // under 'surge' the match IS the attune, so there is no second feeding to resonate — the
+  // concept folds away entirely rather than sitting on top as a bonus-on-a-bonus.
+  const resonant = surgeMode ? false
+    : !!(isEnh && boostC && enhEl && (boostC.def.wild || hasVerb(boostC, 'everecho') || elOf(boostC) === enhEl));
+  // 🔑 THE SURGE FORK. If a matching Surge granted the Attune *and* its boost, one card would
+  // solve two problems and attuning would be near-automatic (measured: obligation 39→44%).
+  // So a matching Surge is SPENT on the transformation — it gives the Attuned value, not its
+  // number. That makes the slot a real either/or: a big flat boost, or the Attune.
+  const boostVal = !boostC ? 0
+    : (surgeMode && isEnh) ? (SURGE_SPENT ? 0 : eff(boostC).boost)
+    : resonant ? Math.ceil(eff(boostC).boost * RESONANCE_MULT)
+    : eff(boostC).boost;
 
   const h = S.hardship;
   const ability = e.ability || null;
@@ -981,7 +1001,7 @@ function resolveFightBeat() {
   const beats = [];
   const b1 = [];
   if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at 1`));
-  else if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
+  else if (r.enhUsed) b1.push(L(`${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
   else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
   if (boostC) b1.push(L(`Surge: +${r.boostEff}${r.resonant ? ` (${elIcon(r.enhEl)} RESONANCE!)` : ''} → ${r.withBoost}`, r.resonant ? 'good' : ''));
   if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} → −${r.armorCut} = ${r.value}`, 'bad'));
@@ -1161,7 +1181,7 @@ function resolve() {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.wrongType) b1.push(L(`Attack: ${spell.def.name} has no Attack — wrong-type Spell plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Attack: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
+    else if (r.enhUsed) b1.push(L(`Attack: ${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
     else b1.push(L(`Attack: basic Atk ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
     if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Boost: +${r.boostEff} → Attack ${r.withBoost}`));
     if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} — your Attuned strike is turned → −${r.armorCut} = ${r.value}`, 'bad'));
@@ -1184,7 +1204,7 @@ function resolve() {
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.wrongType) b1.push(L(`Move: ${spell.def.name} has no Move — wrong-type Spell plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Move: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
+    else if (r.enhUsed) b1.push(L(`Move: ${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
     else b1.push(L(`Move: basic Move ${r.base}${r.isEnh ? ' (its Attuned form is an Attack)' : ''}`));
     if (boostC && S.boostTarget === 'Move') b1.push(L(`Boost: +${r.boostEff} → Move ${r.withBoost}`));
     if (r.reserveBonus) b1.push(L(`Attuned Move matches journey element (${e.element}) → your Arsenal ${reserve.def.name} adds its Boost +${r.reserveBonus} = ${r.value}`, 'good'));
@@ -2081,8 +2101,11 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
-    case 'Element': return 'Initiative · match to Attune';
-    case 'Boost': return '+power · match to amplify';
+    // under 'surge' the Catalyst is pure speed and the Surge carries the only element check
+    case 'Element': return ATTUNE_MODE === 'surge'
+      ? (isFight ? 'how fast you cast' : 'your Pace') : 'Initiative · match to Attune';
+    case 'Boost': return ATTUNE_MODE === 'surge'
+      ? '+power · same element = Attune' : '+power · match to amplify';
     // mid-fight the Arsenal is the ONLY card that survives the exchange — say so, because
     // that is now the most consequential choice on the row.
     case 'Reserve': return S.fuse ? 'consumed by the Fuse'
@@ -2162,7 +2185,7 @@ function cardHTML(card) {
     // Under 'same', the sought element IS the card's own, so naming it again is pure noise —
     // the line drops to the payoff alone and the card carries ONE element symbol.
     const rewired = card.enhElOverride ? '↺' : '';
-    const sameAsSelf = ATTUNE_MODE === 'same' && !card.enhElOverride;
+    const sameAsSelf = (ATTUNE_MODE === 'same' || ATTUNE_MODE === 'surge') && !card.enhElOverride;
     enhLine = sameAsSelf
       ? `matched → ${parts.join(' · ')}`
       : zoneOf(card.id) === 'Spell'
@@ -2437,7 +2460,7 @@ function resolveDuel() {
   const beats = [];
   const b1 = [];
   if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at value 1`));
-  else if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
+  else if (r.enhUsed) b1.push(L(`${ATTUNE_MODE === 'surge' ? 'Surge' : 'Catalyst'} ${(ATTUNE_MODE === 'surge' ? r.boostC : elem).def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(ATTUNE_MODE === 'surge' ? r.boostC : elem)} matches`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
   else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' — unattuned, it will slip past the shields' : ''}`));
   if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → strike ${atk}`));
   if (shield) {
