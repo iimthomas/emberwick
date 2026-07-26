@@ -506,16 +506,17 @@ function dropOn(ev, zone) {
   ev.currentTarget.classList.remove('drag-over');
   if (!isAssignPhase() || dragId == null) return;
   if (zone === 'Reserve' && S.fuse) { dragId = null; return; } // fusing consumes the would-be Reserve
-  assignToZone(dragId, zone);
+  assignRole(dragId, zone); // swaps with whoever holds that role
   dragId = null;
 }
 
 // ---------- fusing (drag one card onto another of the same element) ----------
+// In the slot-row model every card is always seated, so fusing no longer requires unplaced cards —
+// only that they share an element (and that no fuse is active yet).
 function canFuse(bottomId, topId) {
   if (S.phase !== 'assign' || S.fuse || bottomId === topId) return false;
   const a = cardById(bottomId), b = cardById(topId);
-  return !!(a && b && !zoneOf(a.id) && !zoneOf(b.id) &&
-            a.def.element && a.def.element === b.def.element);
+  return !!(a && b && a.def.element && a.def.element === b.def.element);
 }
 
 function fuseOver(ev, topId) {
@@ -532,8 +533,8 @@ function fuseDrop(ev, topId) {
   ev.preventDefault();
   ev.stopPropagation();
   S.fuse = { topId, bottomId: dragId, element: cardById(topId).def.element };
-  if (S.assign.Reserve) S.assign.Reserve = null; // no Reserve is possible while fused
   dragId = null;
+  normalizeAssign(); compactSlots(); // the consumed card frees its slot; close the gap
   render();
 }
 
@@ -541,28 +542,47 @@ function setFuseElement(el) { if (S.fuse && S.phase === 'assign') { S.fuse.eleme
 
 function unfuse() { if (S.phase === 'assign') { S.fuse = null; render(); } }
 
-// ---------- tap-to-place (touch devices — coexists with drag & drop) ----------
-// Tapping a card selects it and reveals its role buttons (Wick/Spark/Tinder/Ember + Fuse).
+// ---------- the slot row: select a card, then swap it with another (or with a role) ----------
 function tapCard(id) {
   if (!isAssignPhase() || S.diverting) return;
   // fuse mode (armed via the Fuse button): the next valid same-element partner completes the fuse
   if (S.fuseArm && S.selectedId != null && S.selectedId !== id && canFuse(S.selectedId, id)) {
     S.fuse = { topId: id, bottomId: S.selectedId, element: cardById(id).def.element };
-    if (S.assign.Reserve) S.assign.Reserve = null;
     S.selectedId = null; S.fuseArm = false;
+    normalizeAssign(); compactSlots(); // the consumed card frees its slot; close the gap
     render();
     return;
   }
   S.fuseArm = false;
+  // a card is already picked up → tapping a second card SWAPS the two
+  if (S.selectedId != null && S.selectedId !== id) {
+    swapCards(S.selectedId, id);
+    S.selectedId = null;
+    render();
+    return;
+  }
   S.selectedId = (S.selectedId === id) ? null : id; // toggle
   render();
 }
 
-// assign straight from a card's role button (role = 'Spell'|'Element'|'Boost'|'Reserve' or null → hand)
+// exchange two cards' slots — the labels never move, the cards do
+function swapCards(idA, idB) {
+  const za = zoneOf(idA), zb = zoneOf(idB);
+  if (!za || !zb) return;
+  S.assign[za] = idB;
+  S.assign[zb] = idA;
+}
+
+// send a card to a named role; whoever was there takes the mover's old slot (a swap, never a displace)
 function assignRole(cardId, role) {
-  if (!isAssignPhase()) return;
+  if (!isAssignPhase() || !role) return;
   S.selectedId = null; S.fuseArm = false;
-  assignToZone(cardId, role); // renders
+  const from = zoneOf(cardId);
+  if (from === role) { render(); return; }
+  const occupant = S.assign[role] || null;
+  if (from) S.assign[from] = occupant;
+  S.assign[role] = cardId;
+  render();
 }
 function armFuse(cardId) { if (isAssignPhase()) { S.selectedId = cardId; S.fuseArm = true; render(); } }
 function cancelFuseArm() { S.fuseArm = false; S.selectedId = null; render(); }
@@ -570,9 +590,7 @@ function cancelFuseArm() { S.fuseArm = false; S.selectedId = null; render(); }
 function tapZone(zone) {
   if (!isAssignPhase() || S.selectedId == null) return;
   if (zone === 'Reserve' && S.fuse) return;
-  const id = S.selectedId;
-  S.selectedId = null; S.fuseArm = false;
-  assignToZone(id, zone);
+  assignRole(S.selectedId, zone);
 }
 
 function tapHand() {
@@ -592,14 +610,30 @@ function assignToZone(cardId, zone) {
 }
 
 // auto-slide the last unassigned card into the Reserve zone once the roles are set
+// THE SLOT ROW (2026-07-06, Thomas's design): there is no separate hand — every card in hand
+// sits in one of the four labelled slots, and the labels never move. POSITION IS THE ROLE, so
+// arranging a turn is *swapping cards around*, not placing them into boxes. Saves the whole
+// hand region (the space the 16:9 scene needs) and makes every card always visible.
 function normalizeAssign() {
   if (!isAssignPhase()) return;
-  for (const z of activeZones()) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
-  if (S.fuse) return; // a fused bottom card never becomes a Reserve
-  if (S.hand.length === HAND_SIZE && ROLES.every(r => S.assign[r]) && !S.assign.Reserve) {
-    const leftover = S.hand.find(c => !zoneOf(c.id));
-    if (leftover) S.assign.Reserve = leftover.id;
+  for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
+  // a fused bottom card is consumed — it holds no slot (and there's no Ember while fused)
+  if (S.fuse) for (const z of ZONES) if (S.assign[z] === S.fuse.bottomId) S.assign[z] = null;
+  // seat any card that isn't in a slot yet, left → right
+  const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
+  for (const card of S.hand) {
+    if (seated.has(card.id) || isFuseBottom(card.id)) continue;
+    const free = ZONES.find(z => !S.assign[z]);
+    if (!free) break;
+    S.assign[free] = card.id;
+    seated.add(card.id);
   }
+}
+
+// pull cards leftward so there's no gap mid-row (used after a fuse consumes a card)
+function compactSlots() {
+  const ids = ZONES.map(z => S.assign[z]).filter(Boolean);
+  ZONES.forEach((z, i) => { S.assign[z] = ids[i] || null; });
 }
 
 function rolesValid() {
@@ -1185,8 +1219,7 @@ function render() {
   renderStatus();
   renderEncounter();
   renderControls();
-  renderZones();
-  renderHand();
+  renderSlots();
   renderLog();
 }
 
@@ -1309,7 +1342,7 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
-      `<b>Tap a card</b>, then tap where it goes — <b>Wick</b> (your spell), <b>Spark</b> (ignites it), <b>Tinder</b> (fuel), or <b>Ember</b> (kept for next turn). Tap ↩ Hand to pull it back. (On desktop you can also drag.)` +
+      `Your cards sit under the four roles — <b>Wick</b> (your spell), <b>Spark</b> (ignites it), <b>Tinder</b> (fuel), <b>Ember</b> (kept for next turn). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
       ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Ember.` +
       `</div></details>`;
     c.innerHTML =
@@ -1405,39 +1438,27 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
-    case 'Element': return 'Initiative + Ether (match your Wick = Kindled)';
+    case 'Element': return 'Initiative · match the Wick to Kindle';
     case 'Boost': return `+value → ${S.boostTarget}`;
-    case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn (automatic)';
+    case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn';
   }
 }
 
-function renderZones() {
-  const panel = $('zones-panel');
+// ONE row, four fixed labels, cards swap between them. Replaces the old zones + hand panels.
+function renderSlots() {
+  const panel = $('slots-panel');
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') { panel.innerHTML = ''; return; }
   const dnd = isAssignPhase();
-  panel.innerHTML = activeZones().map(zone => {
+  panel.innerHTML = ZONES.map(zone => {
     const card = cardById(S.assign[zone]);
-    const base = zone.replace(/[AB]$/, '');
-    const label = slotLabel(zone).toUpperCase();
-    return `<div class="zone zone-${base} ${card ? 'filled' : ''}"` +
+    return `<div class="slot slot-${zone} ${card ? 'filled' : ''}"` +
       (dnd ? ` ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event, '${zone}')" onclick="tapZone('${zone}')"` : '') +
-      `><div class="zone-label">${label}</div>` +
-      `<div class="zone-hint">${zoneHint(zone)}</div>` +
-      (card ? cardHTML(card) : `<div class="zone-empty">${zone === 'Reserve' && S.fuse ? 'no Ember — fused' : dnd ? 'drop a card' : '—'}</div>`) +
+      `><div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}</span>` +
+      `<span class="slot-hint">${zoneHint(zone)}</span></div>` +
+      (card ? cardHTML(card)
+            : `<div class="slot-empty">${zone === 'Reserve' && S.fuse ? 'no Ember — fused' : '—'}</div>`) +
       `</div>`;
   }).join('');
-}
-
-function renderHand() {
-  const panel = $('hand-panel');
-  if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') { panel.innerHTML = ''; return; }
-  const dnd = isAssignPhase();
-  // during assignment the fused bottom card is hidden ("slid behind" the top card)
-  const unassigned = S.hand.filter(c => !zoneOf(c.id) && !(S.phase === 'assign' && isFuseBottom(c.id)));
-  panel.innerHTML =
-    `<div class="hand-label">HAND</div><div class="hand-cards"` +
-    (dnd ? ` ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event, null)" onclick="tapHand()"` : '') +
-    `>` + (unassigned.length ? unassigned.map(cardHTML).join('') : `<div class="zone-empty">${dnd ? 'all cards placed' : 'empty'}</div>`) + `</div>`;
 }
 
 // Per-card visual identity (2026-07-06): each card wears its own arcane SIGIL — a mage's mark,
@@ -1461,12 +1482,11 @@ function roleButtons(card) {
     const active = cur === role;
     return `<button class="rolebtn r-${role} ${active ? 'active' : ''}" onclick="event.stopPropagation(); assignRole(${card.id}, '${role}')">${label}${active ? ' ✓' : ''}</button>`;
   }).join('');
-  // Fuse — only when this card is unplaced and a same-element partner sits in hand
-  const hasPartner = !cur && !S.fuse && card.def.element &&
-    S.hand.some(o => o.id !== card.id && !zoneOf(o.id) && !isFuseBottom(o.id) && o.def.element === card.def.element);
+  // Fuse — whenever a same-element partner is in the row
+  const hasPartner = !S.fuse && card.def.element &&
+    S.hand.some(o => o.id !== card.id && !isFuseBottom(o.id) && o.def.element === card.def.element);
   const fuse = hasPartner ? `<button class="rolebtn r-fuse" onclick="event.stopPropagation(); armFuse(${card.id})">Fuse</button>` : '';
-  const back = cur ? `<button class="rolebtn r-hand" onclick="event.stopPropagation(); assignRole(${card.id}, null)">↩ Hand</button>` : '';
-  return `<div class="role-bar">${btns}${fuse}${back}</div>`;
+  return `<div class="role-bar">${btns}${fuse}</div>`;
 }
 function fuseArmHint(card) {
   return `<div class="role-bar fuse-arm"><span class="fuse-arm-tip">Tap another ${elIcon(card.def.element)} ${card.def.element} card to fuse into ${card.def.name}</span>` +
