@@ -4,10 +4,10 @@
    Runs in the same global scope as game.js, so it scores plays through
    the REAL computeAction() — the bot and the game can never disagree.
 
-   It brute-forces every role assignment (Wick/Spark/Tinder/Ember +
+   It brute-forces every role assignment (Spell/Catalyst/Surge/Arsenal +
    boost target) of sampled hands against every encounter, finds the
    optimal play, and aggregates the questions from Solver_Bot.md — above
-   all: is the Kindle a genuine CHOICE, or kindled-or-bust?
+   all: is the Attune a genuine CHOICE, or attuned-or-bust?
 
    Hardships are excluded here — we measure the clean turn puzzle; the
    Hardship axis is separate.
@@ -57,13 +57,13 @@ const SOLVER = (() => {
 
     for (let w = 0; w < hand.length; w++) {
       const rest = hand.filter((_, i) => i !== w);
-      // Spark: none, or any non-Wick card
+      // Catalyst: none, or any non-Spell card
       const sparkOpts = [null, ...rest];
       for (const spark of sparkOpts) {
         const afterSpark = rest.filter(c => c !== spark);
         const tinderOpts = [null, ...afterSpark];
         for (const tinder of tinderOpts) {
-          // Ember = the leftover most useful as Reserve (highest boost) — journeys use it
+          // Arsenal = the leftover most useful as Reserve (highest boost) — journeys use it
           const leftovers = afterSpark.filter(c => c !== tinder);
           const ember = leftovers.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
           for (const bt of boostTargets) {
@@ -101,11 +101,11 @@ const SOLVER = (() => {
     const isFight = encounter.type === 'fight';
     const m = {
       name: encounter.name, type: encounter.type, N,
-      kindleAvail: 0, bestKindles: 0,
-      kindleRequiredTier: 0,   // among kindle-avail: best tier > best-unkindled tier
-      kindleOptional: 0,       // among kindle-avail: unkindled reaches same tier
-      noKindleLoss: 0,         // among NO-kindle-avail hands: best is a Loss
-      noKindleHands: 0,
+      attuneAvail: 0, bestAttunes: 0,
+      attuneRequiredTier: 0,   // among attune-avail: best tier > best-unattuned tier
+      attuneOptional: 0,       // among attune-avail: unattuned reaches same tier
+      noAttuneLoss: 0,         // among NO-attune-avail hands: best is a Loss
+      noAttuneHands: 0,
       tinderPlays: 0, offAxisBoost: 0, // Initiative (fights) / Pace (journeys) chosen at best
       nightCaught: 0,          // journeys only
       wick: {},                // wickName -> count in best play
@@ -114,23 +114,23 @@ const SOLVER = (() => {
       const hand = randomHand(level);
       const plays = enumerate(hand, encounter);
       const best = bestOf(plays, null);
-      const kindleAvail = plays.some(p => p.enhUsed);
+      const attuneAvail = plays.some(p => p.enhUsed);
       m.wick[best.wickName] = (m.wick[best.wickName] || 0) + 1;
       if (best.usedTinder && best.boostTarget === (isFight ? 'Initiative' : 'Pace')) m.offAxisBoost++;
       if (best.usedTinder) m.tinderPlays++;
       if (!isFight && best.r.nightCaught) m.nightCaught++;
 
-      if (kindleAvail) {
-        m.kindleAvail++;
-        if (best.enhUsed) m.bestKindles++;
-        const bestUnkindled = bestOf(plays, p => !p.enhUsed);
+      if (attuneAvail) {
+        m.attuneAvail++;
+        if (best.enhUsed) m.bestAttunes++;
+        const bestUnattuned = bestOf(plays, p => !p.enhUsed);
         const bestTier = best.score[0];
-        const unkTier = bestUnkindled ? bestUnkindled.score[0] : -1;
-        if (bestTier > unkTier) m.kindleRequiredTier++;   // Kindle buys a whole outcome tier
-        else m.kindleOptional++;                          // unkindled reaches the same tier
+        const unkTier = bestUnattuned ? bestUnattuned.score[0] : -1;
+        if (bestTier > unkTier) m.attuneRequiredTier++;   // Attune buys a whole outcome tier
+        else m.attuneOptional++;                          // unattuned reaches the same tier
       } else {
-        m.noKindleHands++;
-        if (best.score[0] === 0) m.noKindleLoss++;
+        m.noAttuneHands++;
+        if (best.score[0] === 0) m.noAttuneLoss++;
       }
     }
     return m;
@@ -145,24 +145,24 @@ const SOLVER = (() => {
     return { level, N, perRegion };
   }
 
-  // ---- aggregate the headline kindled-or-bust numbers ----
+  // ---- aggregate the headline attuned-or-bust numbers ----
   function headline(sweep, type) {
-    let avail = 0, best = 0, req = 0, opt = 0, noKindle = 0, noKindleLoss = 0, total = 0;
+    let avail = 0, best = 0, req = 0, opt = 0, noAttune = 0, noAttuneLoss = 0, total = 0;
     for (const rg of sweep.perRegion)
       for (const m of rg.encounters) {
         if (m.type !== type) continue;
-        total += m.N; avail += m.kindleAvail; best += m.bestKindles;
-        req += m.kindleRequiredTier; opt += m.kindleOptional;
-        noKindle += m.noKindleHands; noKindleLoss += m.noKindleLoss;
+        total += m.N; avail += m.attuneAvail; best += m.bestAttunes;
+        req += m.attuneRequiredTier; opt += m.attuneOptional;
+        noAttune += m.noAttuneHands; noAttuneLoss += m.noAttuneLoss;
       }
     return {
       total,
       pctAvail: pct(avail, total),
-      pctBestKindles: pct(best, avail),
-      pctRequired: pct(req, avail),      // OBLIGATION INDEX — high = kindled-or-bust
-      pctOptional: pct(opt, avail),      // healthy — kindle is a choice
-      pctNoKindle: pct(noKindle, total),
-      pctNoKindleLoss: pct(noKindleLoss, noKindle),
+      pctBestAttunes: pct(best, avail),
+      pctRequired: pct(req, avail),      // OBLIGATION INDEX — high = attuned-or-bust
+      pctOptional: pct(opt, avail),      // healthy — attune is a choice
+      pctNoAttune: pct(noAttune, total),
+      pctNoAttuneLoss: pct(noAttuneLoss, noAttune),
     };
   }
   const pct = (n, d) => d ? Math.round((n / d) * 100) : 0;
@@ -190,15 +190,15 @@ function runSolver() {
     let html = `<h1>Solver Report</h1><p class="meta">${N} random hands per encounter · levels 2 (early) &amp; 4 (endgame) · Hardships excluded · scored via the live <code>computeAction()</code></p>`;
 
     // headline
-    html += `<h2>Kindled-or-bust — the core question</h2>`;
+    html += `<h2>Attuned-or-bust — the core question</h2>`;
     html += `<table class="head"><tr><th>Metric</th><th>Fights L2</th><th>Fights L4</th><th>Journeys L2</th><th>Journeys L4</th><th>Reading</th></tr>`;
     const rows = [
-      ['Kindle available in hand', 'pctAvail', 'higher = easy to match'],
-      ['Best play Kindles', 'pctBestKindles', 'of hands where it was available'],
-      ['⚠️ Kindle REQUIRED for tier', 'pctRequired', 'the OBLIGATION INDEX — high = bust'],
-      ['✅ Kindle optional (choice)', 'pctOptional', 'unkindled reaches the same tier'],
-      ['No Kindle available', 'pctNoKindle', 'stuck-unkindled hands'],
-      ['…and it forces a Loss', 'pctNoKindleLoss', 'of those stuck hands'],
+      ['Attune available in hand', 'pctAvail', 'higher = easy to match'],
+      ['Best play Attunes', 'pctBestAttunes', 'of hands where it was available'],
+      ['⚠️ Attune REQUIRED for tier', 'pctRequired', 'the OBLIGATION INDEX — high = bust'],
+      ['✅ Attune optional (choice)', 'pctOptional', 'unattuned reaches the same tier'],
+      ['No Attune available', 'pctNoAttune', 'stuck-unattuned hands'],
+      ['…and it forces a Loss', 'pctNoAttuneLoss', 'of those stuck hands'],
     ];
     const H = {
       f2: SOLVER.headline(results[2], 'fight'), f4: SOLVER.headline(results[4], 'fight'),
@@ -212,8 +212,8 @@ function runSolver() {
     html += `</table>`;
 
     // interpretation
-    html += `<div class="interp"><b>How to read the obligation index:</b> it's the % of hands (where a Kindle was available) in which taking the Kindle buys a whole outcome tier over the best un-Kindled play. ` +
-      `<b>&gt;60% ≈ kindled-or-bust</b> (the puzzle is "match or lose"). <b>&lt;25% ≈ healthy</b> (Kindle is optimization you usually could skip). Middle = nuanced.</div>`;
+    html += `<div class="interp"><b>How to read the obligation index:</b> it's the % of hands (where a Attune was available) in which taking the Attune buys a whole outcome tier over the best un-Attuned play. ` +
+      `<b>&gt;60% ≈ attuned-or-bust</b> (the puzzle is "match or lose"). <b>&lt;25% ≈ healthy</b> (Attune is optimization you usually could skip). Middle = nuanced.</div>`;
 
     // secondary forks
     html += `<h2>Secondary — are the forks real?</h2>`;
@@ -229,13 +229,13 @@ function runSolver() {
     // per-region fight detail
     html += `<h2>Per-encounter (level 2)</h2>`;
     for (const rg of results[2].perRegion) {
-      html += `<h3>${rg.region}</h3><table><tr><th>Encounter</th><th>Kindle avail</th><th>Best Kindles</th><th>Obligation</th><th>Top Wick</th></tr>`;
+      html += `<h3>${rg.region}</h3><table><tr><th>Encounter</th><th>Attune avail</th><th>Best Attunes</th><th>Obligation</th><th>Top Spell</th></tr>`;
       for (const m of rg.encounters) {
         const topWick = Object.entries(m.wick).sort((a, b) => b[1] - a[1])[0];
-        const oblig = m.kindleAvail ? Math.round(m.kindleRequiredTier / m.kindleAvail * 100) : 0;
+        const oblig = m.attuneAvail ? Math.round(m.attuneRequiredTier / m.attuneAvail * 100) : 0;
         html += `<tr><td>${m.type === 'fight' ? '⚔️' : '👣'} ${m.name}</td>` +
-          `<td>${SOLVER_pct(m.kindleAvail, m.N)}%</td>` +
-          `<td>${SOLVER_pct(m.bestKindles, m.kindleAvail)}%</td>` +
+          `<td>${SOLVER_pct(m.attuneAvail, m.N)}%</td>` +
+          `<td>${SOLVER_pct(m.bestAttunes, m.attuneAvail)}%</td>` +
           `<td>${oblig}% ${bar(oblig, oblig < 25 ? true : oblig > 60 ? false : null)}</td>` +
           `<td class="note">${topWick ? `${topWick[0]} (${Math.round(topWick[1] / m.N * 100)}%)` : '—'}</td></tr>`;
       }

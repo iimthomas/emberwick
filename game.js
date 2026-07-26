@@ -35,8 +35,8 @@ function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
 
 // ---------- starter deck (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
 // Per-level stat tables: lv[level-1] = [value, enhValue, init, boost, armor, armorEl, upgradeCostToNext].
-// type = what the base Value is (attack/move/hybrid). enhEl = the element the Kindled form SEEKS
-// (often NOT the card's own element). enhType may DIFFER from type — a Move card can Kindle into an Attack.
+// type = what the base Value is (attack/move/hybrid). enhEl = the element the Attuned form SEEKS
+// (often NOT the card's own element). enhType may DIFFER from type — a Move card can Attune into an Attack.
 const CARD_DEFS = [
   { name: 'Flicker',       element: 'Lightning', type: 'hybrid', enhType: 'hybrid', enhEl: 'Shadow',
     lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Shadow',null]] },
@@ -70,7 +70,7 @@ const CARD_DEFS = [
     lv: [[2,4,4,1,2,null,1],[4,8,5,2,2,'Lightning',3],[5,10,7,3,3,'Lightning',4],[6,12,9,5,5,'Lightning',null]] },
   { name: 'Smoulder',      element: 'Fire',      type: 'hybrid', enhType: 'hybrid', enhEl: 'Shadow',
     lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Shadow',null]] },
-  // OURS — colorless wildcard; matches ANY enhEl when played as the Spark (stats synthesized in-grammar)
+  // OURS — colorless wildcard; matches ANY enhEl when played as the Catalyst (stats synthesized in-grammar)
   { name: 'Wander Light',     element: null, wild: true, type: 'hybrid', enhType: null, enhEl: null,
     lv: [[2,null,2,3,1,null,2],[3,null,3,4,2,null,3],[4,null,4,5,2,null,4],[5,null,5,6,3,null,null]] },
 ];
@@ -79,21 +79,21 @@ const CARD_DEFS = [
 const HARDSHIPS = {
   'Ambush':       'Double the Early Damage you suffer this encounter.',
   'Hazards':      'Suffer 1 Time Penalty if you take Early Damage, and 1 more if you take Combat Damage.',
-  'Night Travel': "Your Boost is reduced by your Spark's Initiative (min 0).",
+  'Night Travel': "Your Boost is reduced by your Catalyst's Initiative (min 0).",
   'Storm':        'Any Time Penalties this encounter also deal that much damage.',
 };
 const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel'];
 const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm'];
 
 const ABILITIES = {
-  'Freeze': 'If it deals you Early Damage, you discard your Ember in Cleanup.',
+  'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
   'Poison': 'If it damages you, +1 damage to your next drawn hand (+2 if both Early and Combat).',
-  'Ranged': 'Deals Early Damage even if you win Initiative — unless you discard your Ember in Cleanup (decide now).',
+  'Ranged': 'Deals Early Damage even if you win Initiative — unless you discard your Arsenal in Cleanup (decide now).',
   'Slow':   'You may compare your Move instead of Attack against its HP (best result is used).',
 };
 
 const PERILS = {
-  'Steep':       "The journey's MP is increased by your Ember's Boost.",
+  'Steep':       "The journey's MP is increased by your Arsenal's Boost.",
   'Treacherous': 'Fail to attain Complete Victory → suffer 1 damage after the Time Penalty.',
 };
 
@@ -148,8 +148,8 @@ const ROLES = ['Spell', 'Element', 'Boost'];
 const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
-// Wick = your action · Spark = ignites it (Initiative) · Tinder = fuel (+value) · Ember = kept for tomorrow.
-const SLOT_LABEL = { Spell: 'Wick', Element: 'Spark', Boost: 'Tinder', Reserve: 'Ember' };
+// Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
+const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' };
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
 // ---------- the Dragons (spec §8; all four from the source, transcribed 2026-07-01) ----------
@@ -167,7 +167,7 @@ const DRAGONS = [
   { name: 'Nightmourn', element: 'Shadow',    init: 12, breath: 7, hp: 42, armor: [{ el: 'Shadow', v: 4 }, { el: 'Water', v: 3 }] },
 ];
 // THE APPROACH — two ordinary journey-beats racing to the lair (element = the dragon's
-// weakness, so you can Kindle toward the crack). Complete both → shatter its weakest shield.
+// weakness, so you can Attune toward the crack). Complete both → shatter its weakest shield.
 const APPROACH = { mp: 13, timePenalty: 2, nightfall: 6 };
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Shadow'];
 const dragonWeakness = d => ELEMENTS.filter(el => !d.armor.some(a => a.el === el));
@@ -194,7 +194,7 @@ const CHARMS = [
   { id: 'lanternpace', name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
     text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
   { id: 'tinderbox',   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
-    text: '➕ Your Tinder gives +1 more',            mods: { boost: 1 } },
+    text: '➕ Your Surge gives +1 more',            mods: { boost: 1 } },
   { id: 'wardstone',   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
     text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse',   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
@@ -389,7 +389,7 @@ function freshGame() {
     // ---- cross-turn event effects (run layer) ----
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
-    emberShield: false,    // Ember Hollow: your Ember survives Nightfall (rest of region)
+    emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
     logEntries: [], // [{header, lines:[{text, cls}]}], newest first
   };
   draw(HAND_SIZE);
@@ -443,7 +443,7 @@ function eff(card) {
 
 function cardById(id) { return S.hand.find(c => c.id === id) || null; }
 
-// what a card SEEKS to Kindle — its own enhEl unless an Event rewired it
+// what a card SEEKS to Attune — its own enhEl unless an Event rewired it
 function enhElOf(card) { return card.enhElOverride || card.def.enhEl; }
 
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
@@ -480,7 +480,7 @@ function drawEncounter(avoidType) {
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
   let list = S.encounter.type === 'fight' ? FIGHT_HARDSHIPS : JOURNEY_HARDSHIPS;
-  // Night Travel (wants low-Init Sparks) never pairs with Ranged (punishes low Init
+  // Night Travel (wants low-Init Catalysts) never pairs with Ranged (punishes low Init
   // twice: early hit + dodge only works when winning initiative) — lose-lose, no puzzle
   if (S.encounter.ability === 'Ranged') list = list.filter(h => h !== 'Night Travel');
   S.hardship = Math.random() < region.hardshipChance ? list[Math.floor(Math.random() * list.length)] : null;
@@ -699,7 +699,7 @@ function assignToZone(cardId, zone) {
 function normalizeAssign() {
   if (!isAssignPhase()) return;
   for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
-  // a fused bottom card is consumed — it holds no slot (and there's no Ember while fused)
+  // a fused bottom card is consumed — it holds no slot (and there's no Arsenal while fused)
   if (S.fuse) for (const z of ZONES) if (S.assign[z] === S.fuse.bottomId) S.assign[z] = null;
   // seat any card that isn't in a slot yet, left → right
   const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
@@ -736,31 +736,31 @@ function computeAction(reserve) {
   const boostVal = boostC ? eff(boostC).boost : 0;
   const sEff = eff(spell);
   const spellEl = elOf(spell);
-  // Kindled trigger (source grammar): the Spark must match the Wick's SOUGHT element
-  // (enhEl — often not the card's own element). A wild Spark matches anything.
+  // Attuned trigger (source grammar): the Catalyst must match the Spell's SOUGHT element
+  // (enhEl — often not the card's own element). A wild Catalyst matches anything.
   const enhEl = enhElOf(spell);
   const isEnh = !!(elem && enhEl && (elem.def.wild || elOf(elem) === enhEl));
 
   const h = S.hardship;
   const ability = e.ability || null;
   const elemInit = elem ? eff(elem).init : 0;
-  // Night Travel: Boost reduced by the Spark's Initiative, min 0
+  // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
   const nightCut = boostVal - boostEff;
 
   if (e.type === 'fight') {
     const init = elemInit + (S.boostTarget === 'Initiative' ? boostEff : 0) + charmMod('init');
     const initLost = e.init > init;
-    // Ranged deals Early Damage even when you win initiative, unless dodged (Ember cost)
+    // Ranged deals Early Damage even when you win initiative, unless dodged (Arsenal cost)
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
     let early = initLost || rangedHits ? e.atk : 0;
     if (h === 'Ambush') early *= 2;
-    // cross-type Kindling: a Move card whose Kindled form is an Attack CAN fight when sparked
+    // cross-type Attuning: a Move card whose Attuned form is an Attack CAN fight when sparked
     const enhUsed = isEnh && sEff.enhAtk != null;
     const wrongType = !enhUsed && sEff.atk == null;
     const base = enhUsed ? sEff.enhAtk : (sEff.atk != null ? sEff.atk : 1);
     const withBoost = base + (S.boostTarget === 'Attack' ? boostEff : 0);
-    // enemy armor is a LIST of elements; only a Kindled attack of a shielded element is reduced
+    // enemy armor is a LIST of elements; only a Attuned attack of a shielded element is reduced
     const armorHit = enhUsed ? (e.armor || []).find(a => a.el === enhEl) : null;
     const armorCut = armorHit ? armorHit.v : 0;
     let value = Math.max(0, withBoost - armorCut);
@@ -778,7 +778,7 @@ function computeAction(reserve) {
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
-    // the dodge only costs the Ember when it actually cancels the ranged hit (you won initiative)
+    // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
@@ -786,19 +786,19 @@ function computeAction(reserve) {
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, usedMove, ability, hardship: h };
   }
-  // journeys: cross-type in reverse — an Attack card whose Kindled form is a Move can travel when sparked
+  // journeys: cross-type in reverse — an Attack card whose Attuned form is a Move can travel when sparked
   const enhUsed = isEnh && sEff.enhMove != null;
   const wrongType = !enhUsed && sEff.move == null;
   const base = enhUsed ? sEff.enhMove : (sEff.move != null ? sEff.move : 1);
   const withBoost = base + (S.boostTarget === 'Move' ? boostEff : 0);
   const reserveBonus = enhUsed && e.element && e.element === enhEl && reserve ? eff(reserve).boost : 0;
   const value = withBoost + reserveBonus;
-  // Pace vs Nightfall: your Spark's Initiative (+ Boost if targeted) races the dark
+  // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
   const pace = elemInit + (S.boostTarget === 'Pace' ? boostEff : 0) + paceBless + charmMod('pace');
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace;
-  // Steep peril: the journey's MP grows by your Ember's Boost
+  // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
   const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
   const mpEff = e.mp + steepAdd;
@@ -807,7 +807,7 @@ function computeAction(reserve) {
   const timePenalty = outcome !== 'Complete' ? e.timePenalty : 0;
   const stormDmg = h === 'Storm' ? timePenalty : 0;
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
-  // Ember Hollow wards the Ember: you may still be caught, but the night can't snuff your Ember
+  // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { type: 'journey', spell, elem, boostC, boostVal, boostEff, nightCut, spellEl, enhEl, isEnh, enhUsed, wrongType,
@@ -834,30 +834,30 @@ function resolveFightBeat() {
   const reserve = S.fuse ? null : (cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null);
   S.reserveId = reserve ? reserve.id : null;
 
-  const r = computeAction(reserve);   // armor, Kindle, abilities and hardships all still apply
+  const r = computeAction(reserve);   // armor, Attune, abilities and hardships all still apply
   const hpBefore = f.hp;
   f.hp = Math.max(0, f.hp - r.value);
   const kill = f.hp <= 0;
   // THE BEAT RULE: win the Initiative race and you strike untouched; lose it and it answers.
   // (Soaking is quantised — any damage at all costs a whole card — so a blow EVERY beat
-  // shredded the deck. Gating it on Initiative halves the hits AND makes the Spark choice
+  // shredded the deck. Gating it on Initiative halves the hits AND makes the Catalyst choice
   // a real defensive decision every beat, which is the fork the solver said was underused.)
   const struck = !kill && (r.initLost || r.rangedHits);
   const counter = struck ? Math.max(1, Math.round(e.atk * (f.hp / f.maxHp))) : 0;
   const damage = counter;
   S.beatResult = { value: r.value, hpBefore, kill, struck, counter, damage, ranged: r.rangedHits && !r.initLost };
 
-  log(`Beat ${f.beat}/${f.beats} — Wick: ${spell.def.name} Lv${spell.level} (seeks ${r.enhEl || '—'})` +
-      ` · Spark: ${elem ? `${elem.def.name} (Init ${eff(elem).init})` : '—'}` +
-      ` · Tinder: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
+  log(`Beat ${f.beat}/${f.beats} — Spell: ${spell.def.name} Lv${spell.level} (seeks ${r.enhEl || '—'})` +
+      ` · Catalyst: ${elem ? `${elem.def.name} (Init ${eff(elem).init})` : '—'}` +
+      ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
 
   const L = (t, c = '') => ({ text: t, cls: c });
   const beats = [];
   const b1 = [];
-  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Wick strikes at 1`));
-  else if (r.enhUsed) b1.push(L(`Spark ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → KINDLES: ${r.enhEl} ${r.base}`, 'good'));
-  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Kindled form is a Move)' : ''}`));
-  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Tinder: +${r.boostEff} → ${r.withBoost}`));
+  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at 1`));
+  else if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ATTUNES: ${r.enhEl} ${r.base}`, 'good'));
+  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
+  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → ${r.withBoost}`));
   if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} → −${r.armorCut} = ${r.value}`, 'bad'));
   if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) — better result`, 'good'));
   b1.push(L(`${e.name}: ${hpBefore} → ${f.hp} HP`, f.hp < hpBefore ? 'good' : ''));
@@ -924,7 +924,7 @@ function endMultiFight() {
   if (S.poison > 0) log(`☠️ Poison lingers: ${S.poison} damage to your next hand`, 'bad');
   S.foe = null;
   S.beatResult = null;
-  startUpgrade();   // → endTurn(): discards the set ONCE, keeps the Ember, redraws
+  startUpgrade();   // → endTurn(): discards the set ONCE, keeps the Arsenal, redraws
 }
 
 // ---------- Phase 2/3: resolve action, queue penalties ----------
@@ -947,10 +947,10 @@ function resolve() {
 
   const r = computeAction(reserve);
 
-  log(`The weave — Wick: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
-      ` · Spark: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
-      ` · Tinder: ${boostC ? `${boostC.def.name} (+${boostVal} → ${S.boostTarget})` : '—'}` +
-      ` · Ember: ${reserve ? reserve.def.name : '—'}`);
+  log(`The weave — Spell: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
+      ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
+      ` · Surge: ${boostC ? `${boostC.def.name} (+${boostVal} → ${S.boostTarget})` : '—'}` +
+      ` · Arsenal: ${reserve ? reserve.def.name : '—'}`);
 
   // ---- build the staged reveal (numbers only appear AFTER you commit) ----
   const L = (text, cls = '') => ({ text, cls });
@@ -958,19 +958,19 @@ function resolve() {
 
   if (r.type === 'fight') {
     const b1 = [];
-    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Spark's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.wrongType) b1.push(L(`Attack: ${spell.def.name} has no Attack — wrong-type Wick plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Attack: Spark ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} KINDLES: ${r.enhEl} Atk ${r.base}`, 'good'));
-    else b1.push(L(`Attack: basic Atk ${r.base}${r.isEnh ? ' (its Kindled form is a Move)' : ''}`));
+    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
+    if (r.wrongType) b1.push(L(`Attack: ${spell.def.name} has no Attack — wrong-type Spell plays at value 1`));
+    else if (r.enhUsed) b1.push(L(`Attack: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
+    else b1.push(L(`Attack: basic Atk ${r.base}${r.isEnh ? ' (its Attuned form is a Move)' : ''}`));
     if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Boost: +${r.boostEff} → Attack ${r.withBoost}`));
-    if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} — your Kindled strike is turned → −${r.armorCut} = ${r.value}`, 'bad'));
+    if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} — your Attuned strike is turned → −${r.armorCut} = ${r.value}`, 'bad'));
     if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) instead of Attack — better result`, 'good'));
     beats.push({ label: r.usedMove ? '👣 MOVE' : '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
     else if (r.rangedHits) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, but RANGED hits anyway → Early Damage ${e.atk}`, 'bad'));
-    else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage${e.ability === 'Ranged' && S.rangedDodge ? ' (Ranged dodged — your Ember will be discarded)' : ''}`, 'good'));
+    else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage${e.ability === 'Ranged' && S.rangedDodge ? ' (Ranged dodged — your Arsenal will be discarded)' : ''}`, 'good'));
     if (r.early > 0 && S.hardship === 'Ambush') b2.push(L(`Ambush: Early Damage doubled → ${r.early}`, 'bad'));
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
 
@@ -980,19 +980,19 @@ function resolve() {
     ] });
   } else {
     const b1 = [];
-    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Spark's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.steepAdd) b1.push(L(`Steep: MP raised by your Ember's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.wrongType) b1.push(L(`Move: ${spell.def.name} has no Move — wrong-type Wick plays at value 1`));
-    else if (r.enhUsed) b1.push(L(`Move: Spark ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} KINDLES: Move ${r.base}`, 'good'));
-    else b1.push(L(`Move: basic Move ${r.base}${r.isEnh ? ' (its Kindled form is an Attack)' : ''}`));
+    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
+    if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
+    if (r.wrongType) b1.push(L(`Move: ${spell.def.name} has no Move — wrong-type Spell plays at value 1`));
+    else if (r.enhUsed) b1.push(L(`Move: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
+    else b1.push(L(`Move: basic Move ${r.base}${r.isEnh ? ' (its Attuned form is an Attack)' : ''}`));
     if (boostC && S.boostTarget === 'Move') b1.push(L(`Boost: +${r.boostEff} → Move ${r.withBoost}`));
-    if (r.reserveBonus) b1.push(L(`Kindled Move matches journey element (${e.element}) → your Ember ${reserve.def.name} adds its Boost +${r.reserveBonus} = ${r.value}`, 'good'));
+    if (r.reserveBonus) b1.push(L(`Attuned Move matches journey element (${e.element}) → your Arsenal ${reserve.def.name} adds its Boost +${r.reserveBonus} = ${r.value}`, 'good'));
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
     if (r.paceBless) b2.push(L(`Gray Pilgrim's blessing: +2 Pace → ${r.pace}`, 'good'));
-    if (r.nightCaught && r.emberShielded) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark, but the Ember Hollow wards your Ember (${r.reserve.def.name}) — it survives`, 'good'));
-    else if (r.nightCaught) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark${r.reserve ? ` → the night snuffs your Ember (${r.reserve.def.name})` : ' (no Ember to lose)'}`, 'bad'));
+    if (r.nightCaught && r.emberShielded) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark, but the Ember Hollow wards your Arsenal (${r.reserve.def.name}) — it survives`, 'good'));
+    else if (r.nightCaught) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark${r.reserve ? ` → the night snuffs your Arsenal (${r.reserve.def.name})` : ' (no Arsenal to lose)'}`, 'bad'));
     else b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → home before dark`, 'good'));
     beats.push({ label: '🌙 PACE', big: r.pace, vs: `vs Nightfall ${r.nightfall}`, numCls: r.nightCaught && !r.emberShielded ? 'bad' : 'ok', lines: b2 });
 
@@ -1061,7 +1061,7 @@ function beatDisplayHTML(beat, isNew) {
     if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to soak: ${dmg}</div>`);
     if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
-    if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Ember is lost — ${r.loseReserve}</div>`);
+    if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
     return `<div class="pv-stat pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>${subs.join('')}</div>`;
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
@@ -1289,12 +1289,12 @@ function endTurn() {
   if (reserve && S.loseReserve) {
     S.hand = S.hand.filter(c => c.id !== reserve.id);
     S.discard.push(reserve);
-    log(`Cleanup: your Ember ${reserve.def.name} is discarded — ${S.loseReserve}`, 'bad');
+    log(`Cleanup: your Arsenal ${reserve.def.name} is discarded — ${S.loseReserve}`, 'bad');
     reserve = null;
   }
   const before = S.hand.length;
   draw(HAND_SIZE - S.hand.length);
-  log(`Cleanup: discarded Action Set${reserve ? `, your Ember ${reserve.def.name} glows on` : ''}, drew ${S.hand.length - before} (deck: ${S.deck.length} left)`);
+  log(`Cleanup: discarded Action Set${reserve ? `, your Arsenal ${reserve.def.name} glows on` : ''}, drew ${S.hand.length - before} (deck: ${S.deck.length} left)`);
 
   // Poison lands on the freshly drawn hand, before the next encounter
   if (S.poison > 0 && S.hand.length > 0) {
@@ -1356,7 +1356,7 @@ function evReforge(card, armor, atk) {
 }
 function evRewire(card, el) {
   card.enhElOverride = el;
-  return `${card.def.name} now seeks ${elIcon(el)} ${el} to Kindle.`;
+  return `${card.def.name} now seeks ${elIcon(el)} ${el} to Attune.`;
 }
 // upgrade up to n random still-upgradeable hand cards (a "windfall"/"chunk of XP" expressed as levels)
 function evUpgradeRandom(n, excludeId) {
@@ -1424,8 +1424,8 @@ const EVENTS = [
   { id: 'hollow', name: 'The Ember Hollow',
     flavor: "A hollow where one coal never dies. Bank your light here and the dark can't take it.",
     options: [
-      { label: 'Bank your Ember — the night cannot snuff it for the rest of this region', need: 'none',
-        apply: () => { S.emberShield = true; return [`Your Ember is warded — Nightfall cannot take it for the rest of ${REGIONS[S.region - 1].name}.`]; } },
+      { label: 'Bank your Arsenal — the night cannot snuff it for the rest of this region', need: 'none',
+        apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${REGIONS[S.region - 1].name}.`]; } },
       { label: 'Leave the coal — nothing', need: 'none', apply: () => ['You leave the coal banked and travel on.'] },
     ] },
   { id: 'toll', name: 'The Toll of Thorns',
@@ -1603,7 +1603,7 @@ function renderEncounter() {
       panel.className = 'fight';
       panel.innerHTML =
         `<div class="enc-type">🐉 THE DUEL — beat ${S.duelBeat}</div>` + dragonBar +
-        `<div class="enc-hint">Kindle INTO a live shield to crack it (overflow wounds HP); an unshielded or broken element takes the full strike; unkindled bypasses shields for a small sure hit.</div>`;
+        `<div class="enc-hint">Attune INTO a live shield to crack it (overflow wounds HP); an unshielded or broken element takes the full strike; unattuned bypasses shields for a small sure hit.</div>`;
       return;
     }
     // THE APPROACH — an ordinary journey-beat, with the dragon looming
@@ -1653,8 +1653,8 @@ function renderEncounter() {
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
       `<span>Element ${elChip(e.element)}</span><span>⭐ XP <b>${e.xp}</b></span></div>` +
       (e.element
-        ? `<div class="enc-hint">💡 A Kindled ${elIcon(e.element)} ${e.element} Move also adds your Ember's Boost.</div>`
-        : `<div class="enc-hint">No element — no Ember bonus here.</div>`) +
+        ? `<div class="enc-hint">💡 A Attuned ${elIcon(e.element)} ${e.element} Move also adds your Arsenal's Boost.</div>`
+        : `<div class="enc-hint">No element — no Arsenal bonus here.</div>`) +
       modLines;
   }
 }
@@ -1671,16 +1671,16 @@ function renderControls() {
   if (S.phase === 'assign') {
     const isFight = S.encounter.type === 'fight';
     // escape-hatch hint: when no card has the native value this encounter needs, make
-    // clear you're not stuck — any card can be the Wick (acts at 1), or Divert.
+    // clear you're not stuck — any card can be the Spell (acts at 1), or Divert.
     const needKey = isFight ? 'atk' : 'move';
     const hasNative = S.hand.some(c => eff(c)[needKey] != null);
     const stuckHint = hasNative ? '' :
-      `<div class="hint warn">⚠️ No card has ${isFight ? 'an Attack' : 'a Move'} value this turn — but you're not stuck. Place <b>any</b> card in the Wick (it acts at value <b>1</b>), or <b>Divert</b> for a new encounter. A rough turn costs a little; it can't trap you.</div>`;
-    // the Tinder target now lives ON the Tinder card (see boostPicker in cardHTML) — no radio row
+      `<div class="hint warn">⚠️ No card has ${isFight ? 'an Attack' : 'a Move'} value this turn — but you're not stuck. Place <b>any</b> card in the Spell (it acts at value <b>1</b>), or <b>Divert</b> for a new encounter. A rough turn costs a little; it can't trap you.</div>`;
+    // the Surge target now lives ON the Surge card (see boostPicker in cardHTML) — no radio row
     let boostRow = '';
     if (S.encounter.ability === 'Ranged') {
       boostRow += `<div style="margin:6px 0"><label class="radio"><input type="checkbox" ${S.rangedDodge ? 'checked' : ''} ` +
-        `onchange="S.rangedDodge=this.checked; render()"> ☠️ Dodge the Ranged attack — your Ember is discarded in Cleanup</label></div>`;
+        `onchange="S.rangedDodge=this.checked; render()"> ☠️ Dodge the Ranged attack — your Arsenal is discarded in Cleanup</label></div>`;
     }
     const duel = S.finalPhase === 'duel';
     const phaseLabel = S.finalMode
@@ -1700,8 +1700,8 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
-      `Your cards sit under the four roles — <b>Wick</b> (your spell), <b>Spark</b> (ignites it), <b>Tinder</b> (fuel), <b>Ember</b> (kept for next turn). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
-      ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Ember.` +
+      `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (ignites it), <b>Surge</b> (fuel), <b>Arsenal</b> (kept for next turn). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
+      ` <b>Fuse</b> (once per encounter): tap a card, tap <b>Fuse</b>, then tap another of the same element — the second becomes any element you choose, but you get no Arsenal.` +
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
@@ -1763,7 +1763,7 @@ function renderControls() {
         `<button onclick="eventCancelPick()">← back</button>`;
     } else if (ev.step === 'pickElement') {
       const card = cardById(ev.targetId);
-      body = `<div class="hint">${card.def.name} — choose the element it should seek to Kindle:</div>` +
+      body = `<div class="hint">${card.def.name} — choose the element it should seek to Attune:</div>` +
         `<div class="event-picks">` + ['Fire', 'Water', 'Lightning', 'Shadow'].map(el => `<button onclick="eventPickElement('${el}')">${elIcon(el)} ${el}</button>`).join('') + `</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
@@ -1816,7 +1816,7 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
     case 'Spell': return isFight ? 'your Attack' : 'your Move';
-    case 'Element': return 'Initiative · match the Wick to Kindle';
+    case 'Element': return 'Initiative · match the Spell to Attune';
     case 'Boost': return `+value → ${S.boostTarget}`;
     case 'Reserve': return S.fuse ? 'consumed by the Fuse' : 'kept for next turn';
   }
@@ -1834,14 +1834,14 @@ function renderSlots() {
       `><div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}</span>` +
       `<span class="slot-hint">${zoneHint(zone)}</span></div>` +
       (card ? cardHTML(card)
-            : `<div class="slot-empty">${zone === 'Reserve' && S.fuse ? 'no Ember — fused' : '—'}</div>`) +
+            : `<div class="slot-empty">${zone === 'Reserve' && S.fuse ? 'no Arsenal — fused' : '—'}</div>`) +
       `</div>`;
   }).join('');
 }
 
 // Per-card visual identity (2026-07-06): each card wears its own arcane SIGIL — a mage's mark,
-// magic-as-craft — as a faint watermark, tinted by the element it SEEKS to Kindle (its aura hints
-// what it becomes when lit). Witch Hat register: crafted wonder, restrained. See Card_Identity_And_Attachment.
+// magic-as-craft — as a faint watermark, tinted by the element it SEEKS to Attune (its aura hints
+// what it becomes when attuned). Witch Hat register: crafted wonder, restrained. See Card_Identity_And_Attachment.
 const SIGIL = {
   'Flicker': '✦', 'Sparkstrike': '✷', 'Stormstep': '✥', 'Streamdart': '➶',
   'Unmaking': '⊘', 'Rimeguard': '❈', 'Headlong': '➤', 'Stormglass': '◈',
@@ -1852,11 +1852,11 @@ const SIGIL = {
 const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Shadow: '#d09eff' };
 
 // role buttons shown on a tapped card — the easy path: tap card → tap a role (no hunting for zones)
-const ROLE_BTNS = [['Spell', 'Wick'], ['Element', 'Spark'], ['Boost', 'Tinder'], ['Reserve', 'Ember']];
+const ROLE_BTNS = [['Spell', 'Spell'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
 function roleButtons(card) {
   const cur = zoneOf(card.id);
   const btns = ROLE_BTNS.map(([role, label]) => {
-    if (role === 'Reserve' && S.fuse) return ''; // no Ember while fused
+    if (role === 'Reserve' && S.fuse) return ''; // no Arsenal while fused
     const active = cur === role;
     return `<button class="rolebtn r-${role} ${active ? 'active' : ''}" onclick="event.stopPropagation(); assignRole(${card.id}, '${role}')">${label}${active ? ' ✓' : ''}</button>`;
   }).join('');
@@ -1879,15 +1879,15 @@ function cardHTML(card) {
   const isFusedTop = S.phase === 'assign' && S.fuse && S.fuse.topId === card.id;
   const shownEl = isFusedTop ? S.fuse.element : d.element;
 
-  // the Kindled line shows what the card SEEKS (often not its own element) and
-  // what it becomes — including cross-type transforms (a Move that Kindles into an Attack)
+  // the Attuned line shows what the card SEEKS (often not its own element) and
+  // what it becomes — including cross-type transforms (a Move that Attunes into an Attack)
   const seekEl = enhElOf(card); // may be rewired by an Event
-  let enhLine = d.wild ? '🌈 Wild — any element as Spark' : '✨ —';
+  let enhLine = d.wild ? '🌈 Wild — any element as Catalyst' : '✨ —';
   if (seekEl) {
     const parts = [];
     if (v.enhAtk != null) parts.push(`<span class="v-atk">⚔️ ${v.enhAtk}</span>`);
     if (v.enhMove != null) parts.push(`<span class="v-move">👣 ${v.enhMove}</span>`);
-    enhLine = `${elIcon(seekEl)} when lit${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
+    enhLine = `${elIcon(seekEl)} when attuned${card.enhElOverride ? '↺' : ''} → ${parts.join(' · ')}`;
   }
   const forged = (card.armorMod || card.atkMod) ? ' ◈' : ''; // reforged marker
 
@@ -1933,7 +1933,7 @@ function cardHTML(card) {
   const slot = zoneOf(card.id);
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = slot ? `in-${slot}` : '';
-  // the Tinder card carries its OWN target picker — no separate row of radios to hunt for
+  // the Surge card carries its OWN target picker — no separate row of radios to hunt for
   const btOpts = (S.encounter && S.encounter.type === 'journey') ? ['Move', 'Pace'] : ['Attack', 'Initiative'];
   const boostPicker = (slot === 'Boost' && S.phase === 'assign')
     ? `<div class="bt-row">${btOpts.map(t =>
@@ -2057,7 +2057,7 @@ function startDuel() {
   // (Lv1 soak losses) are gone; a clean approach preserves your full hand AND cracked a shield.
   S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.hand = []; S.discard = [];
-  log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP behind its shields (${shieldText()}). You steel yourself: ${S.deck.length} cards in hand for the duel. Kindle INTO a shield to crack it (overflow wounds), or bypass it unkindled for a small sure hit. Fell it before your cards run dry.`);
+  log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP behind its shields (${shieldText()}). You steel yourself: ${S.deck.length} cards in hand for the duel. Attune INTO a shield to crack it (overflow wounds), or bypass it unattuned for a small sure hit. Fell it before your cards run dry.`);
   startDuelBeat();
 }
 
@@ -2097,7 +2097,7 @@ function resolveDuel() {
   if (S.fuse) {
     const top = cardById(S.fuse.topId), bottom = cardById(S.fuse.bottomId);
     S.actionSetIds.push(S.fuse.bottomId);
-    log(`Fused: ${bottom.def.name} behind ${top.def.name} → counts as ${S.fuse.element} this beat. No Ember.`);
+    log(`Fused: ${bottom.def.name} behind ${top.def.name} → counts as ${S.fuse.element} this beat. No Arsenal.`);
   }
   const reserve = S.fuse ? null : (cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null);
   S.reserveId = reserve ? reserve.id : null;
@@ -2112,9 +2112,9 @@ function resolveDuel() {
   if (r.enhUsed) {
     shield = ds.shields.find(s => s.el === r.enhEl && s.strength > 0) || null;
     if (shield) { chip = Math.min(atk, shield.strength); shield.strength -= chip; overflow = atk - chip; toHp = overflow; }
-    else toHp = atk;            // Kindled into an unshielded / already-broken element → straight to HP
+    else toHp = atk;            // Attuned into an unshielded / already-broken element → straight to HP
   } else {
-    toHp = atk;                 // unkindled → bypasses the shields entirely
+    toHp = atk;                 // unattuned → bypasses the shields entirely
   }
   ds.hp = Math.max(0, ds.hp - toHp);
   const kill = ds.hp <= 0;
@@ -2125,23 +2125,23 @@ function resolveDuel() {
   const damage = early + counter;
   S.duelResult = { atk, toHp, kill, early, counter, damage };
 
-  log(`The weave — Wick: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
-      ` · Spark: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
-      ` · Tinder: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
+  log(`The weave — Spell: ${spell.def.name} Lv${spell.level}${r.spellEl !== spell.def.element ? ` (as ${r.spellEl})` : ''} (seeks ${r.enhEl || '—'})` +
+      ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
+      ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
 
   // --- staged reveal (mirrors the normal fight) ---
   const L = (text, cls = '') => ({ text, cls });
   const beats = [];
   const b1 = [];
-  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Wick strikes at value 1`));
-  else if (r.enhUsed) b1.push(L(`Spark ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → KINDLES: ${r.enhEl} strike ${r.base}`, 'good'));
-  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' — unkindled, it will slip past the shields' : ''}`));
-  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Tinder: +${r.boostEff} → strike ${atk}`));
+  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Spell strikes at value 1`));
+  else if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
+  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' — unattuned, it will slip past the shields' : ''}`));
+  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → strike ${atk}`));
   if (shield) {
     b1.push(L(`🛡️ ${shield.el} shield takes ${chip} (${chip + shield.strength} → ${shield.strength})${shield.strength === 0 ? ' — SHATTERED' : ''}`, 'good'));
     b1.push(overflow > 0 ? L(`Overflow ${overflow} spills past the scale → HP`, 'good') : L(`The strike is spent on the shield — no HP this beat`, 'bad'));
   } else if (r.enhUsed) b1.push(L(`${r.enhEl} is unshielded — the full ${atk} bites → HP`, 'good'));
-  else b1.push(L(`Unkindled — slips past the shields: ${atk} → HP`));
+  else b1.push(L(`Unattuned — slips past the shields: ${atk} → HP`));
   b1.push(L(`🐉 ${S.dragon.name}: ${hpBefore} → ${ds.hp} HP`, ds.hp < hpBefore ? 'good' : ''));
   beats.push({ label: '⚔️ STRIKE', big: toHp, vs: `to HP · 🐉 ${hpBefore}→${ds.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
