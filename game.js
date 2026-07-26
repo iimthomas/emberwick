@@ -13,6 +13,26 @@ const REGION_END_THRESHOLD = 5;  // fewer than this many cards (hand+deck) => re
 const KO_DECK_DISCARD = 4;       // knocked out: also discard this many from deck
 const MAX_DIVERTS = 2;           // diverts allowed before you must face an encounter
 
+// ---- MULTI-BEAT CREATURE FIGHTS (2026-07-06, behind a toggle) ----
+// A creature fight becomes an exchange over several beats instead of one verdict:
+// it holds an HP pool, you re-arrange the SAME hand each beat, and it counterattacks
+// (shrinking as it's wounded). The discard happens ONCE per encounter, not per beat —
+// measured constraint: a set per beat would cost ~9 cards, most of a region's supply.
+// Outcome maps onto the pool at the end, exactly like the old single-exchange thresholds.
+// `var`, not `let`: a top-level `let` is script-scoped and can't be toggled from the console
+// or by the solver harness — the toggle would silently do nothing.
+var MULTIBEAT = true;            // flip in console: MULTIBEAT=false; freshGame()
+// The pool scales with the beat count so the bar stays the SAME as the old single exchange:
+// you still need to average the creature's printed HP per beat to slay it, and half that to
+// drive it off — the thresholds just get smoothed across several beats instead of one roll.
+const MB_HP_MULT = 1.0;          // fine-tuning knob on top of hp × beats
+// A creature that swings every beat would deal ~2.5× its old damage over a fight, which
+// shredded the deck (measured: 8.3 of 17 cards trashed per run). This scales each blow so
+// the TOTAL across a fight lands near the old single-exchange cost.
+const MB_DMG = 0.5;
+function foeBeatsForRegion() { return S.region >= 4 ? 4 : S.region >= 2 ? 3 : 2; }
+function foePool(e, beats) { return Math.round(e.hp * beats * MB_HP_MULT); }
+
 // ---------- starter deck (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
 // Per-level stat tables: lv[level-1] = [value, enhValue, init, boost, armor, armorEl, upgradeCostToNext].
 // type = what the base Value is (attack/move/hybrid). enhEl = the element the Kindled form SEEKS
@@ -196,6 +216,7 @@ function saveGame() {
       assign: S.assign, fuse: S.fuse, divertsUsed: S.divertsUsed,
       boostTarget: S.boostTarget, xp: S.xp, damage: S.damage, damageEl: S.damageEl,
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
+      foe: S.foe,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
@@ -240,6 +261,7 @@ function loadGame() {
       damage: d.damage, damageEl: d.damageEl,
       downgraded: new Set(d.downgraded), actionSetIds: d.actionSetIds, reserveId: d.reserveId,
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
+      foe: d.foe || null, beatResult: null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
       approachOutcomes: d.approachOutcomes || [], duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
@@ -305,6 +327,7 @@ function freshGame() {
     beatTimer: null,
     selectedId: null, // tap-to-place selection (touch)
     fuseArm: false,   // after tapping the Fuse button: next same-element card completes the fuse
+    foe: null,            // multi-beat creature fight: { hp, maxHp, beat, beats, tookDamage }
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
     finalPhase: null,     // 'approach' | 'duel'
@@ -445,9 +468,17 @@ function nextTurn() {
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
+  // a creature becomes a persistent foe with an HP pool (the finale runs its own path)
+  S.foe = null;
+  if (MULTIBEAT && S.encounter.type === 'fight' && !S.finalMode) {
+    const beats = foeBeatsForRegion();
+    const pool = foePool(S.encounter, beats);
+    S.foe = { hp: pool, maxHp: pool, beat: 1, beats, tookDamage: false };
+  }
   S.phase = 'assign';
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
   logChallenge();
+  if (S.foe) log(`It has ${S.foe.hp} HP and you have ${S.foe.beats} beats — wear it down. Your set returns to hand between beats; only its counterattacks cost you.`);
   render();
 }
 
@@ -734,8 +765,120 @@ function computeAction(reserve) {
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
+// ============================================================
+// MULTI-BEAT CREATURE FIGHT — one exchange per beat against a persistent HP pool.
+// Per beat: Initiative → the bite · your strike chips HP · it counterattacks (shrinking)
+//           → you soak. ONCE at the end: outcome from the pool, XP, cleanup/discard.
+// ============================================================
+function resolveFightBeat() {
+  // a card trashed while soaking leaves a dead id in its slot — reseat before reading
+  normalizeAssign();
+  if (!rolesValid()) return;
+  const e = S.encounter, f = S.foe;
+  const spell = cardById(S.assign.Spell);
+  const elem = cardById(S.assign.Element);
+  const boostC = cardById(S.assign.Boost);
+  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
+  if (S.fuse) S.actionSetIds.push(S.fuse.bottomId);
+  const reserve = S.fuse ? null : (cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null);
+  S.reserveId = reserve ? reserve.id : null;
+
+  const r = computeAction(reserve);   // armor, Kindle, abilities and hardships all still apply
+  const hpBefore = f.hp;
+  f.hp = Math.max(0, f.hp - r.value);
+  const kill = f.hp <= 0;
+  // THE BEAT RULE: win the Initiative race and you strike untouched; lose it and it answers.
+  // (Soaking is quantised — any damage at all costs a whole card — so a blow EVERY beat
+  // shredded the deck. Gating it on Initiative halves the hits AND makes the Spark choice
+  // a real defensive decision every beat, which is the fork the solver said was underused.)
+  const struck = !kill && (r.initLost || r.rangedHits);
+  const counter = struck ? Math.max(1, Math.round(e.atk * (f.hp / f.maxHp))) : 0;
+  const damage = counter;
+  S.beatResult = { value: r.value, hpBefore, kill, struck, counter, damage, ranged: r.rangedHits && !r.initLost };
+
+  log(`Beat ${f.beat}/${f.beats} — Wick: ${spell.def.name} Lv${spell.level} (seeks ${r.enhEl || '—'})` +
+      ` · Spark: ${elem ? `${elem.def.name} (Init ${eff(elem).init})` : '—'}` +
+      ` · Tinder: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
+
+  const L = (t, c = '') => ({ text: t, cls: c });
+  const beats = [];
+  const b1 = [];
+  if (r.wrongType) b1.push(L(`${spell.def.name} has no Attack — wrong-type Wick strikes at 1`));
+  else if (r.enhUsed) b1.push(L(`Spark ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches what it seeks`} → KINDLES: ${r.enhEl} ${r.base}`, 'good'));
+  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' (its Kindled form is a Move)' : ''}`));
+  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Tinder: +${r.boostEff} → ${r.withBoost}`));
+  if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} → −${r.armorCut} = ${r.value}`, 'bad'));
+  if (r.usedMove) b1.push(L(`Slow: comparing your MOVE (${r.value}) — better result`, 'good'));
+  b1.push(L(`${e.name}: ${hpBefore} → ${f.hp} HP`, f.hp < hpBefore ? 'good' : ''));
+  beats.push({ label: '⚔️ STRIKE', big: r.value, vs: `· ${e.name} ${hpBefore}→${f.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
+
+  if (!kill) {
+    const b2 = [];
+    if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs ${e.init} → it is faster and answers for ${counter} (weaker as it weakens)`, 'bad'));
+    else if (r.rangedHits) b2.push(L(`Initiative: yours ${r.init} vs ${e.init} → you are faster, but RANGED reaches you anyway → ${counter}`, 'bad'));
+    else b2.push(L(`Initiative: yours ${r.init} vs ${e.init} → you strike and step clear — it cannot answer`, 'good'));
+    beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: struck ? 'bad' : 'ok', lines: b2 });
+  } else {
+    beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: 'ok',
+      lines: [L(`It falls before it can answer — no counterattack.`, 'good')] });
+  }
+  beats.push({ outcomeBeat: true, final: true, fightBeat: true, lines: [] });
+
+  S.pendingR = r;
+  S.beats = beats;
+  S.beatIndex = -1;
+  S.phase = 'reveal';
+  advanceBeat();
+}
+
+// runs when a fight-beat's reveal finishes
+function finishFightBeat() {
+  const br = S.beatResult, f = S.foe;
+  S.pendingR = null; S.beats = null; S.beatIndex = -1;
+  if (br.kill) { endMultiFight(); return; }
+  if (br.damage > 0) {
+    f.tookDamage = true;
+    S.damage = br.damage;
+    S.damageEl = S.encounter.atkEl;
+    S.downgraded = new Set();      // a card may soak once per BEAT (4 cards can't cover 3 beats otherwise)
+    S.afterSoak = 'fightNext';
+    startSoak();
+    return;
+  }
+  nextFightBeat();
+}
+
+function nextFightBeat() {
+  const f = S.foe;
+  if (!f) return;
+  if (f.beat >= f.beats) { endMultiFight(); return; }
+  f.beat++;
+  S.actionSetIds = [];            // the set RETURNS to hand — nothing is discarded mid-fight
+  S.phase = 'assign';
+  log(`You reset your stance — beat ${f.beat} of ${f.beats}. (${S.encounter.name}: ${f.hp}/${f.maxHp} HP)`);
+  render();
+}
+
+// the fight ends: the pool maps onto the SAME Complete/Narrow/Loss thresholds as before
+function endMultiFight() {
+  const e = S.encounter, f = S.foe;
+  const half = Math.ceil(f.maxHp / 2);
+  const outcome = f.hp <= 0 ? 'Complete' : f.hp <= half ? 'Narrow' : 'Loss';
+  S.results[outcome]++;
+  S.xp = outcome !== 'Loss' ? e.xp : 0;
+  log(`${e.name} — ${f.hp}/${f.maxHp} HP left after ${f.beat} beat${f.beat === 1 ? '' : 's'} → ${outcome.toUpperCase()}` +
+      `${outcome === 'Complete' ? ' — it falls' : outcome === 'Narrow' ? ' — it breaks off, wounded' : ' — it still stands; you disengage'}` +
+      `${outcome !== 'Loss' ? ` · +${e.xp} XP` : ''}`,
+      outcome === 'Loss' ? 'bad result' : outcome === 'Narrow' ? 'result' : 'good result');
+  if (S.poison > 0) log(`☠️ Poison lingers: ${S.poison} damage to your next hand`, 'bad');
+  S.foe = null;
+  S.beatResult = null;
+  startUpgrade();   // → endTurn(): discards the set ONCE, keeps the Ember, redraws
+}
+
 // ---------- Phase 2/3: resolve action, queue penalties ----------
 function resolve() {
+  if (S.foe) { resolveFightBeat(); return; }   // multi-beat creature fight
   if (!rolesValid()) return;
   const e = S.encounter;
   const spell = cardById(S.assign.Spell);
@@ -821,7 +964,12 @@ function advanceBeat() {
   if (S.beatTimer) { clearTimeout(S.beatTimer); S.beatTimer = null; }
   S.beatIndex++;
   const beat = S.beats[S.beatIndex];
-  if (!beat) { if (S.finalPhase === 'duel') finishDuel(); else finishResolve(); return; }
+  if (!beat) {
+    if (S.finalPhase === 'duel') finishDuel();
+    else if (S.foe) finishFightBeat();
+    else finishResolve();
+    return;
+  }
   for (const l of beat.lines) log(l.text, l.cls);
   if (!beat.final) S.beatTimer = setTimeout(advanceBeat, 1400);
   render();
@@ -830,6 +978,20 @@ function advanceBeat() {
 function beatDisplayHTML(beat, isNew) {
   const pop = isNew ? ' beat-pop' : '';
   const r = S.pendingR, e = S.encounter;
+  if (beat.outcomeBeat && beat.fightBeat) {
+    const br = S.beatResult, f = S.foe;
+    if (br.kill) {
+      return `<div class="pv-stat pv-result${pop}"><span class="oc oc-Complete">SLAIN</span>` +
+        `<div class="pv-sub good">${e.name} falls — no counterattack</div></div>`;
+    }
+    const subs = [`<div class="pv-sub">${e.name}: ${f.hp}/${f.maxHp} HP</div>`];
+    subs.push(br.damage > 0
+      ? `<div class="pv-sub bad">it answers for ${br.damage}${br.ranged ? ' (Ranged)' : ' — you lost the race'}</div>`
+      : `<div class="pv-sub good">you struck clear — no answer</div>`);
+    const last = f.beat >= f.beats;
+    subs.push(`<div class="pv-sub">${last ? 'last beat — the fight ends' : `beat ${f.beat} of ${f.beats}`}</div>`);
+    return `<div class="pv-stat pv-result${pop}"><span class="oc oc-Narrow">BEAT ${f.beat}</span>${subs.join('')}</div>`;
+  }
   if (beat.outcomeBeat && beat.duel) {
     const dr = S.duelResult, ds = S.dragonState;
     if (dr.kill) {
@@ -945,6 +1107,8 @@ function soakWith(cardId) {
 }
 
 function knockOut() {
+  // being knocked out mid-fight ENDS the fight — you're in no shape to keep swinging
+  if (S.afterSoak === 'fightNext') S.afterSoak = 'fightEnd';
   log(`Cannot soak all the damage → KNOCKED OUT`, 'bad result');
   for (const card of soakEligible()) downgrade(card, ' (knock-out)');
   const n = Math.min(KO_DECK_DISCARD, S.deck.length);
@@ -962,6 +1126,8 @@ function exitSoak() {
   S.afterSoak = 'upgrade';
   if (dest === 'turnEnd') finishTurn();
   else if (dest === 'duelNext') duelCleanupAndNext();
+  else if (dest === 'fightNext') nextFightBeat();
+  else if (dest === 'fightEnd') endMultiFight();
   else startUpgrade();
 }
 
@@ -1336,7 +1502,20 @@ function renderEncounter() {
     (e.ability ? `<div class="enc-mod">☠️ <b>${e.ability}</b> — ${ABILITIES[e.ability]}</div>` : '') +
     (e.peril ? `<div class="enc-mod">⛰️ <b>${e.peril}</b> — ${PERILS[e.peril]}</div>` : '') +
     (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${HARDSHIPS[S.hardship]}</div>` : '');
-  if (e.type === 'fight') {
+  if (e.type === 'fight' && S.foe) {
+    // multi-beat: a live pool you wear down, with the outcome thresholds marked on it
+    const f = S.foe, pct = Math.max(0, Math.round(100 * f.hp / f.maxHp));
+    panel.innerHTML =
+      `<div class="enc-type">FIGHT — beat ${f.beat} of ${f.beats}</div><div class="enc-name">${e.name}</div>` +
+      `<div class="dragon-hp"><div class="dragon-hp-fill" style="width:${pct}%"></div>` +
+      `<span class="dragon-hp-label">${f.hp} / ${f.maxHp} HP</span></div>` +
+      `<div class="enc-stats"><span>0 = <b class="good">slay</b></span>` +
+      `<span>≤${Math.ceil(f.maxHp / 2)} = <b>wounded off</b></span>` +
+      `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
+      `<span>🛡️ ${e.armor.length ? armorText(e.armor) : '—'}</span>` +
+      `<span>strikes with ${elIcon(e.atkEl)}</span>` +
+      `<span>⭐ XP <b>${e.xp}</b></span></div>` + modLines;
+  } else if (e.type === 'fight') {
     panel.innerHTML =
       `<div class="enc-type">FIGHT — ${REGIONS[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
       `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
@@ -1394,11 +1573,15 @@ function renderControls() {
     const duel = S.finalPhase === 'duel';
     const phaseLabel = S.finalMode
       ? (duel ? `🐉 THE DUEL — beat ${S.duelBeat}` : `🐉 THE APPROACH — beat ${S.approachOutcomes.length + 1} of 2`)
+      : S.foe ? `⚔️ ${S.encounter.name.toUpperCase()} — BEAT ${S.foe.beat} OF ${S.foe.beats}`
       : `PHASE 2 — ACTION`;
     const resolveBtn = duel
       ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
+      : S.foe
+      ? `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>Strike — beat ${S.foe.beat}/${S.foe.beats}</button>`
       : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>Resolve ${isFight ? 'Fight' : 'Journey'}</button>`;
-    const divertBtn = S.finalMode ? '' :
+    // Divert only makes sense before the first blow is struck
+    const divertBtn = (S.finalMode || (S.foe && S.foe.beat > 1)) ? '' :
       `<button onclick="beginDivert()" ${canDivert() ? '' : 'disabled'} title="Burn the top deck card + 1 hand card to swap this encounter for one of a different type">` +
       `Divert to a ${S.encounter.type === 'fight' ? 'journey' : 'fight'} (${MAX_DIVERTS - S.divertsUsed} left${S.deck.length === 0 ? ' — deck empty' : ` — burns ${S.deck[0].def.name}`})</button>`;
     // the how-to text is tucked into a collapsed toggle at the bottom — out of the way each turn,
