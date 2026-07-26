@@ -515,6 +515,24 @@ function eff(card) {
 
 function cardById(id) { return S.hand.find(c => c.id === id) || null; }
 
+// What does a level actually BUY? Every stat scales per level, non-uniformly, per card
+// (source grammar) — so "→ Lv3" is unpredictable by design and the player was being asked to
+// spend coins on a lookup table they can't see. Spell it out: ⚔️ 5→6 · ✨ 8→11 · 🛡️ 2→3.
+// This is the "number go up and you know it's good" feedback every other card game has.
+function levelDeltaText(card) {
+  if (!card || card.level >= MAX_LEVEL) return '';
+  const a = eff(card), b = eff({ ...card, level: card.level + 1 });
+  const parts = [];
+  const cmp = (icon, x, y) => { if (x != null && y != null && y !== x) parts.push(`${icon} ${x}<span class="d-arrow">→</span>${y}`); };
+  cmp('⚔️', a.atk, b.atk);
+  cmp('👣', a.move, b.move);
+  cmp('✨', a.enhAtk != null ? a.enhAtk : a.enhMove, b.enhAtk != null ? b.enhAtk : b.enhMove);
+  cmp('💨', a.init, b.init);
+  cmp('➕', a.boost, b.boost);
+  cmp('🛡️', a.armor, b.armor);
+  return parts.join(' · ');
+}
+
 // ============================================================
 // THE ELEMENTAL CYCLE (2026-07-26, testing behind CYCLE_MODE)
 // Each element is empowered by the one before it, so what a card SEEKS is DERIVED from
@@ -1401,12 +1419,14 @@ function rollOffer(rich) {
   const hurt = owned.filter(c => c.level < MAX_LEVEL && c.level <= 2);
   if (hurt.length && roll < (rich ? 0.62 : 0.42)) {
     const c = rand(hurt);
-    return { kind: 'repair', cardId: c.id, name: c.def.name, text: `Mend ${c.def.name} → Lv${c.level + 1}`, rarity: 'common', cost: Math.max(2, c.level) };
+    return { kind: 'repair', cardId: c.id, name: c.def.name,
+             text: `Mend ${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: Math.max(2, c.level) };
   }
   const up = owned.filter(c => c.level < MAX_LEVEL);
   if (!up.length) return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
   const c = rand(up);
-  return { kind: 'upgrade', cardId: c.id, name: c.def.name, text: `${c.def.name} → Lv${c.level + 1}`, rarity: 'common', cost: eff(c).cost || 2 };
+  return { kind: 'upgrade', cardId: c.id, name: c.def.name,
+           text: `${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: eff(c).cost || 2 };
 }
 
 function spinWheel(rich) {
@@ -2181,7 +2201,8 @@ function cardHTML(card) {
     } else {
       const cost = eff(card).cost;
       const ok = cost <= S.coins;
-      action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — ${cost} XP${ok ? '' : ' (not enough)'}</button></div>`;
+      action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — ${cost} XP${ok ? '' : ' (not enough)'}</button>` +
+        `<div class="wo-delta">${levelDeltaText(card)}</div></div>`;
     }
   }
 

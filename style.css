@@ -469,6 +469,13 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .wo-buy  { width: 100%; margin: 0; font-size: 13px; min-height: 34px; background: #3f3a24; border-color: #c9b458; color: #f3e6c4; }
 .wo-buy:hover:not(:disabled) { background: #554d2c; }
 .wo-taken { font-size: 11px; color: #6a675e; text-align: center; padding: 6px 0; }
+/* what a level actually buys — every stat scales non-uniformly, so show the deltas */
+.wo-delta {
+  margin-top: 5px; font-size: 11px; line-height: 1.5; color: #a9d6a2;
+  font-variant-numeric: tabular-nums; letter-spacing: .2px;
+}
+.wo-delta:empty { display: none; }
+.wo-delta .d-arrow { color: #6f7a6c; padding: 0 1px; }
 .charm-tray { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .charm-chip {
   font-size: 10.5px; padding: 2px 8px; border-radius: 999px;
