@@ -585,6 +585,16 @@ function logChallenge() {
 function nextTurn() {
   S.turn++;
   S.regionTurn = (S.regionTurn || 0) + 1;
+  // Top the hand up before anything else. Cleanup draws you back to four, but EVENTS run after
+  // it and several remove a card from your hand (the Gray Pilgrim takes one, the Toll of Thorns
+  // can trash one), which left you starting the next encounter a card short with nothing to
+  // refill it. Doing it here covers every path that can ever thin a hand, present or future.
+  if (S.hand.length < HAND_SIZE && S.deck.length) {
+    const before = S.hand.length;
+    draw(HAND_SIZE - before);
+    const drawn = S.hand.length - before;
+    if (drawn > 0) log(`You draw back up to ${S.hand.length} card${S.hand.length === 1 ? '' : 's'} (+${drawn}).`);
+  }
   drawEncounter();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.divertsUsed = 0;
