@@ -9,7 +9,17 @@
 const START_LEVEL = 2;
 const MAX_LEVEL = 4;
 const HAND_SIZE = 4;
-const REGION_END_THRESHOLD = 5;  // fewer than this many cards (hand+deck) => region ends
+// A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
+// Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
+// not plan when you would reach the dragon. 4 regions x 5 = a 20-turn run you can hold in your
+// head. Depth still costs you - pouring deep burns cards, so you arrive at the dragon thinner -
+// it just costs SURVIVABILITY rather than time, which is the cleaner of the two.
+// 4, not 5: the deck shrinks by the PILE SIZE each turn (poured cards leave, the rest return),
+// so ~2.4 cards a turn against a 12-card deck exhausts it in almost exactly 5. Trashed cards
+// then compound, and region 4 was collapsing to 2 turns. At 4 the deck covers the region with
+// a margin that narrows as the run wears on - an attrition curve, not a cliff.
+const REGION_ENCOUNTERS = 4;
+const REGION_END_THRESHOLD = 5;  // safety net: a deck this thin can't fill a hand
 const KO_DECK_DISCARD = 4;       // knocked out: also discard this many from deck
 const MAX_DIVERTS = 2;           // diverts allowed before you must face an encounter
 
@@ -26,41 +36,47 @@ const MAX_DIVERTS = 2;           // diverts allowed before you must face an enco
 // card seeks its own element). Left in place; the whole table is re-authored at step 3.
 // (often NOT the card's own element). enhType may DIFFER from type — a Move card can Attune into an Attack.
 const CARD_DEFS = [
-  { name: 'Flicker',       element: 'Lightning', type: 'hybrid', enhType: 'hybrid', enhEl: 'Stone',
-    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Stone',null]] },
-  { name: 'Sparkstrike',   element: 'Lightning', type: 'attack', enhType: 'attack', enhEl: 'Fire',
-    lv: [[3,6,2,1,2,null,1],[5,8,3,1,2,null,3],[6,11,3,2,3,null,4],[7,14,4,3,5,null,null]] },
-  { name: 'Stormstep',     element: 'Lightning', type: 'move',   enhType: 'move',   enhEl: 'Lightning',
-    lv: [[3,5,5,1,2,null,2],[5,9,5,2,3,null,4],[6,11,6,4,3,'Lightning',6],[8,14,7,5,4,'Lightning',null]] },
-  { name: 'Streamdart',    element: 'Lightning', type: 'move',   enhType: 'move',   enhEl: 'Water',
-    lv: [[2,4,5,1,2,null,2],[3,6,6,2,2,null,4],[5,9,8,3,5,null,5],[8,12,9,5,5,'Water',null]] },
-  { name: 'Unmaking',      element: 'Water',     type: 'attack', enhType: 'attack', enhEl: 'Fire',
-    lv: [[2,6,1,1,1,null,2],[3,8,1,2,1,null,4],[5,10,2,2,2,'Fire',5],[6,13,3,3,3,'Fire',null]] },
-  { name: 'Rimeguard',     element: 'Water',     type: 'attack', enhType: 'attack', enhEl: 'Water',
-    lv: [[2,3,4,1,3,null,1],[3,5,5,2,4,'Water',3],[4,7,6,4,4,'Water',4],[6,10,7,5,6,'Water',null]] },
-  { name: 'Headlong',      element: 'Water',     type: 'move',   enhType: 'attack', enhEl: 'Stone',
-    lv: [[2,4,1,2,1,null,1],[3,5,1,3,2,null,3],[5,9,2,4,2,'Stone',4],[6,11,3,5,3,'Stone',null]] },
-  { name: 'Stormglass',    element: 'Water',     type: 'attack', enhType: 'attack', enhEl: 'Lightning',
-    lv: [[2,4,4,2,1,null,2],[3,6,6,2,2,null,3],[4,7,8,3,3,null,4],[6,10,10,4,4,null,null]] },
-  { name: 'Stonemarch',    element: 'Stone',    type: 'attack', enhType: 'move',   enhEl: 'Stone',
-    lv: [[3,5,2,2,2,null,2],[4,7,3,3,3,null,3],[5,9,4,5,3,null,5],[5,12,5,6,4,'Stone',null]] },
-  { name: 'Shalewake',     element: 'Stone',    type: 'move',   enhType: 'move',   enhEl: 'Water',
-    lv: [[2,4,5,1,2,null,2],[3,6,6,2,2,null,4],[5,9,8,3,5,null,5],[8,12,9,5,5,'Water',null]] },
-  { name: 'Flintdart',      element: 'Stone',    type: 'move',   enhType: 'move',   enhEl: 'Lightning',
-    lv: [[3,5,5,1,2,null,2],[5,6,5,2,3,null,4],[6,11,6,4,3,'Lightning',6],[8,14,7,5,4,'Lightning',null]] },
-  { name: 'Rockfall',       element: 'Stone',    type: 'attack', enhType: 'attack', enhEl: 'Fire',
-    lv: [[3,6,2,1,2,null,1],[5,8,3,1,2,null,3],[6,11,3,2,3,null,4],[7,14,4,3,5,null,null]] },
-  { name: 'Trailblaze',    element: 'Fire',      type: 'move',   enhType: 'move',   enhEl: 'Fire',
-    lv: [[2,4,1,1,1,null,2],[3,5,1,2,1,null,4],[4,7,2,2,2,'Fire',5],[5,9,3,3,3,'Fire',null]] },
-  { name: 'Hearthwall',    element: 'Fire',      type: 'attack', enhType: 'attack', enhEl: 'Water',
-    lv: [[2,3,4,1,3,null,1],[3,5,5,2,4,'Water',3],[4,7,6,4,4,'Water',4],[6,10,7,5,6,'Water',null]] },
-  { name: 'Updraft',       element: 'Fire',      type: 'move',   enhType: 'move',   enhEl: 'Lightning',
-    lv: [[2,4,4,1,2,null,1],[4,8,5,2,2,'Lightning',3],[5,10,7,3,3,'Lightning',4],[6,12,9,5,5,'Lightning',null]] },
-  { name: 'Smoulder',      element: 'Fire',      type: 'hybrid', enhType: 'hybrid', enhEl: 'Stone',
-    lv: [[2,3,2,2,1,null,2],[3,5,3,3,2,null,3],[4,7,4,4,3,null,4],[6,9,4,5,3,'Stone',null]] },
-  // OURS — colorless wildcard; matches ANY enhEl when played as the Catalyst (stats synthesized in-grammar)
-  { name: 'Wander Light',     element: null, wild: true, type: 'hybrid', enhType: null, enhEl: null,
-    lv: [[2,null,2,3,1,null,2],[3,null,3,4,2,null,3],[4,null,4,5,2,null,4],[5,null,5,6,3,null,null]] },
+  // 4 ARCHETYPES x 4 ELEMENTS (2026-07-26). Each card is SPIKY on one axis and poor on the
+  // others, so it is the natural occupant of one slot and a visible loss anywhere else - the
+  // puzzle is that you never draw one of each. Levelling SHARPENS: the spike rises and the
+  // weaknesses fall, so a card becomes more itself, never simply better. Lv1 is the damaged
+  // state (soaking softens a card back toward the middle); Lv4 is the extreme.
+  //   FORCE -> the Spell   SPARK -> the Catalyst   FLOW -> the Surge   WARD -> soaking
+  //   Fire hits harder / guards worse .. Water fuels and endures, never fast
+  //   Lightning is speed at the cost of guard .. Stone is armour, slow and dry
+  // Row = [value, (dead), init, boost, armor, (dead), costToNextLevel]
+  { name: 'Emberfall', element: 'Fire', arch: 'FORCE',
+    lv: [[5,null,2,2,1,null,2], [7,null,1,1,1,null,3], [9,null,0,1,1,null,4], [11,null,0,1,1,null,null]] },
+  { name: 'Firstlight', element: 'Fire', arch: 'SPARK',
+    lv: [[4,null,5,3,1,null,2], [3,null,7,2,1,null,3], [2,null,9,1,1,null,4], [2,null,11,1,1,null,null]] },
+  { name: 'Bellowsbreath', element: 'Fire', arch: 'FLOW',
+    lv: [[4,null,3,3,1,null,2], [3,null,2,5,1,null,3], [2,null,1,7,1,null,4], [2,null,1,9,1,null,null]] },
+  { name: 'Hearthwall', element: 'Fire', arch: 'WARD',
+    lv: [[4,null,3,2,2,null,2], [3,null,2,1,4,null,3], [2,null,1,1,6,null,4], [2,null,1,1,8,null,null]] },
+  { name: 'Tidebreak', element: 'Water', arch: 'FORCE',
+    lv: [[3,null,1,3,3,null,2], [5,null,0,2,2,null,3], [7,null,0,1,1,null,4], [9,null,0,1,1,null,null]] },
+  { name: 'Riverstep', element: 'Water', arch: 'SPARK',
+    lv: [[2,null,4,4,3,null,2], [2,null,6,3,2,null,3], [2,null,8,2,1,null,4], [2,null,10,2,1,null,null]] },
+  { name: 'Wellspring', element: 'Water', arch: 'FLOW',
+    lv: [[2,null,2,4,3,null,2], [2,null,1,6,2,null,3], [2,null,0,8,1,null,4], [2,null,0,10,1,null,null]] },
+  { name: 'Rimeguard', element: 'Water', arch: 'WARD',
+    lv: [[2,null,2,3,4,null,2], [2,null,1,2,6,null,3], [2,null,0,1,8,null,4], [2,null,0,1,10,null,null]] },
+  { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE',
+    lv: [[4,null,4,2,1,null,2], [6,null,3,1,1,null,3], [8,null,2,1,1,null,4], [10,null,2,1,1,null,null]] },
+  { name: 'Quickfire', element: 'Lightning', arch: 'SPARK',
+    lv: [[3,null,7,3,1,null,2], [2,null,9,2,1,null,3], [2,null,11,1,1,null,4], [2,null,13,1,1,null,null]] },
+  { name: 'Stormglass', element: 'Lightning', arch: 'FLOW',
+    lv: [[3,null,5,3,1,null,2], [2,null,4,5,1,null,3], [2,null,3,7,1,null,4], [2,null,3,9,1,null,null]] },
+  { name: 'Staticwall', element: 'Lightning', arch: 'WARD',
+    lv: [[3,null,5,2,2,null,2], [2,null,4,1,4,null,3], [2,null,3,1,6,null,4], [2,null,3,1,8,null,null]] },
+  { name: 'Rockfall', element: 'Stone', arch: 'FORCE',
+    lv: [[4,null,1,1,4,null,2], [6,null,0,1,3,null,3], [8,null,0,1,2,null,4], [10,null,0,1,2,null,null]] },
+  { name: 'Flintdart', element: 'Stone', arch: 'SPARK',
+    lv: [[3,null,4,2,4,null,2], [2,null,6,1,3,null,3], [2,null,8,1,2,null,4], [2,null,10,1,2,null,null]] },
+  { name: 'Deepvein', element: 'Stone', arch: 'FLOW',
+    lv: [[3,null,2,2,4,null,2], [2,null,1,4,3,null,3], [2,null,0,6,2,null,4], [2,null,0,8,2,null,null]] },
+  { name: 'Cairnguard', element: 'Stone', arch: 'WARD',
+    lv: [[3,null,2,1,5,null,2], [2,null,1,1,7,null,3], [2,null,0,1,9,null,4], [2,null,0,1,11,null,null]] },
 ];
 
 // ---------- modifiers (source rulebook) ----------
@@ -269,7 +285,7 @@ function saveGame() {
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 4, uid, dragon: S.dragon ? S.dragon.name : null,
-      region: S.region, turn: S.turn,
+      region: S.region, turn: S.turn, regionTurn: S.regionTurn,
       deck: S.deck.map(card), hand: S.hand.map(card),
       discard: S.discard.map(card), trashed: S.trashed.map(card),
       queue: S.encounterQueue.map(e => e.name),
@@ -312,7 +328,7 @@ function loadGame() {
     uid = d.uid;
     S = {
       dragon: DRAGONS.find(x => x.name === d.dragon) || DRAGONS[0],
-      region: d.region, turn: d.turn, deck, hand, discard, trashed,
+      region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
       results: d.results, phase: d.phase, encounter,
       hardship: d.hardship, rangedDodge: d.rangedDodge, loseReserve: d.loseReserve,
@@ -419,6 +435,7 @@ function newGame() {
 
 function nextRegion() {
   if (S.region >= REGIONS.length) { freshGame(); return; }
+  S.regionTurn = 0;
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.region++;
@@ -551,6 +568,7 @@ function logChallenge() {
 
 function nextTurn() {
   S.turn++;
+  S.regionTurn = (S.regionTurn || 0) + 1;
   drawEncounter();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.divertsUsed = 0;
@@ -1215,10 +1233,12 @@ function finishTurn() {
 }
 
 function finishRegionCheck() {
-  // end of region?
-  if (S.hand.length + S.deck.length < REGION_END_THRESHOLD) {
-    if (S.region >= REGIONS.length) log(`Fewer than ${REGION_END_THRESHOLD} Mage Cards remain → REGION 4 CLEARED. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
-    else log(`Fewer than ${REGION_END_THRESHOLD} Mage Cards remain → END OF REGION ${S.region}`, 'result');
+  const done = S.regionTurn >= REGION_ENCOUNTERS;
+  const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
+  if (done || dry) {
+    const why = done ? `${REGION_ENCOUNTERS} encounters crossed` : `too few cards left to go on`;
+    if (S.region >= REGIONS.length) log(`${why} → REGION 4 CLEARED. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
+    else log(`${why} → END OF REGION ${S.region}`, 'result');
     S.phase = 'summary';
     render();
     return;
@@ -1713,11 +1733,22 @@ function renderSlots() {
 // magic-as-craft — as a faint watermark, tinted by the element it SEEKS to Attune (its aura hints
 // what it becomes when attuned). Witch Hat register: crafted wonder, restrained. See Card_Identity_And_Attachment.
 const SIGIL = {
-  'Flicker': '✦', 'Sparkstrike': '✷', 'Stormstep': '✥', 'Streamdart': '➶',
-  'Unmaking': '⊘', 'Rimeguard': '❈', 'Headlong': '➤', 'Stormglass': '◈',
-  'Stonemarch': '⬗', 'Shalewake': '∿', 'Flintdart': '➹', 'Rockfall': '⁂',
-  'Trailblaze': '➷', 'Hearthwall': '⌂', 'Updraft': '⇡', 'Smoulder': '✱',
-  'Wander Light': '✺',
+  'Emberfall': '✷',
+  'Firstlight': '☀',
+  'Bellowsbreath': '≋',
+  'Hearthwall': '⌂',
+  'Tidebreak': '≈',
+  'Riverstep': '➶',
+  'Wellspring': '❋',
+  'Rimeguard': '❈',
+  'Sparkstrike': '✦',
+  'Quickfire': '⚡',
+  'Stormglass': '◈',
+  'Staticwall': '⌗',
+  'Rockfall': '⁂',
+  'Flintdart': '➹',
+  'Deepvein': '⬗',
+  'Cairnguard': '⬢',
 };
 const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Stone: '#cdbe98' };
 
