@@ -1097,13 +1097,22 @@ function rollOffer(rich) {
            text: `${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: eff(c).cost || 2 };
 }
 
+// ONE OFFER PER CARD (2026-07-26). The match jackpot - the same card twice at half price - made
+// sense when offers came from all 17 owned cards and a repeat was a rare windfall. Now that they
+// come from a 4-card hand, repeats are common and the "jackpot" is just a way to buy two levels
+// at once: a Lv2 card could reach Lv4 in a single shop, skipping the whole progression arc. The
+// second offer's printed delta was stale too (it still showed Lv2->Lv3 while selling Lv3->Lv4).
 function spinWheel(rich) {
-  const offers = [rollOffer(rich), rollOffer(rich), rollOffer(rich)];
-  // 🎰 THE MATCH JACKPOT (Thomas's idea): the same card twice in one spin = half price
-  const seen = {};
-  for (const o of offers) if (o.cardId) seen[o.cardId] = (seen[o.cardId] || 0) + 1;
-  for (const o of offers) {
-    if (o.cardId && seen[o.cardId] > 1) { o.match = true; o.cost = Math.max(1, Math.floor(o.cost / 2)); }
+  const offers = [];
+  const taken = new Set();
+  for (let i = 0; i < 3; i++) {
+    let o = null;
+    for (let tries = 0; tries < 12; tries++) {
+      o = rollOffer(rich);
+      if (!o.cardId || !taken.has(o.cardId)) break;
+    }
+    if (o && o.cardId) taken.add(o.cardId);
+    offers.push(o);
   }
   return offers;
 }
@@ -1134,7 +1143,7 @@ function wheelBuy(i) {
     const card = anyCardById(o.cardId);
     if (!card) return;
     card.level++;
-    log(`${o.kind === 'repair' ? 'Mended' : 'Upgraded'} ${card.def.name} to Lv${card.level}${o.match ? ' (matched pair — half price!)' : ''} (−${o.cost} coins)`, 'good');
+    log(`${o.kind === 'repair' ? 'Mended' : 'Upgraded'} ${card.def.name} to Lv${card.level} (−${o.cost} coins)`, 'good');
   }
   o.bought = true;
   render();
@@ -1619,10 +1628,10 @@ function renderControls() {
     const canReroll = S.coins >= REROLL_COST;
     const offers = w.offers.map((o, i) => {
       const afford = o.cost <= S.coins && o.kind !== 'none';
-      const cls = `wheel-offer r-${o.rarity}${o.bought ? ' bought' : ''}${o.match ? ' matched' : ''}`;
+      const cls = `wheel-offer r-${o.rarity}${o.bought ? ' bought' : ''}`;
       return `<div class="${cls}">` +
         `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity : o.kind === 'repair' ? 'MEND' : o.kind === 'none' ? '—' : 'UPGRADE'}` +
-        `${o.match ? ' · 🎰 MATCHED' : ''}</div>` +
+        `</div>` +
         `<div class="wo-name">${o.name}</div><div class="wo-text">${o.text}</div>` +
         (o.bought ? `<div class="wo-taken">taken</div>`
           : o.kind === 'none' ? `<div class="wo-taken">—</div>`
