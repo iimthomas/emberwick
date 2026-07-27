@@ -153,10 +153,33 @@ const REGIONS = [
 
 const ROLES = ['Spell', 'Element', 'Boost'];
 const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
-// 🔑 THE PILE (2026-07-26 redesign). The Spell is no longer a seat, it is a PILE: it holds one
-// card or several, and every card you pour in is a slot left empty. All cards in the pile must
-// share an element. That single rule is the brain-burner - power vs speed vs what you carry,
-// out of the same four cards, EVERY turn instead of only when you happen to hold a pair.
+// ============================================================
+// 🔑 THE CLASS SEAM (2026-07-27). Read this before adding ANYTHING to combat.
+//
+// THE ENGINE owns, and every class inherits:
+//   the four slots and "position is the role" · the Arsenal · deck-as-health and soaking ·
+//   the Initiative race · Complete / Narrow / Loss · hardships, perils, Nightfall ·
+//   coins, charms, the Wheel · cleanup (spent → discard, the rest → under the deck).
+//
+// THE CLASS owns exactly one thing: HOW AN ARRANGEMENT BECOMES NUMBERS. It supplies
+//   compose()          → { value, element, init, boost, hits, ...display }
+//   canPlace(id, slot) → is this placement legal
+//   valid()            → can the turn resolve at all
+//   spentIds()         → which cards are consumed; everything else slides under the deck
+//   multi              → which slot (if any) may hold several cards
+// and nothing else in the engine may reach past that.
+//
+// ⚠️ THE MAGE POURS. Other classes will not. A rogue may chain a sequence and never put two
+// cards in one slot; a guardian may spend nothing and pay in damage taken. So:
+//   • never assume S.assign.Spell is an array outside the class
+//   • enemy defence SHAPES must be stated in engine terms — one big hit / many hits / speed —
+//     never as "beaten by a deep pile", or the pile becomes universal through the back door
+//   • `hits` exists on compose() for exactly that reason: the mage returns 1 big hit, a rogue
+//     would return several, and Armour vs Guard can then read a number both classes produce.
+// ============================================================
+
+// ---- THE MAGE: the Spell is a PILE. One card or several, all of one element; every card you
+// pour in is a slot left empty. Power vs speed vs what you carry, out of the same four cards.
 // S.assign.Spell is an ARRAY of ids; Element/Boost/Reserve stay single ids.
 const SLOTS = ['Element', 'Boost', 'Reserve'];   // the single-card slots
 function pileIds() { return (S.assign.Spell || []).filter(id => cardById(id)); }
@@ -177,6 +200,31 @@ function removeFromZone(id) {
   S.assign.Spell = pileIds().filter(i => i !== id);
   for (const z of SLOTS) if (S.assign[z] === id) S.assign[z] = null;
 }
+
+// The mage's combination rule, and the ONLY place the pile is understood.
+const MAGE = {
+  id: 'mage',
+  multi: 'Spell',                       // the one slot that may hold several cards
+  labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
+  canPlace(id, slot) { return slot === 'Spell' ? canPour(id) : true; },
+  valid() { return pileIds().length > 0; },
+  spentIds() { return pileIds(); },     // the pile burns; everything else returns to the deck
+  compose() {
+    const pile = pileCards();
+    if (!pile.length) return null;
+    const elem = cardById(S.assign.Element);
+    const boostC = cardById(S.assign.Boost);
+    return {
+      value: pile.reduce((t, c) => t + cardValue(c), 0),
+      element: pileElement(),
+      init: elem ? eff(elem).init : 0,
+      boost: boostC ? eff(boostC).boost : 0,
+      hits: 1,                          // the mage lands ONE big blow, however deep the pile
+      spell: pile[0], pile, depth: pile.length, elem, boostC,
+    };
+  },
+};
+let CLASS = MAGE;
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
 // Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
@@ -744,7 +792,7 @@ function assignRole(cardId, role) {
   const from = zoneOf(cardId);
   if (from === role && role !== 'Spell') { render(); return; }
   if (role === 'Spell') {
-    if (from === 'Spell' || !canPour(cardId)) { render(); return; }  // the pile is one element
+    if (from === 'Spell' || !CLASS.canPlace(cardId, role)) { render(); return; }
     removeFromZone(cardId);
     S.assign.Spell.push(cardId);
   } else {
@@ -813,29 +861,26 @@ function compactSlots() {
 }
 
 // the only requirement is that something is in the pile - empty slots are a legal, costly choice
-function rolesValid() { return pileIds().length > 0; }
+function rolesValid() { return CLASS.valid(); }
 
 // ---------- action math (pure) ----------
 // Computes the current Action Set vs the current encounter. Used by BOTH the
 // live preview and resolve() so the two can never disagree.
 function computeAction(reserve) {
   const e = S.encounter;
-  const pile = pileCards();
-  if (!pile.length || !e) return null;
-  const spell = pile[0];                       // names the spell; the pile's element is its verb
-  const elem = cardById(S.assign.Element);
-  const boostC = cardById(S.assign.Boost);
-  const spellEl = pileElement();
-  // ATTUNING / RESONANCE are GONE. Power comes from DEPTH: every card poured into the pile adds
-  // its value, and a poured card is a slot left empty. That is the whole decision.
-  const depth = pile.length;
-  const pileVal = pile.reduce((t, c) => t + cardValue(c), 0);
+  // ⚠️ THE CLASS SEAM. Everything the arrangement produces comes from CLASS.compose(); the rest
+  // of this function is engine and must work for a class that never pours a card.
+  const a = CLASS.compose();
+  if (!a || !e) return null;
+  const { spell, pile, depth, elem, boostC, hits } = a;
+  const spellEl = a.element;
+  const pileVal = a.value;
   const enhEl = spellEl, isEnh = false, enhUsed = false, resonant = false;
-  const boostVal = boostC ? eff(boostC).boost : 0;
+  const boostVal = a.boost;
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = elem ? eff(elem).init : 0;
+  const elemInit = a.init;
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
   const nightCut = boostVal - boostEff;
@@ -866,7 +911,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, pile, depth, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, pile, depth, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -895,7 +940,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, pile, depth, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, pile, depth, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -1246,7 +1291,8 @@ function doneUpgrading() { wheelDone(); }
 //   - Commitment now costs at the RUN level, not just the turn: pouring deep burns more deck,
 //     and the deck is both your health and your clock. Deep play shortens your run.
 //   - The Stack fires EVERY turn instead of only inside multi-beat fights.
-function pouredIds() { return pileIds(); }
+// which cards the turn CONSUMES. Engine-side this is just "ask the class".
+function pouredIds() { return CLASS.spentIds(); }
 
 function endTurn() {
   const spentIds = pouredIds();
