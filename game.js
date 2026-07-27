@@ -1116,8 +1116,14 @@ function rollOffer(rich) {
     const c = rand(pool);
     return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost };
   }
-  // repair: only offered when something is actually damaged
-  const owned = ownedCards();
+  // 🔑 CARD OFFERS COME FROM YOUR HAND ONLY (2026-07-26). Upgrading a name in a list you haven't
+  // seen for five turns is abstract and unsatisfying - you buy without knowing what you bought.
+  // Offering the four cards in front of you makes the purchase tangible, and it interlocks with
+  // the Stack: to sharpen a particular card, STACK IT TO RETURN SOON and buy it when it lands.
+  // The timing is already right - the Wheel fires before Cleanup, so you can still see which
+  // cards you poured into the spell (leaving for the region) and which are sliding back under
+  // the deck (returning soon). That is the decision: invest in later, or in sooner.
+  const owned = S.hand.slice();
   const hurt = owned.filter(c => c.level < MAX_LEVEL && c.level <= 2);
   if (hurt.length && roll < (rich ? 0.62 : 0.42)) {
     const c = rand(hurt);
