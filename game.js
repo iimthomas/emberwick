@@ -272,6 +272,16 @@ function randomCurse() {
   const pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
   return pool.length ? rand(pool) : null;
 }
+// Lift a curse. Curses must have a way OUT or taking one is simply wrong late in a run, and
+// the interesting choice ("what will you carry for this?") collapses into "never, thanks".
+function evLiftCurse() {
+  const held = (S.charms || []).filter(id => (charmById(id) || {}).curse);
+  if (!held.length) return 'You carry nothing that needs lifting.';
+  const id = rand(held);
+  S.charms = S.charms.filter(x => x !== id);
+  return `✨ ${charmById(id).name} lifts from you — ${charmById(id).text} is gone.`;
+}
+function curseCount() { return (S.charms || []).filter(id => (charmById(id) || {}).curse).length; }
 function evTakeCurse() {
   const c = randomCurse();
   return c ? evGrantCharm(c.id) : 'The dark has nothing left to take from you.';
@@ -348,6 +358,7 @@ function saveGame() {
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
+      eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -391,6 +402,7 @@ function loadGame() {
       approachOutcomes: d.approachOutcomes || [], duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
       pendingEvent: d.pendingEvent || false, event: d.event || null,
+      eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -464,6 +476,8 @@ function freshGame() {
     pendingEvent: false, // a Complete/Narrow journey owes an Event this turn
     event: null,         // active event state { id, step, opt, targetId, wantElement, lines }
     // ---- cross-turn event effects (run layer) ----
+    eventsSeen: [],        // ids of events already drawn this run (for `once` events)
+    eventFlags: {},        // what you DID in past events, so later ones can react
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
@@ -1413,11 +1427,31 @@ const EVENTS = [
     flavor: "A hooded traveler shares your fire. He asks for a page of your book, and blesses the road ahead.",
     options: [
       { label: 'Give a card — +2 Pace on your next two journeys (the card is gone for good)', need: 'card',
-        apply: ({ card }) => { const t = evTrashCard(card); S.paceBless = 2; return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.']; } },
+        apply: ({ card }) => { const t = evTrashCard(card); S.paceBless = 2; S.eventFlags.pilgrim = 'gave';
+          return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', 'He tucks the page away without reading it. "I will know you again."']; } },
       { label: 'Share your supper — 🪙 −8 coins, +2 Pace on your next journey', need: 'none',
         apply: () => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
-          S.coins -= 8; S.paceBless = 1; return [`You share what you have (−8 coins, ${S.coins} left).`, 'The road ahead is blessed — +2 Pace on your next journey.']; } },
-      { label: 'Keep your book — nothing', need: 'none', apply: () => ['You keep your pages close and travel on.'] },
+          S.coins -= 8; S.paceBless = 1; S.eventFlags.pilgrim = 'fed';
+          return [`You share what you have (−8 coins, ${S.coins} left).`, 'The road ahead is blessed — +2 Pace on your next journey.', 'He eats every scrap and says nothing, which from him is thanks.']; } },
+      { label: 'Keep your book — nothing', need: 'none',
+        apply: () => { S.eventFlags.pilgrim = 'refused'; return ['You keep your pages close and travel on.', 'He nods, unoffended. "A careful sort. The road likes those, sometimes."']; } },
+    ] },
+  // ⤷ CALLBACK: only appears if you have already met him, and he remembers which you were.
+  { id: 'pilgrim2', name: 'The Gray Pilgrim, Again', once: true,
+    when: () => !!S.eventFlags.pilgrim,
+    flavor: "The same hooded traveler, further along a road he has no business being further along. He is already boiling water for two.",
+    options: [
+      { label: 'Ask him to lift what you are carrying', need: 'none',
+        apply: () => { if (!curseCount()) return ['"You carry nothing that needs my hands," he says, faintly disappointed.'];
+          if (S.eventFlags.pilgrim === 'gave') return ['"You gave without asking what it bought," he says. "Sit."', evLiftCurse()];
+          if (S.eventFlags.pilgrim === 'fed') return ['"You fed me once. That is a kind of coin."', evLiftCurse()];
+          if (S.coins < 12) return ['"You kept your pages then, and your coin now." He shrugs. "So do I."'];
+          S.coins -= 12; return [`He holds out a hand until you fill it (−12 coins, ${S.coins} left).`, evLiftCurse()]; } },
+      { label: 'Ask what he is walking toward', need: 'none',
+        apply: () => { const d = S.dragon ? S.dragon.name : 'the thing at the end';
+          return [`"Same as you," he says, and does not look up. "${d} was not always a dragon, you know. That is the sad part."`, ...evUpgradeRandom(1)]; } },
+      { label: 'Walk on before he starts talking', need: 'none',
+        apply: () => ['You are past the fire before he can offer you tea. Behind you, he pours two cups anyway.'] },
     ] },
   { id: 'hollow', name: 'The Ember Hollow',
     flavor: "A hollow where one coal never dies. Bank your light here and the dark can't take it.",
@@ -1461,9 +1495,20 @@ const EVENTS = [
 ];
 function currentEventDef() { return EVENTS.find(e => e.id === S.event.id); }
 
+// 🔑 EVENTS REMEMBER (2026-07-27). An event may declare `when()` to gate itself on what has
+// already happened, and `once: true` to fire at most one time a run. Options record what you
+// chose in S.eventFlags. That is the whole machinery behind recurring characters and callbacks
+// — the run gets a story instead of a series of unrelated screens, and it costs one filter.
+function eventPool() {
+  const seen = S.eventsSeen || [];
+  return EVENTS.filter(e => !(e.once && seen.includes(e.id)) && (!e.when || e.when()));
+}
 function startEvent() {
   if (S.hand.length === 0) { finishRegionCheck(); return; } // nothing to act on
-  const def = rand(EVENTS);
+  const pool = eventPool();
+  if (!pool.length) { finishRegionCheck(); return; }
+  const def = rand(pool);
+  S.eventsSeen = [...(S.eventsSeen || []), def.id];
   S.event = { id: def.id, step: 'options', opt: null, targetId: null, wantElement: false, lines: null };
   S.phase = 'event';
   logHeader(`✦ ${def.name}`);
