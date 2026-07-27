@@ -1337,18 +1337,28 @@ const EVENTS = [
         apply: () => { const up = rand(S.hand); const lines = [evLevel(up, +1)];
           if (Math.random() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
+      { label: 'Take the oil instead — 🪙 +6 coins, the shrine stays cold', need: 'none',
+        apply: () => { S.coins += 6; return [`You pocket the oil — +6 coins (you now hold ${S.coins}).`]; } },
       { label: 'Leave it dark — nothing', need: 'none', apply: () => ['You leave the wick cold and travel on.'] },
     ] },
   { id: 'chandler', name: "The Chandler's Rest",
     flavor: "A woodcutter's hut, the hearth still warm. A night here is enough to mend a frayed tool.",
     options: [
-      { label: 'Mend a card — +1 level', need: 'card', apply: ({ card }) => evLevel(card, +1) },
+      { label: 'Mend one carefully — a card you choose gains +1 level', need: 'card', apply: ({ card }) => evLevel(card, +1) },
+      { label: 'Work through the night — +1 level on TWO cards, but you arrive tired (Hardship next fight)', need: 'none',
+        apply: () => [...evUpgradeRandom(2), evCurseNextFight()] },
+      { label: 'Sell him your spare wax — 🪙 +7 coins', need: 'none',
+        apply: () => { S.coins += 7; return [`The chandler pays well for good wax — +7 coins (you now hold ${S.coins}).`]; } },
     ] },
   { id: 'kiln', name: 'The Kiln of Trials',
     flavor: "An old firing-kiln, its coals banked low. Temper a card here and it comes out changed — hardened, or cracked.",
     options: [
       { label: 'Temper a card — likely +1 level; it might crack (−1)', need: 'card',
         apply: ({ card }) => Math.random() < 0.7 ? ('It hardens. ' + evLevel(card, +1)) : ('It cracks! ' + evLevel(card, -1)) },
+      { label: 'Fire it hot — a card you choose gains +2 levels, or cracks for −1 (even odds)', need: 'card',
+        apply: ({ card }) => Math.random() < 0.5
+          ? ('The kiln roars. ' + evLevel(card, +1) + ' ' + evLevel(card, +1))
+          : ('Too hot — it cracks. ' + evLevel(card, -1)) },
       { label: 'Leave it cold — nothing', need: 'none', apply: () => ['You bank the coals and travel on.'] },
     ] },
   { id: 'cache', name: 'The Buried Cache',
@@ -1357,12 +1367,17 @@ const EVENTS = [
       { label: 'Dig it up — likely a windfall, but the ward may bite your next fight', need: 'none',
         apply: () => { const lines = evUpgradeRandom(2); if (Math.random() < 0.35) lines.push(evCurseNextFight()); return lines; } },
       { label: 'Mark it and move on — a small, safe find', need: 'none', apply: () => evUpgradeRandom(1) },
+      { label: 'Sell the location at the next town — 🪙 +10 coins, nothing dug', need: 'none',
+        apply: () => { S.coins += 10; return [`Someone else can risk the ward — +10 coins (you now hold ${S.coins}).`]; } },
     ] },
   { id: 'pilgrim', name: 'The Gray Pilgrim',
     flavor: "A hooded traveler shares your fire. He asks for a page of your book, and blesses the road ahead.",
     options: [
       { label: 'Give a card — +2 Pace on your next two journeys (the card is gone for good)', need: 'card',
         apply: ({ card }) => { const t = evTrashCard(card); S.paceBless = 2; return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.']; } },
+      { label: 'Share your supper — 🪙 −8 coins, +2 Pace on your next journey', need: 'none',
+        apply: () => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
+          S.coins -= 8; S.paceBless = 1; return [`You share what you have (−8 coins, ${S.coins} left).`, 'The road ahead is blessed — +2 Pace on your next journey.']; } },
       { label: 'Keep your book — nothing', need: 'none', apply: () => ['You keep your pages close and travel on.'] },
     ] },
   { id: 'hollow', name: 'The Ember Hollow',
@@ -1370,6 +1385,8 @@ const EVENTS = [
     options: [
       { label: 'Bank your Arsenal — the night cannot snuff it for the rest of this region', need: 'none',
         apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${REGIONS[S.region - 1].name}.`]; } },
+      { label: 'Take the coal with you — a card you choose gains +1 level, the ward is spent', need: 'card',
+        apply: ({ card }) => ['You lift the everburning coal — ' + evLevel(card, +1)] },
       { label: 'Leave the coal — nothing', need: 'none', apply: () => ['You leave the coal banked and travel on.'] },
     ] },
   { id: 'toll', name: 'The Toll of Thorns',
@@ -1377,6 +1394,9 @@ const EVENTS = [
     options: [
       { label: 'Cut through — a card you choose loses a level, but two others brighten', need: 'card',
         apply: ({ card }) => { const lines = ['You force the thorns — ' + evLevel(card, -1)]; lines.push('but win through to easier ground:', ...evUpgradeRandom(2, card.id)); return lines; } },
+      { label: 'Pay the toll in coin — 🪙 −9 coins, pass untouched', need: 'none',
+        apply: () => { if (S.coins < 9) return ['You cannot pay; the thorns let nothing through for free.'];
+          S.coins -= 9; return [`You pay the bramble-keeper (−9 coins, ${S.coins} left) and pass untouched.`]; } },
       { label: 'Turn back, find another way — nothing lost, nothing gained', need: 'none', apply: () => ['You take the long way around, unscathed.'] },
     ] },
   { id: 'mirror', name: 'The Mirror Fen',
@@ -1388,6 +1408,13 @@ const EVENTS = [
           if (roll === 1) return ['The fen takes. ' + evCurseNextFight()];
           if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
           S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; } },
+      { label: 'Stare until it answers — TWO glimpses, whatever they are', need: 'none',
+        apply: () => { const once = () => { const roll = Math.floor(Math.random() * 4);
+            if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
+            if (roll === 1) return ['The fen takes. ' + evCurseNextFight()];
+            if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
+            S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; };
+          return [...once(), ...once()]; } },
       { label: 'Look away — nothing', need: 'none', apply: () => ['You look away before it shows you too much.'] },
     ] },
 ];
