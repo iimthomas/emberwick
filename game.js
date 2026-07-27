@@ -1180,15 +1180,26 @@ function endTurn() {
   const poured = S.hand.filter(c => spentIds.includes(c.id));
   S.hand = S.hand.filter(c => !poured.includes(c));
   S.discard.push(...poured);
-  const returning = S.hand.slice();
-  if (returning.length > 1) { startStack(returning, poured.length); return; }
-  finishCleanup(returning, poured.length, false);
+  // 🔑 THE ARSENAL IS THE CARD YOU KEEP. It stays in hand and is never stacked - otherwise the
+  // slot has no job at all and its own label lies. This also makes the row a real fork: a card
+  // you KEEP is certain but unscheduled; a card you send under the deck you get to ORDER but
+  // must live without now. Certainty versus control, every turn.
+  let kept = cardById(S.assign.Reserve) || null;
+  if (kept && S.loseReserve) {
+    S.hand = S.hand.filter(c => c !== kept);
+    S.discard.push(kept);
+    log(`Your Arsenal ${displayName(kept)} is lost — ${S.loseReserve}`, 'bad');
+    kept = null;
+  }
+  const returning = S.hand.filter(c => c !== kept);
+  if (returning.length > 1) { startStack(returning, poured.length, kept); return; }
+  finishCleanup(returning, poured.length, false, kept);
 }
 
 // 🃏 THE STACK - you choose the order your returning cards come back in, so you aren't dealt
 // next turn's hand, you write it.
-function startStack(cards, spentCount) {
-  S.stack = { ids: cards.map(c => c.id), order: [], spent: spentCount };
+function startStack(cards, spentCount, kept) {
+  S.stack = { ids: cards.map(c => c.id), order: [], spent: spentCount, keptId: kept ? kept.id : null };
   S.phase = 'stack';
   render();
 }
@@ -1205,11 +1216,12 @@ function finishStack() {
   const rest = st.ids.filter(id => !st.order.includes(id));
   const ordered = [...st.order, ...rest].map(id => cardById(id)).filter(Boolean);
   const spent = st.spent || 0;
+  const kept = st.keptId ? cardById(st.keptId) : null;
   S.stack = null;
-  finishCleanup(ordered, spent, true);
+  finishCleanup(ordered, spent, true, kept);
 }
 
-function finishCleanup(returning, spentCount, ordered) {
+function finishCleanup(returning, spentCount, ordered, kept) {
   S.hand = S.hand.filter(c => !returning.includes(c));
   S.deck.push(...returning);
   const before = S.hand.length;
@@ -1217,6 +1229,7 @@ function finishCleanup(returning, spentCount, ordered) {
   log(`Cleanup: ${spentCount} spent on the spell — gone. ` +
       (returning.length ? `${returning.map(c => displayName(c)).join(', ')} slide under the deck` +
         `${ordered && returning.length > 1 ? ' in your order' : ''}. ` : '') +
+      (kept ? `Your Arsenal ${displayName(kept)} stays in hand. ` : '') +
       `Drew ${S.hand.length - before} (deck ${S.deck.length}, discard ${S.discard.length})`);
 
   // Poison lands on the freshly drawn hand, before the next encounter
@@ -1611,7 +1624,8 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">🃏 STACK THE DECK</div>` +
       `<div class="hint">Your spent cards slide back <b>under the deck</b>. Tap them in the order you want to <b>draw them again</b> — ① comes back soonest. ` +
-      `<b>${left}</b> left to place. <span class="note">(${S.deck.length} cards ahead of them)</span></div>` +
+      `<b>${left}</b> left to place. <span class="note">(${S.deck.length} cards ahead of them` +
+      `${st.keptId ? ` — your Arsenal ${displayName(cardById(st.keptId))} stays in hand` : ''})</span></div>` +
       // There must ALWAYS be a way forward. Without this the phase had no button at all, so a
       // player who didn't realise every card must be tapped was simply stuck mid-fight.
       `<button class="primary" onclick="finishStack()">${st.order.length ? 'Done — slide them under' : 'Skip — leave the order as it is'}</button>` +
