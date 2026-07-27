@@ -242,7 +242,40 @@ const CHARMS = [
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
   { id: 'oathstone',   name: 'Oathstone',        rarity: 'rare', cost: 14,
     text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
+
+  // ☠️ CURSES — charms with negative mods. Never sold on the Wheel; you take one as the PRICE of
+  // something in an Event. The engine already sums mods, so a negative charm needs no new
+  // machinery — which is why this is the cheapest content the game has.
+  { id: 'leadenwick',  name: 'Leaden Wick',      rarity: 'curse', curse: true, cost: 0,
+    text: '💨 −2 Initiative on every card',          mods: { init: -2 } },
+  { id: 'dulledge',    name: 'Dulled Edge',      rarity: 'curse', curse: true, cost: 0,
+    text: '⚔️ Spell-cards (FORCE) strike −2',        mods: { atk: -2, arch: 'FORCE' } },
+  { id: 'dampwick',    name: 'Damp Wick',        rarity: 'curse', curse: true, cost: 0,
+    text: '➕ Your Surge gives −2',                  mods: { boost: -2 } },
+  { id: 'thinplate',   name: 'Thin Plate',       rarity: 'curse', curse: true, cost: 0,
+    text: '🛡️ Every card soaks −1',                  mods: { soak: -1 } },
+  { id: 'tithe',       name: 'The Tithe',        rarity: 'curse', curse: true, cost: 0,
+    text: '🪙 −2 coins from every encounter',        mods: { coin: -2 } },
+  { id: 'longshadow',  name: 'Long Shadow',      rarity: 'curse', curse: true, cost: 0,
+    text: '🌙 −2 Pace against Nightfall',            mods: { pace: -2 } },
 ];
+// grant a charm (or a curse) from an Event. Returns a log line.
+function evGrantCharm(id) {
+  const c = charmById(id);
+  if (!c) return 'Nothing comes of it.';
+  if (S.charms.includes(id)) return `You already carry ${c.name}.`;
+  S.charms.push(id);
+  return c.curse ? `☠️ You take on ${c.name} — ${c.text}` : `🎁 ${c.name} — ${c.text}`;
+}
+// a curse you don't already carry, for Events that charge one as a price
+function randomCurse() {
+  const pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
+  return pool.length ? rand(pool) : null;
+}
+function evTakeCurse() {
+  const c = randomCurse();
+  return c ? evGrantCharm(c.id) : 'The dark has nothing left to take from you.';
+}
 const charmById = id => CHARMS.find(c => c.id === id);
 
 // ============================================================
@@ -1095,7 +1128,7 @@ function upgradable(card) {
 function rollOffer(rich) {
   const roll = Math.random();
   const heldCharms = S.charms || [];
-  const pool = CHARMS.filter(c => !heldCharms.includes(c.id) &&
+  const pool = CHARMS.filter(c => !heldCharms.includes(c.id) && !c.curse &&
     (rich ? true : c.rarity !== 'rare'));
   // a Charm shows up more often at camp
   if (pool.length && roll < (rich ? 0.5 : 0.28)) {
@@ -1337,6 +1370,9 @@ const EVENTS = [
         apply: () => { const up = rand(S.hand); const lines = [evLevel(up, +1)];
           if (Math.random() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
+      { label: 'Swear to tend it — take a CHARM, and a CURSE to carry with it', need: 'none',
+        apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
+          return [good.length ? evGrantCharm(rand(good).id) : 'The shrine has no gift left.', evTakeCurse()]; } },
       { label: 'Take the oil instead — 🪙 +6 coins, the shrine stays cold', need: 'none',
         apply: () => { S.coins += 6; return [`You pocket the oil — +6 coins (you now hold ${S.coins}).`]; } },
       { label: 'Leave it dark — nothing', need: 'none', apply: () => ['You leave the wick cold and travel on.'] },
@@ -1364,8 +1400,11 @@ const EVENTS = [
   { id: 'cache', name: 'The Buried Cache',
     flavor: "A cartographer's mark scratched on a stone — someone buried something here, and warded it.",
     options: [
-      { label: 'Dig it up — likely a windfall, but the ward may bite your next fight', need: 'none',
-        apply: () => { const lines = evUpgradeRandom(2); if (Math.random() < 0.35) lines.push(evCurseNextFight()); return lines; } },
+      { label: 'Dig it up — a charm lies buried, but the ward may cling to you', need: 'none',
+        apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
+          const lines = good.length ? [evGrantCharm(rand(good).id)] : evUpgradeRandom(2);
+          if (Math.random() < 0.4) lines.push(evTakeCurse());
+          return lines; } },
       { label: 'Mark it and move on — a small, safe find', need: 'none', apply: () => evUpgradeRandom(1) },
       { label: 'Sell the location at the next town — 🪙 +10 coins, nothing dug', need: 'none',
         apply: () => { S.coins += 10; return [`Someone else can risk the ward — +10 coins (you now hold ${S.coins}).`]; } },
@@ -1387,6 +1426,8 @@ const EVENTS = [
         apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${REGIONS[S.region - 1].name}.`]; } },
       { label: 'Take the coal with you — a card you choose gains +1 level, the ward is spent', need: 'card',
         apply: ({ card }) => ['You lift the everburning coal — ' + evLevel(card, +1)] },
+      { label: 'Bargain with what sleeps here — 🪙 +14 coins, and a CURSE', need: 'none',
+        apply: () => { S.coins += 14; return [`Something in the dark pays generously — +14 coins (you now hold ${S.coins}).`, evTakeCurse()]; } },
       { label: 'Leave the coal — nothing', need: 'none', apply: () => ['You leave the coal banked and travel on.'] },
     ] },
   { id: 'toll', name: 'The Toll of Thorns',
@@ -1405,13 +1446,13 @@ const EVENTS = [
       { label: 'Look into the fen — something happens (you cannot tell what)', need: 'none',
         apply: () => { const roll = Math.floor(Math.random() * 4);
           if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
-          if (roll === 1) return ['The fen takes. ' + evCurseNextFight()];
+          if (roll === 1) return ['The fen takes. ' + evTakeCurse()];
           if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
           S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; } },
       { label: 'Stare until it answers — TWO glimpses, whatever they are', need: 'none',
         apply: () => { const once = () => { const roll = Math.floor(Math.random() * 4);
             if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
-            if (roll === 1) return ['The fen takes. ' + evCurseNextFight()];
+            if (roll === 1) return ['The fen takes. ' + evTakeCurse()];
             if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
             S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; };
           return [...once(), ...once()]; } },

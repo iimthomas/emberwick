@@ -509,6 +509,8 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   border: 1px solid #4a4436; color: #cbbf9e; background: rgba(201,180,88,.08); cursor: help;
 }
 .charm-chip.r-uncommon { border-color: #4a6a7a; color: #9ec8dd; }
+/* curses ride in the same tray as charms but must never be mistaken for one */
+.charm-chip.r-curse { border-color: #7a3a3a; color: #e08a7a; background: rgba(224,138,122,.08); }
 .charm-chip.r-rare     { border-color: #a07a3a; color: #f0c07a; }
 @media (max-width: 640px) { .wheel-row { grid-template-columns: 1fr; } }
 
