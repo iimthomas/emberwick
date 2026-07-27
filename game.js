@@ -230,6 +230,14 @@ const CHARMS = [
     text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse',   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
     text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
+  { id: 'forgemark',   name: 'Forge Mark',       rarity: 'common', cost: 6,
+    text: '⚔️ Spell-cards (FORCE) strike +2',        mods: { atk: 2, arch: 'FORCE' } },
+  { id: 'quickbrand',  name: 'Quickbrand',       rarity: 'common', cost: 6,
+    text: '💨 Catalyst-cards (SPARK) +2 Initiative', mods: { init: 2, arch: 'SPARK' } },
+  { id: 'wellstone',   name: 'Wellstone',        rarity: 'common', cost: 6,
+    text: '➕ Surge-cards (FLOW) give +2 more',      mods: { boost: 2, arch: 'FLOW' } },
+  { id: 'bulwarkpin',  name: 'Bulwark Pin',      rarity: 'common', cost: 6,
+    text: '🛡️ Guard-cards (WARD) soak +2',           mods: { soak: 2, arch: 'WARD' } },
   { id: 'brightwick',  name: 'Brightwick',       rarity: 'rare', cost: 14,
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
   { id: 'oathstone',   name: 'Oathstone',        rarity: 'rare', cost: 14,
@@ -244,13 +252,20 @@ const charmById = id => CHARMS.find(c => c.id === id);
 const displayName = card => card.def.name;
 function hasCharm(id) { return !!(S && S.charms && S.charms.includes(id)); }
 // sum a mod across held charms; `el` restricts element-gated charms to matching cards
-function charmMod(key, el) {
+// 🔑 TWO CLASSIFICATION AXES. A charm can be gated by ELEMENT (Fire cards...) or by ARCHETYPE
+// (all your Spell cards...). The archetype gate is the one that PORTS ACROSS CLASSES - every
+// class has a FORCE/SPARK/FLOW/WARD shape even when it calls them something else, whereas only
+// the mage has Fire cards. Ungated "all cards" charms stay rare and expensive: with the deck at
+// 4 of each element and 4 of each archetype, a gate hits exactly a quarter of your 16 cards, so
+// an ungated charm is worth four times as much and should cost like it.
+function charmMod(key, el, arch) {
   if (!S || !S.charms) return 0;
   let t = 0;
   for (const id of S.charms) {
     const c = charmById(id);
     if (!c || c.mods[key] == null) continue;
-    if (c.mods.el && c.mods.el !== el) continue;   // element-gated and this card doesn't match
+    if (c.mods.el && c.mods.el !== el) continue;       // element-gated, this card doesn't match
+    if (c.mods.arch && c.mods.arch !== arch) continue; // archetype-gated, ditto
     t += c.mods[key];
   }
   return t;
@@ -459,8 +474,8 @@ function eff(card) {
   const [v, ev, init, boost, armor, armorEl, cost] = d.lv[card.level - 1];
   // run-layer reforge mods (from Events): +armor / −attack, floored at 0. Move is untouched.
   // Charms stack on top, element-gated ones only for cards of that element.
-  const am = charmMod('armor', d.element);
-  const at = charmMod('atk', d.element);
+  const am = charmMod('armor', d.element, d.arch);
+  const at = charmMod('atk', d.element, d.arch);
   const adj = x => x == null ? null : Math.max(0, x + at);
   // ONE VALUE (2026-07-26, redesign step 2). A card no longer prints a separate Attack and
   // Move: it prints how much it ACCOMPLISHES. In a fight that is damage, on a journey it is
@@ -470,7 +485,8 @@ function eff(card) {
   return {
     value: adj(v),
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
-    init, boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
+    init: Math.max(0, init + charmMod('init', d.element, d.arch)),
+    boost: boost + charmMod('boost', d.element, d.arch), armor: Math.max(0, armor + am), cost,
   };
 }
 
@@ -768,7 +784,7 @@ function computeAction(reserve) {
   const nightCut = boostVal - boostEff;
 
   if (e.type === 'fight') {
-    const init = elemInit + charmMod('init');   // Initiative belongs to the Catalyst alone
+    const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
     const initLost = e.init > init;
     // Ranged deals Early Damage even when you win initiative, unless dodged (Arsenal cost)
     const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
@@ -980,7 +996,7 @@ function soakValue(card) {
   // and a rule no non-elemental class could ever join. Armour simply soaks its printed value.
   const armor = eff(card).armor || 0;
   if (armor <= 0) return 0;
-  return armor + charmMod('soak', card.def.element);
+  return armor + charmMod('soak', card.def.element, card.def.arch);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
