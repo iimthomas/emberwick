@@ -143,6 +143,14 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .fuse-panel .el.pick { cursor: pointer; opacity: 0.45; }
 .fuse-panel .el.pick.chosen { opacity: 1; outline: 1px solid #e6e2d8; }
 .fuse-panel button { padding: 2px 8px; font-size: 11px; margin: 0 0 0 4px; }
+/* where this card ENDS UP — the Spell burns, the middle slots return, the Arsenal stays.
+   Spending your best card is the turn's real fork, so it must be visible while you decide. */
+.card-fate { font-size: 10.5px; letter-spacing: .06em; text-align: right; margin-top: 5px; opacity: .8; }
+.fate-spent  { color: #e08a7a; opacity: 1; font-weight: bold; }
+.fate-return { color: #8fb3d1; }
+.fate-kept   { color: #9fd18a; }
+.slot-Spell.filled { box-shadow: inset 0 0 0 1px rgba(224,138,122,.25); }
+
 .card-action.muted { color: #6a675e; font-size: 12px; text-align: center; padding: 3px 0; }
 .card {
   width: 240px;

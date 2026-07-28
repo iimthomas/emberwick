@@ -1797,7 +1797,7 @@ function renderControls() {
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
       `` +
-      ` A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
+      ` <b>Where cards go:</b> the card you cast as your <b>Spell</b> is <b>spent</b> — discarded, gone for the rest of the region. Your Catalyst and Surge slide back <b>under your deck</b> in an order you choose, and your <b>Arsenal</b> stays in hand. So each turn asks not only which card wins this fight, but which card you can afford to lose. A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
       `` +
       `</div></details>`;
     c.innerHTML =
@@ -1917,17 +1917,27 @@ function renderControls() {
 }
 
 // hint shown under each zone label
+// 🔑 EVERY SLOT STATES WHERE ITS CARD ENDS UP (2026-07-28). The Spell is SPENT - gone for the
+// region - and nothing said so, which hid the best fork the turn already had: win comfortably
+// with your Hammer, or scrape through with a lesser card and still have the Hammer at the
+// dragon's door. Measured, the optimal Spell is simply your biggest-value card 89% of the time,
+// because that choice is made without ever seeing its price. The solver cannot see it either -
+// it optimises one encounter at a time and never pays the future cost.
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
-    case 'Spell': return isFight ? 'your Attack' : 'your Move';
-    // under 'surge' the Catalyst is pure speed and the Surge carries the only element check
-    case 'Element': return 'Initiative — strike first';
-    case 'Boost': return '+power to the spell';
-    // mid-fight the Arsenal is the ONLY card that survives the exchange — say so, because
-    // that is now the most consequential choice on the row.
-    case 'Reserve': return 'kept for next turn';
+    case 'Spell': return (isFight ? 'your Attack' : 'your Move') + ' — SPENT, gone for the region';
+    case 'Element': return 'Initiative — returns to your deck';
+    case 'Boost': return '+power — returns to your deck';
+    case 'Reserve': return 'kept in hand for next turn';
   }
+}
+// a one-word mark of the card's fate, shown on the card itself during the action phase
+function fateOf(zone) {
+  if (zone === 'Spell') return { cls: 'fate-spent', text: '⊘ spent' };
+  if (zone === 'Reserve') return { cls: 'fate-kept', text: '✋ kept' };
+  if (zone) return { cls: 'fate-return', text: '↻ returns' };
+  return null;
 }
 
 // ONE row, four fixed labels, cards swap between them. Replaces the old zones + hand panels.
@@ -2046,6 +2056,7 @@ function cardHTML(card) {
   const vals = `<div class="card-val v-one">${valIcon} ${contributes}</div>`;
 
   const slot = zoneOf(card.id);
+  const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = slot ? `in-${slot}` : '';
   const resoOn = false;   // resonance is gone - depth replaced it
@@ -2069,6 +2080,7 @@ function cardHTML(card) {
     `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
     `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
     `<div class="card-vals">${vals}</div>` +
+    (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
     `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
     action + `</div>`;
