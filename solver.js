@@ -59,11 +59,8 @@ const SOLVER = (() => {
     // what's left across Catalyst / Surge / Arsenal. Depth is the decision, so the bot MUST
     // explore it - a bot that only ever pours one card would report a game we aren't shipping.
     const n = hand.length;
-    for (let mask = 1; mask < (1 << n); mask++) {
-      const pile = [], rest = [];
-      for (let i = 0; i < n; i++) ((mask >> i) & 1 ? pile : rest).push(hand[i]);
-      const el = pile[0].def.element;
-      if (pile.some(c => c.def.element !== el)) continue;   // one element per pile
+    for (let w = 0; w < n; w++) {
+      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
       const opts = [null, ...rest];
       for (const spark of opts) {
         for (const tinder of opts) {
@@ -72,7 +69,7 @@ const SOLVER = (() => {
             if (ember && (ember === spark || ember === tinder)) continue;
             for (const bt of boostTargets) {
               S.assign = {
-                Spell: pile.map(c => c.id),
+                Spell: spell.id,
                 Element: spark ? spark.id : null,
                 Boost: tinder ? tinder.id : null,
                 Reserve: ember ? ember.id : null,
@@ -81,8 +78,8 @@ const SOLVER = (() => {
               const r = computeAction(ember);
               if (!r) continue;
               plays.push({
-                r, score: scoreOf(r), enhUsed: false, depth: pile.length,
-                wickName: pile[0].def.name, usedTinder: !!tinder, boostTarget: bt,
+                r, score: scoreOf(r), enhUsed: false,
+                wickName: spell.def.name, usedTinder: !!tinder, boostTarget: bt,
               });
             }
           }
@@ -290,18 +287,15 @@ const RUNSIM = (() => {
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
     let best = null;
     const n = hand.length;
-    for (let mask = 1; mask < (1 << n); mask++) {          // every same-element pile
-      const pile = [], rest = [];
-      for (let i = 0; i < n; i++) ((mask >> i) & 1 ? pile : rest).push(hand[i]);
-      const el = pile[0].def.element;
-      if (pile.some(c => c.def.element !== el)) continue;
+    for (let w = 0; w < n; w++) {                          // every card as the Spell
+      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
       const opts = [null, ...rest];
       for (const spark of opts) for (const tinder of opts) {
         if (tinder && tinder === spark) continue;
         for (const ember of opts) {
           if (ember && (ember === spark || ember === tinder)) continue;
           for (const bt of bts) {
-            S.assign = { Spell: pile.map(c => c.id), Element: spark ? spark.id : null,
+            S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                          Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
             S.boostTarget = bt;
             const r = computeAction(ember); if (!r) continue;
@@ -342,7 +336,7 @@ const RUNSIM = (() => {
           const left = after.filter(c => c !== tinder);
           const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
           for (const bt of ['Attack', 'Initiative']) {
-            S.assign = { Spell: [hand[w].id], Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+            S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
             S.boostTarget = bt;
             const r = computeAction(ember); if (!r) continue;
             const sc = evalDuelPlay(r);

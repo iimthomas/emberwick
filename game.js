@@ -178,49 +178,43 @@ const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
 //     would return several, and Armour vs Guard can then read a number both classes produce.
 // ============================================================
 
-// ---- THE MAGE: the Spell is a PILE. One card or several, all of one element; every card you
-// pour in is a slot left empty. Power vs speed vs what you carry, out of the same four cards.
-// S.assign.Spell is an ARRAY of ids; Element/Boost/Reserve stay single ids.
-const SLOTS = ['Element', 'Boost', 'Reserve'];   // the single-card slots
-function pileIds() { return (S.assign.Spell || []).filter(id => cardById(id)); }
-function pileCards() { return pileIds().map(cardById); }
-function pileElement() { const p = pileCards(); return p.length ? p[0].def.element : null; }
-function canPour(id) {
-  const c = cardById(id); if (!c) return false;
-  const pe = pileElement();
-  return pe == null || c.def.element === pe || pileIds().includes(id);
-}
-// FUSE CUT 2026-07-26. It was a two-step ceremony producing exactly what pouring a card into
-// the pile already produces (bury A under B then pour B == pour A and B: same cards, same total,
-// same empty slots), and it left you holding a fused card with no obvious use. Its job - keeping
-// a four-different-elements hand from being dead - passes to the card set: element spread is a
-// dial we set when the 16 cards are authored.
+// ---- THE MAGE: one card per slot. ----
+// ❌ THE PILE WAS CUT 2026-07-28. Pouring several cards into the Spell cost you the OTHER SLOTS -
+// that was its whole price - so the deeper you poured, the more slots 2-4 stopped existing. Depth
+// and "every slot poses a fork" were therefore eating each other, and it could not be patched
+// because it is the definition of both. With a FOUR-card hand a pour costs a quarter of your turn,
+// so depth was either trivial (lose the Arsenal) or self-defeating (lose everything) - which is
+// why it measured as a coin-flip that changed the outcome only 13-20% of the time. The pile is a
+// mechanic for a bigger hand. Tension now comes from WHERE each card goes, not how many you burn.
+const SLOTS = ['Element', 'Boost', 'Reserve'];
+// what a card contributes as the Spell. Kept as a function because the class layer, the card
+// face and the level-delta readout all ask the same question.
 function cardValue(card) { return card ? eff(card).value : 0; }
+function spellCard() { return cardById(S.assign.Spell); }
 function removeFromZone(id) {
-  S.assign.Spell = pileIds().filter(i => i !== id);
+  if (S.assign.Spell === id) S.assign.Spell = null;
   for (const z of SLOTS) if (S.assign[z] === id) S.assign[z] = null;
 }
 
-// The mage's combination rule, and the ONLY place the pile is understood.
 const MAGE = {
   id: 'mage',
-  multi: 'Spell',                       // the one slot that may hold several cards
+  multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
-  canPlace(id, slot) { return slot === 'Spell' ? canPour(id) : true; },
-  valid() { return pileIds().length > 0; },
-  spentIds() { return pileIds(); },     // the pile burns; everything else returns to the deck
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
   compose() {
-    const pile = pileCards();
-    if (!pile.length) return null;
+    const spell = spellCard();
+    if (!spell) return null;
     const elem = cardById(S.assign.Element);
     const boostC = cardById(S.assign.Boost);
     return {
-      value: pile.reduce((t, c) => t + cardValue(c), 0),
-      element: pileElement(),
+      value: cardValue(spell),
+      element: spell.def.element,
       init: elem ? eff(elem).init : 0,
       boost: boostC ? eff(boostC).boost : 0,
-      hits: 1,                          // the mage lands ONE big blow, however deep the pile
-      spell: pile[0], pile, depth: pile.length, elem, boostC,
+      hits: 1,
+      spell, elem, boostC,
     };
   },
 };
@@ -642,10 +636,7 @@ function enhElOf(card) { return elOf(card); }
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
 function activeZones() { return ZONES; }
 function isAssignPhase() { return S.phase === 'assign'; }
-function zoneOf(cardId) {
-  if (pileIds().includes(cardId)) return 'Spell';
-  return SLOTS.find(z => S.assign[z] === cardId) || null;
-}
+function zoneOf(cardId) { return ZONES.find(z => S.assign[z] === cardId) || null; }
 
 function elOf(card) { return card.def.element; }
 
@@ -811,20 +802,10 @@ function assignRole(cardId, role) {
   S.selectedId = null;
   const from = zoneOf(cardId);
   if (from === role && role !== 'Spell') { render(); return; }
-  if (role === 'Spell') {
-    if (from === 'Spell' || !CLASS.canPlace(cardId, role)) { render(); return; }
-    removeFromZone(cardId);
-    S.assign.Spell.push(cardId);
-  } else {
-    const occupant = S.assign[role] || null;
-    removeFromZone(cardId);
-    S.assign[role] = cardId;
-    // the displaced card takes the mover's old seat if it had one, else normalizeAssign re-seats it
-    if (occupant && occupant !== cardId) {
-      if (from && from !== 'Spell') S.assign[from] = occupant;
-      else removeFromZone(occupant);
-    }
-  }
+  // swap: whoever was there takes the mover's old seat, so the row never has a hole
+  const occupant = S.assign[role] || null;
+  if (from) S.assign[from] = occupant;
+  S.assign[role] = cardId;
   normalizeAssign();
   render();
 }
@@ -858,26 +839,23 @@ function assignToZone(cardId, zone) {
 // hand region (the space the 16:9 scene needs) and makes every card always visible.
 function normalizeAssign() {
   if (!isAssignPhase()) return;
-  if (!Array.isArray(S.assign.Spell)) S.assign.Spell = S.assign.Spell ? [S.assign.Spell] : [];
-  S.assign.Spell = pileIds();
-  for (const z of SLOTS) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
-  // default seating is WIDE: one card in the pile, the rest across the slots. Pouring deeper
-  // is always the player's deliberate act, never something the layout does for them.
-  const seated = new Set([...pileIds(), ...SLOTS.map(z => S.assign[z]).filter(Boolean)]);
+  if (Array.isArray(S.assign.Spell)) S.assign.Spell = S.assign.Spell[0] || null;   // old saves
+  for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
+  // every card is always seated, left to right — position is the role
+  const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
   for (const card of S.hand) {
     if (seated.has(card.id)) continue;
+    const free = ZONES.find(z => !S.assign[z]);
+    if (!free) break;
+    S.assign[free] = card.id;
     seated.add(card.id);
-    if (!S.assign.Spell.length) { S.assign.Spell = [card.id]; continue; }
-    const free = SLOTS.find(z => !S.assign[z]);
-    if (free) S.assign[free] = card.id;
-    else if (canPour(card.id)) S.assign.Spell.push(card.id);
   }
 }
 
-// pull the single-slot cards leftward so there's no gap mid-row
+// pull cards leftward so there's no gap mid-row
 function compactSlots() {
-  const ids = SLOTS.map(z => S.assign[z]).filter(Boolean);
-  SLOTS.forEach((z, i) => { S.assign[z] = ids[i] || null; });
+  const ids = ZONES.map(z => S.assign[z]).filter(Boolean);
+  ZONES.forEach((z, i) => { S.assign[z] = ids[i] || null; });
 }
 
 // the only requirement is that something is in the pile - empty slots are a legal, costly choice
@@ -892,7 +870,7 @@ function computeAction(reserve) {
   // of this function is engine and must work for a class that never pours a card.
   const a = CLASS.compose();
   if (!a || !e) return null;
-  const { spell, pile, depth, elem, boostC, hits } = a;
+  const { spell, elem, boostC, hits } = a;
   const spellEl = a.element;
   const pileVal = a.value;
   const enhEl = spellEl, isEnh = false, enhUsed = false, resonant = false;
@@ -931,7 +909,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, pile, depth, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -960,7 +938,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, pile, depth, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -970,18 +948,17 @@ function computeAction(reserve) {
 function resolve() {
   if (!rolesValid()) return;
   const e = S.encounter;
-  const pile = pileCards();
-  const spell = pile[0];
+  const spell = spellCard();
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  S.actionSetIds = [...pile, elem, boostC].filter(Boolean).map(c => c.id);
+  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
   const reserve = cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null;
   S.reserveId = reserve ? reserve.id : null;
   const boostVal = boostC ? eff(boostC).boost : 0;
 
   const r = computeAction(reserve);
 
-  log(`The weave — Spell: ${r.spellEl} ×${r.depth} (${r.pile.map(x => displayName(x)).join(' + ')}) = ${r.base}` +
+  log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
       ` · Surge: ${boostC ? `${boostC.def.name} (+${boostVal} → ${S.boostTarget})` : '—'}` +
       ` · Arsenal: ${reserve ? reserve.def.name : '—'}`);
@@ -1819,7 +1796,7 @@ function renderControls() {
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
-      ` <b>The Spell is a pile:</b> pour in as many cards as you like, but they must all share an <b>element</b>, and every card you pour in is a slot left empty. Deep = a huge hit and no defence; wide = safe and small.` +
+      `` +
       ` A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
       `` +
       `</div></details>`;
@@ -1943,7 +1920,7 @@ function renderControls() {
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
-    case 'Spell': return 'pour in — one element, deeper is stronger';
+    case 'Spell': return isFight ? 'your Attack' : 'your Move';
     // under 'surge' the Catalyst is pure speed and the Surge carries the only element check
     case 'Element': return 'Initiative — strike first';
     case 'Boost': return '+power to the spell';
@@ -1958,15 +1935,11 @@ function renderSlots() {
   const panel = $('slots-panel');
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') { panel.innerHTML = ''; return; }
   const dnd = isAssignPhase();
-  const pile = pileCards();
-  const total = pile.reduce((t, c) => t + cardValue(c), 0);
   panel.innerHTML = ZONES.map(zone => {
-    const isPile = zone === 'Spell';
-    const cards = isPile ? pile : [cardById(S.assign[zone])].filter(Boolean);
+    const cards = [cardById(S.assign[zone])].filter(Boolean);
     const head = `<div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}` +
-      (isPile && pile.length > 1 ? ` <span class="pile-depth">×${pile.length} = ${total}</span>` : '') +
       `</span><span class="slot-hint">${zoneHint(zone)}</span></div>`;
-    return `<div class="slot slot-${zone} ${cards.length ? 'filled' : ''} ${isPile && pile.length > 1 ? 'deep' : ''}"` +
+    return `<div class="slot slot-${zone} ${cards.length ? 'filled' : ''}"` +
       (dnd ? ` ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event, '${zone}')" onclick="tapZone('${zone}')"` : '') +
       `>` + head +
       (cards.length ? `<div class="pile">${cards.map(cardHTML).join('')}</div>`
@@ -1999,7 +1972,7 @@ const SIGIL = {
 const ACCENT = { Fire: '#ff9e7a', Water: '#9ecfff', Lightning: '#fff29e', Stone: '#cdbe98' };
 
 // role buttons shown on a tapped card — the easy path: tap card → tap a role (no hunting for zones)
-const ROLE_BTNS = [['Spell', 'Pour in'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
+const ROLE_BTNS = [['Spell', 'Spell'], ['Element', 'Catalyst'], ['Boost', 'Surge'], ['Reserve', 'Arsenal']];
 function roleButtons(card) {
   const cur = zoneOf(card.id);
   const btns = ROLE_BTNS.map(([role, label]) => {
@@ -2227,11 +2200,10 @@ function startDuelBeat() {
 
 function resolveDuel() {
   if (!rolesValid()) return;
-  const pile = pileCards();
-  const spell = pile[0];
+  const spell = spellCard();
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
-  S.actionSetIds = [...pile, elem, boostC].filter(Boolean).map(c => c.id);
+  S.actionSetIds = [spell, elem, boostC].filter(Boolean).map(c => c.id);
   const reserve = cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null;
   S.reserveId = reserve ? reserve.id : null;
 
@@ -2258,7 +2230,7 @@ function resolveDuel() {
   const damage = early + counter;
   S.duelResult = { atk, toHp, kill, early, counter, damage };
 
-  log(`The weave — Spell: ${r.spellEl} ×${r.depth} (${r.pile.map(x => displayName(x)).join(' + ')}) = ${r.base}` +
+  log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
       ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
 
