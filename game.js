@@ -330,6 +330,26 @@ function evLiftCurse() {
   return `✨ ${charmById(id).name} lifts from you — ${charmById(id).text} is gone.`;
 }
 function curseCount() { return (S.charms || []).filter(id => (charmById(id) || {}).curse).length; }
+// 🔑 GETTING A LOST CARD BACK (2026-07-27). Trashing is permanent and it compounds: measured,
+// a sub-optimal player loses 6 of 16 cards a run while an optimal one loses none, and there was
+// no way back. Rather than soften the damage curve (a Lv0 floor was considered and dropped -
+// blunted cards would soak for free), recovery lives on the RUN layer, where you pay for it.
+// A recovered card returns at Lv1: it is back, but it is not what it was.
+function evRecoverCard(which) {
+  if (!S.trashed.length) return 'Nothing of yours has been lost yet.';
+  const i = which === 'first' ? 0 : S.trashed.length - 1;
+  const card = S.trashed.splice(i, 1)[0];
+  card.level = 1;
+  S.deck.push(card);
+  return `✨ ${displayName(card)} is yours again — battered, back at Lv1, and now at the bottom of your deck.`;
+}
+function evRecoverAll() {
+  if (!S.trashed.length) return ['Nothing of yours has been lost yet.'];
+  const names = S.trashed.map(c => displayName(c));
+  for (const c of S.trashed) { c.level = 1; S.deck.push(c); }
+  S.trashed = [];
+  return [`✨ Everything you lost comes back at Lv1: ${names.join(', ')}.`];
+}
 function evTakeCurse() {
   const c = randomCurse();
   return c ? evGrantCharm(c.id) : 'The dark has nothing left to take from you.';
@@ -1443,6 +1463,9 @@ const EVENTS = [
       { label: 'Mend one carefully — a card you choose gains +1 level', need: 'card', apply: ({ card }) => evLevel(card, +1) },
       { label: 'Work through the night — +1 level on TWO cards, but you arrive tired (Hardship next fight)', need: 'none',
         apply: () => [...evUpgradeRandom(2), evCurseNextFight()] },
+      { label: 'Ask after what you have lost — a broken card returns at Lv1', need: 'none',
+        when: () => S.trashed.length > 0,
+        apply: () => ['He works in silence for an hour and hands it back.', evRecoverCard('last')] },
       { label: 'Sell him your spare wax — 🪙 +7 coins', need: 'none',
         apply: () => { S.coins += 7; return [`The chandler pays well for good wax — +7 coins (you now hold ${S.coins}).`]; } },
     ] },
@@ -1481,6 +1504,19 @@ const EVENTS = [
           return [`You share what you have (−8 coins, ${S.coins} left).`, 'The road ahead is blessed — +2 Pace on your next journey.', 'He eats every scrap and says nothing, which from him is thanks.']; } },
       { label: 'Keep your book — nothing', need: 'none',
         apply: () => { S.eventFlags.pilgrim = 'refused'; return ['You keep your pages close and travel on.', 'He nods, unoffended. "A careful sort. The road likes those, sometimes."']; } },
+    ] },
+  // ⤷ CONDITIONAL: there is nothing here to find until you have actually lost something.
+  { id: 'ashfield', name: 'The Ashfield',
+    when: () => S.trashed.length > 0,
+    flavor: "A slope of grey cinders where the mountain puts everything it has finished with. Somewhere in it is your handwriting.",
+    options: [
+      { label: 'Dig for the last thing you dropped — 🪙 −6, it returns at Lv1', need: 'none',
+        apply: () => { if (S.coins < 6) return ['You have nothing to trade the ashfield, and it does not give on credit.'];
+          S.coins -= 6; return [`You dig until your hands are black (−6 coins, ${S.coins} left).`, evRecoverCard('last')]; } },
+      { label: 'Take back EVERYTHING you have lost — and a CURSE for the presumption', need: 'none',
+        apply: () => [...evRecoverAll(), 'Something notices how much you took.', evTakeCurse()] },
+      { label: 'Let the ash keep it', need: 'none',
+        apply: () => ['You leave your losses where they fell. The slope does not thank you either way.'] },
     ] },
   // ⤷ CALLBACK: only appears if you have already met him, and he remembers which you were.
   { id: 'pilgrim2', name: 'The Gray Pilgrim, Again', once: true,
@@ -1857,8 +1893,10 @@ function renderControls() {
       body = `<div class="hint"><b>${def.options[ev.opt].label}</b><br>Pick the card from your hand below — its stats are right there on it.</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
+      // an OPTION may gate itself with when(), the same way a whole event can
       body = `<div class="event-flavor">${def.flavor}</div>` +
-        `<div class="event-opts">` + def.options.map((o, i) => `<button onclick="eventChoose(${i})">${o.label}</button>`).join('') + `</div>`;
+        `<div class="event-opts">` + def.options.map((o, i) =>
+          (!o.when || o.when()) ? `<button onclick="eventChoose(${i})">${o.label}</button>` : '').join('') + `</div>`;
     }
     c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
   } else if (S.phase === 'defeat') {
