@@ -110,40 +110,40 @@ const PERILS = {
 // R4 XP values are INFERRED from the source's XP≈0.6×HP pattern — flag for tuning.
 const REGIONS = [
   { name: 'Verdant Edge', hardshipChance: 0, encounters: [
-    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 8, atk: 1, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
-    { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],      xp: 7 },
-    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     armor: [{ el: 'Water', v: 2 }],     xp: 5 },
-    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 8 },
+    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 6, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 0, xp: 4 },
+    { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 7 },
+    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 0,     xp: 5 },
+    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 8 },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 3 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
-    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 1 }],    xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 1 }], xp: 4 },
-    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 3 }],      xp: 8 },
-    { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    armor: [{ el: 'Water', v: 2 }],     xp: 7, ability: 'Freeze' },
+    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 0,    xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning', shape: 'armour', shapeV: 2, xp: 4 },
+    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 4,      xp: 8 },
+    { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 0,     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 7 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5 },
     { type: 'journey', name: 'Scree Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
   ]},
   { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
-    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }],    xp: 9 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }],     xp: 8 },
-    { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 7, atk: 2, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 2 }],      xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 7, atk: 2, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }], xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 5,    xp: 9 },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 3,     xp: 8 },
+    { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 6, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 0,      xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 6, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 0, xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 6 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'Granite Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
   ]},
   { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    armor: [{ el: 'Stone', v: 3 }, { el: 'Water', v: 2 }],    xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 10, atk: 3, atkEl: 'Fire',      armor: [{ el: 'Fire', v: 1 }],                             xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 8,  atk: 4, atkEl: 'Lightning', armor: [{ el: 'Lightning', v: 2 }, { el: 'Fire', v: 2 }],  xp: 8, ability: 'Freeze' },
-    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     armor: [{ el: 'Water', v: 3 }, { el: 'Stone', v: 2 }],    xp: 9 },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 4,    xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 7, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 0,                             xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 7,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 0,  xp: 8, ability: 'Freeze' },
+    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 6,    xp: 9 },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 7, peril: 'Treacherous' },
     { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 6 },
     { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5 },
@@ -244,6 +244,12 @@ const DRAGONS = [
 const APPROACH = { mp: 13, timePenalty: 2, nightfall: 6 };
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 const dragonWeakness = d => ELEMENTS.filter(el => !d.armor.some(a => a.el === el));
+// how a creature defends, in one phrase — this is the question the encounter is asking you
+function shapeText(e) {
+  if (e.shape === 'armour') return `🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`;
+  if (e.shape === 'evasion') return `🌀 <b>Evasion</b> — halves your hit unless you strike first`;
+  return '— unguarded';
+}
 const armorText = list => list.map(a => `${a.v} ${elIcon(a.el)}`).join(' · ');
 
 // ============================================================
@@ -679,7 +685,7 @@ function drawEncounter(avoidType) {
 function logChallenge() {
   const e = S.encounter;
   if (e.type === 'fight') {
-    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} ${e.atkEl} · Armor ${e.armor.length ? e.armor.map(a => `${a.v} ${a.el}`).join(' / ') : '—'} · XP ${e.xp})`);
+    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} ${e.atkEl} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · XP ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · Element ${e.element || '—'} · XP ${e.xp})`);
@@ -893,10 +899,17 @@ function computeAction(reserve) {
     const wrongType = false;
     const base = pileVal;
     const withBoost = base + boostEff;
-    // enemy armor is a LIST of elements; it bites the element your PILE is made of
-    const armorHit = (e.armor || []).find(a => a.el === spellEl);
-    const armorCut = armorHit ? armorHit.v : 0;
+    // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
+    // an elemental attack - a rule no non-elemental class could ever join - but a SHAPE, stated
+    // in engine terms so every class can answer it with whatever it produces.
+    //   🛡️ ARMOUR  flat reduction off every hit -> small hits are eaten, so it wants ONE BIG HIT
+    //   🌀 EVASION  your hit is HALVED unless you won Initiative -> it wants SPEED
+    // (🧱 GUARD - a breakable pool beaten by MANY hits - is deliberately absent: the mage lands
+    //  exactly one hit, so it has nothing to bite on. It is the rogue's lock, not the mage's.)
+    const armorCut = e.shape === 'armour' ? (e.shapeV || 0) : 0;
+    const evaded = e.shape === 'evasion' && initLost;
     let value = Math.max(0, withBoost - armorCut);
+    if (evaded) value = Math.floor(value / 2);
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
@@ -909,7 +922,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -973,7 +986,8 @@ function resolve() {
     if (r.enhUsed) b1.push(L(`Attack: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
     else b1.push(L(`Attack: basic Atk ${r.base}`));
     if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Boost: +${r.boostEff} → Attack ${r.withBoost}`));
-    if (r.armorCut) b1.push(L(`Armor: it shields ${r.enhEl} — your Attuned strike is turned → −${r.armorCut} = ${r.value}`, 'bad'));
+    if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
+    if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
     beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
@@ -1742,7 +1756,7 @@ function renderEncounter() {
       `<div class="enc-type">FIGHT — ${REGIONS[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
       `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
-      `<span>🛡️ ${e.armor.length ? armorText(e.armor) : '—'}</span>` +
+      `<span>${shapeText(e)}</span>` +
       `<span>strikes with ${elIcon(e.atkEl)}</span>` +
       `<span>⭐ XP <b>${e.xp}</b></span></div>` + modLines;
   } else {
