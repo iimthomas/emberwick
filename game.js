@@ -8,6 +8,8 @@
 // ---------- tuning constants (placeholders, see design docs) ----------
 const START_LEVEL = 2;
 const MAX_LEVEL = 4;
+// ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
+let ATTUNE_BONUS = 1;
 const HAND_SIZE = 4;
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
@@ -190,6 +192,23 @@ const SLOTS = ['Element', 'Boost', 'Reserve'];
 // what a card contributes as the Spell. Kept as a function because the class layer, the card
 // face and the level-delta readout all ask the same question.
 function cardValue(card) { return card ? eff(card).value : 0; }
+// ✦ ATTUNING RESTORED 2026-07-29. Read the block above `elOf` for the rule; read this for WHY.
+// With one card per slot and each slot reading a DIFFERENT stat (value / init / boost), the turn
+// decomposed into three independent maximisations - biggest, fastest, fattest - and the 4x4 deck
+// guaranteed it, because the archetypes deliberately separate exactly those three stats. Tension
+// is CONTENTION: a slot has to want a card another slot also wants. Element is the only axis you
+// cannot maximise - you can only match it - so it puts the Catalyst back on two incomparable
+// axes at once and asks the one question the turn was missing:
+//        STRIKE FIRST, OR STRIKE HARD?
+// And the enemy's SHAPE answers it differently every fight: Armour eats a flat chunk so it wants
+// the attuned hit; Evasion halves you unless you win Initiative so it wants the fast Catalyst.
+// The encounter poses the question, the hand constrains the answer.
+// ⚠️ CLASS SEAM: this lives entirely inside MAGE.compose(). The engine never sees an element -
+// pairing is the MAGE's source of power, and a rogue chains, a guardian retaliates.
+function attunedNow() {
+  const sp = spellCard(), el = cardById(S.assign.Element);
+  return !!(sp && el && (el.def.wild || elOf(el) === elOf(sp)));
+}
 function spellCard() { return cardById(S.assign.Spell); }
 function removeFromZone(id) {
   if (S.assign.Spell === id) S.assign.Spell = null;
@@ -208,12 +227,15 @@ const MAGE = {
     if (!spell) return null;
     const elem = cardById(S.assign.Element);
     const boostC = cardById(S.assign.Boost);
+    const attuned = attunedNow();
+    const st = eff(spell);
     return {
-      value: cardValue(spell),
+      value: attuned ? st.attuned : st.value,
       element: spell.def.element,
       init: elem ? eff(elem).init : 0,
       boost: boostC ? eff(boostC).boost : 0,
       hits: 1,
+      attuned, attBonus: st.attuned - st.value,
       spell, elem, boostC,
     };
   },
@@ -599,6 +621,11 @@ function eff(card) {
   // `def.type` / `def.enhType` are now DEAD DATA.
   return {
     value: adj(v),
+    // ✦ THE ATTUNED VALUE (2026-07-29). DERIVED, never printed in the table - column 2 (`ev`)
+    // stays dead. One rule: +(level + 1). It SHARPENS, so the higher a card is levelled the more
+    // it depends on being properly fuelled - a Lv4 Emberfall is enormous attuned and merely large
+    // raw, which is the same "more itself" curve every other stat follows.
+    attuned: adj(v) + card.level + ATTUNE_BONUS,
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
     init: Math.max(0, init + charmMod('init', d.element, d.arch)),
     boost: boost + charmMod('boost', d.element, d.arch), armor: Math.max(0, armor + am), cost,
@@ -617,6 +644,7 @@ function levelDeltaText(card) {
   const parts = [];
   const cmp = (icon, x, y) => { if (x != null && y != null && y !== x) parts.push(`${icon} ${x}<span class="d-arrow">→</span>${y}`); };
   cmp('⚔️', a.value, b.value);
+  cmp('✦', a.attuned, b.attuned);
   cmp('💨', a.init, b.init);
   cmp('➕', a.boost, b.boost);
   cmp('🛡️', a.armor, b.armor);
@@ -879,7 +907,10 @@ function computeAction(reserve) {
   const { spell, elem, boostC, hits } = a;
   const spellEl = a.element;
   const pileVal = a.value;
-  const enhEl = spellEl, isEnh = false, enhUsed = false, resonant = false;
+  // enhUsed/isEnh/enhEl are the engine's long-standing "this action was attuned" fields. The mage
+  // supplies them from its own pairing rule; a class that has no elements simply leaves them false.
+  const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
+  const attBonus = a.attBonus || 0;
   const boostVal = a.boost;
 
   const h = S.hardship;
@@ -922,7 +953,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -951,7 +982,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, hits, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, hits, attBonus, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -983,9 +1014,11 @@ function resolve() {
   if (r.type === 'fight') {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(`Attack: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ${spell.def.name} ATTUNES: ${r.enhEl} Atk ${r.base}`, 'good'));
-    else b1.push(L(`Attack: basic Atk ${r.base}`));
-    if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Boost: +${r.boostEff} → Attack ${r.withBoost}`));
+    if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → Atk ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+    else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
+    // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
+ // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
+    if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
     if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
     beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
@@ -1005,9 +1038,9 @@ function resolve() {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(`Move: Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ${spell.def.name} ATTUNES: Move ${r.base}`, 'good'));
-    else b1.push(L(`Move: basic Move ${r.base}`));
-    if (boostC && S.boostTarget === 'Move') b1.push(L(`Boost: +${r.boostEff} → Move ${r.withBoost}`));
+    if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → Move ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+    else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
+    if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
@@ -1766,9 +1799,7 @@ function renderEncounter() {
       `<span>🌙 Nightfall <b>${e.nightfall}</b></span>` +
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
       `<span>Element ${elChip(e.element)}</span><span>⭐ XP <b>${e.xp}</b></span></div>` +
-      (e.element
-        ? `<div class="enc-hint">💡 A Attuned ${elIcon(e.element)} ${e.element} Move also adds your Arsenal's Boost.</div>`
-        : `<div class="enc-hint">No element — no Arsenal bonus here.</div>`) +
+      `<div class="enc-hint">💡 ✦ A Catalyst matching your Spell's element ATTUNES it — but your Catalyst is also your Pace against the dark. Go far, or get home?</div>` +
       modLines;
   }
 }
@@ -1811,7 +1842,8 @@ function renderControls() {
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
       `` +
-      ` <b>Where cards go:</b> the card you cast as your <b>Spell</b> is <b>spent</b> — discarded, gone for the rest of the region. Your Catalyst and Surge slide back <b>under your deck</b> in an order you choose, and your <b>Arsenal</b> stays in hand. So each turn asks not only which card wins this fight, but which card you can afford to lose. A creature takes several <b>beats</b>: between them your spent cards slide back under the deck and you draw fresh, so the Arsenal is the one card you carry into the next exchange — and you choose the <b>order</b> the spent cards return in.` +
+      ` <b>Where cards go:</b> the card you cast as your <b>Spell</b> is <b>spent</b> — discarded, gone for the rest of the region. Your Catalyst and Surge slide back <b>under your deck</b> in an order you choose, and your <b>Arsenal</b> stays in hand. So each turn asks not only which card wins this fight, but which card you can afford to lose.`
+      + ` <b>✦ Attuning:</b> if your <b>Catalyst</b> shares your <b>Spell's</b> element, the Spell is <b>attuned</b> and strikes for the bigger ✦ number on its face. But the Catalyst is also where your <b>Initiative</b> comes from — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b> Look at what you're facing: 🛡️ <b>Armour</b> shaves a flat amount off every blow, so it wants the attuned hit; 🌀 <b>Evasion</b> halves you unless you act first, so it wants speed.` +
       `` +
       `</div></details>`;
     c.innerHTML =
@@ -1941,7 +1973,13 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') + ' — SPENT, gone for the region';
-    case 'Element': return 'Initiative — returns to your deck';
+    case 'Element': {
+      const sp = spellCard();
+      if (!sp) return 'Initiative — returns to your deck';
+      return attunedNow()
+        ? `✦ ATTUNED — ${elOf(sp)} matches · Initiative`
+        : `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
+    }
     case 'Boost': return '+power — returns to your deck';
     case 'Reserve': return 'kept in hand for next turn';
   }
@@ -2016,6 +2054,10 @@ function cardHTML(card) {
   // the Attuned line shows what the card becomes when its element is matched
   // No attuned line any more - a card has one value, and pouring it into the pile is what
   const contributes = cardValue(card);
+  // ✦ the attuned value sits beside the raw one on EVERY card, because you have to be able to
+  // price the trade before you place anything. It lights up only on the pair that is live.
+  const attV = eff(card).attuned;
+  const attLive = attunedNow() && (zoneOf(card.id) === 'Spell' || zoneOf(card.id) === 'Element');
   const enhLine = d.wild ? '🌈 Wild' : '';
   const forged = '';
 
@@ -2067,12 +2109,13 @@ function cardHTML(card) {
   // numbers never leave (legible math), they just stop shouting all at once.
   // ONE value: the encounter decides whether it reads as damage or as progress.
   const valIcon = (S.encounter && S.encounter.type === 'journey') ? '👣' : '⚔️';
-  const vals = `<div class="card-val v-one">${valIcon} ${contributes}</div>`;
+  const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
+    `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span></div>`;
 
   const slot = zoneOf(card.id);
   const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
-  const slotCls = slot ? `in-${slot}` : '';
+  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';
 

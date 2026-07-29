@@ -55,9 +55,9 @@ const SOLVER = (() => {
     const plays = [];
     S = { hand, encounter, assign: {}, boostTarget: 'Attack', hardship: null, rangedDodge: false, fuse: null };
 
-    // THE PILE: enumerate every same-element subset as the Spell, then every arrangement of
-    // what's left across Catalyst / Surge / Arsenal. Depth is the decision, so the bot MUST
-    // explore it - a bot that only ever pours one card would report a game we aren't shipping.
+    // One card per slot: every choice of Spell x every arrangement of the rest. `enhUsed` is
+    // read straight off the result, so the attune metrics below (availability, obligation,
+    // "does attuning buy a whole outcome tier") come back to life with the rule itself.
     const n = hand.length;
     for (let w = 0; w < n; w++) {
       const spell = hand[w], rest = hand.filter((_, i) => i !== w);
@@ -78,7 +78,7 @@ const SOLVER = (() => {
               const r = computeAction(ember);
               if (!r) continue;
               plays.push({
-                r, score: scoreOf(r), enhUsed: false,
+                r, score: scoreOf(r), enhUsed: !!r.enhUsed,
                 wickName: spell.def.name, usedTinder: !!tinder, boostTarget: bt,
               });
             }

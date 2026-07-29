@@ -458,7 +458,8 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
    deleted (legible math), and identity is never actually lost because the card's whole tint
    already encodes its element. */
 .card .el-identity { transition: opacity .18s ease; }
-.card.in-Spell   .el-identity { opacity: .22; }
+.card.in-Spell   .el-identity { opacity: 1; }
+.card.in-Spell   .el-identity .el { font-weight: bold; }
 .card.in-Element .el-identity, .card.in-Boost .el-identity { opacity: 1; }
 .card.in-Element .el-identity .el, .card.in-Boost .el-identity .el { font-weight: bold; }
 .card.in-Reserve .el-identity { opacity: .55; }
@@ -534,6 +535,14 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .howto[open] > summary::before { content: "× "; }
 .howto > summary:hover { color: #b9b4a5; }
 .howto .hint { margin: 6px 0 2px; }
+
+
+/* ✦ the attuned value, printed beside the raw one on every card. Dim by default - it is a
+   POTENTIAL, not a fact - and it ignites only on the Spell+Catalyst pair that is actually live. */
+.v-att { font-size: .62em; margin-left: .35em; opacity: .45; letter-spacing: .02em; vertical-align: .12em; }
+.v-att.att-live { opacity: 1; color: #ffd98a; text-shadow: 0 0 10px rgba(255,190,90,.55); }
+.card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
+.card.attuned-pair .el-identity .el { background: rgba(255,196,96,.24); color: #ffe6b0; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
