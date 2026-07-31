@@ -544,6 +544,14 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
 .card.attuned-pair .el-identity .el { background: rgba(255,196,96,.24); color: #ffe6b0; }
 
+
+/* the ladder screen: each rung is a QUESTION, so the button leads with the shape, not the name */
+button.rung { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  width: 100%; text-align: left; margin: 5px 0; padding: 10px 12px; line-height: 1.35; }
+button.rung .rung-shape { font-size: .84em; opacity: .8; font-weight: normal; }
+button.rung.locked { opacity: .38; }
+button.rung.locked .rung-shape { font-style: italic; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

@@ -247,32 +247,97 @@ let CLASS = MAGE;
 const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' };
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
-// ---------- the Dragons (spec §8; all four from the source, transcribed 2026-07-01) ----------
-// One is drawn at random per run and FULLY REVEALED from turn 1. Armor is a LIST — a dragon
-// can shield several elements; its "weakness" is simply every element it does NOT shield.
-// Better tiers = less punishment (tp / counterstrike shrink as your total grows).
-// THE DRAGON DUEL (redesigned 2026-07-06, see 03_Content/Dragons.md): each dragon is a
-// PERSISTENT enemy — an HP pool + breakable elemental shields (its armor list). `breath` is
-// the counterstrike base (was the old Early value); the per-beat counter shrinks as HP falls.
-// hp starting values from the old top HP-tier. All OURS to tune with the Run Simulator.
+// ============================================================
+// 🐉 THE LADDER (locked 2026-07-26, BUILT 2026-07-29). Dragons are not random any more.
+//
+// Rung 1 is ALWAYS the same dragon and is also the tutorial boss. Beating a rung UNLOCKS the
+// next WITHOUT removing it — so you pick your rung, and the ladder doubles as the difficulty
+// setting. That is also what makes "add more bosses" scale: a random draw makes a 5th dragon
+// more noise, a ladder makes it a destination.
+//
+// 🔑 EACH RUNG TEACHES ONE DEFENCE SHAPE, and rung 4 is the exam that collides the two you
+// learned. The shapes are stated in ENGINE terms (big hit / speed / time), never in mage terms,
+// so every future class answers them with whatever it produces:
+//     rung 1  🛡️ ARMOUR      flat reduction every beat          → HIT BIG   (so: attune)
+//     rung 2  🌀 EVASION     halved unless you win Initiative   → HIT FIRST (so: take the fast Catalyst)
+//     rung 3  ⏳ RELENTLESS  its breath GROWS each beat         → HIT WELL, EVERY BEAT (a long duel kills you)
+//     rung 4  🛡️🌀 both      you must hit big AND first          → the exam: the one thing you cannot do at once
+//
+// ❌ 🧱 GUARD is deliberately ABSENT. It wants MANY hits and the mage lands exactly one
+// (`compose()` returns hits: 1), so a Guard rung would be unanswerable, not hard. It is the
+// ROGUE's rung — and a mage getting stuck on it is precisely the reason to unlock a second class.
+// Do not "solve" this by giving the mage extra hits; that is the pile coming back by the door.
+//
+// ⚠️ The old 85/84/77/71% difficulty order is DEAD DATA — it was measured under the elemental
+// shields that no longer exist. Rung order is a design choice now, verified by RUNSIM afterwards.
+//
+// Stat grammar: `init` is what your Catalyst must beat (it must be BEATABLE on the evasion rungs
+// or the shape is a flat tax, not a demand). `breath` is the counterstrike base; `shapeV` is the
+// armour value. Each shape demands ONE thing and FORGIVES the other — the armour rung hits soft
+// so you can afford to be slow; the evasion rung hits hard so being slow is what costs you.
+// ============================================================
+let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned 2026-07-29)
 const DRAGONS = [
-  { name: 'Cindermaw',  element: 'Fire',      init: 9,  breath: 8, hp: 44, armor: [{ el: 'Fire', v: 4 }] },
-  { name: 'Skyrender',  element: 'Lightning', init: 13, breath: 7, hp: 40, armor: [{ el: 'Lightning', v: 4 }, { el: 'Fire', v: 1 }] },
-  { name: 'Fathomdread', element: 'Water',    init: 10, breath: 6, hp: 44, armor: [{ el: 'Water', v: 5 }, { el: 'Lightning', v: 3 }, { el: 'Stone', v: 2 }] },
-  { name: 'Cragmourn', element: 'Stone',    init: 12, breath: 7, hp: 42, armor: [{ el: 'Stone', v: 4 }, { el: 'Water', v: 3 }] },
+  { rung: 1, name: 'Cindermaw', element: 'Fire', init: 10, breath: 6, hp: 40,
+    shapes: ['armour'], shapeV: 4,
+    teaches: 'HIT BIG',
+    brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
+  { rung: 2, name: 'Skyrender', element: 'Lightning', init: 10, breath: 8, hp: 44,
+    shapes: ['evasion'], shapeV: 0,
+    teaches: 'HIT FIRST',
+    brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
+  { rung: 3, name: 'Cragmourn', element: 'Stone', init: 7, breath: 5, hp: 56,
+    shapes: ['relentless'], shapeV: 0,
+    teaches: 'WASTE NOTHING',
+    brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
+  { rung: 4, name: 'Fathomdread', element: 'Water', init: 10, breath: 7, hp: 44,
+    shapes: ['armour', 'evasion'], shapeV: 4,
+    teaches: 'BIG *AND* FIRST',
+    brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
 ];
+const hasShape = sh => !!(S.dragon && S.dragon.shapes.includes(sh));
+// the shape, in one phrase — this is the question the whole run is preparing you for
+function dragonShapeText(d) {
+  const bits = [];
+  if (d.shapes.includes('armour')) bits.push(`🛡️ <b>Armour ${d.shapeV}</b>`);
+  if (d.shapes.includes('evasion')) bits.push(`🌀 <b>Evasion</b>`);
+  if (d.shapes.includes('relentless')) bits.push(`⏳ <b>Relentless</b>`);
+  return bits.join(' + ') || '— unguarded';
+}
+function dragonDemand(d) {
+  const bits = [];
+  if (d.shapes.includes('armour')) bits.push(`it shaves <b>${d.shapeV}</b> off every blow`);
+  if (d.shapes.includes('evasion')) bits.push(`it <b>halves</b> any blow it saw coming`);
+  if (d.shapes.includes('relentless')) bits.push(`its breath <b>grows +${RELENTLESS_STEP} every beat</b>`);
+  return bits.join(' · ');
+}
+
+// ---------- THE LADDER'S MEMORY (survives runs; separate key from the run save) ----------
+const LADDER_KEY = 'emberwick-ladder-1';
+function rungsCleared() {
+  try { return Math.max(0, Math.min(DRAGONS.length, +localStorage.getItem(LADDER_KEY) || 0)); }
+  catch (e) { return 0; }
+}
+function clearRung(n) {
+  try { if (n > rungsCleared()) localStorage.setItem(LADDER_KEY, String(n)); } catch (e) {}
+}
+// you may always attempt rung 1, and every rung you have cleared, and the next one up
+function rungUnlocked(n) { return n <= rungsCleared() + 1; }
+function dragonForRung(n) { return DRAGONS.find(d => d.rung === n) || DRAGONS[0]; }
+
 // THE APPROACH — two ordinary journey-beats racing to the lair (element = the dragon's
 // weakness, so you can Attune toward the crack). Complete both → shatter its weakest shield.
 const APPROACH = { mp: 13, timePenalty: 2, nightfall: 6 };
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
-const dragonWeakness = d => ELEMENTS.filter(el => !d.armor.some(a => a.el === el));
+// dragonWeakness CUT 2026-07-29 — "weakness = the elements it does not shield" cannot survive
+// the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
+// briefing tells you what the dragon demands, and the whole run is your preparation for it.
 // how a creature defends, in one phrase — this is the question the encounter is asking you
 function shapeText(e) {
   if (e.shape === 'armour') return `🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`;
   if (e.shape === 'evasion') return `🌀 <b>Evasion</b> — halves your hit unless you strike first`;
   return '— unguarded';
 }
-const armorText = list => list.map(a => `${a.v} ${elIcon(a.el)}`).join(' · ');
 
 // ============================================================
 // CHARMS (2026-07-06) — run-long passives, our answer to Spire's relics. They add NO cards,
@@ -423,6 +488,10 @@ function shuffle(arr) {
 
 // ---------- save state (auto-saves every stable phase; survives refresh) ----------
 const SAVE_KEY = 'emberwick-save-1';
+// BUG FOUND 2026-07-29: the writer said `v: 4` while the reader demanded `d.v !== 3`, so EVERY
+// load silently failed and every reload started a fresh run. One constant now, used by both - the
+// two can never drift again. Bumped to 5 here because dragons changed shape (shields -> SHAPE).
+const SAVE_VERSION = 5;
 
 function saveGame() {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
@@ -432,7 +501,7 @@ function saveGame() {
       return o;
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 4, uid, dragon: S.dragon ? S.dragon.name : null,
+      v: SAVE_VERSION, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn, regionTurn: S.regionTurn,
       deck: S.deck.map(card), hand: S.hand.map(card),
       discard: S.discard.map(card), trashed: S.trashed.map(card),
@@ -460,7 +529,7 @@ function loadGame() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     const d = JSON.parse(raw);
-    if (d.v !== 3) return false;
+    if (d.v !== SAVE_VERSION) return false;
     const mk = s => {
       const def = CARD_DEFS[s.n];
       if (!def) return null;
@@ -501,9 +570,9 @@ function loadGame() {
     if (S.finalMode) {
       if (S.finalPhase === 'duel') {
         S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
-          init: S.dragon.init, atk: S.dragon.breath, atkEl: S.dragon.element, armor: [], xp: 0, finale: true };
+          init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
       } else {
-        const weak = dragonWeakness(S.dragon)[0] || S.dragon.element;
+        const weak = S.dragon.element;
         const beat = (S.approachOutcomes.length || 0) + 1;
         S.encounter = { type: 'journey', name: `Approach to the ${S.dragon.name} · ${beat}/2`,
           mp: APPROACH.mp, timePenalty: APPROACH.timePenalty, nightfall: APPROACH.nightfall,
@@ -515,11 +584,25 @@ function loadGame() {
   } catch (err) { return false; }
 }
 
-function freshGame() {
+// 🪜 THE LADDER SCREEN. Not a difficulty menu bolted on the side — the rung IS the difficulty,
+// so picking one is the same act as choosing which problem you want to solve tonight.
+function showLadder() {
+  S = S || {};
+  S.phase = 'ladder';
+  S.encounter = null;
+  render();
+}
+function startRung(n) { freshGame(n); }
+
+function freshGame(rung) {
   try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
   const cards = shuffle(CARD_DEFS.map(newCard));
+  // no argument (a cold boot, or the bot) → the highest rung you have unlocked, so a returning
+  // player lands on the newest problem rather than replaying the tutorial.
+  const pick = rung ? dragonForRung(rung)
+    : dragonForRung(Math.min(DRAGONS.length, rungsCleared() + 1));
   S = {
-    dragon: DRAGONS[Math.floor(Math.random() * DRAGONS.length)],
+    dragon: pick,
     region: 1,
     turn: 0,
     deck: cards,
@@ -558,8 +641,8 @@ function freshGame() {
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
     finalPhase: null,     // 'approach' | 'duel'
-    dragonState: null,    // { hp, maxHp, shields:[{el,strength}] } — the persistent dragon
-    approachOutcomes: [], // outcome of each of the 2 approach beats (both Complete → crack a shield)
+    dragonState: null,    // { hp, maxHp, boon } — the persistent dragon
+    approachOutcomes: [], // outcome of each of the 2 approach beats (both Complete → a boon)
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
@@ -576,13 +659,17 @@ function freshGame() {
   draw(HAND_SIZE);
   nextTurn();
   // the Dragon is fully revealed from turn 1 — the run's reference frame
-  log(`🐉 Beyond Region 4 waits ${S.dragon.name} — ${S.dragon.element}, armored ${S.dragon.armor.map(a => `${a.v} ${a.el}`).join(' / ')}, unarmored against ${dragonWeakness(S.dragon).join(' & ')}.`);
+  // 🐉 THE BRIEFING. The dragon is known from turn 1 — and now that it is a RUNG rather than a
+  // random draw, the reveal is a briefing rather than a surprise, which is what makes a run
+  // soft-directional: everything you level and every card you stack is preparation for a problem
+  // you can already name.
+  log(`🐉 RUNG ${S.dragon.rung} — beyond Region 4 waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
   render();
 }
 
 // always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
 function newGame() {
-  if (confirm('Start a new run? Your current run will be lost.')) freshGame();
+  if (confirm('Start a new run? Your current run will be lost.')) showLadder();
 }
 
 function nextRegion() {
@@ -1735,7 +1822,7 @@ function render() {
 function renderStatus() {
   const key = S.deck[0];
   $('status-bar').innerHTML =
-    `<span>🐉 <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)} · 🛡️ ${armorText(S.dragon.armor)} · unarmored vs ${dragonWeakness(S.dragon).map(elIcon).join('')}</span>` +
+    `<span>🐉 <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)} · rung ${S.dragon.rung} · ${dragonShapeText(S.dragon)}</span>` +
     (S.finalMode ? '' : `<span>🗺️ <b>${REGIONS[S.region - 1].name}</b> (${S.region}/${REGIONS.length})</span>`) +
     `<span>Deck: <b>${S.deck.length}</b></span>` +
     `<span>Discard: <b>${S.discard.length}</b></span>` +
@@ -1752,18 +1839,16 @@ function renderEncounter() {
   if (S.finalMode && S.phase !== 'defeat' && S.phase !== 'victory') {
     const ds = S.dragonState;
     const hpPct = ds ? Math.max(0, Math.round(100 * ds.hp / ds.maxHp)) : 100;
-    const shieldChips = ds && ds.shields.length
-      ? ds.shields.map(s => `<span class="dshield el el-${s.el} ${s.strength === 0 ? 'broken' : ''}">${elIcon(s.el)} ${s.strength > 0 ? s.strength : '✗'}</span>`).join(' ')
-      : '<span class="dim">unshielded</span>';
     const dragonBar =
       `<div class="dragon-hp"><div class="dragon-hp-fill" style="width:${hpPct}%"></div>` +
       `<span class="dragon-hp-label">🐉 ${S.dragon.name} — ${ds ? ds.hp : S.dragon.hp} / ${ds ? ds.maxHp : S.dragon.hp} HP</span></div>` +
-      `<div class="dragon-shields">🛡️ ${shieldChips} <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath} (unarmored vs ${dragonWeakness(S.dragon).map(elIcon).join('')})</span></div>`;
+      `<div class="dragon-shields">${ds ? shapeStateText() : dragonShapeText(S.dragon)}` +
+      ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>`;
     if (S.finalPhase === 'duel') {
       panel.className = 'fight';
       panel.innerHTML =
         `<div class="enc-type">🐉 THE DUEL — beat ${S.duelBeat}</div>` + dragonBar +
-        `<div class="enc-hint">Attune INTO a live shield to crack it (overflow wounds HP); an unshielded or broken element takes the full strike; unattuned bypasses shields for a small sure hit.</div>`;
+        `<div class="enc-hint">${dragonDemand(S.dragon)} — <b>${S.dragon.teaches}</b>.</div>`;
       return;
     }
     // THE APPROACH — an ordinary journey-beat, with the dragon looming
@@ -1775,7 +1860,7 @@ function renderEncounter() {
       (e ? `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
         `<span>🌙 Nightfall <b>${e.nightfall}</b></span><span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
         `<span>Element ${elChip(e.element)}</span></div>` +
-        `<div class="enc-hint">Complete BOTH approach beats to shatter the ${S.dragon.name}'s weakest shield before the duel begins.</div>` : '');
+        `<div class="enc-hint">Complete BOTH approach beats and you arrive with the advantage — its guard softened before a blow is struck.</div>` : '');
     return;
   }
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
@@ -1928,7 +2013,21 @@ function renderControls() {
       `<div class="phase-label">💀 DEFEAT</div>` +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, trashed <b>${S.trashed.length}</b></p></div>` +
-      `<button class="primary" onclick="freshGame()">New Run</button>`;
+      `<button class="primary" onclick="showLadder()">🪜 The ladder — choose a rung</button>`;
+  } else if (S.phase === 'ladder') {
+    const cleared = rungsCleared();
+    c.innerHTML =
+      `<div class="phase-label">🪜 THE LADDER</div>` +
+      `<div class="summary"><p>Each rung is a different <b>question</b>, not simply a bigger number. ` +
+      `Beat one and the next opens — but every rung you have climbed stays open, so the ladder is also your difficulty setting.</p></div>` +
+      DRAGONS.map(d => {
+        const open = rungUnlocked(d.rung), done = d.rung <= cleared;
+        return `<button class="${d.rung === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} rung${open ? '' : ' locked'}"` +
+          (open ? ` onclick="startRung(${d.rung})"` : ' disabled') + `>` +
+          `<b>${done ? '✔ ' : ''}Rung ${d.rung} — ${open ? d.name : '???'}</b>` +
+          `<span class="rung-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear rung ' + (d.rung - 1) + ' to open'}</span>` +
+          `</button>`;
+      }).join('');
   } else if (S.phase === 'victory') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -1940,7 +2039,7 @@ function renderControls() {
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
-      `<button class="primary" onclick="freshGame()">New Run</button>`;
+      `<button class="primary" onclick="showLadder()">🪜 The ladder — choose your next rung</button>`;
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -1956,9 +2055,9 @@ function renderControls() {
       `<button onclick="startWheel(true)">🔥 Make camp — the long wheel (🪙 ${S.coins})</button>` +
       (runDone
         ? `<button class="primary" onclick="beginFinalBattle()">🐉 Face the ${S.dragon.name} — the Dragon Duel</button>` +
-          `<button onclick="freshGame()">Restart from scratch</button>`
+          `<button onclick="showLadder()">Restart from scratch</button>`
         : `<button class="primary" onclick="nextRegion()">Enter ${REGIONS[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
-          `<button onclick="freshGame()">Restart from scratch</button>`);
+          `<button onclick="showLadder()">Restart from scratch</button>`);
   }
 }
 
@@ -2161,9 +2260,11 @@ function beginFinalBattle() {
   S.approachOutcomes = [];
   S.duelBeat = 0;
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
+  // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
+  // clean Approach buys — one tick of the shape softened for the whole duel (see finishApproach).
   S.dragonState = {
     hp: S.dragon.hp, maxHp: S.dragon.hp,
-    shields: S.dragon.armor.map(a => ({ el: a.el, strength: a.v })),
+    boon: { armourCut: 0, unseen: 0, calm: 0 },
   };
   S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
   S.hand = []; S.discard = [];
@@ -2172,7 +2273,7 @@ function beginFinalBattle() {
   S.downgraded = new Set();
   S.damage = 0; S.poison = 0; S.loseReserve = null; S.afterSoak = 'upgrade';
   logHeader(`— 🐉 THE ${S.dragon.name.toUpperCase()}: THE APPROACH —`);
-  log(`Region 4 is behind you. Two hard journeys race to the lair — Complete BOTH and you arrive having found the crack, shattering the ${S.dragon.name}'s weakest shield before a blow is struck. Then the duel begins.`);
+  log(`Region 4 is behind you. Two hard journeys race to the lair — Complete BOTH and you arrive with the advantage, softening its guard before a blow is struck. Then the duel begins.`);
   startApproachBeat();
 }
 
@@ -2180,7 +2281,7 @@ function beginFinalBattle() {
 function startApproachBeat() {
   if (S.hand.length === 0) { finishApproach(); return; } // nothing left to travel with → straight to the lair
   const beat = S.approachOutcomes.length + 1;
-  const weak = dragonWeakness(S.dragon)[0] || S.dragon.element; // travel toward the crack
+  const weak = S.dragon.element; // the approach carries the dragon's own colour — flavour only
   S.encounter = { type: 'journey', name: `Approach to the ${S.dragon.name} · ${beat}/2`,
     mp: APPROACH.mp, timePenalty: APPROACH.timePenalty, nightfall: APPROACH.nightfall,
     element: weak, xp: 0, finale: true };
@@ -2207,25 +2308,56 @@ function finishApproach() {
   const outcomes = S.approachOutcomes;
   const bothComplete = outcomes.length >= 2 && outcomes.every(o => o === 'Complete');
   logHeader(`— 🐉 The lair of the ${S.dragon.name} —`);
+  // A clean Approach softens ONE TICK of whatever the dragon's shape is — so the reward always
+  // speaks the same language as the problem, whichever rung you are on.
   if (bothComplete) {
-    const live = S.dragonState.shields.filter(s => s.strength > 0).sort((a, b) => a.strength - b.strength);
-    if (live.length) {
-      const s = live[0]; s.strength = 0;
-      log(`A clean approach — you arrive having found the crack. The ${elIcon(s.el)} ${s.el} shield is shattered before a single blow is struck!`, 'good result');
-    } else {
-      log(`A clean approach — but the ${S.dragon.name} bears no shields to break.`, 'good');
-    }
+    const b = S.dragonState.boon, said = [];
+    if (hasShape('armour')) { b.armourCut = 2; said.push(`you found where the slag has split — 🛡️ Armour ${S.dragon.shapeV} → ${duelArmour()}`); }
+    if (hasShape('evasion')) { b.unseen = 2; said.push(`you come out of the dark unseen — 🌀 its Evasion sleeps for 2 beats`); }
+    if (hasShape('relentless')) { b.calm = 2; said.push(`you arrive rested — ⏳ its breath holds steady for 2 beats before it starts to grow`); }
+    log(`A clean approach: ${said.join(' · ')}.`, 'good result');
   } else {
-    log(`You reach the lair battered and late — the ${S.dragon.name}'s guard is whole.`);
+    log(`You reach the lair battered and late — the ${S.dragon.name} meets you at its full strength.`);
   }
   startDuel();
 }
 
 // ---------- THE DUEL: one-set fight-beats vs the persistent dragon ----------
-function shieldText() {
+// 🐉 SHAPED DEFENCE AT BOSS SCALE (2026-07-29). Elemental shields are gone; a dragon defends with
+// the same vocabulary a creature does, so nothing here is a special case the engine has to learn.
+// The difference is only that a dragon persists across beats — which is what makes RELENTLESS
+// possible at all, and why it is a boss-only shape.
+function duelArmour() {
+  if (!hasShape('armour')) return 0;
+  return Math.max(0, S.dragon.shapeV - (S.dragonState.boon.armourCut || 0));
+}
+// what a strike is actually worth once the shape has had its say
+function duelStrike(r) {
+  const armour = duelArmour();
+  // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
+  const evaded = hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
+  let toHp = Math.max(0, r.value - armour);
+  if (evaded) toHp = Math.floor(toHp / 2);
+  return { toHp, armour, evaded };
+}
+// ⏳ RELENTLESS inverts the normal counterstrike: instead of SHRINKING as the dragon weakens, its
+// breath GROWS every beat. That turns the duel into a race, which is a demand no card stat answers
+// — you answer it by not wasting beats, which is a run-long skill.
+function duelCounter(hpAfter) {
   const ds = S.dragonState;
-  if (!ds.shields.length) return 'no shields';
-  return ds.shields.map(s => s.strength > 0 ? `${s.strength} ${elIcon(s.el)}` : `${elIcon(s.el)}✗`).join(' · ');
+  if (hasShape('relentless')) {
+    const b = Math.max(0, S.duelBeat - 1 - (ds.boon.calm || 0));
+    return S.dragon.breath + b * RELENTLESS_STEP;
+  }
+  return Math.ceil(S.dragon.breath * hpAfter / ds.maxHp);
+}
+function shapeStateText() {
+  const bits = [];
+  const a = duelArmour();
+  if (hasShape('armour')) bits.push(`🛡️ ${a}${a < S.dragon.shapeV ? ' (cracked)' : ''}`);
+  if (hasShape('evasion')) bits.push(S.dragonState.boon.unseen > 0 ? `🌀 unseen you (${S.dragonState.boon.unseen} left)` : '🌀 Evasion');
+  if (hasShape('relentless')) bits.push(`⏳ next breath ${duelCounter(S.dragonState.hp)}`);
+  return bits.join(' · ') || 'unguarded';
 }
 
 function startDuel() {
@@ -2236,7 +2368,7 @@ function startDuel() {
   // (Lv1 soak losses) are gone; a clean approach preserves your full hand AND cracked a shield.
   S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.hand = []; S.discard = [];
-  log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP behind its shields (${shieldText()}). You steel yourself: ${S.deck.length} cards in hand for the duel. Attune INTO a shield to crack it (overflow wounds), or bypass it unattuned for a small sure hit. Fell it before your cards run dry.`);
+  log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
   startDuelBeat();
 }
 
@@ -2253,8 +2385,10 @@ function startDuelBeat() {
   // synthetic persistent enemy: armor [] so computeAction returns the RAW strike; shields are applied here.
   // atk = the Early bite (ceil breath/2) so losing Initiative stings without doubling the breath;
   // the counterstrike (full breath, HP-scaled) is the main threat. hp huge so computeAction never "wins" — we judge HP.
+  // synthetic persistent enemy. NO `shape` field: computeAction must return the RAW strike, because
+  // the dragon's shape is applied in duelStrike() where the boon and the beat counter live.
   S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
-    init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, armor: [], xp: 0, finale: true };
+    init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
   S.divertsUsed = 0; S.diverting = false;
@@ -2263,7 +2397,7 @@ function startDuelBeat() {
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
-  log(`${S.dragon.name}: ${S.dragonState.hp}/${S.dragonState.maxHp} HP · shields ${shieldText()}`);
+  log(`${S.dragon.name}: ${S.dragonState.hp}/${S.dragonState.maxHp} HP · ${shapeStateText()}`);
   render();
 }
 
@@ -2276,28 +2410,22 @@ function resolveDuel() {
   const reserve = cardById(S.assign.Reserve) || S.hand.find(c => !S.actionSetIds.includes(c.id)) || null;
   S.reserveId = reserve ? reserve.id : null;
 
-  const r = computeAction(reserve); // fight math; e.armor=[] → r.value is the raw strike, r.enhEl = what it became
+  const r = computeAction(reserve); // the encounter carries no shape, so r.value is the RAW strike
   const ds = S.dragonState;
   const atk = r.value;
 
-  // --- apply the strike to shields / HP ---
+  // --- the SHAPE has its say, then HP ---
   const hpBefore = ds.hp;
-  let toHp = 0, chip = 0, shield = null, overflow = 0;
-  if (r.enhUsed) {
-    shield = ds.shields.find(s => s.el === r.enhEl && s.strength > 0) || null;
-    if (shield) { chip = Math.min(atk, shield.strength); shield.strength -= chip; overflow = atk - chip; toHp = overflow; }
-    else toHp = atk;            // Attuned into an unshielded / already-broken element → straight to HP
-  } else {
-    toHp = atk;                 // unattuned → bypasses the shields entirely
-  }
+  const st = duelStrike(r);
+  const toHp = st.toHp;
   ds.hp = Math.max(0, ds.hp - toHp);
   const kill = ds.hp <= 0;
 
-  // --- counterstrike shrinks with remaining HP; Early Damage if out-initiatived ---
-  const counter = kill ? 0 : Math.ceil(S.dragon.breath * ds.hp / ds.maxHp);
-  const early = kill ? 0 : r.early; // r.early = breath when you lose Initiative, else 0
+  const counter = kill ? 0 : duelCounter(ds.hp);
+  const early = kill ? 0 : r.early; // r.early = the bite when you lose Initiative, else 0
   const damage = early + counter;
-  S.duelResult = { atk, toHp, kill, early, counter, damage };
+  if (ds.boon.unseen > 0) ds.boon.unseen--;   // the surprise lasts a fixed number of beats
+  S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
@@ -2307,14 +2435,12 @@ function resolveDuel() {
   const L = (text, cls = '') => ({ text, cls });
   const beats = [];
   const b1 = [];
-  if (r.enhUsed) b1.push(L(`Catalyst ${elem.def.wild ? `(Wild) supplies ${r.enhEl}` : `${elOf(elem)} matches`} → ATTUNES: ${r.enhEl} strike ${r.base}`, 'good'));
-  else b1.push(L(`Basic strike ${r.base}${r.isEnh ? ' — unattuned, it will slip past the shields' : ''}`));
-  if (S.boostTarget === 'Attack' && boostC) b1.push(L(`Surge: +${r.boostEff} → strike ${atk}`));
-  if (shield) {
-    b1.push(L(`🛡️ ${shield.el} shield takes ${chip} (${chip + shield.strength} → ${shield.strength})${shield.strength === 0 ? ' — SHATTERED' : ''}`, 'good'));
-    b1.push(overflow > 0 ? L(`Overflow ${overflow} spills past the scale → HP`, 'good') : L(`The strike is spent on the shield — no HP this beat`, 'bad'));
-  } else if (r.enhUsed) b1.push(L(`${r.enhEl} is unshielded — the full ${atk} bites → HP`, 'good'));
-  else b1.push(L(`Unattuned — slips past the shields: ${atk} → HP`));
+  if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → strike ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+  else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
+  if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+  if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
+  if (st.evaded) b1.push(L(`🌀 Evasion: it saw you coming — half the blow finds nothing → ${toHp}`, 'bad'));
+  if (hasShape('evasion') && r.initLost && ds.boon.unseen > 0) b1.push(L(`🌀 It has not seen you yet — the blow lands whole despite your pace`, 'good'));
   b1.push(L(`🐉 ${S.dragon.name}: ${hpBefore} → ${ds.hp} HP`, ds.hp < hpBefore ? 'good' : ''));
   beats.push({ label: '⚔️ STRIKE', big: toHp, vs: `to HP · 🐉 ${hpBefore}→${ds.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
@@ -2322,6 +2448,7 @@ function resolveDuel() {
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs ${S.dragon.init} → the ${S.dragon.name} strikes first → Early Damage ${early}`, 'bad'));
     else b2.push(L(`Initiative: yours ${r.init} vs ${S.dragon.init} → you strike first — no Early Damage`, 'good'));
+    if (hasShape('relentless')) b2.push(L(`⏳ It draws a deeper breath — counterstrike ${counter}${S.duelBeat > 1 ? ` (was ${counter - RELENTLESS_STEP})` : ''}`, 'bad'));
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${S.dragon.init}`, numCls: early ? 'bad' : 'ok', lines: b2 });
   }
 
@@ -2366,7 +2493,12 @@ function defeat(msg) {
 function victory() {
   const survivors = [...S.hand, ...S.deck, ...S.discard];
   const score = survivors.reduce((t, c) => t + c.level, 0);
+  const was = rungsCleared();
+  clearRung(S.dragon.rung);
+  const next = dragonForRung(S.dragon.rung + 1);
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
+  if (next && S.dragon.rung > was) log(`🪜 Rung ${S.dragon.rung} cleared — RUNG ${next.rung}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
+  else if (!next) log(`🪜 The ladder is climbed. Every rung stands open — take whichever you like.`, 'good result');
   S.phase = 'victory';
   render();
 }

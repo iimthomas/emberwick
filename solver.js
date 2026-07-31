@@ -311,19 +311,15 @@ const RUNSIM = (() => {
   // ---- duel play evaluation: computeAction gives the raw strike (dragon armor []),
   // so we simulate resolveDuel's shield/HP math here WITHOUT mutating dragonState ----
   function evalDuelPlay(r) {
-    const ds = S.dragonState, atk = r.value;
-    let toHp = 0, chip = 0;
-    if (r.enhUsed) {
-      const shield = ds.shields.find(s => s.el === r.enhEl && s.strength > 0);
-      if (shield) { chip = Math.min(atk, shield.strength); toHp = atk - chip; }
-      else toHp = atk;
-    } else toHp = atk;
-    const hpAfter = Math.max(0, ds.hp - toHp);
+    const ds = S.dragonState;
+    // reuse the GAME's own shape math rather than restating it - the 2026-07-06 lesson was that a
+    // forked copy of the duel maths drifts, and the bot then reports a game we are not shipping.
+    const st = duelStrike(r);
+    const hpAfter = Math.max(0, ds.hp - st.toHp);
     const kill = hpAfter <= 0;
-    const counter = kill ? 0 : Math.ceil(S.dragon.breath * hpAfter / ds.maxHp);
+    const counter = kill ? 0 : duelCounter(hpAfter);
     const incoming = kill ? 0 : (r.early || 0) + counter;
-    // progress = HP damage + half-credit for shield chipped (breaks enable future full hits)
-    return [kill ? 1 : 0, toHp + chip * 0.5, -incoming];
+    return [kill ? 1 : 0, st.toHp, -incoming];
   }
   function chooseBestDuel() {
     const hand = S.hand, full = hand.length >= 3;
@@ -351,8 +347,12 @@ const RUNSIM = (() => {
   // crude "how much card is this" for the stack heuristic — its best single number
   const bigness = c => { const e = eff(c); return Math.max(e.attuned || 0, e.value || 0); };
 
+  let rungCursor = 0;
   function autoRun(withEvents) {
-    freshGame();
+    // dragons are a LADDER now, so a random draw would under-sample the hard rungs. Round-robin
+    // every rung so perDragon is an even read on all four.
+    rungCursor = (rungCursor % DRAGONS.length) + 1;
+    freshGame(rungCursor);
     const m = { turns: 0, firstL4: null, events: 0, regionAvg: [], regionMax: [],
                 win: null, dragon: null, duelBeats: 0, approachClean: false, dragonHPleft: null };
     let g = 0;
