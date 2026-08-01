@@ -923,9 +923,22 @@ function drawEncounter(avoidType) {
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
   let list = S.encounter.type === 'fight' ? FIGHT_HARDSHIPS : JOURNEY_HARDSHIPS;
-  // Night Travel (wants low-Init Catalysts) never pairs with Ranged (punishes low Init
-  // twice: early hit + dodge only works when winning initiative) — lose-lose, no puzzle
-  if (S.encounter.ability === 'Ranged') list = list.filter(h => h !== 'Night Travel');
+  // 🔑 A HARDSHIP MUST STAY A RISK, NOT BECOME A TAX (2026-07-29). Hardships change the SHAPE of a
+  // turn's danger — you play around them. But ☠️ Ranged makes Early Damage CERTAIN, so every
+  // hardship whose condition is "if you take Early Damage" stops being something you can play
+  // around and becomes a flat surcharge with extra words:
+  //   ⚠️ Hazards — "1 Time Penalty if you take Early Damage" → always. And with Storm's cousin
+  //                rules that is a guaranteed chain.
+  //   ☠️ Ambush  — "double the Early Damage" → a guaranteed doubling rather than a gamble.
+  //   🌙 Night Travel — already excluded (it wants a low-Init Catalyst, which Ranged punishes).
+  // ⚠️ This got worse the moment the Ranged dodge was cut, because dodging used to be the out.
+  // If a future ability guarantees a condition, exclude the hardships keyed to it HERE.
+  // ⚠️ CONSEQUENCE, ACCEPTED FOR NOW: all three FIGHT_HARDSHIPS are keyed to Early Damage or to
+  // low Initiative, so a Ranged creature now rolls NO hardship at all. That is defensible —
+  // Ranged is its own modifier and doesn't need a surcharge — but it is a real loss of variety,
+  // and the honest fix is a fight hardship that isn't about Early Damage (something about the
+  // hand, the deck, or the Stack). Until then, Ranged creatures are hardship-free.
+  if (S.encounter.ability === 'Ranged') list = list.filter(h => !['Night Travel', 'Hazards', 'Ambush'].includes(h));
   S.hardship = Math.random() < region.hardshipChance ? list[Math.floor(Math.random() * list.length)] : null;
   // a Cache/Mirror Fen ward: the next FIGHT carries a Hardship whether the region rolled one or not
   if (S.curseNextFight && S.encounter.type === 'fight') {
