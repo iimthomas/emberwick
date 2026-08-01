@@ -282,6 +282,30 @@ const RUNSIM = (() => {
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
   // pick + assign the best play for the current encounter (mutates S.assign/boostTarget only)
+  // the arrangement search, factored out so the Prism can ask "how good is this hand?"
+  function pickArrangement() {
+    const hand = S.hand, isFight = S.encounter.type === 'fight';
+    const scoreOf2 = scoreOf;   // RUNSIM's own scorer;
+    let best = null;
+    for (let w = 0; w < hand.length; w++) {
+      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
+      const opts = [null, ...rest];
+      for (const spark of opts) for (const tinder of opts) {
+        if (tinder && tinder === spark) continue;
+        for (const ember of opts) {
+          if (ember && (ember === spark || ember === tinder)) continue;
+          S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
+                       Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+          const r = computeAction(ember); if (!r) continue;
+          const sc = scoreOf2(r);
+          if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, sc };
+        }
+      }
+    }
+    if (best) S.assign = best.assign;
+    return best ? best.sc : [-1, 0, 0];
+  }
+
   function chooseBest() {
     // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
@@ -296,10 +320,35 @@ const RUNSIM = (() => {
         const r = computeAction(null); if (!r) continue;
         const sc = t === 'armor'
           ? [0, -((r.early || 0) + (r.combatDmg || 0) - S.wake), 0]
-          : (isF ? fightScore(r) : journeyScore(r));
+          : (scoreOf(r));
         if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
       }
       S.wakeTarget = bestT;
+    }
+    // ✦ THE PRISM. The bot draws BLIND exactly as a player does — it decides to draw before it
+    // sees the card, then picks the best legal replacement afterwards. Policy: take it whenever
+    // the hand can't already Complete, since a rainbow hand can neither attune nor bank.
+    // ⚠️ Like banking, the bot cannot price the region-level cost of the discarded card, so its
+    // Prism RATE means little. What the Prism does to a rainbow hand's OUTCOME is the real number.
+    if (typeof prismReady === 'function' && prismReady()) {
+      const scoreNow = () => { const r = computeAction(cardById(S.assign.Reserve)); return r ? (scoreOf(r)) : [-1,0,0]; };
+      pickArrangement();
+      const before = scoreNow();
+      if (before[0] < 2) {
+        prismDraw();
+        let best = null;
+        const drawn = S.prism;
+        for (const c of S.hand.slice()) {
+          if (elOf(c) === elOf(drawn)) continue;
+          const snapHand = S.hand.slice(), snapAssign = { ...S.assign }, snapDiscard = S.discard.slice();
+          prismTake(c.id);
+          pickArrangement();
+          const sc = scoreNow();
+          if (!best || better(sc, best.sc)) best = { sc, id: c.id };
+          S.hand = snapHand; S.assign = snapAssign; S.discard = snapDiscard; S.prism = drawn;
+        }
+        if (best && better(best.sc, before)) prismTake(best.id); else prismRefuse();
+      }
     }
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
