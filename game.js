@@ -1598,17 +1598,19 @@ function finishRegionCheck() {
 // opt-in choice. Design + pool: 03_Content/Events.md. All outcomes are
 // existing engine verbs (level, reforge stat, rewire enhEl).
 // ============================================================
+// 🔑 EVENTS SOFTEN, THEY NEVER DELETE (2026-07-29, Thomas). A card can still leave your deck for
+// good — but only ever as a consequence of DAMAGE, which is the deck-as-health system doing its
+// job. It must never be the price of a choice you made at a campfire: an option that permanently
+// costs you a card is one nobody sensible takes, so it isn't a decision, it's a trap. Lv1 is the
+// floor here; the card just stays Lv1.
 function evLevel(card, delta) {
   if (delta > 0) {
     if (card.level >= MAX_LEVEL) return `${card.def.name} already burns as bright as it can — nothing changes.`;
     card.level++; return `${card.def.name} brightens to Lv${card.level}.`;
   }
-  if (card.level <= 1) { // Lv1 downgrade = burned out
-    S.hand = S.hand.filter(c => c.id !== card.id);
-    S.trashed.push(card);
-    return `${card.def.name} was Lv1 — it gutters out and LEAVES YOUR DECK for the rest of the run.`;
-  }
-  card.level--; return `${card.def.name} dims to Lv${card.level}.`;
+  if (card.level <= 1) return `${card.def.name} is already as dull as it gets — it takes no more harm.`;
+  card.level--;
+  return `${card.def.name} dims to Lv${card.level}.${card.level === 3 ? ' Its Lv4 edge is gone.' : ''}`;
 }
 // evReforge / evRewire CUT 2026-07-26 - permanently rewriting a card makes it stop being the
 // card you learned. Events that only change LEVEL survive (Chandler, Kiln, Toll).
@@ -1620,11 +1622,6 @@ function evUpgradeRandom(n, excludeId) {
   return picks.map(c => evLevel(c, +1));
 }
 function evCurseNextFight() { S.curseNextFight = true; return 'A ward bites — your next fight will carry a Hardship.'; }
-function evTrashCard(card) { // "give a page of your book" — permanent deck-thinning
-  S.hand = S.hand.filter(c => c.id !== card.id);
-  S.trashed.push(card);
-  return `${card.def.name} LEAVES YOUR DECK for the rest of the run — your deck is your health, so that is a card of it gone.`;
-}
 const rand = arr => arr[Math.floor(Math.random() * arr.length)];
 
 const EVENTS = [
@@ -1680,13 +1677,16 @@ const EVENTS = [
   { id: 'pilgrim', name: 'The Gray Pilgrim',
     flavor: "A hooded traveler shares your fire. He asks for a page of your book, and blesses the road ahead.",
     options: [
-      { label: 'Give a card — +2 Pace on your next two journeys (it LEAVES YOUR DECK for the whole run)', need: 'card',
-        apply: ({ card }) => { const t = evTrashCard(card); S.paceBless = 2; S.eventFlags.pilgrim = 'gave';
-          return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', `Your deck is one card thinner for the rest of the run — ${S.deck.length + S.hand.length + S.discard.length} left.`, 'He tucks the page away without reading it. "I will know you again."']; } },
-      { label: 'Share your supper — 🪙 −8 coins, +2 Pace on your next journey', need: 'none',
-        apply: () => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
-          S.coins -= 8; S.paceBless = 1; S.eventFlags.pilgrim = 'fed';
-          return [`You share what you have (−8 coins, ${S.coins} left).`, 'The road ahead is blessed — +2 Pace on your next journey.', 'He eats every scrap and says nothing, which from him is thanks.']; } },
+      // ⚠️ REWRITTEN 2026-07-29. The old first option TRASHED a card for the whole run, and both
+      // paying options gave +2 Pace — so the "choice" was one currency at two prices. These three
+      // now pay in three different currencies: travel · deck power · coins.
+      { label: 'Let him read a page — a card you choose DIMS one level; the road ahead is blessed (+2 Pace, next two journeys)', need: 'card',
+        apply: ({ card }) => { const t = evLevel(card, -1); S.paceBless = 2; S.eventFlags.pilgrim = 'gave';
+          return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', 'He reads it once, closes your book gently, and hands it back. "I will know you again."']; } },
+      { label: 'Share your supper — 🪙 −8 coins, and he tends your kit: a card you choose BRIGHTENS a level', need: 'card',
+        apply: ({ card }) => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
+          S.coins -= 8; S.eventFlags.pilgrim = 'fed';
+          return [`You share what you have (−8 coins, ${S.coins} left).`, 'He works at it by the fire without being asked — ' + evLevel(card, +1), 'He eats every scrap and says nothing, which from him is thanks.']; } },
       { label: 'Keep your book — nothing', need: 'none',
         apply: () => { S.eventFlags.pilgrim = 'refused'; return ['You keep your pages close and travel on.', 'He nods, unoffended. "A careful sort. The road likes those, sometimes."']; } },
     ] },
