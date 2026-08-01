@@ -561,12 +561,12 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 .card.attuned-pair .el-identity .el { background: rgba(255,196,96,.24); color: #ffe6b0; }
 
 
-/* the ladder screen: each rung is a QUESTION, so the button leads with the shape, not the name */
-button.rung { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+/* the stage-select screen: each rung is a QUESTION, so the button leads with the shape, not the name */
+button.stage { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
   width: 100%; text-align: left; margin: 5px 0; padding: 10px 12px; line-height: 1.35; }
-button.rung .rung-shape { font-size: .84em; opacity: .8; font-weight: normal; }
-button.rung.locked { opacity: .38; }
-button.rung.locked .rung-shape { font-style: italic; }
+button.stage .stage-shape { font-size: .84em; opacity: .8; font-weight: normal; }
+button.stage.locked { opacity: .38; }
+button.stage.locked .stage-shape { font-style: italic; }
 
 
 /* what you CARRY — charms, curses and temporary blessings, on the status bar every turn.

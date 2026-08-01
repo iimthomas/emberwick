@@ -347,49 +347,48 @@ const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserv
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
 // ============================================================
-// 🐉 THE LADDER (locked 2026-07-26, BUILT 2026-07-29). Dragons are not random any more.
+// 🐉 THE STAGES (locked 2026-07-26, BUILT 2026-07-29). Dragons are not random any more.
 //
-// Rung 1 is ALWAYS the same dragon and is also the tutorial boss. Beating a rung UNLOCKS the
-// next WITHOUT removing it — so you pick your rung, and the ladder doubles as the difficulty
-// setting. That is also what makes "add more bosses" scale: a random draw makes a 5th dragon
+// Stage 1 is ALWAYS the same dragon and is also the tutorial boss. Beating a stage UNLOCKS the
+// next WITHOUT removing it — so you pick your stage, and you can always replay an easier one. That is also what makes "add more bosses" scale: a random draw makes a 5th dragon
 // more noise, a ladder makes it a destination.
 //
-// 🔑 EACH RUNG TEACHES ONE DEFENCE SHAPE, and rung 4 is the exam that collides the two you
+// 🔑 EACH STAGE TEACHES ONE DEFENCE SHAPE, and stage 4 is the exam that collides the two you
 // learned. The shapes are stated in ENGINE terms (big hit / speed / time), never in mage terms,
 // so every future class answers them with whatever it produces:
-//     rung 1  🛡️ ARMOUR      flat reduction every beat          → HIT BIG   (so: attune)
-//     rung 2  🌀 EVASION     halved unless you win Initiative   → HIT FIRST (so: take the fast Catalyst)
-//     rung 3  ⏳ RELENTLESS  its breath GROWS each beat         → HIT WELL, EVERY BEAT (a long duel kills you)
-//     rung 4  🛡️🌀 both      you must hit big AND first          → the exam: the one thing you cannot do at once
+//     stage 1  🛡️ ARMOUR      flat reduction every beat          → HIT BIG   (so: attune)
+//     stage 2  🌀 EVASION     halved unless you win Initiative   → HIT FIRST (so: take the fast Catalyst)
+//     stage 3  ⏳ RELENTLESS  its breath GROWS each beat         → HIT WELL, EVERY BEAT (a long duel kills you)
+//     stage 4  🛡️🌀 both      you must hit big AND first          → the exam: the one thing you cannot do at once
 //
 // ❌ 🧱 GUARD is deliberately ABSENT. It wants MANY hits and the mage lands exactly one
-// (`compose()` returns hits: 1), so a Guard rung would be unanswerable, not hard. It is the
-// ROGUE's rung — and a mage getting stuck on it is precisely the reason to unlock a second class.
+// (`compose()` returns hits: 1), so a Guard stage would be unanswerable, not hard. It is the
+// ROGUE's stage — and a mage getting stuck on it is precisely the reason to unlock a second class.
 // Do not "solve" this by giving the mage extra hits; that is the pile coming back by the door.
 //
 // ⚠️ The old 85/84/77/71% difficulty order is DEAD DATA — it was measured under the elemental
-// shields that no longer exist. Rung order is a design choice now, verified by RUNSIM afterwards.
+// shields that no longer exist. Stage order is a design choice now, verified by RUNSIM afterwards.
 //
-// Stat grammar: `init` is what your Catalyst must beat (it must be BEATABLE on the evasion rungs
+// Stat grammar: `init` is what your Catalyst must beat (it must be BEATABLE on the evasion stages
 // or the shape is a flat tax, not a demand). `breath` is the counterstrike base; `shapeV` is the
-// armour value. Each shape demands ONE thing and FORGIVES the other — the armour rung hits soft
-// so you can afford to be slow; the evasion rung hits hard so being slow is what costs you.
+// armour value. Each shape demands ONE thing and FORGIVES the other — the armour stage hits soft
+// so you can afford to be slow; the evasion stage hits hard so being slow is what costs you.
 // ============================================================
 let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned 2026-07-29)
 const DRAGONS = [
-  { rung: 1, name: 'Cindermaw', element: 'Fire', init: 10, breath: 6, hp: 40,
+  { stage: 1, name: 'Cindermaw', element: 'Fire', init: 10, breath: 6, hp: 40,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { rung: 2, name: 'Skyrender', element: 'Lightning', init: 10, breath: 8, hp: 44,
+  { stage: 2, name: 'Skyrender', element: 'Lightning', init: 10, breath: 8, hp: 44,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { rung: 3, name: 'Cragmourn', element: 'Stone', init: 7, breath: 5, hp: 56,
+  { stage: 3, name: 'Cragmourn', element: 'Stone', init: 7, breath: 5, hp: 56,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { rung: 4, name: 'Fathomdread', element: 'Water', init: 10, breath: 7, hp: 44,
+  { stage: 4, name: 'Fathomdread', element: 'Water', init: 10, breath: 7, hp: 44,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -413,16 +412,16 @@ function dragonDemand(d) {
 
 // ---------- THE LADDER'S MEMORY (survives runs; separate key from the run save) ----------
 const LADDER_KEY = 'emberwick-ladder-1';
-function rungsCleared() {
+function stagesCleared() {
   try { return Math.max(0, Math.min(DRAGONS.length, +localStorage.getItem(LADDER_KEY) || 0)); }
   catch (e) { return 0; }
 }
-function clearRung(n) {
-  try { if (n > rungsCleared()) localStorage.setItem(LADDER_KEY, String(n)); } catch (e) {}
+function clearStage(n) {
+  try { if (n > stagesCleared()) localStorage.setItem(LADDER_KEY, String(n)); } catch (e) {}
 }
-// you may always attempt rung 1, and every rung you have cleared, and the next one up
-function rungUnlocked(n) { return n <= rungsCleared() + 1; }
-function dragonForRung(n) { return DRAGONS.find(d => d.rung === n) || DRAGONS[0]; }
+// you may always attempt stage 1, and every stage you have cleared, and the next one up
+function stageUnlocked(n) { return n <= stagesCleared() + 1; }
+function dragonForStage(n) { return DRAGONS.find(d => d.stage === n) || DRAGONS[0]; }
 
 // THE APPROACH — two ordinary journey-beats racing to the lair (element = the dragon's
 // weakness, so you can Attune toward the crack). Complete both → shatter its weakest shield.
@@ -691,23 +690,23 @@ function loadGame() {
   } catch (err) { return false; }
 }
 
-// 🪜 THE LADDER SCREEN. Not a difficulty menu bolted on the side — the rung IS the difficulty,
+// 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
 // so picking one is the same act as choosing which problem you want to solve tonight.
-function showLadder() {
+function showStages() {
   S = S || {};
   S.phase = 'ladder';
   S.encounter = null;
   render();
 }
-function startRung(n) { freshGame(n); }
+function startStage(n) { freshGame(n); }
 
-function freshGame(rung) {
+function freshGame(stage) {
   try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
   const cards = shuffle(CARD_DEFS.map(newCard));
-  // no argument (a cold boot, or the bot) → the highest rung you have unlocked, so a returning
+  // no argument (a cold boot, or the bot) → the highest stage you have unlocked, so a returning
   // player lands on the newest problem rather than replaying the tutorial.
-  const pick = rung ? dragonForRung(rung)
-    : dragonForRung(Math.min(DRAGONS.length, rungsCleared() + 1));
+  const pick = stage ? dragonForStage(stage)
+    : dragonForStage(Math.min(DRAGONS.length, stagesCleared() + 1));
   S = {
     dragon: pick,
     region: 1,
@@ -773,17 +772,17 @@ function freshGame(rung) {
   draw(HAND_SIZE);
   nextTurn();
   // the Dragon is fully revealed from turn 1 — the run's reference frame
-  // 🐉 THE BRIEFING. The dragon is known from turn 1 — and now that it is a RUNG rather than a
+  // 🐉 THE BRIEFING. The dragon is known from turn 1 — and now that it is a STAGE rather than a
   // random draw, the reveal is a briefing rather than a surprise, which is what makes a run
   // soft-directional: everything you level and every card you stack is preparation for a problem
   // you can already name.
-  log(`🐉 RUNG ${S.dragon.rung} — beyond Region 4 waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
+  log(`🐉 STAGE ${S.dragon.stage} — beyond Region 4 waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
   render();
 }
 
 // always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
 function newGame() {
-  if (confirm('Start a new run? Your current run will be lost.')) showLadder();
+  if (confirm('Start a new run? Your current run will be lost.')) showStages();
 }
 
 function nextRegion() {
@@ -2076,7 +2075,7 @@ function carriedText() {
 function renderStatus() {
   const key = S.deck[0];
   $('status-bar').innerHTML =
-    `<span>🐉 <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)} · rung ${S.dragon.rung} · ${dragonShapeText(S.dragon)}</span>` +
+    `<span>🐉 <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)} · stage ${S.dragon.stage} · ${dragonShapeText(S.dragon)}</span>` +
     (S.finalMode ? '' : `<span>🗺️ <b>${REGIONS[S.region - 1].name}</b> (${S.region}/${REGIONS.length})</span>`) +
     `<span>Deck: <b>${S.deck.length}</b></span>` +
     `<span>Discard: <b>${S.discard.length}</b></span>` +
@@ -2294,19 +2293,19 @@ function renderControls() {
       `<div class="phase-label">💀 DEFEAT</div>` +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, trashed <b>${S.trashed.length}</b></p></div>` +
-      `<button class="primary" onclick="showLadder()">🪜 The ladder — choose a rung</button>`;
+      `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
   } else if (S.phase === 'ladder') {
-    const cleared = rungsCleared();
+    const cleared = stagesCleared();
     c.innerHTML =
-      `<div class="phase-label">🪜 THE LADDER</div>` +
-      `<div class="summary"><p>Each rung is a different <b>question</b>, not simply a bigger number. ` +
-      `Beat one and the next opens — but every rung you have climbed stays open, so the ladder is also your difficulty setting.</p></div>` +
+      `<div class="phase-label">🗺️ THE STAGES</div>` +
+      `<div class="summary"><p>Each stage is a different <b>question</b>, not simply a bigger number. ` +
+      `Beat one and the next opens — but every stage you have cleared stays open, so you can always go back.</p></div>` +
       DRAGONS.map(d => {
-        const open = rungUnlocked(d.rung), done = d.rung <= cleared;
-        return `<button class="${d.rung === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} rung${open ? '' : ' locked'}"` +
-          (open ? ` onclick="startRung(${d.rung})"` : ' disabled') + `>` +
-          `<b>${done ? '✔ ' : ''}Rung ${d.rung} — ${open ? d.name : '???'}</b>` +
-          `<span class="rung-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear rung ' + (d.rung - 1) + ' to open'}</span>` +
+        const open = stageUnlocked(d.stage), done = d.stage <= cleared;
+        return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
+          (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
+          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>` +
+          `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
           `</button>`;
       }).join('');
   } else if (S.phase === 'victory') {
@@ -2320,7 +2319,7 @@ function renderControls() {
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
-      `<button class="primary" onclick="showLadder()">🪜 The ladder — choose your next rung</button>`;
+      `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`;
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -2336,9 +2335,9 @@ function renderControls() {
       `<button onclick="startWheel(true)">🔥 Make camp — the long wheel (🪙 ${S.coins})</button>` +
       (runDone
         ? `<button class="primary" onclick="beginFinalBattle()">🐉 Face the ${S.dragon.name} — the Dragon Duel</button>` +
-          `<button onclick="showLadder()">Restart from scratch</button>`
+          `<button onclick="showStages()">Restart from scratch</button>`
         : `<button class="primary" onclick="nextRegion()">Enter ${REGIONS[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
-          `<button onclick="showLadder()">Restart from scratch</button>`);
+          `<button onclick="showStages()">Restart from scratch</button>`);
   }
 }
 
@@ -2603,7 +2602,7 @@ function finishApproach() {
   const bothComplete = outcomes.length >= 2 && outcomes.every(o => o === 'Complete');
   logHeader(`— 🐉 The lair of the ${S.dragon.name} —`);
   // A clean Approach softens ONE TICK of whatever the dragon's shape is — so the reward always
-  // speaks the same language as the problem, whichever rung you are on.
+  // speaks the same language as the problem, whichever stage you are on.
   if (bothComplete) {
     const b = S.dragonState.boon, said = [];
     if (hasShape('armour')) { b.armourCut = 2; said.push(`you found where the slag has split — 🛡️ Armour ${S.dragon.shapeV} → ${duelArmour()}`); }
@@ -2789,12 +2788,12 @@ function defeat(msg) {
 function victory() {
   const survivors = [...S.hand, ...S.deck, ...S.discard];
   const score = survivors.reduce((t, c) => t + c.level, 0);
-  const was = rungsCleared();
-  clearRung(S.dragon.rung);
-  const next = dragonForRung(S.dragon.rung + 1);
+  const was = stagesCleared();
+  clearStage(S.dragon.stage);
+  const next = dragonForStage(S.dragon.stage + 1);
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
-  if (next && S.dragon.rung > was) log(`🪜 Rung ${S.dragon.rung} cleared — RUNG ${next.rung}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
-  else if (!next) log(`🪜 The ladder is climbed. Every rung stands open — take whichever you like.`, 'good result');
+  if (next && S.dragon.stage > was) log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
+  else if (!next) log(`🪜 Every stage stands open — take whichever you like.`, 'good result');
   S.phase = 'victory';
   render();
 }
