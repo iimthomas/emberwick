@@ -597,6 +597,9 @@ button.stage.locked .stage-shape { font-style: italic; }
   background: linear-gradient(100deg, rgba(155,127,196,.16), rgba(127,176,196,.10)); }
 .prism-lab { font-size: 13px; color: #cbb6ee; }
 .prism-row button { padding: 3px 10px; font-size: 12.5px; border-radius: 999px; }
+.prism-row.prism-open { flex-direction: column; align-items: stretch; }
+.prism-card { max-width: 220px; margin: 2px 0 6px; }
+.prism-card .card { width: 100%; min-width: 0; }
 .prism-go { background: rgba(155,127,196,.3); border-color: #9b7fc4; color: #efe4ff; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */

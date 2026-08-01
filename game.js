@@ -2197,8 +2197,12 @@ function renderControls() {
     // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
     // the whole point is that you choose with the encounter in front of you.
     // ✦ the Prism: an offer above the row, answered by tapping the card you're willing to lose
+    // 🔑 SHOW THE OBJECT. Naming the drawn card is not enough — its value, attuned value, init,
+    // boost, armour and ELEMENT are the entire basis of the decision, and the element decides
+    // which cards you're even allowed to replace. Same rule the Rewiring Pool taught us.
     const prismRow = S.prism
-      ? `<div class="prism-row"><span class="prism-lab">✦ <b>${displayName(S.prism)}</b> Lv${S.prism.level} drawn — tap a card below to replace it (that card is <b>spent for the region</b>)</span>` +
+      ? `<div class="prism-row prism-open"><span class="prism-lab">✦ You drew — tap a card in the row below to put it in that card's place (<b>that card is spent for the region</b>)</span>` +
+        `<div class="prism-card">${cardHTML(S.prism)}</div>` +
         `<button onclick="prismRefuse()">Let it go instead</button></div>`
       : (prismReady()
         ? `<div class="prism-row"><span class="prism-lab">✦ <b>The Prism</b> — all four elements, so no pair. Draw one, discard one?</span>` +
@@ -2468,6 +2472,8 @@ function cardHTML(card) {
   if (S.diverting) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
 
+  } else if (S.prism && card.id === S.prism.id) {
+    action = `<div class="card-action muted">the card you drew</div>`;
   } else if (S.prism) {
     // ⚠️ THE GUARANTEE ONLY HOLDS IF YOU DON'T DISCARD THE COLOUR YOU JUST DREW. Replacing the
     // Stone card with a Stone card leaves you rainbow again — you'd have paid a card for nothing.
