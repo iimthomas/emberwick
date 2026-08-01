@@ -1317,7 +1317,7 @@ function downgrade(card, why) {
     S.trashed.push(card);
     if (S.actionSetIds.includes(card.id)) S.actionSetIds = S.actionSetIds.filter(id => id !== card.id);
     if (S.reserveId === card.id) S.reserveId = null;
-    log(`${card.def.name} was Level 1 → TRASHED (gone for the game)${why}`, 'bad');
+    log(`${card.def.name} was Lv1 → it LEAVES YOUR DECK for the rest of the run${why}`, 'bad');
   } else {
     card.level--;
     log(`${card.def.name} downgraded to Lv${card.level}${why}`, 'bad');
@@ -1606,7 +1606,7 @@ function evLevel(card, delta) {
   if (card.level <= 1) { // Lv1 downgrade = burned out
     S.hand = S.hand.filter(c => c.id !== card.id);
     S.trashed.push(card);
-    return `${card.def.name} was Lv1 — it gutters out and is lost.`;
+    return `${card.def.name} was Lv1 — it gutters out and LEAVES YOUR DECK for the rest of the run.`;
   }
   card.level--; return `${card.def.name} dims to Lv${card.level}.`;
 }
@@ -1623,7 +1623,7 @@ function evCurseNextFight() { S.curseNextFight = true; return 'A ward bites — 
 function evTrashCard(card) { // "give a page of your book" — permanent deck-thinning
   S.hand = S.hand.filter(c => c.id !== card.id);
   S.trashed.push(card);
-  return `${card.def.name} is given away — gone from your book (your deck is thinner).`;
+  return `${card.def.name} LEAVES YOUR DECK for the rest of the run — your deck is your health, so that is a card of it gone.`;
 }
 const rand = arr => arr[Math.floor(Math.random() * arr.length)];
 
@@ -1680,9 +1680,9 @@ const EVENTS = [
   { id: 'pilgrim', name: 'The Gray Pilgrim',
     flavor: "A hooded traveler shares your fire. He asks for a page of your book, and blesses the road ahead.",
     options: [
-      { label: 'Give a card — +2 Pace on your next two journeys (the card is gone for good)', need: 'card',
+      { label: 'Give a card — +2 Pace on your next two journeys (it LEAVES YOUR DECK for the whole run)', need: 'card',
         apply: ({ card }) => { const t = evTrashCard(card); S.paceBless = 2; S.eventFlags.pilgrim = 'gave';
-          return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', 'He tucks the page away without reading it. "I will know you again."']; } },
+          return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', `Your deck is one card thinner for the rest of the run — ${S.deck.length + S.hand.length + S.discard.length} left.`, 'He tucks the page away without reading it. "I will know you again."']; } },
       { label: 'Share your supper — 🪙 −8 coins, +2 Pace on your next journey', need: 'none',
         apply: () => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
           S.coins -= 8; S.paceBless = 1; S.eventFlags.pilgrim = 'fed';
@@ -1960,7 +1960,7 @@ function renderStatus() {
     (S.finalMode ? '' : `<span>🗺️ <b>${REGIONS[S.region - 1].name}</b> (${S.region}/${REGIONS.length})</span>`) +
     `<span>Deck: <b>${S.deck.length}</b></span>` +
     `<span>Discard: <b>${S.discard.length}</b></span>` +
-    `<span>Trashed: <b>${S.trashed.length}</b></span>` +
+    `<span title="cards that have left your deck for the rest of this run">Lost: <b>${S.trashed.length}</b></span>` +
     `<span>Next draw: <b>${key ? `${key.def.name} Lv${key.level}` : '—'}</b></span>` +
     `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
     `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>` +
@@ -2338,7 +2338,7 @@ function cardHTML(card) {
   } else if (S.phase === 'soak') {
     if (!wasDowngraded) {
       const soak = soakValue(card);
-      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' (TRASH!)' : ''}</button></div>`;
+      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' ⚠️ Lv1: LEAVES YOUR DECK' : ''}</button></div>`;
     } else {
       action = `<div class="card-action muted">already downgraded</div>`;
     }
