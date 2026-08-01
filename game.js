@@ -94,7 +94,7 @@ const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm'];
 const ABILITIES = {
   'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
   'Poison': 'If it damages you, +1 damage to your next drawn hand (+2 if both Early and Combat).',
-  'Ranged': 'Deals Early Damage even if you win Initiative — unless you discard your Arsenal in Cleanup (decide now).',
+  'Ranged': 'It shoots from range — you take Early Damage even when you strike first. Speed cannot save you here.',
 };
 
 const PERILS = {
@@ -744,7 +744,7 @@ function freshGame(stage) {
     phase: null,
     encounter: null,
     hardship: null,      // active Hardship name or null
-    rangedDodge: false,  // vs Ranged: commit now to discard Reserve in Cleanup
+    rangedDodge: false,  // dead since 2026-07-29 (the dodge was cut); kept so old saves still load
     loseReserve: null,   // reason string — Reserve is discarded in Cleanup
     poison: 0,           // damage owed to the NEXT drawn hand
     afterSoak: 'upgrade', // where the soak phase exits to: 'upgrade' | 'turnEnd'
@@ -1157,8 +1157,8 @@ function computeAction(reserve) {
   if (e.type === 'fight') {
     const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
     const initLost = e.init > init;
-    // Ranged deals Early Damage even when you win initiative, unless dodged (Arsenal cost)
-    const rangedHits = ability === 'Ranged' && !initLost && !S.rangedDodge;
+    // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
+    const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
     if (h === 'Ambush') early *= 2;
     const wrongType = false;
@@ -1184,7 +1184,6 @@ function computeAction(reserve) {
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
     // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
-    if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     return { type: 'fight', spell, hits, attBonus, banks, bank, wake, wakeTarget, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
@@ -1262,7 +1261,7 @@ function resolve() {
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
     else if (r.rangedHits) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, but RANGED hits anyway → Early Damage ${e.atk}`, 'bad'));
-    else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage${e.ability === 'Ranged' && S.rangedDodge ? ' (Ranged dodged — your Arsenal will be discarded)' : ''}`, 'good'));
+    else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage`, 'good'));
     if (r.early > 0 && S.hardship === 'Ambush') b2.push(L(`Ambush: Early Damage doubled → ${r.early}`, 'bad'));
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
 
@@ -2182,11 +2181,15 @@ function renderControls() {
     // wrong-typed and there is nothing to warn about. (It was also silently firing every turn:
     // it probed eff(c).atk, which no longer exists, so the check read false for every card.)
     // the Surge target now lives ON the Surge card (see boostPicker in cardHTML) — no radio row
-    let boostRow = '';
-    if (S.encounter.ability === 'Ranged') {
-      boostRow += `<div style="margin:6px 0"><label class="radio"><input type="checkbox" ${S.rangedDodge ? 'checked' : ''} ` +
-        `onchange="S.rangedDodge=this.checked; render()"> ☠️ Dodge the Ranged attack — your Arsenal is discarded in Cleanup</label></div>`;
-    }
+    // ☠️ THE RANGED DODGE IS CUT (2026-07-29). It was the last decision in the game that wasn't
+    // on a card — a bare checkbox — AND a pre-commitment (decide before you know whether you even
+    // win Initiative) AND a fake choice, since paying your whole Arsenal to avoid ~2 damage is
+    // almost never right. Same disease as the old Attack-or-Initiative fork.
+    // 🔑 What Ranged IS now: Early Damage regardless of Initiative. One sentence, no toggle. And
+    // it gives the ability a real job in the current vocabulary — it switches OFF the Initiative
+    // half of the Catalyst fork, so against a Ranged creature speed buys you nothing and your
+    // Catalyst is free to ATTUNE instead. An ability that redirects the turn's question.
+    const boostRow = '';
     const duel = S.finalPhase === 'duel';
     const phaseLabel = S.finalMode
       ? (duel ? `🐉 THE DUEL — beat ${S.duelBeat}` : `🐉 THE APPROACH — beat ${S.approachOutcomes.length + 1} of 2`)
