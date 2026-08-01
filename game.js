@@ -958,8 +958,16 @@ function assignToZone(cardId, zone) {
 // sits in one of the four labelled slots, and the labels never move. POSITION IS THE ROLE, so
 // arranging a turn is *swapping cards around*, not placing them into boxes. Saves the whole
 // hand region (the space the 16:9 scene needs) and makes every card always visible.
+// 🐛 BUG 2026-07-29: this used to bail out unless `isAssignPhase()`, which meant the slot row was
+// the ONLY way a card is ever visible but was only ever filled during the assign phase. Every
+// card-picking phase (soak / upgrade / stack / the Wheel) happens BEFORE cleanup, so their cards
+// were still seated from the turn just played and they all worked. An EVENT is the one thing that
+// fires AFTER cleanup - the played cards have left the hand, `S.assign` still points at their now
+// dead ids, and the freshly drawn four were never seated. Result: four "— empty —" slots, a real
+// hand behind them, and a card-picker with nothing to pick. Seating is purely ADDITIVE (it only
+// fills empty slots with unseated cards and never displaces one), so it is safe in every phase.
 function normalizeAssign() {
-  if (!isAssignPhase()) return;
+  if (!S || !S.assign || !S.hand) return;
   if (Array.isArray(S.assign.Spell)) S.assign.Spell = S.assign.Spell[0] || null;   // old saves
   for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
   // every card is always seated, left to right — position is the role
@@ -1710,6 +1718,13 @@ function startEvent() {
 }
 function eventChoose(i) {
   const opt = currentEventDef().options[i];
+  // never ask for a card you cannot possibly give - the player would be stuck on a picker with
+  // nothing to pick and only a "back" button to explain it
+  if (opt.need === 'card' && S.hand.length === 0) {
+    log(`You have no cards in hand to offer — that road is closed to you.`, 'bad');
+    render();
+    return;
+  }
   S.event.opt = i;
   if (opt.need === 'card') { S.event.step = 'pickCard'; render(); return; }
   resolveEvent(opt, null, null);
@@ -2004,7 +2019,9 @@ function renderControls() {
       // an OPTION may gate itself with when(), the same way a whole event can
       body = `<div class="event-flavor">${def.flavor}</div>` +
         `<div class="event-opts">` + def.options.map((o, i) =>
-          (!o.when || o.when()) ? `<button onclick="eventChoose(${i})">${o.label}</button>` : '').join('') + `</div>`;
+          (!o.when || o.when())
+            ? `<button onclick="eventChoose(${i})"${o.need === 'card' && !S.hand.length ? ' disabled title="no cards in hand"' : ''}>${o.label}</button>`
+            : '').join('') + `</div>`;
     }
     c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
   } else if (S.phase === 'defeat') {
