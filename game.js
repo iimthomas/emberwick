@@ -1773,6 +1773,10 @@ function elChip(el) {
 // 3D animation frames will replace: #mage-slot and #foe-slot. Swap the innerHTML for an
 // <img>/<canvas> playing a sprite sequence and the layout does not change.
 // ============================================================
+// ⚠️ VIEWBOX GOTCHA (2026-07-29): each of these viewBoxes used to be far larger than the art
+// drawn inside it, and `preserveAspectRatio="... meet"` scales to fit the WHOLE viewBox - empty
+// margins included. So the containers could be sized correctly in CSS and the art would still
+// render small. Keep every viewBox cropped to the drawing's actual bounding box.
 const ART = {
   // 🔄 THE TURN (2026-07-29, layout concept 5). The mage was back-to-camera; now she is turned
   // THREE-QUARTERS into the room. Same staging - large in the near foreground, foe higher and
@@ -1788,16 +1792,22 @@ const ART = {
   // mockup) it lands behind the slot row and is completely occluded - the scene is full-bleed
   // BEHIND the UI, so anything below ~40% of the mage's height is hidden by cards. Reaching UP and
   // right is also better composition: the foe sits higher in frame, so the gesture points at it.
-  mage: `<svg viewBox="0 0 540 470" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-    <path d="M318 14 C272 72 236 130 214 178 L104 178 C130 120 194 52 318 14 Z"/>
-    <ellipse cx="200" cy="188" rx="142" ry="31" transform="rotate(-8 200 188)"/>
-    <path d="M132 470 C142 366 176 296 240 276 C304 296 336 366 348 470 Z"/>
-    <path d="M296 316 C356 288 416 236 452 176 L482 200 C446 268 378 324 314 356 Z"/>
-    <path d="M318 16 C274 74 240 130 218 178" fill="none" stroke="#e8913c" stroke-width="7" stroke-linecap="round" opacity=".5"/>
-    <path d="M258 280 C302 300 330 362 344 462" fill="none" stroke="#e8913c" stroke-width="7" stroke-linecap="round" opacity=".5"/>
-    <circle cx="468" cy="188" r="16" fill="#e8913c" opacity=".8"/>
+  // 🎨 PROPORTIONS MATCHED TO THOMAS'S MAYA MOCK (2026-07-29). The first placeholder had a modest
+  // brim ~1.3x shoulder width; his design is nearer 2.4x, with a tall rounded crown and the face
+  // visible beneath it. That matters because the layout is verified against this silhouette - a
+  // placeholder with the wrong proportions means measuring a composition nobody is building.
+  // Cropped at the waist, as in the mock: good framing AND half a body you never have to animate.
+  mage: `<svg viewBox="30 14 500 420" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <path d="M186 208 C174 140 196 74 248 44 C298 20 332 48 332 98 C332 142 320 180 308 210 Z"/>
+    <ellipse cx="248" cy="214" rx="212" ry="44" transform="rotate(-7 248 214)"/>
+    <path d="M212 220 C212 264 238 292 266 292 C294 292 318 264 318 222 Z"/>
+    <path d="M194 430 C202 364 226 320 266 304 C308 320 332 364 340 430 Z"/>
+    <path d="M320 342 C378 318 440 270 488 206 L520 232 C474 302 400 358 336 384 Z"/>
+    <path d="M300 60 C266 96 246 152 244 208" fill="none" stroke="#e8913c" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+    <path d="M290 306 C320 326 336 372 342 424" fill="none" stroke="#e8913c" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+    <circle cx="506" cy="220" r="18" fill="#e8913c" opacity=".8"/>
   </svg>`,
-  dragon: `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  dragon: `<svg viewBox="84 94 636 390" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
     <defs><radialGradient id="dEye"><stop offset="0%" stop-color="#fff3d0"/>
       <stop offset="45%" stop-color="#ffb547"/><stop offset="100%" stop-color="#e8913c" stop-opacity="0"/></radialGradient></defs>
     <path d="M400 300 L140 120 L200 210 L90 180 L190 280 L120 300 L400 340 Z"/>
@@ -1810,7 +1820,7 @@ const ART = {
     <ellipse cx="428" cy="222" rx="12" ry="8" fill="url(#dEye)"/>
   </svg>`,
   // a generic beast for ordinary fights (per-creature art comes much later)
-  beast: `<svg viewBox="0 0 600 420" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  beast: `<svg viewBox="146 86 310 338" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
     <defs><radialGradient id="bEye"><stop offset="0%" stop-color="#fff3d0"/>
       <stop offset="50%" stop-color="#ffb547"/><stop offset="100%" stop-color="#e8913c" stop-opacity="0"/></radialGradient></defs>
     <path d="M150 420 C160 330 200 280 300 272 C400 280 440 330 450 420 Z"/>
