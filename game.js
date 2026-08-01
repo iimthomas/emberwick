@@ -1893,6 +1893,59 @@ const ART = {
   </svg>`,
 };
 
+// ============================================================
+// 🌄 EVERY JOURNEY IS A PLACE (2026-07-29). Journeys all rendered identically, so arriving
+// somewhere new looked like not having moved. Each palette is AUTHORED (not randomised) and
+// chosen by hashing the encounter's NAME — so a place always looks like itself, and two
+// different journeys never look the same. Warm-but-somber throughout: Witch Hat register.
+//
+// 🔑 And the darkness is not decoration — it IS the Nightfall you are racing. A journey with a
+// deep dark literally looks darker before you have read a single number. Legible math, drawn.
+// ============================================================
+const SCENES = [
+  { key: 'moor',   sky: '#0b0d16', mid: '#141826', ground: '#241f1a', glow: '150,140,220', gx: 66, gy: 38 },
+  { key: 'pines',  sky: '#070d0b', mid: '#0f1a16', ground: '#1c2018', glow: '120,190,160', gx: 56, gy: 44 },
+  { key: 'ash',    sky: '#0f0b09', mid: '#1a120d', ground: '#2a1c12', glow: '232,145,60',  gx: 74, gy: 40 },
+  { key: 'ford',   sky: '#080e13', mid: '#0f1a22', ground: '#1a2128', glow: '127,176,196', gx: 60, gy: 48 },
+  { key: 'pass',   sky: '#0c1016', mid: '#161c24', ground: '#232a30', glow: '200,220,240', gx: 72, gy: 30 },
+  { key: 'canyon', sky: '#130b08', mid: '#20120c', ground: '#31190f', glow: '208,96,58',   gx: 62, gy: 42 },
+];
+// fights get a per-REGION tint for the same reason — four regions should not be one room
+const REGION_TINT = ['232,145,60', '150,190,140', '127,176,196', '190,130,200'];
+function hashStr(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h); }
+// ⚠️ A HASH IS ARBITRARY, AND ARBITRARY READS AS WRONG. Hashing alone put "Mirefen Road" on a
+// cold mountain pass and "Sunwarm Trail" on a river. Match the fiction first; hash only decides
+// the names no keyword claims, so every journey still gets a place and most get the RIGHT one.
+// (Same lesson the elemental cycle taught: derived-but-arbitrary is worse than plainly authored.)
+// ⚠️ ORDER MATTERS — first match wins, so the STRONGER signal goes higher. And keep the keywords
+// long: bare 'ash' matched "Stormw-ash" and bare 'sun' matched "Sun-ken Causeway", both of which
+// are water. Substring matching on three-letter words is a trap.
+const SCENE_WORDS = {
+  moor:   ['fen', 'mire', 'meadow', 'moor', 'marsh', 'bog', 'vale', 'shroud', 'wither'],
+  ash:    ['ashen', 'ember', 'cinder', 'kiln', 'forge', 'scorch', 'char', 'sunwarm', 'flare'],
+  canyon: ['quarry', 'hollow', 'canyon', 'stone', 'rock', 'gorge', 'cairn', 'granite', 'scree', 'slate', 'grit', ' cut'],
+  pines:  ['fern', 'wood', 'forest', 'pine', 'thicket', 'grove', 'green', 'moss', 'briar', 'track'],
+  ford:   ['ford', 'river', 'cross', 'tide', 'lake', 'brook', 'stream', 'well', 'rain', 'wash', 'causeway', 'sunken', 'basin', 'drown'],
+  pass:   ['pass', 'highland', 'ridge', 'peak', 'crest', 'mount', 'cliff', 'tempest', 'storm', 'wind', 'echo'],
+};
+function sceneFor(name) {
+  const low = (name || '').toLowerCase();
+  for (const key in SCENE_WORDS) {
+    if (SCENE_WORDS[key].some(w => low.includes(w))) return SCENES.find(p => p.key === key);
+  }
+  return SCENES[hashStr(low || 'road') % SCENES.length];
+}
+function sceneVars(e, isFight) {
+  if (isFight) {
+    const tint = REGION_TINT[(S.region - 1) % REGION_TINT.length];
+    return `--glow:${tint}; --gx:74%; --gy:44%; --night:0;`;
+  }
+  const p = sceneFor(e && e.name);
+  const night = Math.min(.42, ((e && e.nightfall) || 0) / 26);
+  return `--sky:${p.sky}; --mid:${p.mid}; --ground:${p.ground}; --glow:${p.glow};` +
+         ` --gx:${p.gx}%; --gy:${p.gy}%; --night:${night.toFixed(3)};`;
+}
+
 function renderScene() {
   const el = $('scene');
   if (!el) return;
@@ -1908,8 +1961,9 @@ function renderScene() {
   else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}</div>`;
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
   el.className = isFight ? 'is-fight' : 'is-journey';
+  el.setAttribute('style', sceneVars(e, isFight));
   el.innerHTML =
-    `<div class="scene-glow"></div><div class="scene-floor"></div>` +
+    `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
     `<div class="scene-name">${duel ? S.dragon.name : e ? e.name : ''}</div>` +

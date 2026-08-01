@@ -309,11 +309,20 @@ label.radio { margin-right: 14px; cursor: pointer; }
     linear-gradient(180deg, #0d0b09 0%, #17110c 64%, #241811 100%);
 }
 #scene[hidden] { display: none; }
+/* 🌄 the journey's palette comes from JS (see SCENES) — one authored mood per place, picked by
+   the encounter's name so a place always looks like itself. Fallbacks keep it sane if unset. */
 #scene.is-journey {
   background:
-    radial-gradient(46% 40% at 64% 56%, rgba(127,176,196,.13), transparent 72%),
-    radial-gradient(74% 52% at 38% 106%, rgba(232,145,60,.22), transparent 70%),
-    linear-gradient(180deg, #0a0c10 0%, #121513 60%, #1f1a12 100%);
+    radial-gradient(46% 40% at var(--gx,64%) var(--gy,56%), rgba(var(--glow,127,176,196),.17), transparent 72%),
+    radial-gradient(74% 52% at 38% 106%, rgba(232,145,60,.18), transparent 70%),
+    linear-gradient(180deg, var(--sky,#0a0c10) 0%, var(--mid,#121513) 60%, var(--ground,#1f1a12) 100%);
+  transition: background .45s ease;
+}
+/* 🌙 the darkness IS the Nightfall you're racing — deeper dark, darker picture */
+.scene-night {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(2,4,12,var(--night,0)) 0%, rgba(2,4,12,calc(var(--night,0) * .45)) 70%, transparent 100%);
+  transition: background .45s ease;
 }
 #scene svg { width: 100%; height: 100%; display: block; }
 /* DEPTH: the mage is FOREGROUND (large, anchored to the very bottom edge); the foe is in the
@@ -344,7 +353,10 @@ label.radio { margin-right: 14px; cursor: pointer; }
   animation: scene-breathe 7s ease-in-out infinite;
 }
 #scene.is-journey .scene-glow {
-  background: radial-gradient(44% 46% at 70% 40%, rgba(127,176,196,.14), transparent 74%);
+  background: radial-gradient(44% 46% at var(--gx,70%) var(--gy,40%), rgba(var(--glow,127,176,196),.18), transparent 74%);
+}
+#scene.is-fight .scene-glow {
+  background: radial-gradient(40% 46% at var(--gx,74%) var(--gy,44%), rgba(var(--glow,208,96,58),.20), transparent 74%);
 }
 #scene::after {
   content: ""; position: absolute; left: 0; right: 0; top: -20%; bottom: -20%;
