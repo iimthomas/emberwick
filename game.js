@@ -1774,11 +1774,28 @@ function elChip(el) {
 // <img>/<canvas> playing a sprite sequence and the layout does not change.
 // ============================================================
 const ART = {
-  // the mage, seen from behind — the pointed hat is the readable shape (and the brand)
-  mage: `<svg viewBox="0 0 500 400" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-    <path d="M330 40 C280 110 250 175 238 232 L142 232 C158 160 210 80 330 40 Z"/>
-    <ellipse cx="196" cy="238" rx="128" ry="27"/>
-    <path d="M60 400 C78 320 130 268 196 268 C262 268 314 320 332 400 Z"/>
+  // 🔄 THE TURN (2026-07-29, layout concept 5). The mage was back-to-camera; now she is turned
+  // THREE-QUARTERS into the room. Same staging - large in the near foreground, foe higher and
+  // further - because that depth is what makes the scene feel dynamic and flat side-on duel
+  // layouts throw it away. What changed is that you can see a PERSON.
+  // 🔑 Why it matters more than it looks: the roster is planned at up to eight classes, and the
+  // player character is the biggest identity carrier in the game. From behind, eight classes are
+  // eight coats. In three-quarter view they are eight silhouettes. The hat still reads, so the
+  // brand mark from the old framing survives.
+  // The two ember strokes are the candle catching her leading edge - they are what says "there is
+  // a face on this side" while everything is still a placeholder silhouette.
+  // ⚠️ The raised arm must stay in the UPPER half of the figure. Drawn reaching ACROSS (as in the
+  // mockup) it lands behind the slot row and is completely occluded - the scene is full-bleed
+  // BEHIND the UI, so anything below ~40% of the mage's height is hidden by cards. Reaching UP and
+  // right is also better composition: the foe sits higher in frame, so the gesture points at it.
+  mage: `<svg viewBox="0 0 540 470" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <path d="M318 14 C272 72 236 130 214 178 L104 178 C130 120 194 52 318 14 Z"/>
+    <ellipse cx="200" cy="188" rx="142" ry="31" transform="rotate(-8 200 188)"/>
+    <path d="M132 470 C142 366 176 296 240 276 C304 296 336 366 348 470 Z"/>
+    <path d="M296 316 C356 288 416 236 452 176 L482 200 C446 268 378 324 314 356 Z"/>
+    <path d="M318 16 C274 74 240 130 218 178" fill="none" stroke="#e8913c" stroke-width="7" stroke-linecap="round" opacity=".5"/>
+    <path d="M258 280 C302 300 330 362 344 462" fill="none" stroke="#e8913c" stroke-width="7" stroke-linecap="round" opacity=".5"/>
+    <circle cx="468" cy="188" r="16" fill="#e8913c" opacity=".8"/>
   </svg>`,
   dragon: `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
     <defs><radialGradient id="dEye"><stop offset="0%" stop-color="#fff3d0"/>
