@@ -598,6 +598,16 @@ function shuffle(arr) {
 }
 
 // ---------- save state (auto-saves every stable phase; survives refresh) ----------
+// 🔢 THE BUILD STAMP. Read straight off game.js's own `?v=` query, so it can NEVER drift from the
+// cache-bust number — which is the number that actually decides what the browser is running.
+// Added 2026-07-29 after a screenshot showed a build two versions stale and it took a browser
+// test to work out why a mechanic "wasn't there". index.html has no cache-buster of its own, so
+// a phone can happily serve yesterday's HTML (which then requests yesterday's assets).
+const BUILD = (() => {
+  try { const t = document.querySelector('script[src*="game.js"]'); const m = t && t.src.match(/v=(\d+)/); return m ? m[1] : '?'; }
+  catch (e) { return '?'; }
+})();
+
 const SAVE_KEY = 'emberwick-save-1';
 // BUG FOUND 2026-07-29: the writer said `v: 4` while the reader demanded `d.v !== 3`, so EVERY
 // load silently failed and every reload started a fresh run. One constant now, used by both - the
@@ -2047,7 +2057,7 @@ function render() {
   normalizeAssign();
   saveGame();
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
-  $('turn-indicator').textContent = S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`;
+  $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`) + ` · build ${BUILD}`;
   renderStatus();
   renderScene();
   renderEncounter();
