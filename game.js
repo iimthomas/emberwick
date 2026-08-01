@@ -103,6 +103,12 @@ const PERILS = {
 };
 
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
+// ⚠️ THE SAME GOES FOR A JOURNEY'S `element` (removed from its panel 2026-07-29). The source game
+// paid a bonus for matching your Move's element to the journey's; we cut it 2026-07-26 as the most
+// obscure rule in the game — the tell was that Thomas played for months and never once mentioned
+// it. It must not come back for the same reason as below: a journey is CONTENT, content is
+// class-blind, and a rogue has no element to match with.
+//
 // ⚠️ `atkEl` ON CREATURES IS DEAD DATA and must NOT be shown (removed from the panel 2026-07-29).
 // It stopped doing arithmetic when soak doubling was cut on 2026-07-26, so printing "strikes with
 // 💧" advertised a rule that does not exist — a PHANTOM STAT, which is worse than a hidden one:
@@ -934,7 +940,7 @@ function logChallenge() {
     log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · XP ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
-    log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · Element ${e.element || '—'} · XP ${e.xp})`);
+    log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · XP ${e.xp})`);
     if (e.peril) log(`PERIL — ${e.peril}: ${PERILS[e.peril]}`, 'bad');
   }
   if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${HARDSHIPS[S.hardship]}`, 'bad');
@@ -2130,7 +2136,7 @@ function renderEncounter() {
       `<div class="enc-type">🐉 THE APPROACH${beatTag ? ` — beat ${beatTag}` : ''}</div>` + dragonBar +
       (e ? `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
         `<span>🌙 Nightfall <b>${e.nightfall}</b></span><span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
-        `<span>Element ${elChip(e.element)}</span></div>` +
+        `</div>` +
         `<div class="enc-hint">Complete BOTH approach beats and you arrive with the advantage — its guard softened before a blow is struck.</div>` : '');
     return;
   }
@@ -2154,7 +2160,7 @@ function renderEncounter() {
       `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
       `<span>🌙 Nightfall <b>${e.nightfall}</b></span>` +
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
-      `<span>Element ${elChip(e.element)}</span><span>⭐ XP <b>${e.xp}</b></span></div>` +
+      `<span>⭐ XP <b>${e.xp}</b></span></div>` +
       `<div class="enc-hint">💡 ✦ A Catalyst matching your Spell's element ATTUNES it — but your Catalyst is also your Pace against the dark. Go far, or get home?</div>` +
       modLines;
   }
