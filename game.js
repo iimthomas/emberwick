@@ -227,6 +227,68 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // ⚠️ Initiative reads low and that is NOT this mechanic's fault - only 4 of the 16 cards have init
 // 6+, so when you lack a SPARK you are short by 5-9, not 1-3. The gap is a chasm and a token cannot
 // bridge a chasm. The fix is a floor under init, and it is deliberately a separate change.
+// ============================================================
+// ✦ THE PRISM (Thomas's design, 2026-07-29)
+//
+// THE HOLE IT FILLS: 15% of hands hold all four elements and therefore NO PAIR - so they can
+// neither attune nor bank, and the turn collapses back to the solved game. Measured: on a rainbow
+// hand the naive biggest/fastest/fattest play is already optimal 90% of the time (vs 67% on a
+// paired hand), and the average outcome is 1.08 against 1.36. Punished twice - weaker AND boring.
+//
+// 🔑 THE PROPERTY THAT MAKES IT WORK: a rainbow hand holds all four elements, so ANY card you
+// draw is GUARANTEED to pair with something you already hold. The cure cannot fail, and it cannot
+// fail *because* the hand is rainbow. So the Prism cures rather than compensates.
+//
+// THE RULE: draw one, discard one. The hand never leaves four cards - the slot row is four fixed
+// positions and a fifth card would have nowhere to stand (that is exactly the bug that made the
+// Kiln of Trials unplayable this morning), so the drawn card is held OUTSIDE the hand until you
+// place it or refuse it.
+//
+// WHY THE DISCARD AND NOT THE DECK BOTTOM: a free cure is a button you press every rainbow hand,
+// which fixes availability and adds no tension. A discard makes it a real question - is fixing
+// this hand worth losing a card for the rest of the region? Sometimes plainly not. It also speaks
+// a currency the player already reads every turn, because the Spell says "SPENT, gone for the
+// region" in the same words. And it cannot be a punishment for drawing badly, because it is
+// OPTIONAL: decline and you are exactly where you were.
+//
+// ⚠️ NO DECK, NO PRISM. Near the end of a region "gone for the region" is really "gone for the
+// run", and deck size is also what ends the region - so with an empty deck the trade stops being
+// a choice and becomes a trap. It simply does not appear.
+// ============================================================
+function prismReady() {
+  if (S.prismUsed || S.prism || !isAssignPhase() || S.hand.length < 4) return false;
+  if (!S.deck.length) return false;                       // no draw, no Prism
+  return new Set(S.hand.map(c => elOf(c))).size >= 4;     // all four elements: no pair anywhere
+}
+function prismDraw() {
+  if (!prismReady()) return;
+  S.prism = S.deck.shift();
+  S.prismUsed = true;
+  log(`✦ The Prism — the circle is complete. You draw ${displayName(S.prism)}.`, 'good');
+  render();
+}
+// take the drawn card INTO a slot; the card it replaces is spent for the region
+function prismTake(id) {
+  if (!S.prism) return;
+  const out = cardById(id); if (!out) return;
+  if (elOf(out) === elOf(S.prism)) return;   // would leave you rainbow again — see cardHTML
+  const zone = zoneOf(id);
+  S.hand = S.hand.filter(c => c.id !== id);
+  S.discard.push(out);
+  S.hand.push(S.prism);
+  if (zone) S.assign[zone] = S.prism.id;
+  log(`${displayName(out)} is spent for the region; ${displayName(S.prism)} takes its place.`);
+  S.prism = null;
+  render();
+}
+function prismRefuse() {
+  if (!S.prism) return;
+  S.discard.push(S.prism);
+  log(`You let ${displayName(S.prism)} go — spent for the region.`);
+  S.prism = null;
+  render();
+}
+
 function banksNow() {
   const surge = cardById(S.assign.Boost), elem = cardById(S.assign.Element);
   return !!(surge && elem && elOf(surge) === elOf(elem));
@@ -560,7 +622,7 @@ function saveGame() {
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -606,6 +668,7 @@ function loadGame() {
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
+      prism: null, prismUsed: d.prismUsed || false,
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -700,6 +763,8 @@ function freshGame(rung) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    prism: null,        // ✦ the drawn card, held OUTSIDE the hand until you place or refuse it
+    prismUsed: false,   // once per turn
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
@@ -880,6 +945,7 @@ function nextTurn() {
   // coins roll over between turns — deliberately NOT reset
   S.damage = 0;
   S.damageEl = null;
+  S.prism = null; S.prismUsed = false;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2113,6 +2179,14 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
     // the whole point is that you choose with the encounter in front of you.
+    // ✦ the Prism: an offer above the row, answered by tapping the card you're willing to lose
+    const prismRow = S.prism
+      ? `<div class="prism-row"><span class="prism-lab">✦ <b>${displayName(S.prism)}</b> Lv${S.prism.level} drawn — tap a card below to replace it (that card is <b>spent for the region</b>)</span>` +
+        `<button onclick="prismRefuse()">Let it go instead</button></div>`
+      : (prismReady()
+        ? `<div class="prism-row"><span class="prism-lab">✦ <b>The Prism</b> — all four elements, so no pair. Draw one, discard one?</span>` +
+          `<button class="prism-go" onclick="prismDraw()">Draw a card</button></div>`
+        : '');
     const wakeRow = S.wake > 0
       ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
         Object.keys(WAKE_TARGETS).map(k =>
@@ -2129,6 +2203,7 @@ function renderControls() {
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
+      prismRow +
       wakeRow +
       boostRow +
       resolveBtn +
@@ -2376,6 +2451,13 @@ function cardHTML(card) {
   if (S.diverting) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
 
+  } else if (S.prism) {
+    // ⚠️ THE GUARANTEE ONLY HOLDS IF YOU DON'T DISCARD THE COLOUR YOU JUST DREW. Replacing the
+    // Stone card with a Stone card leaves you rainbow again — you'd have paid a card for nothing.
+    // That's a pure gotcha rather than a decision, so the engine simply won't let you do it.
+    action = elOf(card) === elOf(S.prism)
+      ? `<div class="card-action muted">same ${elOf(card)} — replacing this leaves you with no pair</div>`
+      : `<div class="card-action"><button onclick="prismTake(${card.id})">Replace this one — it is spent</button></div>`;
   } else if (isAssignPhase() && S.selectedId === card.id) {
     action = roleButtons(card);
   }

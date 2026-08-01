@@ -590,6 +590,15 @@ button.rung.locked .rung-shape { font-style: italic; }
 .wake-btn { padding: 3px 9px; font-size: 12.5px; border-radius: 999px; }
 .wake-btn.on { background: rgba(232,145,60,.32); border-color: #e8913c; color: #ffe6b0; }
 
+
+/* ✦ the Prism — an offer above the slot row, answered by tapping the card you'll give up */
+.prism-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px;
+  padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(155,127,196,.5);
+  background: linear-gradient(100deg, rgba(155,127,196,.16), rgba(127,176,196,.10)); }
+.prism-lab { font-size: 13px; color: #cbb6ee; }
+.prism-row button { padding: 3px 10px; font-size: 12.5px; border-radius: 999px; }
+.prism-go { background: rgba(155,127,196,.3); border-color: #9b7fc4; color: #efe4ff; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================
