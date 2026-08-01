@@ -552,6 +552,18 @@ button.rung .rung-shape { font-size: .84em; opacity: .8; font-weight: normal; }
 button.rung.locked { opacity: .38; }
 button.rung.locked .rung-shape { font-style: italic; }
 
+
+/* what you CARRY — charms, curses and temporary blessings, on the status bar every turn.
+   A permanent modifier you cannot see is a violation of legible-math, not a UI nicety. */
+.carry-chip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 9px;
+  font-size: .82em; background: rgba(120,180,120,.16); border: 1px solid rgba(140,200,140,.45);
+  color: #bfe0bf; white-space: nowrap; }
+.carry-chip.is-curse { background: rgba(180,70,70,.18); border-color: rgba(220,110,110,.5); color: #f0b3b3; }
+.carry-name { margin-right: 5px; }
+.event-carry { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font-size: .95em; }
+
+@media (max-width: 900px) { .carry-name { display: none; } .carry-chip { font-size: .76em; padding: 0 6px; } }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

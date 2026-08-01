@@ -402,9 +402,14 @@ function evGrantCharm(id) {
   S.charms.push(id);
   return c.curse ? `☠️ You take on ${c.name} — ${c.text}` : `🎁 ${c.name} — ${c.text}`;
 }
-// a curse you don't already carry, for Events that charge one as a price
+// a curse you don't already carry, for Events that charge one as a price.
+// 🔑 It must never be the curse that exactly UNDOES what you were just given: the Mirror Fen could
+// roll "+2 Pace on your next journey" and "Long Shadow: -2 Pace" together, so the blessing was
+// invisible and the whole event read as "nothing happened, and also you are worse off tomorrow".
+// A gamble whose faces silently annihilate each other is not a gamble, it is a non-event.
 function randomCurse() {
-  const pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
+  let pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
+  if (S.paceBless > 0) { const p = pool.filter(c => !(c.mods && c.mods.pace)); if (p.length) pool = p; }
   return pool.length ? rand(pool) : null;
 }
 // Lift a curse. Curses must have a way OUT or taking one is simply wrong late in a run, and
@@ -1679,21 +1684,23 @@ const EVENTS = [
     flavor: "The fen shows things that aren't there yet — you can't tell if it's a gift or a warning.",
     options: [
       { label: 'Look into the fen — something happens (you cannot tell what)', need: 'none',
-        apply: () => { const roll = Math.floor(Math.random() * 4);
-          if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
-          if (roll === 1) return ['The fen takes. ' + evTakeCurse()];
-          if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
-          S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; } },
-      { label: 'Stare until it answers — TWO glimpses, whatever they are', need: 'none',
-        apply: () => { const once = () => { const roll = Math.floor(Math.random() * 4);
-            if (roll === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
-            if (roll === 1) return ['The fen takes. ' + evTakeCurse()];
-            if (roll === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
-            S.paceBless = 1; return ['A glimpse of the road ahead — +2 Pace on your next journey.']; };
-          return [...once(), ...once()]; } },
+        apply: () => mirrorGlimpse(Math.floor(Math.random() * 4)) },
+      // TWO glimpses must be two DIFFERENT glimpses - the same face twice is either a shrug or a
+      // double curse, and neither is what "stare until it answers" promises.
+      { label: 'Stare until it answers — TWO glimpses, and they will not be the same', need: 'none',
+        apply: () => shuffle([0, 1, 2, 3]).slice(0, 2).flatMap(mirrorGlimpse) },
       { label: 'Look away — nothing', need: 'none', apply: () => ['You look away before it shows you too much.'] },
     ] },
 ];
+// one face of the Mirror Fen, factored out so the one-glimpse and two-glimpse options can never
+// drift apart - they were two hand-copied roll tables before
+function mirrorGlimpse(face) {
+  if (face === 0) return ['The fen gives.', ...evUpgradeRandom(2)];
+  if (face === 1) return ['The fen takes. ' + evTakeCurse()];
+  if (face === 2) return ['The fen gives, a little.', ...evUpgradeRandom(1)];
+  S.paceBless = 1;
+  return ['A glimpse of the road ahead — +2 Pace on your next journey.'];
+}
 function currentEventDef() { return EVENTS.find(e => e.id === S.event.id); }
 
 // 🔑 EVENTS REMEMBER (2026-07-27). An event may declare `when()` to gate itself on what has
@@ -1834,6 +1841,28 @@ function render() {
   renderLog();
 }
 
+// 🔑 EVERYTHING CURRENTLY MODIFYING YOUR MATHS, NAMED AND SIGNED (2026-07-29). Curses were
+// shown on the Wheel screen and NOWHERE else, so for the rest of a run the player did arithmetic
+// against a number they could not see. "Legible math always" does not only mean show the working
+// - it means show the TERMS. Temporary blessings lived as bare counters and were just as invisible.
+// The NAME is flavour; the EFFECT is the maths. They're separate spans so a phone can drop the
+// name and still show you every term you're calculating against.
+function carried() {
+  const out = [];
+  for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
+  if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
+  if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
+  if (S.curseNextFight) out.push({ curse: true, name: 'Followed', text: '⚠️ next fight carries a Hardship' });
+  return out;
+}
+const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
+function carriedText() {
+  const c = carried();
+  if (!c.length) return '';
+  return c.map(x => `<span class="carry-chip${x.curse ? ' is-curse' : ''}" title="${carryLine(x)}">` +
+    `<b class="carry-name">${x.curse ? '☠️' : '🎁'} ${x.name}</b><span class="carry-eff">${x.text}</span></span>`).join('');
+}
+
 function renderStatus() {
   const key = S.deck[0];
   $('status-bar').innerHTML =
@@ -1844,8 +1873,8 @@ function renderStatus() {
     `<span>Trashed: <b>${S.trashed.length}</b></span>` +
     `<span>Next draw: <b>${key ? `${key.def.name} Lv${key.level}` : '—'}</b></span>` +
     `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
-    (S.charms.length ? `<span>🎁 <b>${S.charms.length}</b></span>` : '') +
-    `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>`;
+    `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>` +
+    carriedText();
 }
 
 function renderEncounter() {
@@ -2009,7 +2038,14 @@ function renderControls() {
     const ev = S.event;
     let body;
     if (ev.step === 'done') {
-      body = `<div class="summary">${ev.lines.map(l => `<p>${l}</p>`).join('')}</div>` +
+      // 🔑 The Mirror Fen could roll "+2 Pace" AND "-2 Pace" in one breath. Both lines were true,
+      // both printed, and neither said they touched the same number - so working out that it had
+      // cancelled was left to the player. An event must state where it LEFT you.
+      const now = carried();
+      body = `<div class="summary">${ev.lines.map(l => `<p>${l}</p>`).join('')}` +
+        (now.length
+          ? `<p class="event-carry"><b>You now carry:</b> ${now.map(x => `<span class="${x.curse ? 'bad' : 'good'}">${carryLine(x)}</span>`).join(' · ')}</p>`
+          : `<p class="event-carry">You carry nothing that changes your maths.</p>`) + `</div>` +
         `<button class="primary" onclick="eventContinue()">Continue</button>`;
     } else if (ev.step === 'pickCard') {
       // the choice is made ON the cards below — this panel just states the deal
