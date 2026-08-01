@@ -103,7 +103,15 @@ const PERILS = {
 };
 
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
-// Enemy armor is a LIST (R4 creatures shield multiple elements). atkEl = the element its
+// ⚠️ `atkEl` ON CREATURES IS DEAD DATA and must NOT be shown (removed from the panel 2026-07-29).
+// It stopped doing arithmetic when soak doubling was cut on 2026-07-26, so printing "strikes with
+// 💧" advertised a rule that does not exist — a PHANTOM STAT, which is worse than a hidden one:
+// the player reasonably assumes anything in the stat line matters and plans around it.
+// 🔑 And it must never be given a job again: content is CLASS-BLIND by design, and elements are
+// the MAGE's suit. An elemental enemy would re-couple the bestiary to one class's mechanic, which
+// is the exact thing shaped defence was built to delete. The rows keep the field only because
+// rewriting 16 of them buys nothing; the flavour pass may remove it.
+// (historical) Enemy armor is a LIST (R4 creatures shield multiple elements). atkEl = the element its
 // damage carries (soak-doubling). Nightfall values are OURS (source has none).
 // `beats` = how many exchanges the creature takes (default 2). SKIRMISHERS — low HP, high
 // Init — are ONE beat: they're a tempo change, a fight you win or lose in a single breath,
@@ -913,7 +921,7 @@ function drawEncounter(avoidType) {
 function logChallenge() {
   const e = S.encounter;
   if (e.type === 'fight') {
-    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} ${e.atkEl} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · XP ${e.xp})`);
+    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · XP ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · Element ${e.element || '—'} · XP ${e.xp})`);
@@ -2128,7 +2136,7 @@ function renderEncounter() {
       `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
-      `<span>strikes with ${elIcon(e.atkEl)}</span>` +
+
       `<span>⭐ XP <b>${e.xp}</b></span></div>` + modLines;
   } else {
     panel.innerHTML =
