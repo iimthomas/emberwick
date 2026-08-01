@@ -205,6 +205,38 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // The encounter poses the question, the hand constrains the answer.
 // ⚠️ CLASS SEAM: this lives entirely inside MAGE.compose(). The engine never sees an element -
 // pairing is the MAGE's source of power, and a rogue chains, a guardian retaliates.
+// 🔥 THE EMBERWAKE - the Surge's second job (Thomas's design, 2026-07-29).
+//
+// THE PROBLEM IT SOLVES: a flat +N to a threshold check is worth nothing outside a narrow band.
+// Measured over 6400 hands, the Surge changed NOTHING on 30% of turns (9% you lost anyway, 5% you
+// had already won, 16% stuck on Narrow either way) - and when it did matter you simply took your
+// biggest-boost card 86% of the time. Three turns in ten the slot was dead weight and the other
+// seven it was a sort. ❌ Going back to the old Attack-or-Initiative picker was rejected: it
+// measured 13%, then 4% after doubling, because Initiative's payoff is CAPPED and Attack's is not.
+//
+// THE RULE: if your SURGE shares your CATALYST's element, its boost does not fire this turn - it
+// BANKS as a token worth half the boost, rounded up. At the start of your next turn you aim that
+// token at ⚔️ attack, 💨 initiative or 🛡️ armour.
+//
+// 🔑 WHY THIS IS THE GOOD VERSION: you bank BLIND but you spend INFORMED - next turn you can see
+// the encounter before choosing where the power lands. And the element pair becomes a currency you
+// can only spend ONCE: pair it with the Spell to ATTUNE, or with the Catalyst to BANK. Both at once
+// needs three of a kind (11% of hands), so it is a genuine either/or, available 85% of the time,
+// and expressed through ARRANGEMENT rather than a button.
+// Measured target split at a +3 token: 🛡️ armour 55% · ⚔️ attack 35% · 💨 initiative 7%.
+// ⚠️ Initiative reads low and that is NOT this mechanic's fault - only 4 of the 16 cards have init
+// 6+, so when you lack a SPARK you are short by 5-9, not 1-3. The gap is a chasm and a token cannot
+// bridge a chasm. The fix is a floor under init, and it is deliberately a separate change.
+function banksNow() {
+  const surge = cardById(S.assign.Boost), elem = cardById(S.assign.Element);
+  return !!(surge && elem && elOf(surge) === elOf(elem));
+}
+function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost / 2) : 0; }
+const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative', armor: '🛡️ armour' };
+// the token is only aimable while you can still see the encounter and change your mind
+function wakeReady() { return S.wake > 0 && isAssignPhase(); }
+function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
+
 function attunedNow() {
   const sp = spellCard(), el = cardById(S.assign.Element);
   return !!(sp && el && (el.def.wild || elOf(el) === elOf(sp)));
@@ -229,13 +261,18 @@ const MAGE = {
     const boostC = cardById(S.assign.Boost);
     const attuned = attunedNow();
     const st = eff(spell);
+    // 🔥 a banked Surge gives NOTHING this turn - that is the price of aiming it next turn
+    const banks = banksNow();
+    const bank = banks ? bankValueOf(boostC) : 0;
+    const w = S.wake || 0, wt = S.wakeTarget;
     return {
-      value: attuned ? st.attuned : st.value,
+      value: (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0),
       element: spell.def.element,
-      init: elem ? eff(elem).init : 0,
-      boost: boostC ? eff(boostC).boost : 0,
+      init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0),
+      boost: banks ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: 1,
       attuned, attBonus: st.attuned - st.value,
+      banks, bank, wake: w, wakeTarget: wt,
       spell, elem, boostC,
     };
   },
@@ -523,6 +560,7 @@ function saveGame() {
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -567,6 +605,7 @@ function loadGame() {
       defeatMsg: d.defeatMsg,
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
+      wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -656,6 +695,11 @@ function freshGame(rung) {
     // ---- cross-turn event effects (run layer) ----
     eventsSeen: [],        // ids of events already drawn this run (for `once` events)
     eventFlags: {},        // what you DID in past events, so later ones can react
+    // 🔥 THE EMBERWAKE (2026-07-29). `wake` is the token you hold RIGHT NOW and may aim this
+    // turn; `wakePending` is what you banked this turn and collect at cleanup. It expires after
+    // one turn on purpose - a token that keeps would make farming banks on easy encounters the
+    // optimal line, and the run would become savings-account management.
+    wake: 0, wakeTarget: null, wakePending: 0,
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
@@ -1011,6 +1055,7 @@ function computeAction(reserve) {
   // supplies them from its own pairing rule; a class that has no elements simply leaves them false.
   const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
   const attBonus = a.attBonus || 0;
+  const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0, wakeTarget = a.wakeTarget || null;
   const boostVal = a.boost;
 
   const h = S.hardship;
@@ -1053,7 +1098,7 @@ function computeAction(reserve) {
     if (ability === 'Ranged' && S.rangedDodge && !initLost) loseReserve = 'dodged the Ranged attack';
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, banks, bank, wake, wakeTarget, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -1082,7 +1127,7 @@ function computeAction(reserve) {
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, hits, attBonus, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, hits, attBonus, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -1118,7 +1163,9 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
     if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
     beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
@@ -1140,7 +1187,9 @@ function resolve() {
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → Move ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
@@ -1210,6 +1259,7 @@ function finishResolve() {
   if (S.finalMode && S.finalPhase === 'approach') S.approachOutcomes.push(r.outcome);
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
+  if (r.banks) S.wakePending = r.bank;
   if (r.outcome !== 'Loss') { const g = e.xp + charmMod('coin'); S.coins += g; log(`+${g} coins (you now hold ${S.coins})`, 'good'); }
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
@@ -1230,6 +1280,12 @@ function finishResolve() {
       damage += overflow;
       log(`Deck is empty — remaining Time Penalty ${overflow} becomes damage`, 'bad');
     }
+  }
+  // 🛡️ an Emberwake aimed at armour simply takes the hit for you
+  if (S.wakeTarget === 'armor' && S.wake > 0 && damage > 0) {
+    const stop = Math.min(damage, S.wake);
+    damage -= stop;
+    log(`🔥 Emberwake holds — ${stop} damage turned aside`, 'good');
   }
   S.damage = damage;
   if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
@@ -1439,6 +1495,11 @@ function doneUpgrading() { wheelDone(); }
 function pouredIds() { return CLASS.spentIds(); }
 
 function endTurn() {
+  // 🔥 the token you banked this turn arrives now; the one you were holding expires, spent or not
+  if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
+  S.wake = S.wakePending || 0;
+  S.wakePending = 0;
+  S.wakeTarget = null;
   const spentIds = pouredIds();
   const poured = S.hand.filter(c => spentIds.includes(c.id));
   S.hand = S.hand.filter(c => !poured.includes(c));
@@ -1877,6 +1938,8 @@ function render() {
 function carried() {
   const out = [];
   for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
+  if (S.wake > 0) out.push({ curse: false, name: 'Emberwake',
+    text: S.wakeTarget ? `🔥 +${S.wake} → ${WAKE_TARGETS[S.wakeTarget]}` : `🔥 +${S.wake} — unaimed` });
   if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
   if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
   if (S.curseNextFight) out.push({ curse: true, name: 'Followed', text: '⚠️ next fight carries a Hardship' });
@@ -1994,6 +2057,14 @@ function renderControls() {
       `Divert to a ${S.encounter.type === 'fight' ? 'journey' : 'fight'} (${MAX_DIVERTS - S.divertsUsed} left${S.deck.length === 0 ? ' — deck empty' : ` — burns ${S.deck[0].def.name}`})</button>`;
     // the how-to text is tucked into a collapsed toggle at the bottom — out of the way each turn,
     // still one tap away. The actionable "you're not stuck" warning stays inline.
+    // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
+    // the whole point is that you choose with the encounter in front of you.
+    const wakeRow = S.wake > 0
+      ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
+        Object.keys(WAKE_TARGETS).map(k =>
+          `<button class="wake-btn${S.wakeTarget === k ? ' on' : ''}" onclick="aimWake('${k}')">${WAKE_TARGETS[k]}</button>`).join('') +
+        `<span class="wake-note">spend it or lose it</span></div>`
+      : '';
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
@@ -2004,6 +2075,7 @@ function renderControls() {
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
+      wakeRow +
       boostRow +
       resolveBtn +
       divertBtn +
@@ -2159,7 +2231,13 @@ function zoneHint(zone) {
         ? `✦ ATTUNED — ${elOf(sp)} matches · Initiative`
         : `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
     }
-    case 'Boost': return '+power — returns to your deck';
+    case 'Boost': {
+      const sc = cardById(S.assign.Boost), el = cardById(S.assign.Element);
+      if (sc && el && elOf(sc) === elOf(el))
+        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, nothing now`;
+      if (el) return `+power now — or match ${elOf(el)} to BANK it`;
+      return '+power — returns to your deck';
+    }
     case 'Reserve': return 'kept in hand for next turn';
   }
 }
@@ -2517,7 +2595,9 @@ function resolveDuel() {
   const b1 = [];
   if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → strike ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst: +${r.bank} Emberwake for next beat`, 'good'));
+  else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+  if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
   if (st.evaded) b1.push(L(`🌀 Evasion: it saw you coming — half the blow finds nothing → ${toHp}`, 'bad'));
   if (hasShape('evasion') && r.initLost && ds.boon.unseen > 0) b1.push(L(`🌀 It has not seen you yet — the blow lands whole despite your pace`, 'good'));

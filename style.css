@@ -568,6 +568,16 @@ button.rung.locked .rung-shape { font-style: italic; }
 
 @media (max-width: 900px) { .carry-name { display: none; } .carry-chip { font-size: .76em; padding: 0 6px; } }
 
+
+/* 🔥 the Emberwake — banked blind last turn, aimed now with the encounter in front of you */
+.wake-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px;
+  padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(232,145,60,.45);
+  background: rgba(232,145,60,.10); }
+.wake-lab { font-size: 13px; color: #f0a86a; }
+.wake-note { font-size: 11px; opacity: .6; margin-left: auto; }
+.wake-btn { padding: 3px 9px; font-size: 12.5px; border-radius: 999px; }
+.wake-btn.on { background: rgba(232,145,60,.32); border-color: #e8913c; color: #ffe6b0; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

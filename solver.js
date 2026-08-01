@@ -283,6 +283,24 @@ const RUNSIM = (() => {
 
   // pick + assign the best play for the current encounter (mutates S.assign/boostTarget only)
   function chooseBest() {
+    // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
+    // encounter, so giving up boost now for a token later is always negative to it — exactly the
+    // blind spot it has about the Spell being spent. Banking rates from RUNSIM are therefore
+    // meaningless; only a human can price the future.
+    if (S.wake > 0) {
+      const isF = S.encounter.type === 'fight';
+      const before = computeAction(null);
+      let bestT = 'atk', bestSc = null;
+      for (const t of ['atk', 'init', 'armor']) {
+        S.wakeTarget = t;
+        const r = computeAction(null); if (!r) continue;
+        const sc = t === 'armor'
+          ? [0, -((r.early || 0) + (r.combatDmg || 0) - S.wake), 0]
+          : (isF ? fightScore(r) : journeyScore(r));
+        if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
+      }
+      S.wakeTarget = bestT;
+    }
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
     let best = null;
