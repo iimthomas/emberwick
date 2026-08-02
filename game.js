@@ -338,18 +338,31 @@ const MAGE = {
     const boostC = cardById(S.assign.Boost);
     const attuned = attunedNow();
     const st = eff(spell);
+    // ✦ Lv4 verbs that shape the strike and the race (see VERBS). Each is checked BY SLOT, so a
+    // card carrying one contributes nothing special anywhere else — that is the brake.
+    const vSpell = verbOf(spell), vElem = verbOf(elem);
     // 🔥 a banked Surge gives NOTHING this turn - that is the price of aiming it next turn
     const banks = banksNow();
-    const bank = banks ? bankValueOf(boostC) : 0;
+    // ✦ Motherlode banks the FULL boost · Backdraft doubles what it banks
+    const vB = verbOf(boostC);
+    let bank = banks ? bankValueOf(boostC) : 0;
+    if (banks && vB && vB.slot === 'Boost') {
+      if (vB.name === 'Motherlode') bank = eff(boostC).boost;
+      if (vB.name === 'Backdraft') bank *= 2;
+    }
     const w = S.wake || 0, wt = S.wakeTarget;
     return {
-      value: (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0),
+      value: (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0)
+        + (attuned && vElem && vElem.name === 'Firstflame' ? 3 : 0),
       element: spell.def.element,
-      init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0),
+      init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
+        + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
       boost: banks ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: 1,
       attuned, attBonus: st.attuned - st.value,
       banks, bank, wake: w, wakeTarget: wt,
+      vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
+      vElem: vElem && vElem.slot === 'Element' ? vElem.name : null,
       spell, elem, boostC,
     };
   },
@@ -358,6 +371,59 @@ let CLASS = MAGE;
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
 // Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
+// ============================================================
+// ✦ LEVEL 4 ABILITIES (2026-07-29) — a card becomes so much itself that it gains a VERB.
+//
+// 🔑 THE RULE THAT MAKES THIS NOT [[Evolution]]: THE VERB ONLY FIRES IN ONE SLOT.
+// Evolution's verbs floated free, so they were true exceptions to the engine. A slot-scoped verb
+// is the slot contract getting DEEPER — you read it when the card is in that slot, exactly like
+// element disclosure by position, and it enriches the ARRANGEMENT puzzle instead of bolting a
+// subsystem beside it. Each archetype's verb fires in its HOME slot:
+//     FORCE → Spell   SPARK → Catalyst   FLOW → Surge   WARD → soaking
+// so a Lv4 card is the card *becoming fully itself* — levelling-as-sharpening said as a verb
+// rather than as a number. Element temperament flavours it: 🔥 swing hard · 💧 survive/set up
+// ⚡ go first · 🪨 grind.
+//
+// ⚠️ THE BRAKE: an all-Lv4 deck must stay UNPLAYABLE. Four Lv4 specialists still cannot fill four
+// slots, because every verb is dead in the other three. SHIP TEST for any new verb:
+//     "does this card become WORSE to hold in the other three slots?"
+// If not, it is a power-up, not sharpening, and it breaks the brake.
+//
+// ⚠️ YOU LOSE IT IF THE CARD IS SOFTENED BELOW Lv4 (Thomas's call). That is the point — a verb
+// you can LOSE is what makes protecting it a decision, and it makes a Lv4 card simultaneously the
+// most valuable thing you own and the most expensive thing to soak with.
+// ============================================================
+const VERBS = {
+  // FORCE → SPELL — the one big hit, the 🛡️ Armour answer
+  Emberfall:    { slot: 'Spell',   name: 'Overwhelm',  text: 'Your strike ignores 🛡️ Armour entirely.' },
+  Tidebreak:    { slot: 'Spell',   name: 'Undertow',   text: 'If this strike does not Complete, you take no Combat Damage.' },
+  Sparkstrike:  { slot: 'Spell',   name: 'Thunderhead',text: 'If you win Initiative, this strikes for +4.' },
+  Rockfall:     { slot: 'Spell',   name: 'Landslide',  text: '🌀 Evasion cannot halve this strike.' },
+  // SPARK → CATALYST — the race, the 🌀 Evasion answer
+  Firstlight:   { slot: 'Element', name: 'Firstflame', text: 'When this attunes your Spell, the strike gains a further +3.' },
+  Riverstep:    { slot: 'Element', name: 'Slipstream', text: 'Your Initiative counts as +4 higher against 🌀 Evasion.' },
+  Quickfire:    { slot: 'Element', name: 'Outpace',    text: 'You win Initiative automatically.' },
+  Flintdart:    { slot: 'Element', name: 'Bedrock',    text: 'You take no Early Damage, even when you lose the race.' },
+  // FLOW → SURGE — the fork, the 🔥 Emberwake
+  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Banking from here DOUBLES the Emberwake.' },
+  Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake banked from here lasts a second turn.' },
+  Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Banking from here also gives +3 Initiative this turn.' },
+  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here keeps the FULL boost, not half.' },
+  // WARD → SOAKING — keeping cards, the run-level currency
+  Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
+  Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
+  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it soaks, you gain a 🔥 +2 Emberwake.' },
+  Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it soaks, it soaks ALL remaining damage.' },
+};
+// a card only has its verb at Lv4 — soften it and the verb is gone
+function verbOf(card) { return card && card.level >= MAX_LEVEL ? VERBS[card.def.name] || null : null; }
+// is the named card's verb live RIGHT NOW, i.e. seated in the slot it belongs to?
+function verbLive(name, zone) {
+  const id = S.assign && S.assign[zone];
+  const c = id ? cardById(id) : null;
+  return !!(c && c.def.name === name && verbOf(c));
+}
+
 const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' };
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
@@ -788,6 +854,7 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
     prism: null,        // ✦ the drawn card, held OUTSIDE the hand until you place or refuse it
     prismUsed: false,   // once per turn
@@ -882,6 +949,7 @@ function levelDeltaText(card) {
   cmp('💨', a.init, b.init);
   cmp('➕', a.boost, b.boost);
   cmp('🛡️', a.armor, b.armor);
+  if (card.level + 1 >= MAX_LEVEL && VERBS[card.def.name]) parts.push(`<b class="d-verb">✦ ${VERBS[card.def.name].name}</b>`);
   return parts.join(' · ');
 }
 
@@ -991,7 +1059,7 @@ function nextTurn() {
   // coins roll over between turns — deliberately NOT reset
   S.damage = 0;
   S.damageEl = null;
-  S.prism = null; S.prismUsed = false;
+  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -1178,12 +1246,17 @@ function computeAction(reserve) {
   const nightCut = boostVal - boostEff;
 
   if (e.type === 'fight') {
+    // ✦ Lv4 CATALYST verbs shape the race itself
+    const vS = a.vSpell, vE = a.vElem;
     const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
-    const initLost = e.init > init;
+    // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
+    const evInit = init + (vE === 'Slipstream' ? 4 : 0);
+    const initLost = vE === 'Outpace' ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
     if (h === 'Ambush') early *= 2;
+    if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
     const base = pileVal;
     const withBoost = base + boostEff;
@@ -1194,22 +1267,25 @@ function computeAction(reserve) {
     //   🌀 EVASION  your hit is HALVED unless you won Initiative -> it wants SPEED
     // (🧱 GUARD - a breakable pool beaten by MANY hits - is deliberately absent: the mage lands
     //  exactly one hit, so it has nothing to bite on. It is the rogue's lock, not the mage's.)
-    const armorCut = e.shape === 'armour' ? (e.shapeV || 0) : 0;
-    const evaded = e.shape === 'evasion' && initLost;
+    // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
+    const armorCut = (e.shape === 'armour' && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
+    const evaded = e.shape === 'evasion' && vS !== 'Landslide' && (e.init > evInit);
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
+    if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
     const outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
-    const combatDmg = outcome !== 'Complete' ? e.atk : 0;
+    // ✦ Undertow: a strike that falls short still costs you nothing in return
+    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk : 0;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
     // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, banks, bank, wake, wakeTarget, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -1473,7 +1549,9 @@ function soakValue(card) {
   // and a rule no non-elemental class could ever join. Armour simply soaks its printed value.
   const armor = eff(card).armor || 0;
   if (armor <= 0) return 0;
-  return armor + charmMod('soak', card.def.element, card.def.arch);
+  const v = verbOf(card);
+  const frost = v && v.name === 'Frostbite' ? 4 : 0;      // ✦ Frostbite soaks well beyond its plate
+  return armor + frost + charmMod('soak', card.def.element, card.def.arch);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -1502,10 +1580,19 @@ function downgrade(card, why) {
 function soakWith(cardId) {
   const card = cardById(cardId);
   if (!card || S.downgraded.has(card.id) || S.damage <= 0) return;
-  const soak = soakValue(card);
-  const armor = eff(card).armor || 0;
-  const doubled = soak > armor;
-  downgrade(card, `, soaking ${soak}${doubled ? ` (armor ${armor} ×2 — its element matches the enemy attack)` : ''}`);
+  // ✦ Lv4 WARD verbs, all of them about KEEPING CARDS — the run-level currency
+  const v = verbOf(card);
+  const bulwark = v && v.name === 'Bulwark';             // soaks everything still coming
+  const guarded = v && v.name === 'Emberguard' && !S.emberguardUsed;  // takes the hit, keeps its level
+  const soak = bulwark ? S.damage : soakValue(card);
+  if (guarded) {
+    S.emberguardUsed = true;
+    S.downgraded.add(card.id);                            // spent for the encounter, but NOT blunted
+    log(`✦ Emberguard — ${displayName(card)} takes ${soak} and holds its edge.`, 'good');
+  } else {
+    downgrade(card, `, soaking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
+  }
+  if (v && v.name === 'Groundwire') { S.wakePending = (S.wakePending || 0) + 2; log(`✦ Groundwire — the blow earns you a 🔥 +2 Emberwake.`, 'good'); }
   S.damage = Math.max(0, S.damage - soak);
   if (S.damage <= 0) {
     log(`All damage soaked.`);
@@ -1678,7 +1765,10 @@ function pouredIds() { return CLASS.spentIds(); }
 
 function endTurn() {
   // 🔥 the token you banked this turn arrives now; the one you were holding expires, spent or not
-  if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
+  // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
+  if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
+  else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
+  S.wakeDeep = verbLive('Wellspring', 'Boost') && banksNow();
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
   S.wakeTarget = null;
@@ -2638,6 +2728,8 @@ function cardHTML(card) {
     `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span></div>`;
 
   const slot = zoneOf(card.id);
+  const verb = verbOf(card);
+  const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
   const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '');
@@ -2662,6 +2754,8 @@ function cardHTML(card) {
     `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
     `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
     `<div class="card-vals">${vals}</div>` +
+    (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
+      `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
     `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
