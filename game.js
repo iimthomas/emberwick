@@ -562,9 +562,9 @@ const TUTORIAL = {
   // no in-play lesson can do because by then you are already in one.
   intro: [
     { title: 'You are a mage on the road',
-      body: 'Somewhere past the fourth region a dragon is waiting, and you already know which one. ' +
-            'Everything between here and there is preparation.<br><br>' +
-            'You carry <b>sixteen cards</b>. You will hold <b>four at a time</b>, and every turn you will decide what those four are for.' },
+      body: 'There is a dragon at the end of the road, and you are what stands between it and everyone behind you.<br><br>' +
+            'You carry <b>sixteen cards</b> — the whole of your craft. You will hold <b>four at a time</b>, ' +
+            'and every turn you decide what those four are for.' },
     { title: 'A turn is an arrangement',
       body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
             '<b>SPELL</b> is your action. It is <b>spent</b> afterwards, gone for the rest of the region.<br>' +
