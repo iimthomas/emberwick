@@ -958,10 +958,10 @@ function drawEncounter(avoidType) {
 function logChallenge() {
   const e = S.encounter;
   if (e.type === 'fight') {
-    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · XP ${e.xp})`);
+    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · 🪙 ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
-    log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · XP ${e.xp})`);
+    log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · 🪙 ${e.xp})`);
     if (e.peril) log(`PERIL — ${e.peril}: ${PERILS[e.peril]}`, 'bad');
   }
   if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${HARDSHIPS[S.hardship]}`, 'bad');
@@ -1287,7 +1287,7 @@ function resolve() {
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
 
     beats.push({ outcomeBeat: true, final: true, lines: [
-      L(`Attack ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· +${e.xp} XP` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
+      L(`Attack ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
         r.outcome === 'Loss' ? 'bad result' : r.outcome === 'Narrow' ? 'result' : 'good result'),
     ] });
   } else {
@@ -1310,7 +1310,7 @@ function resolve() {
     beats.push({ label: '🌙 PACE', big: r.pace, vs: `vs Nightfall ${r.nightfall}`, numCls: r.nightCaught && !r.emberShielded ? 'bad' : 'ok', lines: b2 });
 
     beats.push({ outcomeBeat: true, final: true, lines: [
-      L(`Move ${r.value} vs MP ${r.mpEff} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· +${e.xp} XP` : ''}${r.outcome !== 'Complete' ? ` · Time Penalty ${e.timePenalty}` : ''}`,
+      L(`Move ${r.value} vs MP ${r.mpEff} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Time Penalty ${e.timePenalty}` : ''}`,
         r.outcome === 'Loss' ? 'bad result' : r.outcome === 'Narrow' ? 'result' : 'good result'),
     ] });
   }
@@ -1343,7 +1343,7 @@ function beatDisplayHTML(beat, isNew) {
   const r = S.pendingR, e = S.encounter;
   if (beat.outcomeBeat) {
     const subs = [];
-    subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">⭐ +${e.xp} XP</div>` : `<div class="pv-sub bad">no XP</div>`);
+    subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
     const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
     if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to soak: ${dmg}</div>`);
     if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
@@ -2191,14 +2191,14 @@ function renderEncounter() {
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
 
-      `<span>⭐ XP <b>${e.xp}</b></span></div>` + modLines;
+      `<span>🪙 <b>${e.xp}</b></span></div>` + modLines;
   } else {
     panel.innerHTML =
       `<div class="enc-type">JOURNEY — ${REGIONS[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
       `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
       `<span>🌙 Nightfall <b>${e.nightfall}</b></span>` +
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
-      `<span>⭐ XP <b>${e.xp}</b></span></div>` +
+      `<span>🪙 <b>${e.xp}</b></span></div>` +
       `<div class="enc-hint">💡 ✦ A Catalyst matching your Spell's element ATTUNES it — but your Catalyst is also your Pace against the dark. Go far, or get home?</div>` +
       modLines;
   }
@@ -2390,7 +2390,7 @@ function renderControls() {
       `<div class="phase-label">🏆 THE ${S.dragon.name.toUpperCase()} FALLS — VICTORY</div>` +
       `<div class="summary">` +
       `<p>FINAL SCORE (sum of surviving card levels): <b>${score}</b></p>` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Trashed: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
+      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
@@ -2403,7 +2403,7 @@ function renderControls() {
       `<div class="phase-label">${runDone ? `REGION 4 CLEARED — THE ${S.dragon.name.toUpperCase()} AWAITS` : `END OF REGION ${S.region} — ${REGIONS[S.region - 1].name}`}</div>` +
       `<div class="summary">` +
       `<p>Turns played: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b></p>` +
-      `<p>Score so far (sum of surviving card levels): <b>${score}</b> · Trashed: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
+      `<p>Score so far (sum of surviving card levels): <b>${score}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
@@ -2568,7 +2568,7 @@ function cardHTML(card) {
     } else {
       const cost = eff(card).cost;
       const ok = cost <= S.coins;
-      action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — ${cost} XP${ok ? '' : ' (not enough)'}</button>` +
+      action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — 🪙 ${cost}${ok ? '' : ' (not enough)'}</button>` +
         `<div class="wo-delta">${levelDeltaText(card)}</div></div>`;
     }
   }
