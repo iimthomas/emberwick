@@ -83,14 +83,48 @@ const CARD_DEFS = [
 ];
 
 // ---------- modifiers (source rulebook) ----------
+// 🔑 A HARDSHIP CHANGES WHICH ARRANGEMENT IS RIGHT — it does not merely raise the price of the
+// turn you were going to play anyway (2026-07-29). Three of the original four were pure TAXES:
+// Ambush, Hazards and Storm all just make a bad outcome worse. 🌙 Night Travel was the only one
+// that met the bar — it makes a FAST Catalyst cost you Surge, so the whole hand rearranges.
+// The three added here follow Night Travel, not the taxes.
+//
+// ⚠️ THE STRUCTURAL HOLE THEY ALSO FILL: every original fight hardship keyed on EARLY DAMAGE or
+// low Initiative, which is why a ☠️ Ranged creature (whose Early Damage is certain) could roll none
+// at all. None of the three below touch Early Damage.
 const HARDSHIPS = {
   'Ambush':       'Double the Early Damage you suffer this encounter.',
   'Hazards':      'Suffer 1 Time Penalty if you take Early Damage, and 1 more if you take Combat Damage.',
   'Night Travel': "Your Boost is reduced by your Catalyst's Initiative (min 0).",
   'Storm':        'Any Time Penalties this encounter also deal that much damage.',
+  // ⚖️ aims straight at the most-solved part of the turn: the Spell is simply your biggest card 83%
+  'Dead Weight':  'Your heaviest card cannot be your Spell.',
+  // 🐌 the same trick on the race — your fastest card is barred from the Catalyst
+  'Mire':         'Your fastest card cannot be your Catalyst.',
+  // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
+  // mage that means no attuning, for a rogue it would mean no chain.
+  'Dead Air':     'Your cards find no accord — nothing attunes this encounter.',
 };
-const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel'];
-const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm'];
+const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air'];
+const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air'];
+
+// 🔑 the placement bans are ENGINE rules, not class rules — they read `value` and `init`, which
+// every class has. A class's own canPlace() is consulted separately, so the two never collide.
+function heaviestId() {
+  let best = null; for (const c of S.hand) if (!best || cardValue(c) > cardValue(best)) best = c;
+  return best ? best.id : null;
+}
+function fastestId() {
+  let best = null; for (const c of S.hand) if (!best || eff(c).init > eff(best).init) best = c;
+  return best ? best.id : null;
+}
+// why this card may not go here, or null if it may
+function placementBan(id, zone) {
+  if (S.hardship === 'Dead Weight' && zone === 'Spell' && id === heaviestId()) return '⚖️ Dead Weight — your heaviest card cannot be your Spell';
+  if (S.hardship === 'Mire' && zone === 'Element' && id === fastestId()) return '🐌 Mire — your fastest card cannot be your Catalyst';
+  return null;
+}
+function slotLegal(id, zone) { return !placementBan(id, zone) && CLASS.canPlace(id, zone); }
 
 const ABILITIES = {
   'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
@@ -126,7 +160,8 @@ const PERILS = {
 // STACK either; the deck-scheduling skill belongs to the fights that actually last.
 // R4 XP values are INFERRED from the source's XP≈0.6×HP pattern — flag for tuning.
 const REGIONS = [
-  { name: 'Verdant Edge', hardshipChance: 0, encounters: [
+  // 🌿 Verdant Edge — no hardships at all; it is where the game teaches itself
+  { name: 'Verdant Edge', hardshipChance: 0, hardships: [], encounters: [
     { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 7 },
     { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 5 },
@@ -136,7 +171,8 @@ const REGIONS = [
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
-  { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
+  // 🏹 Wilding Marches — open country full of ambushers and archers: it is about being CAUGHT
+  { name: 'Wilding Marches', hardshipChance: 0.35, hardships: ['Ambush', 'Mire', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 4 },
     { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 8 },
@@ -146,7 +182,8 @@ const REGIONS = [
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5 },
     { type: 'journey', name: 'Scree Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
   ]},
-  { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
+  // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
+  { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 9 },
     { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 1,     xp: 8 },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 7, ability: 'Poison' },
@@ -156,7 +193,8 @@ const REGIONS = [
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'Granite Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
   ]},
-  { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
+  // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
+  { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
     { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 2,    xp: 7, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 8, ability: 'Freeze' },
@@ -315,6 +353,7 @@ function wakeReady() { return S.wake > 0 && isAssignPhase(); }
 function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
 
 function attunedNow() {
+  if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
   const sp = spellCard(), el = cardById(S.assign.Element);
   return !!(sp && el && (el.def.wild || elOf(el) === elOf(sp)));
 }
@@ -1017,6 +1056,10 @@ function drawEncounter(avoidType) {
   // and the honest fix is a fight hardship that isn't about Early Damage (something about the
   // hand, the deck, or the Stack). Until then, Ranged creatures are hardship-free.
   if (S.encounter.ability === 'Ranged') list = list.filter(h => !['Night Travel', 'Hazards', 'Ambush'].includes(h));
+  // 🗺️ EACH REGION DRAWS FROM ITS OWN POOL (2026-07-29, Thomas: hardships should fit the
+  // monsters of the region). A region may declare `hardships`; without one it gets the full menu.
+  // This is also the hook stages will use once they own their own content.
+  if (region.hardships) list = list.filter(h => region.hardships.includes(h));
   S.hardship = Math.random() < region.hardshipChance ? list[Math.floor(Math.random() * list.length)] : null;
   // a Cache/Mirror Fen ward: the next FIGHT carries a Hardship whether the region rolled one or not
   if (S.curseNextFight && S.encounter.type === 'fight') {
@@ -1149,6 +1192,8 @@ function swapCards(idA, idB) {
 
 function assignRole(cardId, role) {
   if (!isAssignPhase() || !role) return;
+  const ban = placementBan(cardId, role);
+  if (ban) { S.selectedId = null; log(ban, 'bad'); render(); return; }
   S.selectedId = null;
   const from = zoneOf(cardId);
   if (from === role && role !== 'Spell') { render(); return; }
@@ -1201,6 +1246,15 @@ function normalizeAssign() {
   for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
   // every card is always seated, left to right — position is the role
   const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
+  for (const card of S.hand) {
+    if (seated.has(card.id)) continue;
+    // ⚖️🐌 auto-seating must respect a placement ban, or the row would open illegal
+    const free = ZONES.find(z => !S.assign[z] && !placementBan(card.id, z));
+    if (!free) continue;
+    S.assign[free] = card.id;
+    seated.add(card.id);
+  }
+  // anything a ban pushed out still needs a seat — give it the first slot it is allowed
   for (const card of S.hand) {
     if (seated.has(card.id)) continue;
     const free = ZONES.find(z => !S.assign[z]);
