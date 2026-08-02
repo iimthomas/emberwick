@@ -679,6 +679,27 @@ button.stage.locked .stage-shape { font-style: italic; }
 .card-verb.verb-live b { color: #ffe6b0; }
 .d-verb { color: #ffd98a; }
 
+
+/* 🏅 THE GRADE — a run reporting on itself. Big letter, then where the points came from, so a
+   loss is a plan rather than a full stop. */
+.grade { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "letter total" "letter rows" "diag diag";
+  gap: 2px 16px; align-items: center; margin: 10px 0 14px; padding: 14px 16px; border-radius: 10px;
+  border: 1px solid rgba(201,162,74,.35); background: linear-gradient(105deg, rgba(201,162,74,.10), transparent 62%); }
+.g-letter { grid-area: letter; font-family: Georgia, serif; font-size: 54px; line-height: 1; width: 74px;
+  text-align: center; color: #f0e2c6; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
+.g-S { color: #ffe08a; text-shadow: 0 0 22px rgba(255,196,90,.75); }
+.g-A { color: #b6e08a; } .g-B { color: #8ac8e0; } .g-C { color: #d8c9a8; } .g-D { color: #dd8a6a; }
+.g-total { grid-area: total; font-size: 20px; font-weight: 700; color: #f0e2c6; font-variant-numeric: tabular-nums; }
+.g-rows { grid-area: rows; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.g-row { display: grid; grid-template-columns: minmax(0,1fr) 90px 52px; gap: 8px; align-items: center; font-size: 12.5px; }
+.g-bar { position: relative; height: 7px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+.g-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg,#8a6f2c,#c9a24a 70%,#efd89a); }
+.g-num { text-align: right; font-variant-numeric: tabular-nums; color: #d6c49c; }
+.g-diag { grid-area: diag; margin: 10px 0 0; padding-top: 10px; font-size: 13px; line-height: 1.5;
+  color: #e0c3a8; border-top: 1px solid rgba(201,162,74,.2); }
+.g-diag b { color: #ffd9a8; }
+@media (max-width: 560px) { .g-row { grid-template-columns: minmax(0,1fr) 56px 46px; } .g-letter { font-size: 42px; width: 56px; } }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

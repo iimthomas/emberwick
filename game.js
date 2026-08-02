@@ -752,7 +752,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
-      duelStamina0: S.duelStamina0,
+      duelStamina0: S.duelStamina0, stats: S.stats,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -799,6 +799,7 @@ function loadGame() {
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       prism: null, prismUsed: d.prismUsed || false, duelStamina0: d.duelStamina0 || 0,
+      stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -893,6 +894,8 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
+    stats: { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
     prism: null,        // ✦ the drawn card, held OUTSIDE the hand until you place or refuse it
@@ -1554,6 +1557,13 @@ function finishResolve() {
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
   if (r.banks) S.wakePending = r.bank;
+  // 📊 CRAFT: could this hand have attuned at all, and did you find it? Availability is a
+  // property of the HAND (any same-element pair), so the stat measures your play, not your luck.
+  if (S.stats) {
+    const els = S.hand.map(c => elOf(c));
+    if (els.some((e, i) => els.indexOf(e) !== i)) S.stats.attuneAvail++;
+    if (r.enhUsed) S.stats.attuned++;
+  }
   // 🪙 COINS CANNOT GO NEGATIVE (fixed 2026-07-29). ☠️ The Tithe takes 2 from every encounter, so a
   // low-XP one — the Approach pays 0 — drove the purse below zero and the Wheel offered prices
   // against a debt. A curse should take what you HAVE, never put you in the red: negative money
@@ -2566,6 +2576,7 @@ function renderControls() {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     c.innerHTML =
       `<div class="phase-label">💀 DEFEAT</div>` +
+      gradeHTML(gradeRun(false), false) +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
       `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
@@ -2588,8 +2599,8 @@ function renderControls() {
     const score = survivors.reduce((t, c) => t + c.level, 0);
     c.innerHTML =
       `<div class="phase-label">🏆 THE ${S.dragon.name.toUpperCase()} FALLS — VICTORY</div>` +
+      gradeHTML(gradeRun(true), true) +
       `<div class="summary">` +
-      `<p>FINAL SCORE (sum of surviving card levels): <b>${score}</b></p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
@@ -3007,6 +3018,7 @@ function resolveDuel() {
   const st = duelStrike(r);
   const toHp = st.toHp;
   ds.hp = Math.max(0, ds.hp - toHp);
+  if (S.stats) { S.stats.duelDmg += toHp; S.stats.duelBeats = S.duelBeat; }
   const kill = ds.hp <= 0;
 
   const counter = kill ? 0 : duelCounter(ds.hp);
@@ -3078,6 +3090,70 @@ function defeat(msg) {
   S.defeatMsg = msg;
   S.phase = 'defeat';
   render();
+}
+
+// ============================================================
+// 🏅 THE GRADE (2026-07-29). Two jobs that look unrelated but are the same feature.
+//
+// 1. IT GIVES A FINITE LADDER UNLIMITED HEADROOM. Four stages is a CAMPAIGN — you beat it and
+//    you're done. A grade means every stage keeps something in it: you cleared Cindermaw with a
+//    C, and there is still an S in there. Content you PRACTISE instead of content you consume,
+//    at almost no cost because the stages already exist.
+//
+// 2. IT MAKES LOSING TEACH. "Death is part of the game" only works if you leave knowing what to
+//    do differently, and today a loss says only "your cards ran dry". A graded loss says you
+//    averaged 9 damage a beat and needed 14 — which is a PLAN for the next run. ⏳ Relentless in
+//    particular is invisible without this: you don't feel the escalation, you just die late.
+//
+// ⚠️ PEOPLE PLAY FOR THE GRADE, SO IT TEACHES WHATEVER IT MEASURES. Grade the wrong thing and
+// you actively make the game worse. Hence: NOT total damage (rewards hoarding), NOT raw turn
+// count (punishes careful play). Only the four things this game is actually about —
+//     🃏 the deck you kept  ⚔️ how cleanly you solved hands  ✦ craft  🐉 the kill.
+// A perfect losing run still reaches ~75, which is a B — death is part of the game, not a zero.
+// ============================================================
+const GRADE_BANDS = [[85, 'S'], [70, 'A'], [55, 'B'], [40, 'C'], [0, 'D']];
+function gradeRun(won) {
+  const st = S.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 };
+  const survivors = [...S.hand, ...S.deck, ...S.discard];
+  const levels = survivors.reduce((t, c) => t + c.level, 0);
+  const res = S.results, encounters = res.Complete + res.Narrow + res.Loss;
+
+  // 🃏 THE DECK YOU KEPT — deck-as-health is the pillar, so it is the biggest single share
+  const deck = Math.round(30 * Math.min(1, levels / 40));
+  // ⚔️ HOW CLEANLY YOU SOLVED HANDS — a Narrow counts, but only a third as much
+  const exec = encounters ? Math.round(25 * Math.min(1, (res.Complete + res.Narrow / 3) / encounters)) : 0;
+  // ✦ CRAFT — of the hands that COULD attune, how many did you find? Measures play, not luck.
+  const craft = st.attuneAvail ? Math.round(20 * (st.attuned / st.attuneAvail)) : 0;
+  // 🐉 THE KILL — felling it is most of it; felling it FAST is the rest (⏳ Relentless's demand)
+  const kill = won ? 25 - Math.max(0, Math.min(8, (st.duelBeats - 3) * 2)) : 0;
+
+  const total = deck + exec + craft + kill;
+  const letter = (GRADE_BANDS.find(b => total >= b[0]) || GRADE_BANDS[GRADE_BANDS.length - 1])[1];
+  return { total, letter, deck, exec, craft, kill, levels, st, encounters };
+}
+// the one line that turns a defeat into a next attempt
+function lossDiagnosis() {
+  const st = S.stats, ds = S.dragonState;
+  if (!ds || !st || !st.duelBeats) return 'You never reached the lair — the road took you first.';
+  const per = st.duelDmg / st.duelBeats;
+  const needed = ds.maxHp / st.duelBeats;
+  return `You averaged <b>${per.toFixed(1)}</b> damage a beat over ${st.duelBeats}. ` +
+    `Felling it in that time needed <b>${needed.toFixed(1)}</b>.` +
+    (hasShape('relentless') ? ` ⏳ Its breath had grown to <b>${duelCounter(ds.hp)}</b> — a long duel is one you have already lost.` : '');
+}
+function gradeHTML(g, won) {
+  const bar = (label, got, max) =>
+    `<div class="g-row"><span class="g-lab">${label}</span>` +
+    `<span class="g-bar"><i style="width:${Math.round(100 * got / max)}%"></i></span>` +
+    `<span class="g-num">${got}<span class="dim">/${max}</span></span></div>`;
+  return `<div class="grade"><div class="g-letter g-${g.letter}">${g.letter}</div>` +
+    `<div class="g-total">${g.total}<span class="dim"> / 100</span></div>` +
+    `<div class="g-rows">` +
+    bar('🃏 the deck you kept', g.deck, 30) +
+    bar('⚔️ hands solved', g.exec, 25) +
+    bar(`✦ craft <span class="dim">(attuned ${g.st.attuned} of ${g.st.attuneAvail})</span>`, g.craft, 20) +
+    bar(won ? `🐉 the kill <span class="dim">(${g.st.duelBeats} beats)</span>` : '🐉 the kill', g.kill, 25) +
+    `</div>` + (won ? '' : `<p class="g-diag">${lossDiagnosis()}</p>`) + `</div>`;
 }
 
 function victory() {
