@@ -3151,6 +3151,10 @@ function startApproachBeat() {
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
+  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too. The
+  // Prism and Emberguard are once-per-TURN, and without this they were once per BOSS BATTLE —
+  // enter the Approach having used a Prism and it never appeared again for the whole fight.
+  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 The Approach · beat ${beat} of 2 —`);
@@ -3269,6 +3273,10 @@ function startDuelBeat() {
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
+  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too. The
+  // Prism and Emberguard are once-per-TURN, and without this they were once per BOSS BATTLE —
+  // enter the Approach having used a Prism and it never appeared again for the whole fight.
+  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
