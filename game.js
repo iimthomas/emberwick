@@ -1369,7 +1369,18 @@ function finishResolve() {
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
   if (r.banks) S.wakePending = r.bank;
-  if (r.outcome !== 'Loss') { const g = e.xp + charmMod('coin'); S.coins += g; log(`+${g} coins (you now hold ${S.coins})`, 'good'); }
+  // 🪙 COINS CANNOT GO NEGATIVE (fixed 2026-07-29). ☠️ The Tithe takes 2 from every encounter, so a
+  // low-XP one — the Approach pays 0 — drove the purse below zero and the Wheel offered prices
+  // against a debt. A curse should take what you HAVE, never put you in the red: negative money
+  // is a state with no way back, and it silently taxed every future encounter too.
+  // The log also printed "+-2 coins", which is its own small lie about what happened.
+  if (r.outcome !== 'Loss') {
+    const g = e.xp + charmMod('coin');
+    const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
+    S.coins = Math.max(0, S.coins + g);
+    if (got >= 0) log(`+${got} coins (you now hold ${S.coins})`, 'good');
+    else log(`${got} coins — ${e.xp ? `${e.xp} earned, but the Tithe takes its share` : 'the Tithe takes its share'} (you now hold ${S.coins})`, 'bad');
+  }
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
