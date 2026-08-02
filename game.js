@@ -2367,7 +2367,7 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">💀 DEFEAT</div>` +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, trashed <b>${S.trashed.length}</b></p></div>` +
+      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
       `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
