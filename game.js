@@ -10,6 +10,7 @@ const START_LEVEL = 2;
 const MAX_LEVEL = 4;
 // ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
 let ATTUNE_BONUS = 1;
+const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 const HAND_SIZE = 4;
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
@@ -126,40 +127,40 @@ const PERILS = {
 // R4 XP values are INFERRED from the source's XP≈0.6×HP pattern — flag for tuning.
 const REGIONS = [
   { name: 'Verdant Edge', hardshipChance: 0, encounters: [
-    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 6, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4 },
-    { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 4, atk: 2, atkEl: 'Fire',            xp: 7 },
-    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 6, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 5 },
-    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 2, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 8 },
+    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4 },
+    { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 7 },
+    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 5 },
+    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 1, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 8 },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 3 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 3 },
   ]},
   { name: 'Wilding Marches', hardshipChance: 0.35, encounters: [
-    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 6, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 8, atk: 2, atkEl: 'Lightning',  xp: 4 },
-    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 2, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 8 },
-    { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 6, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 7, ability: 'Freeze' },
+    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 4 },
+    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 8 },
+    { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 4, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 7, ability: 'Freeze' },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 7 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5 },
     { type: 'journey', name: 'Scree Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 4, peril: 'Steep' },
   ]},
   { name: 'Deepdark Hollows', hardshipChance: 0.5, encounters: [
-    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 6, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 9 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 4, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 1,     xp: 8 },
-    { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 6, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 6, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 9 },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 1,     xp: 8 },
+    { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 7, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 6 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'Granite Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 5 },
   ]},
   { name: "The Dragon's Shadow", hardshipChance: 0.65, encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 7,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 2,    xp: 7, ability: 'Poison' },
-    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 7, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 7,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 8, ability: 'Freeze' },
-    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 7,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 9 },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 2,    xp: 7, ability: 'Poison' },
+    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 8, ability: 'Freeze' },
+    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 9 },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 7, peril: 'Treacherous' },
     { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 6 },
     { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5 },
@@ -851,7 +852,14 @@ function eff(card) {
     // raw, which is the same "more itself" curve every other stat follows.
     attuned: adj(v) + card.level + ATTUNE_BONUS,
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
-    init: Math.max(0, init + charmMod('init', d.element, d.arch)),
+    // 💨 THE INITIATIVE FLOOR (2026-07-29). Sharpening drove every non-SPARK card's init to 0-1,
+    // so only 4 of the 16 cards could ever contest a race and the deck's MEDIAN init FELL as you
+    // levelled (3 → 2 → 1 → 1). Measured: 32% of hands held nothing that could clear the enemy —
+    // initiative was weather, not a decision. A card at init 0 isn't sharpened, it's DISQUALIFIED
+    // from the Catalyst slot, which breaks the 16-card brief's own test (every card wanted in ≥2
+    // slots). The floor keeps SPARK enormously faster (13 vs 3 at Lv4) — it stops the rest being
+    // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
+    init: Math.max(INIT_FLOOR, init + charmMod('init', d.element, d.arch)),
     boost: boost + charmMod('boost', d.element, d.arch), armor: Math.max(0, armor + am), cost,
   };
 }
