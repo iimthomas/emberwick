@@ -593,6 +593,39 @@ const TUTORIAL = {
   // understands, its when() never returns true and it simply never fires. It also never blocks
   // and never forces a move, so a player who is ahead is never held up.
   lessons: [
+    // 🔍 READ THE ENEMY FIRST. These walk the encounter panel chip by chip, ringing each number
+    // as it is explained — because the panel is the first thing on screen and the whole turn is an
+    // answer to it. They come before the hand lessons for the same reason the layout does:
+    // read enemy → arrange cards → confirm.
+    { id: 'f-hp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
+      point: '#encounter-panel .enc-stats span:nth-child(1)',
+      text: '❤️ <b>HP</b> is what it takes to put it down. Deal that much and you <b>Complete</b> the fight. ' +
+            'Reach the <b>half</b> and it is a <b>Narrow</b> — you win through, but it still hits you back.' },
+    { id: 'f-init', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
+      point: '#encounter-panel .enc-stats span:nth-child(2)',
+      text: '💨 <b>Init</b> is the number your <b>Catalyst</b> has to beat. Beat it and you strike first; fail and it gets a hit in before you swing.' },
+    { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
+      point: '#encounter-panel .enc-stats span:nth-child(3)',
+      text: '⚔️ <b>Atk</b> is what it does to you — once if it strikes first, and again if you fail to Complete. ' +
+            'You pay that in <b>cards</b>, so a small number is not a small thing.' },
+    { id: 'f-shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
+      point: '#encounter-panel .enc-stats span:nth-child(4)',
+      text: 'Its <b>shape</b> is how it defends. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
+            '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The shape decides what your turn should be.' },
+    { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
+      point: '#encounter-panel .enc-stats span:nth-child(5)',
+      text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
+    // 👣 the journey panel asks a different question and gets its own walkthrough
+    { id: 'j-mp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
+      point: '#encounter-panel .enc-stats span:nth-child(1)',
+      text: '👣 A journey wants <b>distance</b>, not damage — the same cards, read a different way. Beat its <b>MP</b> to arrive; reach half and you get there late.' },
+    { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
+      point: '#encounter-panel .enc-stats span:nth-child(2)',
+      text: '🌙 <b>Nightfall</b> races your <b>Catalyst</b>. If its Initiative is lower than this, the dark catches you and takes the card in your <b>Arsenal</b>.' },
+    { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
+      point: '#encounter-panel .enc-stats span:nth-child(3)',
+      text: '⏳ <b>Time Penalty</b> is what arriving late costs — cards burned off the top of your deck. On a journey you lose <b>time</b>, not blood.' },
+
     { id: 'slots', when: () => S.turn === 1 && isAssignPhase(),
       point: '#slots-panel',
       text: 'Your four cards sit under four labels — <b>position is the role</b>. Tap two cards to swap them, or tap a card then tap a label.' },
@@ -605,9 +638,6 @@ const TUTORIAL = {
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
       text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
-    { id: 'shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
-      point: '#encounter-panel',
-      text: 'Every creature defends with a <b>shape</b>. 🛡️ <b>Armour</b> shaves a flat amount off any blow, so it wants one big hit. 🌀 <b>Evasion</b> halves you unless you strike first.' },
     { id: 'bank', when: () => isAssignPhase() && banksNow(),
       point: '.in-Boost',
       text: 'Your <b>SURGE</b> matches your Catalyst, so it will <b>bank</b> instead of firing — nothing now, but next turn you aim it at attack, initiative or armour.' },
