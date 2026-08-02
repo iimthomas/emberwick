@@ -1509,7 +1509,14 @@ function rollOffer(rich) {
     return { kind: 'repair', cardId: c.id, name: c.def.name,
              text: `Mend ${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: Math.max(2, c.level) };
   }
-  const up = owned.filter(c => c.level < MAX_LEVEL);
+  // 🔑 YOU MAY NOT UPGRADE WHAT YOU JUST BLUNTED (bug fixed 2026-07-29). The old upgrade menu
+  // enforced this via upgradable(); the Wheel replaced that menu and never inherited the check,
+  // so you could be KNOCKED OUT, have four cards downgraded, and buy one straight back up in the
+  // same breath. Damage has to stick for at least the turn or coins are an undo button.
+  // ⚠️ This matters far more once Lv4 abilities land: losing a verb and re-buying it in the same
+  // shop would gut the whole "a verb you can LOSE is what makes protecting it a decision".
+  // `repair` offers are the sanctioned way to mend damage — deliberately a separate, priced kind.
+  const up = owned.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id));
   if (!up.length) return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
   const c = rand(up);
   return { kind: 'upgrade', cardId: c.id, name: c.def.name,
