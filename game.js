@@ -1988,7 +1988,20 @@ function spinWheel(rich) {
   return offers;
 }
 
-function startUpgrade() { startWheel(false); }
+// 🎰 NO SHOP ONCE THE BOSS FIGHT HAS BEGUN (2026-07-29, Thomas). The Approach and the Duel are
+// one continuous confrontation — you are on the dragon's road and then in its lair, and there is
+// nobody out there selling you anything. Mechanically it matters too: the duel is a race between
+// its HP and your remaining cards, and a shop mid-race lets you buy your way out of the very
+// pressure the fight is made of. Coins keep, so nothing is lost — you spend them next run.
+function startUpgrade() {
+  // ⚠️ the two finale phases resume differently: the Approach runs the normal turn tail, the Duel
+  // sequences its own beats. Sending the Duel through finishTurn() would stall the fight outright.
+  if (S.finalMode) {
+    if (S.finalPhase === 'duel') duelCleanupAndNext(); else finishTurn();
+    return;
+  }
+  startWheel(false);
+}
 
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
