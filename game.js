@@ -547,17 +547,77 @@ const TUTORIAL = {
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
   ],
-  // turn -> one short lesson. Only facts that cannot go stale.
-  lessons: {
-    1: 'Your four cards sit under four labels. <b>Position is the role</b> — tap two cards to swap them, or tap a card then tap a label.',
-    2: 'Your <b>Spell</b> is your action. It is <b>spent</b> — gone for the rest of the region — so the biggest card is not always the right one.',
-    3: 'Your <b>Catalyst</b> decides who strikes first. Match its element to your Spell and the Spell <b>attunes</b>, striking far harder.',
-    4: 'But your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b> Look at what you are facing.',
-    6: 'Your <b>Surge</b> adds its power now — or, if it matches your Catalyst, <b>banks</b> for next turn where you can aim it.',
-    8: 'Damage is soaked by <b>blunting your own cards</b>. Your deck is your health, so every fight costs you something.',
-    10: 'Your <b>Arsenal</b> is the one card you keep. Everything else slides under your deck in an order you choose.',
-  },
+  // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
+  // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
+  // about so you are shown rather than told.
+  //
+  // 🔑 WHY REACTIVE AND NOT SCRIPTED: a scripted "now click the Catalyst" sequence is the most
+  // brittle thing you can build — it breaks the moment a slot, a phase or a rule moves, which is
+  // exactly what Thomas asked to avoid. A reactive lesson is self-healing: if the player already
+  // understands, its when() never returns true and it simply never fires. It also never blocks
+  // and never forces a move, so a player who is ahead is never held up.
+  lessons: [
+    { id: 'slots', when: () => S.turn === 1 && isAssignPhase(),
+      point: '#slots-panel',
+      text: 'Your four cards sit under four labels — <b>position is the role</b>. Tap two cards to swap them, or tap a card then tap a label.' },
+    { id: 'spent', when: () => S.turn === 1 && isAssignPhase(),
+      point: '.in-Spell',
+      text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
+    { id: 'couldattune', when: () => isAssignPhase() && !attunedNow() && handHasPair(),
+      point: () => { const id = pairPartnerId(); return id ? '.in-' + (zoneOf(id) || 'Spell') : null; },
+      text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
+    { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
+      point: '.attuned-pair',
+      text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
+    { id: 'shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
+      point: '#encounter-panel',
+      text: 'Every creature defends with a <b>shape</b>. 🛡️ <b>Armour</b> shaves a flat amount off any blow, so it wants one big hit. 🌀 <b>Evasion</b> halves you unless you strike first.' },
+    { id: 'bank', when: () => isAssignPhase() && banksNow(),
+      point: '.in-Boost',
+      text: 'Your <b>SURGE</b> matches your Catalyst, so it will <b>bank</b> instead of firing — nothing now, but next turn you aim it at attack, initiative or armour.' },
+    { id: 'soak', when: () => S.phase === 'soak',
+      point: '#slots-panel',
+      text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
+    { id: 'stack', when: () => S.phase === 'stack',
+      point: '#slots-panel',
+      text: 'Your spent cards slide back <b>under your deck</b> — and you choose the order. Tap them in the order you want to see them again.' },
+    { id: 'wheel', when: () => S.phase === 'wheel',
+      point: '#controls-panel',
+      text: 'Coins buy levels. A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else.' },
+    { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
+      point: '#slots-panel',
+      text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
+    { id: 'prism', when: () => prismReady(),
+      point: '.prism-row',
+      text: 'All four elements, so nothing can pair. <b>The Prism</b> lets you draw one and discard one — any card you draw is guaranteed to match something you hold.' },
+    { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
+      point: '#encounter-panel',
+      text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
+  ],
 };
+// does the hand hold a same-element pair at all, and which card is the partner worth moving?
+function handHasPair() {
+  const els = S.hand.map(c => elOf(c));
+  return els.some((e, i) => els.indexOf(e) !== i);
+}
+function pairPartnerId() {
+  const sp = spellCard(); if (!sp) return null;
+  const m = S.hand.find(c => c.id !== sp.id && elOf(c) === elOf(sp));
+  return m ? m.id : null;
+}
+// 🎓 the next thing worth saying: the first untaught lesson whose when() is true
+function nextLesson() {
+  if (!S || !S.tutorial || S.lessonsOff) return null;
+  S.taught = S.taught || [];
+  for (const l of TUTORIAL.lessons) {
+    if (S.taught.includes(l.id)) continue;
+    let ok = false; try { ok = !!l.when(); } catch (e) { ok = false; }
+    if (ok) return l;
+  }
+  return null;
+}
+function learned(id) { S.taught = [...(S.taught || []), id]; render(); }
+
 // 🔑 ONE ACCESSOR, so the tutorial is a dataset rather than a branch
 function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
 
@@ -801,6 +861,7 @@ function saveGame() {
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial,
+      taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -828,7 +889,7 @@ function loadGame() {
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
-      tutorial: !!d.tutorial,
+      tutorial: !!d.tutorial, taught: d.taught || [], lessonsOff: !!d.lessonsOff,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -891,7 +952,7 @@ function freshGame(stage) {
     : stage ? dragonForStage(stage)
     : dragonForStage(Math.min(DRAGONS.length, stagesCleared() + 1));
   S = {
-    tutorial,
+    tutorial, taught: [], lessonsOff: false,
     dragon: pick,
     region: 1,
     turn: 0,
@@ -2369,6 +2430,19 @@ function render() {
   renderControls();
   renderSlots();
   renderLog();
+  pointAtLesson();
+}
+
+// 🎓 SHOW, DON'T TELL. The lesson puts a ring around the thing it describes — the slot row, the
+// card that would attune, the enemy panel. This is the interactive half: you read a sentence and
+// the screen tells you where to look.
+function pointAtLesson() {
+  document.querySelectorAll('.lesson-point').forEach(el => el.classList.remove('lesson-point'));
+  const L = nextLesson(); if (!L || !L.point) return;
+  let sel = L.point; if (typeof sel === 'function') { try { sel = sel(); } catch (e) { sel = null; } }
+  if (!sel) return;
+  const el = document.querySelector(sel);
+  if (el) el.classList.add('lesson-point');
 }
 
 // 🔑 EVERYTHING CURRENTLY MODIFYING YOUR MATHS, NAMED AND SIGNED (2026-07-29). Curses were
@@ -2510,10 +2584,12 @@ function renderControls() {
     // 🔑 SHOW THE OBJECT. Naming the drawn card is not enough — its value, attuned value, init,
     // boost, armour and ELEMENT are the entire basis of the decision, and the element decides
     // which cards you're even allowed to replace. Same rule the Rewiring Pool taught us.
-    // 🎓 the tutorial teaches with DATA (TUTORIAL.lessons), never with a special code path
-    const lesson = (S.tutorial && !S.lessonsOff && TUTORIAL.lessons[S.turn]) || '';
-    const lessonRow = lesson
-      ? `<div class="lesson-row"><span>🎓 ${lesson}</span><button onclick="S.lessonsOff=true;render()">hide tips</button></div>`
+    // 🎓 driven by nextLesson() — reactive, never scripted
+    const L = nextLesson();
+    const lessonRow = L
+      ? `<div class="lesson-row"><span>🎓 ${L.text}</span>` +
+        `<span class="lesson-btns"><button class="primary" onclick="learned('${L.id}')">got it</button>` +
+        `<button onclick="S.lessonsOff=true;render()">hide tips</button></span></div>`
       : '';
     const prismRow = S.prism
       ? `<div class="prism-row prism-open"><span class="prism-lab">✦ You drew — tap a card in the row below to put it in that card's place (<b>that card is spent for the region</b>)</span>` +
