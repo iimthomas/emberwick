@@ -647,6 +647,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
+      duelStamina0: S.duelStamina0,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -692,7 +693,7 @@ function loadGame() {
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
-      prism: null, prismUsed: d.prismUsed || false,
+      prism: null, prismUsed: d.prismUsed || false, duelStamina0: d.duelStamina0 || 0,
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -787,6 +788,7 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
     prism: null,        // ✦ the drawn card, held OUTSIDE the hand until you place or refuse it
     prismUsed: false,   // once per turn
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
@@ -2158,7 +2160,8 @@ function renderEncounter() {
       `<div class="dragon-hp"><div class="dragon-hp-fill" style="width:${hpPct}%"></div>` +
       `<span class="dragon-hp-label">🐉 ${S.dragon.name} — ${ds ? ds.hp : S.dragon.hp} / ${ds ? ds.maxHp : S.dragon.hp} HP</span></div>` +
       `<div class="dragon-shields">${ds ? shapeStateText() : dragonShapeText(S.dragon)}` +
-      ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>`;
+      ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>` +
+      (S.finalPhase === 'duel' ? staminaBar() : '');
     if (S.finalPhase === 'duel') {
       panel.className = 'fight';
       panel.innerHTML =
@@ -2730,6 +2733,16 @@ function shapeStateText() {
   return bits.join(' · ') || 'unguarded';
 }
 
+// 🃏 YOUR HALF OF THE RACE. The dragon's bar is its HP; this is yours — the cards you have left.
+// No reshuffle in a duel, so every card you soak with is stamina you never get back.
+function staminaBar() {
+  const left = S.deck.length + S.hand.length;
+  const pct = S.duelStamina0 ? Math.max(0, Math.round(100 * left / S.duelStamina0)) : 100;
+  return `<div class="stamina"><div class="stamina-fill" style="width:${pct}%"></div>` +
+    `<span class="stamina-label">🃏 your cards — ${left} / ${S.duelStamina0}</span></div>` +
+    `<div class="stamina-note">🔑 <b>You lose when your cards run out</b> — every card you soak with is stamina you never get back.</div>`;
+}
+
 function startDuel() {
   S.finalPhase = 'duel';
   S.duelBeat = 0;
@@ -2738,6 +2751,10 @@ function startDuel() {
   // (Lv1 soak losses) are gone; a clean approach preserves your full hand AND cracked a shield.
   S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.hand = []; S.discard = [];
+  // 🔑 THE DUEL IS A RACE AND THE PLAYER COULDN'T SEE IT (2026-07-29). You lose when your CARDS
+  // RUN OUT, not when a health bar empties — the single most important fact about the fight, and
+  // nothing on screen said it. Remember what you arrived with so the race can be drawn.
+  S.duelStamina0 = S.deck.length;
   log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
   startDuelBeat();
 }
@@ -2748,7 +2765,7 @@ function startDuelBeat() {
   // dragon before it runs dry. A duel that outlasts your cards is the legible, developed loss.
   if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
   if (S.hand.length === 0) { // deck and hand both spent — the loss has developed over the duel
-    defeat(`Your cards are spent — the ${S.dragon.name} still stands at ${S.dragonState.hp} HP. You watched the shields crack, but could not finish it.`);
+    defeat(`Your cards are spent — the ${S.dragon.name} still stands at ${S.dragonState.hp} of ${S.dragonState.maxHp} HP. You wounded it, but the deck ran dry first.`);
     return;
   }
   S.duelBeat++;
