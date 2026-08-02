@@ -513,6 +513,54 @@ const DRAGONS = [
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
 ];
+// ============================================================
+// 🎓 STAGE 0 — THE TUTORIAL (2026-07-29, Thomas: "something separate where it won't break
+// when working on the main game").
+//
+// 🔑 THAT CONSTRAINT IS THE WHOLE DESIGN. A tutorial made of SPECIAL-CASE CODE breaks every
+// time the engine changes — it is a second game you have to maintain. This one is pure DATA: two
+// gentle regions, one small dragon, a handful of lesson strings. It runs the SAME engine down the
+// SAME code path as every other stage, so a new mechanic simply appears in it and nothing to
+// break exists. The only thing that can go stale is a lesson's TEXT, which is the phantom-string
+// problem — so the lessons deliberately only name things that cannot change: the four slots,
+// position-is-the-role, what the Spell costs, and how you lose.
+//
+// Gentle by construction: low HP, low Initiative, no abilities, no perils, NO HARDSHIPS, and a
+// dragon with a quarter of Cindermaw's HP. Nobody should lose this — it is where the game
+// teaches itself, and the first three runs decide whether there is a fourth.
+// ============================================================
+const TUTORIAL = {
+  dragon: { stage: 0, name: 'Emberling', element: 'Fire', init: 5, breath: 3, hp: 20,
+    shapes: ['armour'], shapeV: 2, teaches: 'HIT BIG',
+    brief: 'A young thing, barely scaled — but the scale it has will turn a weak blow. Put your weight behind one strike and it will not hold.' },
+  regions: [
+    { name: 'The Chandlery Road', hardshipChance: 0, hardships: [], encounters: [
+      { type: 'fight',   name: 'Wick Moth',   hp: 5,  init: 1, atk: 1, xp: 4 },
+      { type: 'journey', name: 'Lamplit Lane', mp: 5,  nightfall: 1, timePenalty: 1, xp: 4 },
+      { type: 'fight',   name: 'Tallow Vole', hp: 6,  init: 2, atk: 1, shape: 'armour', shapeV: 1, xp: 4 },
+      { type: 'journey', name: 'The Long Meadow', mp: 6, nightfall: 2, timePenalty: 1, xp: 5 },
+    ] },
+    { name: 'The Ember Hollow', hardshipChance: 0, hardships: [], encounters: [
+      { type: 'fight',   name: 'Sootling',    hp: 8,  init: 4, atk: 1, shape: 'evasion', shapeV: 0, xp: 5 },
+      { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 1, xp: 5 },
+      { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
+      { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
+    ] },
+  ],
+  // turn -> one short lesson. Only facts that cannot go stale.
+  lessons: {
+    1: 'Your four cards sit under four labels. <b>Position is the role</b> — tap two cards to swap them, or tap a card then tap a label.',
+    2: 'Your <b>Spell</b> is your action. It is <b>spent</b> — gone for the rest of the region — so the biggest card is not always the right one.',
+    3: 'Your <b>Catalyst</b> decides who strikes first. Match its element to your Spell and the Spell <b>attunes</b>, striking far harder.',
+    4: 'But your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b> Look at what you are facing.',
+    6: 'Your <b>Surge</b> adds its power now — or, if it matches your Catalyst, <b>banks</b> for next turn where you can aim it.',
+    8: 'Damage is soaked by <b>blunting your own cards</b>. Your deck is your health, so every fight costs you something.',
+    10: 'Your <b>Arsenal</b> is the one card you keep. Everything else slides under your deck in an order you choose.',
+  },
+};
+// 🔑 ONE ACCESSOR, so the tutorial is a dataset rather than a branch
+function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
+
 const hasShape = sh => !!(S.dragon && S.dragon.shapes.includes(sh));
 // the shape, in one phrase — this is the question the whole run is preparing you for
 function dragonShapeText(d) {
@@ -752,7 +800,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
-      duelStamina0: S.duelStamina0, stats: S.stats,
+      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
     }));
@@ -773,14 +821,15 @@ function loadGame() {
     };
     const deck = d.deck.map(mk), hand = d.hand.map(mk), discard = d.discard.map(mk), trashed = d.trashed.map(mk);
     if ([...deck, ...hand, ...discard, ...trashed].some(c => !c)) return false; // card data changed since save
-    const region = REGIONS[d.region - 1];
+    const region = RUN()[d.region - 1];
     if (!region) return false;
     const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
     const stable = ['summary', 'defeat', 'victory', 'event', 'wheel'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
-      dragon: DRAGONS.find(x => x.name === d.dragon) || DRAGONS[0],
+      tutorial: !!d.tutorial,
+      dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
       results: d.results, phase: d.phase, encounter,
@@ -837,9 +886,12 @@ function freshGame(stage) {
   const cards = shuffle(CARD_DEFS.map(newCard));
   // no argument (a cold boot, or the bot) → the highest stage you have unlocked, so a returning
   // player lands on the newest problem rather than replaying the tutorial.
-  const pick = stage ? dragonForStage(stage)
+  const tutorial = stage === 0;
+  const pick = tutorial ? TUTORIAL.dragon
+    : stage ? dragonForStage(stage)
     : dragonForStage(Math.min(DRAGONS.length, stagesCleared() + 1));
   S = {
+    tutorial,
     dragon: pick,
     region: 1,
     turn: 0,
@@ -847,7 +899,7 @@ function freshGame(stage) {
     hand: [],
     discard: [],
     trashed: [],
-    encounterQueue: shuffle(REGIONS[0].encounters),
+    encounterQueue: shuffle((stage === 0 ? TUTORIAL.regions : REGIONS)[0].encounters),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
     phase: null,
     encounter: null,
@@ -912,7 +964,7 @@ function freshGame(stage) {
   // random draw, the reveal is a briefing rather than a surprise, which is what makes a run
   // soft-directional: everything you level and every card you stack is preparation for a problem
   // you can already name.
-  log(`🐉 STAGE ${S.dragon.stage} — beyond Region 4 waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
+  log(`🐉 STAGE ${S.dragon.stage} — beyond Region ${RUN().length} waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
   render();
 }
 
@@ -922,7 +974,7 @@ function newGame() {
 }
 
 function nextRegion() {
-  if (S.region >= REGIONS.length) { freshGame(); return; }
+  if (S.region >= RUN().length) { freshGame(); return; }
   S.regionTurn = 0;
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
@@ -931,7 +983,7 @@ function nextRegion() {
   S.hand = [];
   S.discard = [];
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
-  S.encounterQueue = shuffle(REGIONS[S.region - 1].encounters);
+  S.encounterQueue = shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
   nextTurn();
 }
@@ -1028,7 +1080,7 @@ function log(text, cls = '') { S.logEntries[0].lines.push({ text, cls }); }
 // turn flow
 // ============================================================
 function drawEncounter(avoidType) {
-  const region = REGIONS[S.region - 1];
+  const region = RUN()[S.region - 1];
   if (S.encounterQueue.length === 0) S.encounterQueue = shuffle(region.encounters);
   // normal turns take the next in the shuffled bag; Divert steers toward a DIFFERENT
   // type (its whole purpose) — falling back to next-in-bag only if the bag has no other type left.
@@ -1919,7 +1971,7 @@ function finishRegionCheck() {
   const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
   if (done || dry) {
     const why = done ? `${REGION_ENCOUNTERS} encounters crossed` : `too few cards left to go on`;
-    if (S.region >= REGIONS.length) log(`${why} → REGION 4 CLEARED. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
+    if (S.region >= RUN().length) log(`${why} → REGION ${RUN().length} CLEARED. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
     else log(`${why} → END OF REGION ${S.region}`, 'result');
     S.phase = 'summary';
     render();
@@ -2060,7 +2112,7 @@ const EVENTS = [
     flavor: "A hollow where one coal never dies. Bank your light here and the dark can't take it.",
     options: [
       { label: 'Bank your Arsenal — the night cannot snuff it for the rest of this region', need: 'none',
-        apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${REGIONS[S.region - 1].name}.`]; } },
+        apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${RUN()[S.region - 1].name}.`]; } },
       { label: 'Take the coal with you — a card you choose gains +1 level, the ward is spent', need: 'card',
         apply: ({ card }) => ['You lift the everburning coal — ' + evLevel(card, +1)] },
       { label: 'Bargain with what sleeps here — 🪙 +14 coins, and a CURSE', need: 'none',
@@ -2347,7 +2399,7 @@ function renderStatus() {
   const key = S.deck[0];
   $('status-bar').innerHTML =
     `<span>🐉 <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)} · stage ${S.dragon.stage} · ${dragonShapeText(S.dragon)}</span>` +
-    (S.finalMode ? '' : `<span>🗺️ <b>${REGIONS[S.region - 1].name}</b> (${S.region}/${REGIONS.length})</span>`) +
+    (S.finalMode ? '' : `<span>🗺️ <b>${RUN()[S.region - 1].name}</b> (${S.region}/${RUN().length})</span>`) +
     `<span>Deck: <b>${S.deck.length}</b></span>` +
     `<span>Discard: <b>${S.discard.length}</b></span>` +
     `<span title="cards that have left your deck for the rest of this run">Lost: <b>${S.trashed.length}</b></span>` +
@@ -2396,7 +2448,7 @@ function renderEncounter() {
     (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${HARDSHIPS[S.hardship]}</div>` : '');
   if (e.type === 'fight') {
     panel.innerHTML =
-      `<div class="enc-type">FIGHT — ${REGIONS[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
+      `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
       `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
@@ -2404,7 +2456,7 @@ function renderEncounter() {
       `<span>🪙 <b>${e.xp}</b></span></div>` + modLines;
   } else {
     panel.innerHTML =
-      `<div class="enc-type">JOURNEY — ${REGIONS[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
+      `<div class="enc-type">JOURNEY — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
       `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
       `<span>🌙 Nightfall <b>${e.nightfall}</b></span>` +
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
@@ -2458,6 +2510,11 @@ function renderControls() {
     // 🔑 SHOW THE OBJECT. Naming the drawn card is not enough — its value, attuned value, init,
     // boost, armour and ELEMENT are the entire basis of the decision, and the element decides
     // which cards you're even allowed to replace. Same rule the Rewiring Pool taught us.
+    // 🎓 the tutorial teaches with DATA (TUTORIAL.lessons), never with a special code path
+    const lesson = (S.tutorial && !S.lessonsOff && TUTORIAL.lessons[S.turn]) || '';
+    const lessonRow = lesson
+      ? `<div class="lesson-row"><span>🎓 ${lesson}</span><button onclick="S.lessonsOff=true;render()">hide tips</button></div>`
+      : '';
     const prismRow = S.prism
       ? `<div class="prism-row prism-open"><span class="prism-lab">✦ You drew — tap a card in the row below to put it in that card's place (<b>that card is spent for the region</b>)</span>` +
         `<div class="prism-card">${cardHTML(S.prism)}</div>` +
@@ -2482,6 +2539,7 @@ function renderControls() {
       `</div></details>`;
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
+      lessonRow +
       prismRow +
       wakeRow +
       boostRow +
@@ -2586,6 +2644,8 @@ function renderControls() {
       `<div class="phase-label">🗺️ THE STAGES</div>` +
       `<div class="summary"><p>Each stage is a different <b>question</b>, not simply a bigger number. ` +
       `Beat one and the next opens — but every stage you have cleared stays open, so you can always go back.</p></div>` +
+      `<button class="primary stage" onclick="startStage(0)"><b>🎓 Stage 0 — the Emberling</b>` +
+      `<span class="stage-shape">a short, gentle run that teaches the game · always open</span></button>` +
       DRAGONS.map(d => {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
@@ -2609,9 +2669,9 @@ function renderControls() {
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
-    const runDone = S.region >= REGIONS.length;
+    const runDone = S.region >= RUN().length;
     c.innerHTML =
-      `<div class="phase-label">${runDone ? `REGION 4 CLEARED — THE ${S.dragon.name.toUpperCase()} AWAITS` : `END OF REGION ${S.region} — ${REGIONS[S.region - 1].name}`}</div>` +
+      `<div class="phase-label">${runDone ? `REGION ${RUN().length} CLEARED — THE ${S.dragon.name.toUpperCase()} AWAITS` : `END OF REGION ${S.region} — ${RUN()[S.region - 1].name}`}</div>` +
       `<div class="summary">` +
       `<p>Turns played: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b></p>` +
       `<p>Score so far (sum of surviving card levels): <b>${score}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
@@ -2622,7 +2682,7 @@ function renderControls() {
       (runDone
         ? `<button class="primary" onclick="beginFinalBattle()">🐉 Face the ${S.dragon.name} — the Dragon Duel</button>` +
           `<button onclick="showStages()">Restart from scratch</button>`
-        : `<button class="primary" onclick="nextRegion()">Enter ${REGIONS[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
+        : `<button class="primary" onclick="nextRegion()">Enter ${RUN()[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
           `<button onclick="showStages()">Restart from scratch</button>`);
   }
 }

@@ -700,6 +700,14 @@ button.stage.locked .stage-shape { font-style: italic; }
 .g-diag b { color: #ffd9a8; }
 @media (max-width: 560px) { .g-row { grid-template-columns: minmax(0,1fr) 56px 46px; } .g-letter { font-size: 42px; width: 56px; } }
 
+
+/* 🎓 the tutorial's lesson line — one fact a turn, and you can turn it off */
+.lesson-row { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 8px; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid rgba(127,176,196,.45); background: rgba(127,176,196,.10);
+  font-size: 12.5px; line-height: 1.45; color: #cfe3ec; }
+.lesson-row b { color: #eaf6fb; }
+.lesson-row button { flex: none; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================
