@@ -1325,6 +1325,58 @@ function resolve() {
 }
 
 // step through the reveal: auto-advances with a delay, click to hurry, outcome waits for a click
+// ============================================================
+// 💥 IMPACT (2026-07-29). Pure CSS on the two ANIMATION SLOTS - nothing here touches layout
+// or logic, so real sprites drop in later without any of it changing.
+//
+// 🔑 THE REACTION IS THE MECHANIC, NOT DECORATION. Each defence shape gets its OWN reaction,
+// so a player learns what a shape DOES by watching it once:
+//     🛡️ ARMOUR ate most of it  -> it SHRUGS: sparks skitter, the body barely moves
+//     🌀 EVASION slipped you     -> it is NOT THERE: a lateral blur, the blow passes through
+//     a clean hit                -> it ROCKS, and harder the bigger the hit
+// That is the same argument as the enemy panel naming the shape: teach through what the player
+// sees, not through a tutorial line.
+//
+// Calibration is old-school Pokemon on purpose - a flash, a shake, a knock-back. Cheap, readable,
+// and it tells us whether animation is worth the sprite work BEFORE anything is modelled.
+const REDUCED = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+function fx(sel, cls, ms) {
+  if (REDUCED()) return;
+  const el = typeof sel === 'string' ? $(sel) : sel;
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;              // restart the animation if it is already running
+  el.classList.add(cls);
+  setTimeout(() => el && el.classList.remove(cls), ms);
+}
+// how hard did that land, as a share of what the target can take
+function hitWeight(value, pool) {
+  if (!pool || value <= 0) return 0;
+  const f = value / pool;
+  return f >= 0.30 ? 3 : f >= 0.15 ? 2 : 1;
+}
+// play whatever this revealed beat earned
+function beatFx(beat) {
+  const r = S.pendingR;
+  if (!r || !beat || !beat.label) return;
+  if (beat.label.includes('ATTACK') || beat.label.includes('STRIKE')) {
+    if (r.evaded) { fx('foe-slot', 'fx-evade', 480); return; }
+    // armour ate the lion's share -> the shrug, which is the shape's whole lesson
+    const raw = (r.withBoost || r.value || 0);
+    if (r.armorCut && r.value <= raw * 0.55) { fx('foe-slot', 'fx-shrug', 520); return; }
+    const pool = S.dragonState ? S.dragonState.maxHp : (S.encounter ? S.encounter.hp : 0);
+    const w = hitWeight(r.value, pool);
+    if (w) { fx('foe-slot', 'fx-hit-' + w, 520); if (w === 3) fx('scene', 'fx-shake', 380); }
+  } else if (beat.label.includes('MOVE')) {
+    if (r.outcome === 'Complete') fx('scene', 'fx-surge', 900);
+  } else if (beat.label.includes('INITIATIVE')) {
+    if (r.early > 0) { fx('mage-slot', 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
+  } else if (beat.label.includes('PACE')) {
+    if (r.nightCaught) fx('scene', 'fx-dark', 700);
+  }
+  if (beat.outcomeBeat && r.combatDmg > 0) { fx('mage-slot', 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
+}
+
 function advanceBeat() {
   if (S.phase !== 'reveal') return;
   if (S.beatTimer) { clearTimeout(S.beatTimer); S.beatTimer = null; }
@@ -1338,6 +1390,7 @@ function advanceBeat() {
   for (const l of beat.lines) log(l.text, l.cls);
   if (!beat.final) S.beatTimer = setTimeout(advanceBeat, 1400);
   render();
+  beatFx(beat);   // after render, so the slots exist to animate
 }
 
 function beatDisplayHTML(beat, isNew) {
