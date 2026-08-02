@@ -732,6 +732,11 @@ button.stage.locked .stage-shape { font-style: italic; }
 .intro p b { color: #f0e2c6; }
 .intro-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
+
+/* ⚖️🐌 a hardship has barred this card from a slot — say which card, on the card */
+.card-barred { margin-top: 4px; padding: 2px 6px; border-radius: 5px; font-size: 10px; letter-spacing: .04em;
+  background: rgba(190,90,70,.20); border: 1px solid rgba(220,110,90,.5); color: #f0b3a0; text-align: center; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

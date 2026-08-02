@@ -1454,6 +1454,18 @@ function normalizeAssign() {
   if (!S || !S.assign || !S.hand) return;
   if (Array.isArray(S.assign.Spell)) S.assign.Spell = S.assign.Spell[0] || null;   // old saves
   for (const z of ZONES) if (S.assign[z] && !cardById(S.assign[z])) S.assign[z] = null;
+  // ⚖️🐌 SEATING IS ADDITIVE AND NEVER DISPLACES — which quietly let a BANNED card stay put. A card
+  // seated last turn sits where it is, and when the next encounter arrives carrying Dead Weight or
+  // Mire its slot has just become illegal with nothing to move it.
+  // ⚠️ Evicting alone is not enough: the card then has no seat, and the fallback puts it straight
+  // back. A ban has to SWAP it with a slot that can legally hold it, both ways.
+  for (const z of ZONES) {
+    const id = S.assign[z];
+    if (!id || !placementBan(id, z)) continue;
+    const to = ZONES.find(o => o !== z && !placementBan(id, o) && (!S.assign[o] || !placementBan(S.assign[o], z)));
+    if (to) { const other = S.assign[to]; S.assign[to] = id; S.assign[z] = other || null; }
+    else S.assign[z] = null;
+  }
   // every card is always seated, left to right — position is the role
   const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
   for (const card of S.hand) {
@@ -1464,10 +1476,11 @@ function normalizeAssign() {
     S.assign[free] = card.id;
     seated.add(card.id);
   }
-  // anything a ban pushed out still needs a seat — give it the first slot it is allowed
+  // anything a ban pushed out still needs a seat — the first slot it is ALLOWED, and only then
+  // any slot at all, so a hand can never end up with a card nowhere on the row
   for (const card of S.hand) {
     if (seated.has(card.id)) continue;
-    const free = ZONES.find(z => !S.assign[z]);
+    const free = ZONES.find(z => !S.assign[z] && !placementBan(card.id, z)) || ZONES.find(z => !S.assign[z]);
     if (!free) break;
     S.assign[free] = card.id;
     seated.add(card.id);
@@ -3040,6 +3053,11 @@ function cardHTML(card) {
   const verb = verbOf(card);
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
   const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
+  // ⚖️🐌 name the barred card outright — "your heaviest" is not something you can read off a row
+  const barred = isAssignPhase() && S.hardship
+    ? (placementBan(card.id, 'Spell') ? '⚖️ too heavy for the SPELL'
+      : placementBan(card.id, 'Element') ? '🐌 too fast for the CATALYST' : null)
+    : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
@@ -3065,6 +3083,7 @@ function cardHTML(card) {
     `<div class="card-vals">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
+    (barred ? `<div class="card-barred">${barred}</div>` : '') +
     (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
     `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
     `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
