@@ -718,6 +718,20 @@ button.stage.locked .stage-shape { font-style: italic; }
   50%     { box-shadow: 0 0 0 7px rgba(127,200,230,0); } }
 @media (prefers-reduced-motion: reduce) { .lesson-point { animation: none; } }
 
+
+/* 📖 the opening brief — paged, and you go through all of it before the first card is dealt */
+.intro { max-width: 60ch; padding: 4px 2px 2px; }
+.intro-dots { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.intro-dots i { width: 22px; height: 3px; border-radius: 2px; background: rgba(234,217,186,.18); }
+.intro-dots i.seen { background: rgba(201,162,74,.55); }
+.intro-dots i.on { background: #e8913c; }
+.intro-count { margin-left: auto; font-size: 11px; letter-spacing: .14em; color: #9a8d76; }
+.intro h3 { margin: 0 0 8px; font-size: 17px; font-weight: 400; color: #f0e2c6;
+  font-family: Georgia, "Iowan Old Style", serif; }
+.intro p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.62; color: #cbbb9c; }
+.intro p b { color: #f0e2c6; }
+.intro-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================

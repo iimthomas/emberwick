@@ -530,6 +530,16 @@ const DRAGONS = [
 // teaches itself, and the first three runs decide whether there is a fourth.
 // ============================================================
 const TUTORIAL = {
+  // 🔑 STAGE 0 IS FULLY DETERMINISTIC — same encounters, same order, same opening hands, every
+  // single run (Thomas, 2026-07-29). A tutorial that varies cannot TEACH: you can only promise
+  // "your first hand holds a pair, so here is what attuning does" if the first hand is known.
+  // Deck order is authored so the lessons land where they are meant to: hand 1 has exactly one
+  // pair (attuning), and a rainbow hand arrives later (the Prism).
+  fixed: true,
+  deckOrder: ['Emberfall', 'Firstlight', 'Riverstep', 'Cairnguard',
+              'Bellowsbreath', 'Tidebreak', 'Quickfire', 'Rockfall',
+              'Wellspring', 'Staticwall', 'Sparkstrike', 'Rimeguard',
+              'Stormglass', 'Flintdart', 'Hearthwall', 'Deepvein'],
   dragon: { stage: 0, name: 'Emberling', element: 'Fire', init: 5, breath: 3, hp: 20,
     shapes: ['armour'], shapeV: 2, teaches: 'HIT BIG',
     brief: 'A young thing, barely scaled — but the scale it has will turn a weak blow. Put your weight behind one strike and it will not hold.' },
@@ -546,6 +556,32 @@ const TUTORIAL = {
       { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
+  ],
+  // 📖 THE OPENING BRIEF — you read these before the first card is dealt. Thomas asked for a
+  // paged window you must go through: it is the one place to explain WHAT AN ENCOUNTER IS, which
+  // no in-play lesson can do because by then you are already in one.
+  intro: [
+    { title: 'You are a mage on the road',
+      body: 'Somewhere past the fourth region a dragon is waiting, and you already know which one. ' +
+            'Everything between here and there is preparation.<br><br>' +
+            'You carry <b>sixteen cards</b>. You will hold <b>four at a time</b>, and every turn you will decide what those four are for.' },
+    { title: 'A turn is an arrangement',
+      body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
+            '<b>SPELL</b> is your action. It is <b>spent</b> afterwards, gone for the rest of the region.<br>' +
+            '<b>CATALYST</b> decides who strikes first — and if it shares your Spell\'s element, the Spell <b>attunes</b> and hits far harder.<br>' +
+            '<b>SURGE</b> adds its power now, or <b>banks</b> it for next turn.<br>' +
+            '<b>ARSENAL</b> is the one card you keep.' },
+    { title: 'Two kinds of encounter',
+      body: '⚔️ A <b>FIGHT</b> asks for damage. Beat its <b>HP</b> outright to <b>Complete</b> it; reach half for a <b>Narrow</b>, and it hits you back. ' +
+            'Each creature defends with a <b>shape</b> — 🛡️ <b>Armour</b> shaves a flat amount off any blow, so it wants one big hit; ' +
+            '🌀 <b>Evasion</b> halves you unless you strike first.<br><br>' +
+            '👣 A <b>JOURNEY</b> asks for distance. Beat its <b>MP</b> to arrive; fall short and you lose time. ' +
+            'It also has a <b>🌙 Nightfall</b> — if your Catalyst is too slow, the dark catches you.<br><br>' +
+            'Same four cards, two completely different questions.' },
+    { title: 'Your deck is your health',
+      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it — each drops a level, and a card at Lv1 <b>leaves your deck for good</b>.<br><br>' +
+            'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
+            'You will lose runs. That is the game working — you learn the shapes, unlock more, and come back.' },
   ],
   // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
   // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
@@ -808,10 +844,22 @@ let S = null;
 
 function newCard(def) { return { id: ++uid, def, level: START_LEVEL }; }
 
+// 🎲 ONE SOURCE OF RANDOMNESS, so Stage 0 can be made identical without touching every site that
+// rolls. In a normal run this is just rnd(); in the tutorial it is a seeded generator
+// reset at the start, which makes the encounters, the hands, the Wheel offers and the events all
+// play out the same way every single time. Patching each call site individually would have meant
+// finding them all, and missing one is invisible until someone notices their tutorial differed.
+let TSEED = 0;
+function rnd() {
+  if (!S || !S.tutorial) return Math.random();
+  TSEED = (TSEED * 1664525 + 1013904223) >>> 0;
+  return TSEED / 4294967296;
+}
+
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rnd() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -913,7 +961,7 @@ function loadGame() {
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
-    if (S.encounterQueue.length === 0) S.encounterQueue = shuffle(region.encounters);
+    if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
     // the finale's encounter is synthetic (not in the region tables) — rebuild it for the saved beat
     if (S.finalMode) {
       if (S.finalPhase === 'duel') {
@@ -940,11 +988,27 @@ function showStages() {
   S.encounter = null;
   render();
 }
-function startStage(n) { freshGame(n); }
+function startStage(n) {
+  freshGame(n);
+  // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
+  // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
+  if (n === 0) { S.introPage = 0; S.phase = 'intro'; }
+  render();
+}
+function introNext(d) {
+  S.introPage = Math.max(0, (S.introPage || 0) + d);
+  if (S.introPage >= TUTORIAL.intro.length) { S.introPage = 0; S.phase = 'assign'; }
+  render();
+}
 
 function freshGame(stage) {
   try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
-  const cards = shuffle(CARD_DEFS.map(newCard));
+  const tutorialRun = stage === 0;
+  TSEED = 20260729;   // 🎲 the tutorial's fixed seed — same run, every time
+  // 🎓 the tutorial deals from an authored order; every other run shuffles
+  const cards = tutorialRun
+    ? TUTORIAL.deckOrder.map(n => newCard(CARD_DEFS.find(d => d.name === n))).filter(Boolean)
+    : shuffle(CARD_DEFS.map(newCard));
   // no argument (a cold boot, or the bot) → the highest stage you have unlocked, so a returning
   // player lands on the newest problem rather than replaying the tutorial.
   const tutorial = stage === 0;
@@ -960,7 +1024,7 @@ function freshGame(stage) {
     hand: [],
     discard: [],
     trashed: [],
-    encounterQueue: shuffle((stage === 0 ? TUTORIAL.regions : REGIONS)[0].encounters),
+    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(REGIONS[0].encounters),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
     phase: null,
     encounter: null,
@@ -1044,7 +1108,7 @@ function nextRegion() {
   S.hand = [];
   S.discard = [];
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
-  S.encounterQueue = shuffle(RUN()[S.region - 1].encounters);
+  S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
   nextTurn();
 }
@@ -1142,7 +1206,7 @@ function log(text, cls = '') { S.logEntries[0].lines.push({ text, cls }); }
 // ============================================================
 function drawEncounter(avoidType) {
   const region = RUN()[S.region - 1];
-  if (S.encounterQueue.length === 0) S.encounterQueue = shuffle(region.encounters);
+  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
   // normal turns take the next in the shuffled bag; Divert steers toward a DIFFERENT
   // type (its whole purpose) — falling back to next-in-bag only if the bag has no other type left.
   let idx = 0;
@@ -1151,7 +1215,7 @@ function drawEncounter(avoidType) {
     if (diff !== -1) idx = diff;
   }
   S.encounter = S.encounterQueue.splice(idx, 1)[0];
-  if (S.encounterQueue.length === 0) S.encounterQueue = shuffle(region.encounters);
+  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
@@ -1176,10 +1240,10 @@ function drawEncounter(avoidType) {
   // monsters of the region). A region may declare `hardships`; without one it gets the full menu.
   // This is also the hook stages will use once they own their own content.
   if (region.hardships) list = list.filter(h => region.hardships.includes(h));
-  S.hardship = Math.random() < region.hardshipChance ? list[Math.floor(Math.random() * list.length)] : null;
+  S.hardship = rnd() < region.hardshipChance ? list[Math.floor(rnd() * list.length)] : null;
   // a Cache/Mirror Fen ward: the next FIGHT carries a Hardship whether the region rolled one or not
   if (S.curseNextFight && S.encounter.type === 'fight') {
-    if (!S.hardship) S.hardship = list[Math.floor(Math.random() * list.length)];
+    if (!S.hardship) S.hardship = list[Math.floor(rnd() * list.length)];
     S.curseNextFight = false;
   }
 }
@@ -1824,7 +1888,7 @@ function upgradable(card) {
 
 // build one offer; `rich` (camp) leans rarer
 function rollOffer(rich) {
-  const roll = Math.random();
+  const roll = rnd();
   const heldCharms = S.charms || [];
   const pool = CHARMS.filter(c => !heldCharms.includes(c.id) && !c.curse &&
     (rich ? true : c.rarity !== 'rare'));
@@ -2071,7 +2135,7 @@ function evUpgradeRandom(n, excludeId) {
   return picks.map(c => evLevel(c, +1));
 }
 function evCurseNextFight() { S.curseNextFight = true; return 'A ward bites — your next fight will carry a Hardship.'; }
-const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+const rand = arr => arr[Math.floor(rnd() * arr.length)];
 
 const EVENTS = [
   { id: 'wayshrine', name: 'The Guttered Wayshrine',
@@ -2079,7 +2143,7 @@ const EVENTS = [
     options: [
       { label: 'Relight it — a card brightens (a greedy flame might dim another)', need: 'none',
         apply: () => { const up = rand(S.hand); const lines = [evLevel(up, +1)];
-          if (Math.random() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
+          if (rnd() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
       { label: 'Swear to tend it — take a CHARM, and a CURSE to carry with it', need: 'none',
         apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
@@ -2104,9 +2168,9 @@ const EVENTS = [
     flavor: "An old firing-kiln, its coals banked low. Temper a card here and it comes out changed — hardened, or cracked.",
     options: [
       { label: 'Temper a card — likely +1 level; it might crack (−1)', need: 'card',
-        apply: ({ card }) => Math.random() < 0.7 ? ('It hardens. ' + evLevel(card, +1)) : ('It cracks! ' + evLevel(card, -1)) },
+        apply: ({ card }) => rnd() < 0.7 ? ('It hardens. ' + evLevel(card, +1)) : ('It cracks! ' + evLevel(card, -1)) },
       { label: 'Fire it hot — a card you choose gains +2 levels, or cracks for −1 (even odds)', need: 'card',
-        apply: ({ card }) => Math.random() < 0.5
+        apply: ({ card }) => rnd() < 0.5
           ? ('The kiln roars. ' + evLevel(card, +1) + ' ' + evLevel(card, +1))
           : ('Too hot — it cracks. ' + evLevel(card, -1)) },
       { label: 'Leave it cold — nothing', need: 'none', apply: () => ['You bank the coals and travel on.'] },
@@ -2117,7 +2181,7 @@ const EVENTS = [
       { label: 'Dig it up — a charm lies buried, but the ward may cling to you', need: 'none',
         apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
           const lines = good.length ? [evGrantCharm(rand(good).id)] : evUpgradeRandom(2);
-          if (Math.random() < 0.4) lines.push(evTakeCurse());
+          if (rnd() < 0.4) lines.push(evTakeCurse());
           return lines; } },
       { label: 'Mark it and move on — a small, safe find', need: 'none', apply: () => evUpgradeRandom(1) },
       { label: 'Sell the location at the next town — 🪙 +10 coins, nothing dug', need: 'none',
@@ -2194,7 +2258,7 @@ const EVENTS = [
     flavor: "The fen shows things that aren't there yet — you can't tell if it's a gift or a warning.",
     options: [
       { label: 'Look into the fen — something happens (you cannot tell what)', need: 'none',
-        apply: () => mirrorGlimpse(Math.floor(Math.random() * 4)) },
+        apply: () => mirrorGlimpse(Math.floor(rnd() * 4)) },
       // TWO glimpses must be two DIFFERENT glimpses - the same face twice is either a shrug or a
       // double curse, and neither is what "stare until it answers" promises.
       { label: 'Stare until it answers — TWO glimpses, and they will not be the same', need: 'none',
@@ -2514,7 +2578,7 @@ function renderEncounter() {
         `<div class="enc-hint">Complete BOTH approach beats and you arrive with the advantage — its guard softened before a blow is struck.</div>` : '');
     return;
   }
-  if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
+  if (S.phase === 'intro' || S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
   panel.className = e.type;
   const modLines =
     (e.ability ? `<div class="enc-mod">☠️ <b>${e.ability}</b> — ${ABILITIES[e.ability]}</div>` : '') +
@@ -2714,6 +2778,20 @@ function renderControls() {
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
       `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
+  } else if (S.phase === 'intro') {
+    const i = Math.min(S.introPage || 0, TUTORIAL.intro.length - 1), pg = TUTORIAL.intro[i];
+    const last = i === TUTORIAL.intro.length - 1;
+    c.innerHTML =
+      `<div class="phase-label">🎓 BEFORE YOU BEGIN</div>` +
+      `<div class="intro">` +
+        `<div class="intro-dots">${TUTORIAL.intro.map((_, n) => `<i class="${n === i ? 'on' : n < i ? 'seen' : ''}"></i>`).join('')}` +
+          `<span class="intro-count">${i + 1} / ${TUTORIAL.intro.length}</span></div>` +
+        `<h3>${pg.title}</h3><p>${pg.body}</p>` +
+        `<div class="intro-nav">` +
+          (i > 0 ? `<button onclick="introNext(-1)">← back</button>` : `<span></span>`) +
+          `<button class="primary" onclick="introNext(1)">${last ? 'Begin ▸' : 'Next ▸'}</button>` +
+        `</div>` +
+      `</div>`;
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
     c.innerHTML =
@@ -2987,7 +3065,7 @@ function beginFinalBattle() {
     hp: S.dragon.hp, maxHp: S.dragon.hp,
     boon: { armourCut: 0, unseen: 0, calm: 0 },
   };
-  S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
+  S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
   S.hand = []; S.discard = [];
   draw(HAND_SIZE);
   S.hardship = null;
@@ -3097,7 +3175,7 @@ function startDuel() {
   // steel yourself at the lair's mouth: gather every card you still hold (spent-set and all)
   // into a fresh deck — this is your finite duel stamina. Only cards TRASHED on the approach
   // (Lv1 soak losses) are gone; a clean approach preserves your full hand AND cracked a shield.
-  S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]);
+  S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.hand = []; S.discard = [];
   // 🔑 THE DUEL IS A RACE AND THE PLAYER COULDN'T SEE IT (2026-07-29). You lose when your CARDS
   // RUN OUT, not when a health bar empties — the single most important fact about the fight, and
