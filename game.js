@@ -1386,7 +1386,7 @@ function finishResolve() {
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
   if (r.loseReserve) S.loseReserve = r.loseReserve;
   if (r.poison > 0) S.poison = r.poison;
-  S.damageEl = r.type === 'fight' ? e.atkEl : null; // its damage carries its attack element (source data)
+  S.damageEl = null;   // dead since soak doubling was cut 2026-07-26; kept in the schema for old saves
   if (r.timePenalty > 0) {
     if (r.type === 'fight') log(`Hazards: ${r.timePenalty} Time Penalt${r.timePenalty === 1 ? 'y' : 'ies'} (early/combat damage suffered)`, 'bad');
     const fromDeck = Math.min(r.timePenalty, S.deck.length);
@@ -2303,9 +2303,14 @@ function renderControls() {
   } else if (S.phase === 'soak') {
     c.innerHTML =
       `<div class="phase-label">PHASE 3 — PENALTY</div>` +
+      // ⚠️ THE THIRD PHANTOM ELEMENT (removed 2026-07-29). `damageEl` stopped mattering when soak
+      // doubling was cut on 2026-07-26 — armour soaks its printed value, full stop — so naming the
+      // damage's colour advertised a rule that isn't there, exactly like the creature's `atkEl`
+      // and the journey's `element`. Vocabulary fixed too: "Trashed" was retired for the plain
+      // statement of what actually happens.
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
-      (S.damageEl ? ` (${elChip(S.damageEl)} damage)` : '') +
-      `. Click a card to Downgrade it (soaks its Armor value). Level 1 cards are Trashed.</div>`;
+      `. Tap a card to blunt it — it soaks its 🛡️ armour value. ` +
+      `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
   } else if (S.phase === 'wheel') {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
@@ -2836,7 +2841,7 @@ function finishDuel() {
   if (dr.damage <= 0) { log(`No counterstrike lands — press the assault.`); duelCleanupAndNext(); return; }
   log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — soak it with your remaining cards.`, 'bad');
   S.damage = dr.damage;
-  S.damageEl = S.dragon.element; // its breath carries its element — matching armor soaks double
+  S.damageEl = null;   // dead — see above; a dragon's breath has no colour the maths reads
   S.downgraded = new Set();
   S.afterSoak = 'duelNext';
   startSoak(); // soakable → player downgrades; else knockout (downgrade all + burn deck) then continue
