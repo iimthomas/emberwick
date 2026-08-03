@@ -359,6 +359,51 @@ const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative', armor: '�
 function wakeReady() { return S.wake > 0 && isAssignPhase(); }
 function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
 
+// ============================================================
+// 🕯️ THE CANDLE (2026-07-29, Thomas). While it is lit you can see the NEXT encounter.
+//
+// 🔑 WHY FORESIGHT, AND WHY IT MUST BE LOSABLE. Thomas: "theres still a feeling of just finding
+// the one best play instead of weighing between 2 or a few plays." The diagnosis: every fork in
+// the mage's turn cashes out to the SAME scoreboard - this encounter's outcome - so one option is
+// always better and skill is search rather than judgement. The game has a second currency, the
+// DECK, and exactly one place they collide: the Spell is SPENT. But nobody can price that trade
+// blind, so the rational default is always "win now" (measured: the Spell is your biggest card
+// 82-94% of the time). Showing the next encounter makes the price payable:
+//     "Complete this with my Hammer - or take the Narrow and still hold it for the Boar."
+// Those are not rankable. One buys an outcome, the other buys a future.
+//
+// 🔑 AND A REVEAL YOU CAN LOSE IS A RESOURCE; ONE YOU ALWAYS HAVE IS A UI FEATURE. Making it
+// losable gives you something to protect, turns foresight into a DIAL (the ranger's candle will
+// not go out, or sees two ahead - so foreknowledge stays their identity), and hands later stages a
+// difficulty lever that is not a bigger number. It also earns the title back: the candle was
+// retired from the UI vocabulary in 2026-07-26 and had survived only in the art.
+//
+// ⚠️ ONLY A COMPLETE KEEPS IT. Outcomes run Complete 62% / Narrow 35% / Loss 3%, so snuffing on
+// a Loss alone would put it out 3% of the time - decoration with a nice name. Snuffing on anything
+// short of a clean win puts it out about a third of the time, which is a real presence and never a
+// spiral, because a single Complete brings it back. It also finally gives NARROW its own identity:
+// until now Complete and Narrow differed only by "you take damage". Now the choice between them is
+//     "a safe Narrow and eat 2 - or push for the Complete and keep seeing the road"
+// which is two currencies that do not convert, on the most common turn in the game.
+// 🌙 Nightfall snuffs it too: being caught after dark already takes your Arsenal, and now it
+// costs you your footing - the first time your Catalyst's Pace has a consequence outliving its turn.
+// ============================================================
+function lightCandle(why) {
+  if (S.candle) return;
+  S.candle = true;
+  log(`🕯️ Your candle catches again${why ? ' — ' + why : ''}. You can see the road ahead.`, 'good');
+}
+function snuffCandle(why) {
+  if (!S.candle) return;
+  S.candle = false;
+  log(`🕯️ Your candle gutters out — ${why}. You cannot see what is coming.`, 'bad');
+}
+// what waits after this one, if you can see it
+function nextEncounter() {
+  if (!S.candle || S.finalMode) return null;
+  return S.encounterQueue && S.encounterQueue.length ? S.encounterQueue[0] : null;
+}
+
 function attunedNow() {
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
   const sp = spellCard(), el = cardById(S.assign.Element);
@@ -945,7 +990,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
-      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial,
+      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -975,6 +1020,7 @@ function loadGame() {
     uid = d.uid;
     S = {
       tutorial: !!d.tutorial, taught: d.taught || [], lessonsOff: !!d.lessonsOff,
+      candle: d.candle !== false,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -1109,6 +1155,8 @@ function freshGame(stage) {
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
+    // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
+    candle: true,
     stats: { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
@@ -1597,6 +1645,7 @@ function computeAction(reserve) {
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
+  // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { type: 'journey', spell, hits, attBonus, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
@@ -1784,6 +1833,12 @@ function finishResolve() {
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
   if (r.banks) S.wakePending = r.bank;
+  // 🕯️ a clean win keeps your footing; anything less costs it — and the dark takes it regardless
+  if (!S.finalMode) {
+    if (r.nightCaught) snuffCandle('the dark caught you on the road');
+    else if (r.outcome === 'Complete') lightCandle('you come through cleanly');
+    else snuffCandle(r.outcome === 'Narrow' ? 'you scraped through' : 'the encounter went badly');
+  }
   // 📊 CRAFT: could this hand have attuned at all, and did you find it? Availability is a
   // property of the HAND (any same-element pair), so the stat measures your play, not your luck.
   if (S.stats) {
@@ -2610,6 +2665,18 @@ function renderStatus() {
     carriedText();
 }
 
+// 🕯️ what you can see of the road ahead — and, when the candle is out, that you cannot.
+function candleLine() {
+  if (S.finalMode) return '';
+  const n = nextEncounter();
+  if (!S.candle) return `<div class="candle out">🕯️ <b>Your candle is out.</b> You cannot see what waits beyond this. <span class="dim">Complete an encounter to relight it.</span></div>`;
+  if (!n) return `<div class="candle lit">🕯️ <b>Lit.</b> <span class="dim">Nothing more on this road — the region ends after this.</span></div>`;
+  const what = n.type === 'fight'
+    ? `⚔️ <b>${n.name}</b> · ❤️ ${n.hp} · 💨 ${n.init} · ${n.shape === 'armour' ? `🛡️ Armour ${n.shapeV}` : n.shape === 'evasion' ? '🌀 Evasion' : 'unguarded'}`
+    : `👣 <b>${n.name}</b> · MP ${n.mp} · 🌙 ${n.nightfall}`;
+  return `<div class="candle lit">🕯️ <span class="dim">by candlelight you can make out</span> ${what}</div>`;
+}
+
 function renderEncounter() {
   const e = S.encounter;
   const panel = $('encounter-panel');
@@ -2654,7 +2721,7 @@ function renderEncounter() {
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
 
-      `<span>🪙 <b>${e.xp}</b></span></div>` + modLines;
+      `<span>🪙 <b>${e.xp}</b></span></div>` + modLines + candleLine();
   } else {
     panel.innerHTML =
       `<div class="enc-type">JOURNEY — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
@@ -2662,7 +2729,7 @@ function renderEncounter() {
       `<span>🌙 Nightfall <b>${e.nightfall}</b></span>` +
       `<span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
       `<span>🪙 <b>${e.xp}</b></span></div>` +
-      `<div class="enc-hint">💡 ✦ A Catalyst matching your Spell's element ATTUNES it — but your Catalyst is also your Pace against the dark. Go far, or get home?</div>` +
+      candleLine() +
       modLines;
   }
 }
