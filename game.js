@@ -120,10 +120,6 @@ function fastestId() {
 }
 // why this card may not go here, or null if it may
 function placementBan(id, zone) {
-  // 🐉 a sealed slot is a placement ban like any other, so the slot row, auto-seating and the
-  // swap-eviction all handle it for free
-  const fx = duelFx();
-  if (fx.seal && zone === fx.seal) return `🐉 ${S.dragonState.active.name} — your ${SLOT_LABEL[zone]} is sealed this beat`;
   if (S.hardship === 'Dead Weight' && zone === 'Spell' && id === heaviestId()) return '⚖️ Dead Weight — your heaviest card cannot be your Spell';
   if (S.hardship === 'Mire' && zone === 'Element' && id === fastestId()) return '🐌 Mire — your fastest card cannot be your Catalyst';
   return null;
@@ -758,24 +754,24 @@ function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
 // turns* and the one place the game is long enough to support planning.
 //
 // 🔑 AND EACH IS A VARIATION ON THAT DRAGON'S ONE DEMAND, never a grab-bag: the fight teaches
-// its shape three ways instead of one. Effects are stated in ENGINE terms (seal a slot, dull a
+// its shape three ways instead of one. Effects are stated in ENGINE terms (burn a card, dull a
 // number, harden the shape) so a rogue meets exactly the same dragon.
 // ============================================================
 const DRAGON_ATTACKS = {
   Cindermaw: [
     { id: 'slag',   name: 'Slagfall',       tell: 'molten rock sheets off its plates', fx: {} },
     { id: 'forge',  name: 'Bank the Forge', tell: 'it hunkers down and the scales knit — 🛡️ Armour +2', fx: { armour: 2 } },
-    { id: 'blast',  name: 'Cinderblast',    tell: 'ash chokes the air — your ➕ SURGE will give nothing', fx: { seal: 'Boost' } },
+    { id: 'blast',  name: 'Cinderblast',    tell: 'ash chokes the air — the card you SURGE with will burn up', fx: { burn: 'Boost' } },
   ],
   Skyrender: [
     { id: 'shear',  name: 'Windshear',      tell: 'it wheels for another pass', fx: {} },
     { id: 'stoop',  name: 'Stoop',          tell: 'it climbs to dive — 💨 its Initiative +4', fx: { init: 4 } },
-    { id: 'clap',   name: 'Thunderclap',    tell: 'the air splits — your 💨 CATALYST will be sealed', fx: { seal: 'Element' } },
+    { id: 'clap',   name: 'Thunderclap',    tell: 'the air splits — the card you CATALYSE with will be struck from your hand', fx: { burn: 'Element' } },
   ],
   Cragmourn: [
     { id: 'grind',  name: 'Grind',          tell: 'it leans into you without hurrying', fx: {} },
     { id: 'settle', name: 'Settle',         tell: 'it draws a longer breath — ⏳ the escalation takes an extra step', fx: { breathStep: 1 } },
-    { id: 'bind',   name: 'Rockbind',       tell: 'stone closes on your pack — your ✦ ARSENAL will be sealed', fx: { seal: 'Reserve' } },
+    { id: 'bind',   name: 'Rockbind',       tell: 'stone closes on your pack — whatever you hold in ARSENAL will be taken', fx: { burn: 'Reserve' } },
   ],
   Fathomdread: [
     { id: 'under',  name: 'Undertow',       tell: 'the current gathers under you', fx: {} },
@@ -3450,6 +3446,23 @@ function resolveDuel() {
   const early = kill ? 0 : r.early; // r.early = the bite when you lose Initiative, else 0
   const damage = early + counter;
   if (ds.boon.unseen > 0) ds.boon.unseen--;   // the surprise lasts a fixed number of beats
+  // 🐉 A DENIAL SHOULD COST A CARD, NOT A TURN (2026-07-29, Thomas: "blocking slots might be too
+  // much... you can't really do anything about it"). He is right, and the reason is the telegraph:
+  // you can SEE a seal coming and there is nothing to do about it, so it removes a turn rather
+  // than posing a problem. Burning the card you USED keeps the whole turn intact, costs you in the
+  // currency the game actually runs on (the deck), and — because it is announced a beat early —
+  // makes the telegraph ACTIONABLE: you arrange this beat around the card you are about to lose.
+  const burn = duelFx().burn;
+  if (burn && S.assign[burn]) {
+    const gone = cardById(S.assign[burn]);
+    if (gone) {
+      S.hand = S.hand.filter(c => c.id !== gone.id);
+      S.discard.push(gone);
+      if (S.reserveId === gone.id) S.reserveId = null;
+      S.actionSetIds = S.actionSetIds.filter(id => id !== gone.id);
+      log(`🐉 ${ds.active.name} takes ${displayName(gone)} — it is gone for the rest of the duel.`, 'bad');
+    }
+  }
   S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
