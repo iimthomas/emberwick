@@ -120,6 +120,10 @@ function fastestId() {
 }
 // why this card may not go here, or null if it may
 function placementBan(id, zone) {
+  // 🐉 a sealed slot is a placement ban like any other, so the slot row, auto-seating and the
+  // swap-eviction all handle it for free
+  const fx = duelFx();
+  if (fx.seal && zone === fx.seal) return `🐉 ${S.dragonState.active.name} — your ${SLOT_LABEL[zone]} is sealed this beat`;
   if (S.hardship === 'Dead Weight' && zone === 'Spell' && id === heaviestId()) return '⚖️ Dead Weight — your heaviest card cannot be your Spell';
   if (S.hardship === 'Mire' && zone === 'Element' && id === fastestId()) return '🐌 Mire — your fastest card cannot be your Catalyst';
   return null;
@@ -406,6 +410,7 @@ function nextEncounter() {
 
 function attunedNow() {
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
+  if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
   const sp = spellCard(), el = cardById(S.assign.Element);
   return !!(sp && el && (el.def.wild || elOf(el) === elOf(sp)));
 }
@@ -443,8 +448,9 @@ const MAGE = {
     }
     const w = S.wake || 0, wt = S.wakeTarget;
     return {
-      value: (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0)
-        + (attuned && vElem && vElem.name === 'Firstflame' ? 3 : 0),
+      value: Math.max(0, (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0)
+        + (attuned && vElem && vElem.name === 'Firstflame' ? 3 : 0)
+        + (duelFx().value || 0)),                       // 🐉 Deep Pressure
       element: spell.def.element,
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
@@ -738,6 +744,48 @@ function learned(id) { S.taught = [...(S.taught || []), id]; render(); }
 
 // 🔑 ONE ACCESSOR, so the tutorial is a dataset rather than a branch
 function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
+
+// ============================================================
+// 🐉 DRAGON ATTACKS (2026-07-29, Thomas). The duel is the ONLY multi-beat fight in the game —
+// everything else is one hand, one problem — so it is the only place where "what happens next"
+// can exist at all. Until now the dragon did the same thing every beat, which made extra beats
+// the GRINDING that got beats capped in the first place. Varied attacks are what make a multi-beat
+// fight worth being multi-beat.
+//
+// 🔑 EVERY ATTACK IS TELEGRAPHED A BEAT AHEAD. An attack that arrives unannounced is a dice
+// roll; an attack you can SEE coming is a problem. Same principle as the candle and the turn-1
+// briefing — you arrange this beat knowing what the next one brings, which is *hard-reactive
+// turns* and the one place the game is long enough to support planning.
+//
+// 🔑 AND EACH IS A VARIATION ON THAT DRAGON'S ONE DEMAND, never a grab-bag: the fight teaches
+// its shape three ways instead of one. Effects are stated in ENGINE terms (seal a slot, dull a
+// number, harden the shape) so a rogue meets exactly the same dragon.
+// ============================================================
+const DRAGON_ATTACKS = {
+  Cindermaw: [
+    { id: 'slag',   name: 'Slagfall',       tell: 'molten rock sheets off its plates', fx: {} },
+    { id: 'forge',  name: 'Bank the Forge', tell: 'it hunkers down and the scales knit — 🛡️ Armour +2', fx: { armour: 2 } },
+    { id: 'blast',  name: 'Cinderblast',    tell: 'ash chokes the air — your ➕ SURGE will give nothing', fx: { seal: 'Boost' } },
+  ],
+  Skyrender: [
+    { id: 'shear',  name: 'Windshear',      tell: 'it wheels for another pass', fx: {} },
+    { id: 'stoop',  name: 'Stoop',          tell: 'it climbs to dive — 💨 its Initiative +4', fx: { init: 4 } },
+    { id: 'clap',   name: 'Thunderclap',    tell: 'the air splits — your 💨 CATALYST will be sealed', fx: { seal: 'Element' } },
+  ],
+  Cragmourn: [
+    { id: 'grind',  name: 'Grind',          tell: 'it leans into you without hurrying', fx: {} },
+    { id: 'settle', name: 'Settle',         tell: 'it draws a longer breath — ⏳ the escalation takes an extra step', fx: { breathStep: 1 } },
+    { id: 'bind',   name: 'Rockbind',       tell: 'stone closes on your pack — your ✦ ARSENAL will be sealed', fx: { seal: 'Reserve' } },
+  ],
+  Fathomdread: [
+    { id: 'under',  name: 'Undertow',       tell: 'the current gathers under you', fx: {} },
+    { id: 'silt',   name: 'Silt',           tell: 'the water goes thick and dull — ✦ nothing will attune', fx: { noAttune: true } },
+    { id: 'press',  name: 'Deep Pressure',  tell: 'the weight of the trench settles — ⚔️ every card strikes −2', fx: { value: -2 } },
+  ],
+};
+function attacksFor(d) { return DRAGON_ATTACKS[d.name] || [{ id: 'plain', name: 'Breath', tell: 'it draws breath', fx: {} }]; }
+// what is in force THIS beat
+function duelFx() { return (S.dragonState && S.dragonState.active && S.dragonState.active.fx) || {}; }
 
 const hasShape = sh => !!(S.dragon && S.dragon.shapes.includes(sh));
 // the shape, in one phrase — this is the question the whole run is preparing you for
@@ -2688,7 +2736,7 @@ function renderEncounter() {
       `<span class="dragon-hp-label">🐉 ${S.dragon.name} — ${ds ? ds.hp : S.dragon.hp} / ${ds ? ds.maxHp : S.dragon.hp} HP</span></div>` +
       `<div class="dragon-shields">${ds ? shapeStateText() : dragonShapeText(S.dragon)}` +
       ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>` +
-      (S.finalPhase === 'duel' ? staminaBar() : '');
+      (S.finalPhase === 'duel' ? staminaBar() + telegraph() : '');
     if (S.finalPhase === 'duel') {
       panel.className = 'fight';
       panel.innerHTML =
@@ -3200,6 +3248,7 @@ function beginFinalBattle() {
   S.dragonState = {
     hp: S.dragon.hp, maxHp: S.dragon.hp,
     boon: { armourCut: 0, unseen: 0, calm: 0 },
+    active: null, next: null,   // 🐉 what it is doing now, and what it has telegraphed
   };
   S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
   S.hand = []; S.discard = [];
@@ -3272,7 +3321,7 @@ function duelArmour() {
 }
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
-  const armour = duelArmour();
+  const armour = duelArmour() + (duelFx().armour || 0);   // 🐉 Bank the Forge
   // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
   const evaded = hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
   let toHp = Math.max(0, r.value - armour);
@@ -3286,7 +3335,7 @@ function duelCounter(hpAfter) {
   const ds = S.dragonState;
   if (hasShape('relentless')) {
     const b = Math.max(0, S.duelBeat - 1 - (ds.boon.calm || 0));
-    return S.dragon.breath + b * RELENTLESS_STEP;
+    return S.dragon.breath + (b + (duelFx().breathStep || 0)) * RELENTLESS_STEP;   // 🐉 Settle
   }
   return Math.ceil(S.dragon.breath * hpAfter / ds.maxHp);
 }
@@ -3301,6 +3350,17 @@ function shapeStateText() {
 
 // 🃏 YOUR HALF OF THE RACE. The dragon's bar is its HP; this is yours — the cards you have left.
 // No reshuffle in a duel, so every card you soak with is stamina you never get back.
+// 🐉 WHAT IT IS DOING NOW, AND WHAT IT WILL DO NEXT. The telegraph is the whole point — an attack
+// you can see coming is a problem, one that arrives unannounced is a dice roll.
+function telegraph() {
+  const ds = S.dragonState; if (!ds) return '';
+  const now = ds.active, next = ds.next;
+  const plain = attacksFor(S.dragon)[0];
+  return (now && now.id !== plain.id
+      ? `<div class="tg now">🐉 <b>NOW — ${now.name}:</b> ${now.tell}</div>` : '') +
+    (next ? `<div class="tg next">👁️ <b>NEXT BEAT — ${next.name}:</b> ${next.tell}</div>` : '');
+}
+
 function staminaBar() {
   const left = S.deck.length + S.hand.length;
   const pct = S.duelStamina0 ? Math.max(0, Math.round(100 * left / S.duelStamina0)) : 100;
@@ -3335,6 +3395,13 @@ function startDuelBeat() {
     return;
   }
   S.duelBeat++;
+  // 🐉 last beat's telegraph becomes this beat's reality, then it tells you the next one.
+  // Beat 1 is deliberately plain — you have not been given a chance to react to anything yet.
+  const atks = attacksFor(S.dragon);
+  S.dragonState.active = S.dragonState.next || atks[0];
+  S.dragonState.next = atks[Math.floor(rnd() * atks.length)];
+  if (S.dragonState.active && S.dragonState.active.id !== atks[0].id)
+    log(`🐉 ${S.dragon.name} — <b>${S.dragonState.active.name}</b>: ${S.dragonState.active.tell}.`, 'bad');
   // synthetic persistent enemy: armor [] so computeAction returns the RAW strike; shields are applied here.
   // atk = the Early bite (ceil breath/2) so losing Initiative stings without doubling the breath;
   // the counterstrike (full breath, HP-scaled) is the main threat. hp huge so computeAction never "wins" — we judge HP.
