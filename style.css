@@ -578,6 +578,15 @@ button.stage.locked .stage-shape { font-style: italic; }
 .carry-name { margin-right: 5px; }
 .event-carry { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font-size: .95em; }
 
+/* 📏 the standing — your deck's total levels against what this dragon usually asks for.
+   Deliberately a chip of TERMS, not a bar: a bar would imply a precision the measurement
+   does not have. Sits apart from the carry-chips because it is not a modifier. */
+.standing { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 9px;
+  font-size: .82em; background: rgba(200,180,110,.10); border: 1px solid rgba(201,180,88,.40);
+  color: #d8cfa8; white-space: nowrap; }
+.standing .good { color: #8fcf9a; }
+.standing .bad { color: #e79a8a; }
+
 @media (max-width: 900px) { .carry-name { display: none; } .carry-chip { font-size: .76em; padding: 0 6px; } }
 
 

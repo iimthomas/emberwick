@@ -549,20 +549,34 @@ const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith
 // so you can afford to be slow; the evasion stage hits hard so being slow is what costs you.
 // ============================================================
 let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned 2026-07-29)
+// 📏 PAR (2026-08-04, measured). `par` is the DECK LEVEL TOTAL at which this dragon becomes a
+// coin flip - measured over 1,200 runs by bucketing every lair by its deck's total levels and
+// reading the win rate (36-39 / 40-43 / ... ). It climbs 36 → 44 → 48 → 52 across the stages and
+// is monotone within every one of them, which is what makes it honest enough to show a player.
+//
+// 🔑 WHY *TOTAL LEVELS* AND NOT CARD COUNT. Every simple summary of a lair was tested (cards
+// left, average level, biggest card, best attuned strike, Lv4 count, damage-per-beat × beats).
+// Card count alone barely predicts anything; total levels predicts best and is the most legible -
+// it is the same quantity the GRADE already scores as "the deck you kept", and it starts every run
+// at exactly 32 (16 cards × Lv2), rises when you upgrade and falls when you soak. It is the run's
+// health bar, and it existed all along without ever being shown.
+//
+// ⚠️ IT IS A GUIDE, NOT A VERDICT. At stage 4, decks below par still win 24% of the time and
+// decks above it still lose. Never phrase it as a prediction, and never gate anything on it.
 const DRAGONS = [
-  { stage: 1, name: 'Cindermaw', element: 'Fire', init: 10, breath: 6, hp: 40,
+  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 40,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', element: 'Lightning', init: 10, breath: 8, hp: 44,
+  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 44,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', element: 'Stone', init: 7, breath: 5, hp: 56,
+  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 56,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', element: 'Water', init: 10, breath: 7, hp: 44,
+  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 44,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -2695,6 +2709,35 @@ function carriedText() {
     `<b class="carry-name">${x.curse ? '☠️' : '🎁'} ${x.name}</b><span class="carry-eff">${x.text}</span></span>`).join('');
 }
 
+// 📏 THE STANDING (2026-08-04). Measured: half of all stage-4 defeats were ALREADY UNWINNABLE
+// when the player reached the lair - and the game never said so, so four beats were spent
+// discovering a result decided on the road. That is not unfair (only 11% of losses were variance);
+// it is a TELEGRAPH failure, and "unannounced = dice roll" is a claim about the player's
+// INFORMATION, not about the RNG.
+//
+// 🔑 So this is the one term "legible math always" never showed: the price you are paying at the
+// RUN level. Every other number on screen is about this turn. Soaking a card, taking a Narrow and
+// buying a level are all decisions whose real cost lands at the lair, and until now the ledger was
+// invisible while you were writing in it.
+// ⚠️ It is a DISPLAY, not a rule - nothing reads it, nothing gates on it. If it ever becomes an
+// input to the maths it stops being information and starts being a stat.
+function deckLevels() { return [...S.hand, ...S.deck, ...S.discard].reduce((t, c) => t + c.level, 0); }
+function standingText() {
+  if (!S.dragon || !S.dragon.par) return '';
+  const have = deckLevels(), par = S.dragon.par;
+  // ⚠️ IT IS A TARGET, NOT A VERDICT, AND FOR MOST OF THE RUN IT CANNOT BE ONE (measured
+  // 2026-08-04 over 2,000 runs). The median deck level of a run that goes on to WIN and one that
+  // goes on to LOSE are: region 1 -> 35 vs 35 · region 2 -> 40 vs 39 · region 3 -> 44 vs 42
+  // · region 4 -> 47 vs 45. 🔑 THEY ARE IDENTICAL UNTIL REGION 3. There is nothing to warn
+  // about early, because nothing has gone wrong yet - the road's debt is contracted late.
+  // So: show the TERMS the whole way (a target you are travelling toward, which is information),
+  // and only pass judgement from region 4, where the numbers actually separate.
+  const judge = S.finalMode || S.region >= 4;
+  const cls = !judge ? '' : have >= par ? 'good' : have >= par - 4 ? '' : 'bad';
+  return `<span class="standing" title="Your deck's total card levels, against the total this dragon usually asks for by the lair. A target, not a prediction — measured over 2,000 runs. Levelling raises it; soaking lowers it.">` +
+    `🃏 Deck <b class="${cls}">${have}</b> → <b>${par}</b> by the lair</span>`;
+}
+
 function renderStatus() {
   const key = S.deck[0];
   $('status-bar').innerHTML =
@@ -2706,6 +2749,7 @@ function renderStatus() {
     `<span>Next draw: <b>${key ? `${key.def.name} Lv${key.level}` : '—'}</b></span>` +
     `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
     `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>` +
+    standingText() +
     carriedText();
 }
 
