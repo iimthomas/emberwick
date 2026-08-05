@@ -600,16 +600,8 @@ button.stage.locked .stage-shape { font-style: italic; }
 .wake-btn.on { background: rgba(232,145,60,.32); border-color: #e8913c; color: #ffe6b0; }
 
 
-/* ✦ the Prism — an offer above the slot row, answered by tapping the card you'll give up */
-.prism-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px;
-  padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(155,127,196,.5);
-  background: linear-gradient(100deg, rgba(155,127,196,.16), rgba(127,176,196,.10)); }
-.prism-lab { font-size: 13px; color: #cbb6ee; }
-.prism-row button { padding: 3px 10px; font-size: 12.5px; border-radius: 999px; }
-.prism-row.prism-open { flex-direction: column; align-items: stretch; }
-.prism-card { max-width: 220px; margin: 2px 0 6px; }
-.prism-card .card { width: 100%; min-width: 0; }
-.prism-go { background: rgba(155,127,196,.3); border-color: #9b7fc4; color: #efe4ff; }
+/* ❌ the Prism's styles were deleted with the rule, 2026-08-05 — a cut rule loses its display in
+   the same change, or a later session finds selectors for a mechanic that no longer exists. */
 
 
 /* the loss condition must survive the immersive layout, which hides .enc-hint */

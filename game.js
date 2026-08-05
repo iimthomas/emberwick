@@ -288,66 +288,29 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // 6+, so when you lack a SPARK you are short by 5-9, not 1-3. The gap is a chasm and a token cannot
 // bridge a chasm. The fix is a floor under init, and it is deliberately a separate change.
 // ============================================================
-// ✦ THE PRISM (Thomas's design, 2026-07-29)
+// ❌ THE PRISM IS CUT (2026-08-05, Thomas). DO NOT REINTRODUCE IT AS A FREE DRAW.
 //
-// THE HOLE IT FILLS: 15% of hands hold all four elements and therefore NO PAIR - so they can
-// neither attune nor bank, and the turn collapses back to the solved game. Measured: on a rainbow
-// hand the naive biggest/fastest/fattest play is already optimal 90% of the time (vs 67% on a
-// paired hand), and the average outcome is 1.08 against 1.36. Punished twice - weaker AND boring.
+// It let an all-four-elements hand (no pair, so nothing can attune) draw one and discard one.
+// Thomas: "it feels a bit weird like, you got an unlucky hand that can't fuse, lets help you out
+// a little bit. in tcgs, if you get a bad hand, then you get a bad hand."
 //
-// 🔑 THE PROPERTY THAT MAKES IT WORK: a rainbow hand holds all four elements, so ANY card you
-// draw is GUARANTEED to pair with something you already hold. The cure cannot fail, and it cannot
-// fail *because* the hand is rainbow. So the Prism cures rather than compensates.
+// 🔑 AND THE MEASUREMENT WAS WORSE THAN THE INSTINCT. Over ~4,000 turns, a rainbow hand
+// happens on 14% of turns, and with the Prism those turns ended 68C/30N/3L against 60C/36N/4L for
+// an ordinary hand. A BAD HAND WAS BETTER THAN A GOOD ONE - you got card SELECTION and then ended
+// up with a pair anyway, while a normal hand got the pair and no selection. It did not soften
+// variance, it overpaid for it by ~22 points of Complete rate.
 //
-// THE RULE: draw one, discard one. The hand never leaves four cards - the slot row is four fixed
-// positions and a fifth card would have nowhere to stand (that is exactly the bug that made the
-// Kiln of Trials unplayable this morning), so the drawn card is held OUTSIDE the hand until you
-// place it or refuse it.
+// With it gone, a rainbow hand lands at 46C/44N/9L - clearly worse, but not a dead turn (you still
+// Complete or Narrow 90% of the time). That is a HARD PROBLEM, which is what the compass asks for.
+// ⚠️ And the run-level difficulty did not move at all: 61% Complete with it and without it.
+// The Prism was never holding the game up; it was moving 14% of turns to best-in-the-game.
 //
-// WHY THE DISCARD AND NOT THE DECK BOTTOM: a free cure is a button you press every rainbow hand,
-// which fixes availability and adds no tension. A discard makes it a real question - is fixing
-// this hand worth losing a card for the rest of the region? Sometimes plainly not. It also speaks
-// a currency the player already reads every turn, because the Spell says "SPENT, gone for the
-// region" in the same words. And it cannot be a punishment for drawing badly, because it is
-// OPTIONAL: decline and you are exactly where you were.
-//
-// ⚠️ NO DECK, NO PRISM. Near the end of a region "gone for the region" is really "gone for the
-// run", and deck size is also what ends the region - so with an empty deck the trade stops being
-// a choice and becomes a trap. It simply does not appear.
+// ⚠️ IF A RAINBOW HAND EVER FEELS TOO PUNISHING, THE ANSWER IS NOT THIS RULE AGAIN - it is the
+// COSTED version parked in 08_Ideas/Prism_Costed.md: draw one, discard one, and the discarded card
+// is gone for the RUN rather than the region. Same out, but a price instead of a gift. (Losses on
+// rainbow turns do triple, 4% -> 9%, and unlike a TCG you cannot play a bad hand out over several
+// turns - one hand IS one creature - so that is the argument to watch for.)
 // ============================================================
-function prismReady() {
-  if (S.prismUsed || S.prism || !isAssignPhase() || S.hand.length < 4) return false;
-  if (!S.deck.length) return false;                       // no draw, no Prism
-  return new Set(S.hand.map(c => elOf(c))).size >= 4;     // all four elements: no pair anywhere
-}
-function prismDraw() {
-  if (!prismReady()) return;
-  S.prism = S.deck.shift();
-  S.prismUsed = true;
-  log(`✦ The Prism — the circle is complete. You draw ${displayName(S.prism)}.`, 'good');
-  render();
-}
-// take the drawn card INTO a slot; the card it replaces is spent for the region
-function prismTake(id) {
-  if (!S.prism) return;
-  const out = cardById(id); if (!out) return;
-  if (elOf(out) === elOf(S.prism)) return;   // would leave you rainbow again — see cardHTML
-  const zone = zoneOf(id);
-  S.hand = S.hand.filter(c => c.id !== id);
-  S.discard.push(out);
-  S.hand.push(S.prism);
-  if (zone) S.assign[zone] = S.prism.id;
-  log(`${displayName(out)} is spent for the region; ${displayName(S.prism)} takes its place.`);
-  S.prism = null;
-  render();
-}
-function prismRefuse() {
-  if (!S.prism) return;
-  S.discard.push(S.prism);
-  log(`You let ${displayName(S.prism)} go — spent for the region.`);
-  S.prism = null;
-  render();
-}
 
 function banksNow() {
   const surge = cardById(S.assign.Boost), elem = cardById(S.assign.Element);
@@ -602,7 +565,7 @@ const TUTORIAL = {
   // single run (Thomas, 2026-07-29). A tutorial that varies cannot TEACH: you can only promise
   // "your first hand holds a pair, so here is what attuning does" if the first hand is known.
   // Deck order is authored so the lessons land where they are meant to: hand 1 has exactly one
-  // pair (attuning), and a rainbow hand arrives later (the Prism).
+  // pair (attuning), and a rainbow hand arrives later (the hand that cannot attune at all).
   fixed: true,
   deckOrder: ['Emberfall', 'Firstlight', 'Riverstep', 'Cairnguard',
               'Bellowsbreath', 'Tidebreak', 'Quickfire', 'Rockfall',
@@ -721,9 +684,10 @@ const TUTORIAL = {
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
       text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
-    { id: 'prism', when: () => prismReady(),
-      point: '.prism-row',
-      text: 'All four elements, so nothing can pair. <b>The Prism</b> lets you draw one and discard one — any card you draw is guaranteed to match something you hold.' },
+    // ✦ the rainbow hand is now taught as a PROBLEM, not as a thing the game fixes for you
+    { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
+      point: '#slots-panel',
+      text: 'All four elements, so <b>nothing can pair</b> — no Spell will attune this turn. Some hands simply cannot. Play the best plain line you have, and keep your best card for a hand that can.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
       text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
@@ -1047,7 +1011,7 @@ function saveGame() {
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, prismUsed: S.prismUsed,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
@@ -1097,7 +1061,7 @@ function loadGame() {
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
-      prism: null, prismUsed: d.prismUsed || false, duelStamina0: d.duelStamina0 || 0,
+      duelStamina0: d.duelStamina0 || 0,
       stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
@@ -1218,8 +1182,6 @@ function freshGame(stage) {
     stats: { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
-    prism: null,        // ✦ the drawn card, held OUTSIDE the hand until you place or refuse it
-    prismUsed: false,   // once per turn
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
@@ -1425,7 +1387,7 @@ function nextTurn() {
   // coins roll over between turns — deliberately NOT reset
   S.damage = 0;
   S.damageEl = null;
-  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
+  S.emberguardUsed = false;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2862,10 +2824,6 @@ function renderControls() {
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
     // the whole point is that you choose with the encounter in front of you.
-    // ✦ the Prism: an offer above the row, answered by tapping the card you're willing to lose
-    // 🔑 SHOW THE OBJECT. Naming the drawn card is not enough — its value, attuned value, init,
-    // boost, armour and ELEMENT are the entire basis of the decision, and the element decides
-    // which cards you're even allowed to replace. Same rule the Rewiring Pool taught us.
     // 🎓 driven by nextLesson() — reactive, never scripted
     const L = nextLesson();
     const lessonRow = L
@@ -2873,14 +2831,6 @@ function renderControls() {
         `<span class="lesson-btns"><button class="primary" onclick="learned('${L.id}')">got it</button>` +
         `<button onclick="S.lessonsOff=true;render()">hide tips</button></span></div>`
       : '';
-    const prismRow = S.prism
-      ? `<div class="prism-row prism-open"><span class="prism-lab">✦ You drew — tap a card in the row below to put it in that card's place (<b>that card is spent for the region</b>)</span>` +
-        `<div class="prism-card">${cardHTML(S.prism)}</div>` +
-        `<button onclick="prismRefuse()">Let it go instead</button></div>`
-      : (prismReady()
-        ? `<div class="prism-row"><span class="prism-lab">✦ <b>The Prism</b> — all four elements, so no pair. Draw one, discard one?</span>` +
-          `<button class="prism-go" onclick="prismDraw()">Draw a card</button></div>`
-        : '');
     const wakeRow = S.wake > 0
       ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
         Object.keys(WAKE_TARGETS).map(k =>
@@ -2898,7 +2848,6 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
-      prismRow +
       wakeRow +
       boostRow +
       resolveBtn +
@@ -3168,15 +3117,6 @@ function cardHTML(card) {
   if (S.diverting) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
 
-  } else if (S.prism && card.id === S.prism.id) {
-    action = `<div class="card-action muted">the card you drew</div>`;
-  } else if (S.prism) {
-    // ⚠️ THE GUARANTEE ONLY HOLDS IF YOU DON'T DISCARD THE COLOUR YOU JUST DREW. Replacing the
-    // Stone card with a Stone card leaves you rainbow again — you'd have paid a card for nothing.
-    // That's a pure gotcha rather than a decision, so the engine simply won't let you do it.
-    action = elOf(card) === elOf(S.prism)
-      ? `<div class="card-action muted">same ${elOf(card)} — replacing this leaves you with no pair</div>`
-      : `<div class="card-action"><button onclick="prismTake(${card.id})">Replace this one — it is spent</button></div>`;
   } else if (isAssignPhase() && S.selectedId === card.id) {
     action = roleButtons(card);
   }
@@ -3314,10 +3254,9 @@ function startApproachBeat() {
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
-  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too. The
-  // Prism and Emberguard are once-per-TURN, and without this they were once per BOSS BATTLE —
-  // enter the Approach having used a Prism and it never appeared again for the whole fight.
-  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
+  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
+  // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
+  S.emberguardUsed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 The Approach · beat ${beat} of 2 —`);
@@ -3454,10 +3393,9 @@ function startDuelBeat() {
   S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
-  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too. The
-  // Prism and Emberguard are once-per-TURN, and without this they were once per BOSS BATTLE —
-  // enter the Approach having used a Prism and it never appeared again for the whole fight.
-  S.prism = null; S.prismUsed = false; S.emberguardUsed = false;
+  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
+  // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
+  S.emberguardUsed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);

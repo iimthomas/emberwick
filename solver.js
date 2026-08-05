@@ -282,7 +282,9 @@ const RUNSIM = (() => {
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
   // pick + assign the best play for the current encounter (mutates S.assign/boostTarget only)
-  // the arrangement search, factored out so the Prism can ask "how good is this hand?"
+  // the arrangement search, factored out so anything can ask "how good is this hand?" — its only
+  // caller (the Prism's bot policy) went with the rule on 2026-08-05, but it stays exported
+  // because "score this hand" is the question every future card-selection experiment starts from
   function pickArrangement() {
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const scoreOf2 = scoreOf;   // RUNSIM's own scorer;
@@ -325,31 +327,8 @@ const RUNSIM = (() => {
       }
       S.wakeTarget = bestT;
     }
-    // ✦ THE PRISM. The bot draws BLIND exactly as a player does — it decides to draw before it
-    // sees the card, then picks the best legal replacement afterwards. Policy: take it whenever
-    // the hand can't already Complete, since a rainbow hand can neither attune nor bank.
-    // ⚠️ Like banking, the bot cannot price the region-level cost of the discarded card, so its
-    // Prism RATE means little. What the Prism does to a rainbow hand's OUTCOME is the real number.
-    if (typeof prismReady === 'function' && prismReady()) {
-      const scoreNow = () => { const r = computeAction(cardById(S.assign.Reserve)); return r ? (scoreOf(r)) : [-1,0,0]; };
-      pickArrangement();
-      const before = scoreNow();
-      if (before[0] < 2) {
-        prismDraw();
-        let best = null;
-        const drawn = S.prism;
-        for (const c of S.hand.slice()) {
-          if (elOf(c) === elOf(drawn)) continue;
-          const snapHand = S.hand.slice(), snapAssign = { ...S.assign }, snapDiscard = S.discard.slice();
-          prismTake(c.id);
-          pickArrangement();
-          const sc = scoreNow();
-          if (!best || better(sc, best.sc)) best = { sc, id: c.id };
-          S.hand = snapHand; S.assign = snapAssign; S.discard = snapDiscard; S.prism = drawn;
-        }
-        if (best && better(best.sc, before)) prismTake(best.id); else prismRefuse();
-      }
-    }
+    // ❌ the Prism's bot policy was deleted with the rule (2026-08-05) — a rainbow hand is now
+    // simply a hand that cannot attune, and the bot plays it the same way it plays any other.
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
     let best = null;
