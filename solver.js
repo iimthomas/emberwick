@@ -414,6 +414,12 @@ const RUNSIM = (() => {
   // crude "how much card is this" for the stack heuristic — its best single number
   const bigness = c => { const e = eff(c); return Math.max(e.attuned || 0, e.value || 0); };
 
+  // 📏 MEASUREMENT HOOKS. measure.js attaches here rather than forking autoRun — the 2026-07-06
+  // lesson (a forked copy of the duel maths drifts, and then the bot reports a game we are not
+  // shipping) applies just as hard to a forked copy of the RUN loop.
+  let HOOK = {};
+  function setHook(h) { HOOK = h || {}; }
+
   let rungCursor = 0;
   function autoRun(withEvents) {
     // dragons are a LADDER now, so a random draw would under-sample the hard rungs. Round-robin
@@ -425,9 +431,11 @@ const RUNSIM = (() => {
     let g = 0;
     while (g++ < 800) {
       const p = S.phase;
+      // 📏 the LAIR — the deck you actually fight the dragon with, after the road has taken its cut
+      if (HOOK.onLair && S.finalMode && S.finalPhase === 'duel' && !m._lair) { m._lair = true; HOOK.onLair(m); }
       if (p === 'assign') {
-        if (S.finalMode && S.finalPhase === 'duel') { chooseBestDuel(); resolveDuel(); }
-        else { chooseBest(); resolve(); }
+        if (S.finalMode && S.finalPhase === 'duel') { chooseBestDuel(); if (HOOK.onDuelAssign) HOOK.onDuelAssign(m); resolveDuel(); }
+        else { chooseBest(); if (HOOK.onAssign) HOOK.onAssign(m); resolve(); }
         m.turns++;
       }
       else if (p === 'reveal') advanceBeat();
@@ -436,9 +444,13 @@ const RUNSIM = (() => {
       // simplest defensible proxy, and it at least beats leaving the order to chance).
       else if (p === 'stack') {
         const st = S.stack;
-        const next = st.ids.filter(id => !st.order.includes(id))
-          .map(id => cardById(id)).filter(Boolean)
-          .sort((a, b) => bigness(b) - bigness(a))[0];
+        const pool = st.ids.filter(id => !st.order.includes(id)).map(id => cardById(id)).filter(Boolean);
+        // 📏 the stack POLICY is switchable so measure.js can A/B it. If ordering the returned
+        // cards never moves a run-level number, the Stack is decoration and should be told so.
+        const pol = HOOK.stackPolicy || 'big';
+        const next = pol === 'random' ? pool[Math.floor(Math.random() * pool.length)]
+          : pol === 'small' ? pool.slice().sort((a, b) => bigness(a) - bigness(b))[0]
+          : pool.slice().sort((a, b) => bigness(b) - bigness(a))[0];
         if (next) stackPick(next.id); else break;
       }
       else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
@@ -522,7 +534,7 @@ const RUNSIM = (() => {
     finally { window.render = _r; window.saveGame = _s; try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
-  return { run };
+  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better };
 })();
 
 function runSimulator() {
