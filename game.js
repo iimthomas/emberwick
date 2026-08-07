@@ -370,13 +370,68 @@ function nextEncounter() {
 function attunedNow() {
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
   if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
-  const sp = spellCard(), el = cardById(S.assign.Element);
-  return !!(sp && el && (el.def.wild || elOf(el) === elOf(sp)));
+  const sp = spellCard(); if (!sp) return false;
+  const el = cardById(S.assign.Element);
+  const matches = c => !!(c && (c.def.wild || elOf(c) === elOf(sp)));
+  // ✦ SECOND FLAME - the Surge becomes a second place a pair can happen, so the Catalyst is free
+  // to be chosen purely for speed. Closest thing in the game to playing a different class.
+  if (hasCharm('secondflame') && matches(cardById(S.assign.Boost))) return true;
+  // ✦ KINDLED ARSENAL — the carried card can be the match too
+  if (hasCharm('kindledarsenal') && matches(cardById(S.assign.Reserve))) return true;
+  // ✦ LOOSE WEAVE - any Catalyst attunes. The bonus is halved in compose(), so this is a real
+  // trade: you attune almost every turn and your ceiling drops.
+  if (hasCharm('looseweave') && el) return true;
+  return matches(el);
+}
+// ⚠️ WHICH CARD DID IT. Until Second Flame and Loose Weave existed, "attuned" always meant
+// "the Catalyst matched", and three log lines plus the slot hints simply said so. Adding a second
+// way to attune CRASHED the reveal (`elem.def` on a null Catalyst) and would have made the Catalyst
+// claim credit for the Surge's work. 🔑 The display has to read the same source as the rule -
+// so the rule now names its own cause and every line asks for it.
+function attunerCard() {
+  const sp = spellCard(); if (!sp) return null;
+  const matches = c => !!(c && (c.def.wild || elOf(c) === elOf(sp)));
+  const el = cardById(S.assign.Element), bo = cardById(S.assign.Boost);
+  if (matches(el)) return el;
+  if (hasCharm('secondflame') && matches(bo)) return bo;
+  if (hasCharm('kindledarsenal') && matches(cardById(S.assign.Reserve))) return cardById(S.assign.Reserve);
+  if (hasCharm('looseweave') && el) return el;   // attuned, but only loosely
+  return null;
+}
+// did this attune only because of Loose Weave? (i.e. nothing actually matched)
+function looseOnly() {
+  if (!hasCharm('looseweave')) return false;
+  const sp = spellCard(); if (!sp) return false;
+  const matches = c => !!(c && (c.def.wild || elOf(c) === elOf(sp)));
+  if (matches(cardById(S.assign.Element))) return false;
+  if (hasCharm('secondflame') && matches(cardById(S.assign.Boost))) return false;
+  if (hasCharm('kindledarsenal') && matches(cardById(S.assign.Reserve))) return false;
+  return true;
 }
 function spellCard() { return cardById(S.assign.Spell); }
 function removeFromZone(id) {
   if (S.assign.Spell === id) S.assign.Spell = null;
   for (const z of SLOTS) if (S.assign[z] === id) S.assign[z] = null;
+}
+
+// ✦ the attuned strike, with the mage's two rule-charms folded in. Kept OUT of compose() so the
+// arithmetic stays readable: base -> Loose Weave halving -> Three of a Kind doubling.
+function mageStrike(spell, attuned, elem, boostC) {
+  const st = eff(spell);
+  // ✦ COLD IRON — pays you for NOT pairing, which is the only charm that makes a rainbow hand
+  // (all four elements, no pair possible) something you wanted. Anti-synergy with every other mage
+  // charm by construction, which is exactly what makes choosing it a build rather than a pickup.
+  if (!attuned) return st.value + (hasCharm('coldiron') ? 3 : 0);
+  // ✦ LOOSE WEAVE: an unmatched pair attunes for only half the bonus
+  let v = looseOnly() ? st.value + Math.floor((st.attuned - st.value) / 2) : st.attuned;
+  // ✦ THREE OF A KIND: pair attunes, three RESONATES. Requires a genuine match by construction -
+  // if all three share an element then the Catalyst matches the Spell, so it can never stack with
+  // a Loose Weave freebie.
+  if (hasCharm('threekind') && elem && boostC) {
+    const e = elOf(spell);
+    if (elOf(elem) === e && elOf(boostC) === e) v *= 2;
+  }
+  return v;
 }
 
 const MAGE = {
@@ -407,7 +462,7 @@ const MAGE = {
     }
     const w = S.wake || 0, wt = S.wakeTarget;
     return {
-      value: Math.max(0, (attuned ? st.attuned : st.value) + (wt === 'atk' ? w : 0)
+      value: Math.max(0, mageStrike(spell, attuned, elem, boostC) + (wt === 'atk' ? w : 0)
         + (attuned && vElem && vElem.name === 'Firstflame' ? 3 : 0)
         + (duelFx().value || 0)),                       // 🐉 Deep Pressure
       element: spell.def.element,
@@ -420,6 +475,7 @@ const MAGE = {
       vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
       vElem: vElem && vElem.slot === 'Element' ? vElem.name : null,
       spell, elem, boostC,
+      attuner: attunerCard(), loose: looseOnly(),
     };
   },
 };
@@ -854,6 +910,64 @@ const CHARMS = [
   { id: 'longshadow',  name: 'Long Shadow',      rarity: 'curse', curse: true, cost: 0,
     text: '🌙 −2 Pace against Nightfall',            mods: { pace: -2 } },
 ];
+// 🔑 RULE-CHANGING CHARMS (2026-08-05). Every charm above modifies a NUMBER; these change a
+// RULE. That difference is the whole point - the market research (06_Development/Market_And_Retention.md)
+// found BUILD DISCOVERY to be the genre's single largest retention driver, and Balatro's engine is
+// literally "each Joker changes one rule". Ours changed integers.
+//
+// 🔑 AND IT GOES IN THE RUN LAYER ONLY. The 16 cards stay fixed and knowable - that is the
+// premise of the puzzle and half the design leans on it (the Stack, the standing, deck-as-health,
+// sharpening). A charm is the one place a rule may bend, so a run can differ in its TOOLS without
+// the deck differing at all.
+//
+// TWO BARS, and they are strict:
+//   1. Does it make a DIFFERENT ARRANGEMENT correct? If it only makes the same arrangement better,
+//      it is a stat wearing a costume - that is what the numeric charms above already are.
+//   2. Is there a hand where you would rather NOT have it? Balatro's jokers are lateral and can
+//      genuinely hurt you. That is what makes taking one a decision instead of a pickup.
+//
+// ⚠️ AND THE LEGIBILITY RULE THAT CUT FIVE CHARMS ON 2026-08-05: a charm may only name
+// something PRINTED ON THE CARD. Never an archetype (FORCE/SPARK/FLOW/WARD are printed nowhere),
+// never the retired elemental cycle. Element is fine - it is on the face.
+//
+// ⚠️ MOST RULE-CHANGERS ARE GENERIC, and that is not an accident: the ENGINE owns nearly every
+// rule (the four slots, the Arsenal, soaking, the Initiative race, cleanup, the Stack, the candle,
+// Divert, hardships) while the MAGE owns exactly one - pairing. A generic charm is also rewritten
+// free by every class we add; a mage charm dies with the mage.
+const RULE_CHARMS = [
+  // ---- GENERIC: engine rules, so every future class inherits these unchanged ----
+  { id: 'unspent',  name: 'Unspent',       rarity: 'rare', cost: 13, rule: true,
+    text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
+    why: 'the smallest sufficient Spell becomes the whole game' },
+  { id: 'reversed', name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
+    text: '🃏 Returning cards go to the <b>TOP</b> of your deck, not the bottom',
+    why: 'the Stack stops being a schedule and becomes next turn\'s hand' },
+  { id: 'slowfoot', name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
+    text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
+    why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
+  // ---- MAGE: the one rule this class owns is PAIRING ----
+  { id: 'threekind', name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, mage: true,
+    text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
+    why: 'pair attunes, three resonates' },
+  { id: 'looseweave', name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, mage: true,
+    text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>half</b> the bonus',
+    why: 'ceiling traded for consistency' },
+  { id: 'secondflame', name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, mage: true,
+    text: '✦ Your <b>Surge</b> can attune the Spell too — freeing the Catalyst to be pure speed',
+    why: 'the Catalyst stops serving two masters' },
+  { id: 'coldiron', name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, mage: true,
+    text: '✦ Your <b>unattuned</b> strikes are <b>+3</b>',
+    why: 'the anti-pairing build — and it makes a hand with no pair a plan instead of a punishment' },
+  { id: 'kindledarsenal', name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, mage: true,
+    text: '✦ Your <b>Arsenal</b> can attune the Spell as well',
+    why: 'the one slot with no job in the maths gets one' },
+  { id: 'heldember', name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, mage: true,
+    text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
+    why: 'attuning stops costing you tempo' },
+];
+CHARMS.push(...RULE_CHARMS);
+// (`hasCharm()` already exists further down — every rule below asks it.)
+
 // grant a charm (or a curse) from an Event. Returns a log line.
 function evGrantCharm(id) {
   const c = charmById(id);
@@ -931,7 +1045,9 @@ function charmMod(key, el) {
   let t = 0;
   for (const id of S.charms) {
     const c = charmById(id);
-    if (!c || c.mods[key] == null) continue;
+    // ⚠️ a RULE-changing charm carries no `mods` at all — it bends an engine rule instead of
+    // adding to a number, so it must fall straight through this sum rather than crash it.
+    if (!c || !c.mods || c.mods[key] == null) continue;
     if (c.mods.el && c.mods.el !== el) continue;   // element-gated, and an element is PRINTED
     t += c.mods[key];
   }
@@ -1009,7 +1125,7 @@ function saveGame() {
       approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
@@ -1059,7 +1175,7 @@ function loadGame() {
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
-      duelStamina0: d.duelStamina0 || 0,
+      duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
       stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
@@ -1096,11 +1212,50 @@ function startStage(n) {
   // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
   // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
   if (n === 0) { S.introPage = 0; S.phase = 'intro'; }
+  else { S.setout = rollSetout(); if (S.setout.length) S.phase = 'setout'; }
   render();
+  // ⚠️ ON A PHONE THE CONTROLS PANEL SITS BELOW THE HAND, so the only thing you can do on this
+  // screen starts ~1000px down a stacked layout. Every other phase has cards to read on the way
+  // past; this one does not, so scroll to the question.
+  if (S.phase === 'setout') { const el = $('controls-panel'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); }
 }
 function introNext(d) {
   S.introPage = Math.max(0, (S.introPage || 0) + d);
   if (S.introPage >= TUTORIAL.intro.length) { S.introPage = 0; S.phase = 'assign'; }
+  render();
+}
+
+// ============================================================
+// 🏕️ SETTING OUT (2026-08-05, Thomas: *"at the beginning of a run, lets also add a thing
+// where you pick 1 out of 3 class charm. alot of roguelike games do this, helps make feel every run
+// fresh right from the start"*).
+//
+// 🔑 IT IS THE BUILD-DISCOVERY FIX ARRIVING AT TURN ZERO. The 16 cards are identical every run
+// by design, so without this a run's first hour is indistinguishable from its last. One rule-charm,
+// chosen before a card is dealt, means you leave the workshop already playing a *different game* -
+// and because it is CHOSEN rather than drawn, the run has a direction you picked instead of one
+// the shuffle picked for you. That is *soft-directional runs* stated as an opening move.
+//
+// ⚠️ CLASS charms only. The generic pool is what the Wheel sells; the opening pick is where the
+// class shows you what IT can do, so a rogue's three will look nothing like these.
+// ⚠️ Not in the tutorial — stage 0 is deterministic and teaches the turn, not the meta.
+function mageCharmPool() { return CHARMS.filter(c => c.mage && !c.curse); }
+function rollSetout() {
+  const pool = mageCharmPool().slice();
+  const offers = [];
+  while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
+  return offers.map(c => c.id);
+}
+function pickSetout(id) {
+  if (!S.setout || !S.setout.includes(id)) return;
+  const c = charmById(id); if (!c) return;
+  S.charms.push(id);
+  S.setout = null;
+  S.phase = 'assign';
+  logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+  log(`🏕️ You set out carrying <b>${c.name}</b> — ${c.text}`, 'good');
+  logChallenge();
+  saveGame();
   render();
 }
 
@@ -1129,6 +1284,8 @@ function freshGame(stage) {
     trashed: [],
     encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(REGIONS[0].encounters),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
+    setout: null,       // 🏕️ the three class charms offered before turn 1
+
     phase: null,
     encounter: null,
     hardship: null,      // active Hardship name or null
@@ -1579,6 +1736,7 @@ function computeAction(reserve) {
   const a = CLASS.compose();
   if (!a || !e) return null;
   const { spell, elem, boostC, hits } = a;
+  const attuner = a.attuner || null, loose = !!a.loose;
   const spellEl = a.element;
   const pileVal = a.value;
   // enhUsed/isEnh/enhEl are the engine's long-standing "this action was attuned" fields. The mage
@@ -1623,6 +1781,10 @@ function computeAction(reserve) {
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
+    // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
+    // this makes LOSING it a legitimate plan, which is a whole second answer to 🛡️ Armour and
+    // rescues hands whose only fast card is the one they need in the Spell.
+    if (initLost && hasCharm('slowfoot')) value += 4;
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
@@ -1635,7 +1797,7 @@ function computeAction(reserve) {
     // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
@@ -1665,7 +1827,7 @@ function computeAction(reserve) {
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, hits, attBonus, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -1697,7 +1859,7 @@ function resolve() {
   if (r.type === 'fight') {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → Atk ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
@@ -1723,7 +1885,7 @@ function resolve() {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → Move ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
     else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
@@ -1844,6 +2006,10 @@ function finishResolve() {
   const e = S.encounter;
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   S.results[r.outcome]++;
+  // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
+  // about the turn just played has to be stashed here rather than recomputed from S.assign.
+  S.lastOutcome = r.outcome;
+  S.lastAttuned = !!r.enhUsed;
   // a Gray Pilgrim / Mirror Fen blessing covers a limited number of journeys — spend a charge
   if (r.type === 'journey' && (S.paceBless || 0) > 0) S.paceBless--;
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
@@ -2149,7 +2315,16 @@ function endTurn() {
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
   S.wakeTarget = null;
-  const spentIds = pouredIds();
+  let spentIds = pouredIds();
+  // ✦ UNSPENT - a clean win costs you nothing. The Spell is the only card the turn CONSUMES, so
+  // this is the biggest rule in the game to bend: it turns "what is my biggest card" into "what is
+  // the smallest card that still Completes", which is exactly the decision the Spell slot has
+  // never had (measured: the biggest card is correct 78% of the time).
+  if (hasCharm('unspent') && S.lastOutcome === 'Complete' && spentIds.length) {
+    const saved = S.hand.filter(c => spentIds.includes(c.id));
+    if (saved.length) log(`✦ Unspent — ${saved.map(c => displayName(c)).join(', ')} survives the casting.`, 'good');
+    spentIds = [];
+  }
   const poured = S.hand.filter(c => spentIds.includes(c.id));
   S.hand = S.hand.filter(c => !poured.includes(c));
   S.discard.push(...poured);
@@ -2164,7 +2339,12 @@ function endTurn() {
     log(`Your Arsenal ${displayName(kept)} is lost — ${S.loseReserve}`, 'bad');
     kept = null;
   }
-  const returning = S.hand.filter(c => c !== kept);
+  // ✦ HELD EMBER - attuning normally costs you the Catalyst for a while. This makes the pair
+  // free, so you stop weighing "can I afford to spend this card as fuel" and start hunting matches.
+  const held = (hasCharm('heldember') && S.lastAttuned) ? cardById(S.assign.Element) : null;
+  if (held && held !== kept && S.hand.includes(held))
+    log(`✦ Held Ember — ${displayName(held)} stays in your hand.`, 'good');
+  const returning = S.hand.filter(c => c !== kept && c !== held);
   if (returning.length > 1) { startStack(returning, poured.length, kept); return; }
   finishCleanup(returning, poured.length, false, kept);
 }
@@ -2196,7 +2376,11 @@ function finishStack() {
 
 function finishCleanup(returning, spentCount, ordered, kept) {
   S.hand = S.hand.filter(c => !returning.includes(c));
-  S.deck.push(...returning);
+  // 🃏 REVERSED - the Stack normally schedules cards several turns out, which the measurement
+  // said is worth about 2 points of Complete rate. Put them on TOP and the same ordering decision
+  // is about the hand you are holding NEXT TURN. Same rule, completely different weight.
+  if (hasCharm('reversed')) S.deck.unshift(...returning);
+  else S.deck.push(...returning);
   const before = S.hand.length;
   draw(HAND_SIZE - S.hand.length);
   log(`Cleanup: ${spentCount} spent on the spell — gone. ` +
@@ -2884,6 +3068,21 @@ function renderControls() {
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
       `. Tap a card to blunt it — it soaks its 🛡️ armour value. ` +
       `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
+  } else if (S.phase === 'setout') {
+    // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
+    // three RULES, so all three rules are on screen in full, with what each one is FOR underneath.
+    const offers = (S.setout || []).map(id => charmById(id)).filter(Boolean);
+    c.innerHTML =
+      `<div class="phase-label">SETTING OUT</div>` +
+      `<div class="setout">` +
+      `<p class="setout-story">The workshop door closes behind you and the latch settles. ` +
+      `Four regions of road, and then <b>${S.dragon.name}</b> at the end of them — ` +
+      `everything you will have out there, you are carrying now.</p>` +
+      `<p class="setout-ask">One last thing goes in the pack.</p>` +
+      offers.map(o => `<button class="setout-offer r-${o.rarity}" onclick="pickSetout('${o.id}')">` +
+        `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
+        (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
+      `</div>`;
   } else if (S.phase === 'wheel') {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
@@ -3013,19 +3212,36 @@ function renderControls() {
 // dragon's door. Measured, the optimal Spell is simply your biggest-value card 89% of the time,
 // because that choice is made without ever seeing its price. The solver cannot see it either -
 // it optimises one encounter at a time and never pays the future cost.
+// one line, three places (fight / journey / duel). It names the card that ACTUALLY attuned, which
+// is the Catalyst normally, the Surge under ✦ Second Flame, and a non-matching Catalyst under
+// ✦ Loose Weave - where it says so, because a half bonus with no explanation reads as a bug.
+function attunedLineText(r, spell, verb) {
+  const src = r.attuner;
+  const nm = src ? src.def.name : 'your Catalyst';
+  const sums = `${verb} ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`;
+  if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives half → ${sums}`;
+  return `✦ ATTUNED — ${nm} is ${src ? elOf(src) : r.spellEl} like ${spell.def.name} → ${sums}`;
+}
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   switch (zone) {
-    case 'Spell': return (isFight ? 'your Attack' : 'your Move') + ' — SPENT, gone for the region';
+    case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
+      (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
     case 'Element': {
       const sp = spellCard();
       if (!sp) return 'Initiative — returns to your deck';
-      return attunedNow()
-        ? `✦ ATTUNED — ${elOf(sp)} matches · Initiative`
-        : `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
+      // ⚠️ the Catalyst may no longer be the thing that attuned — say who did
+      const src = attunerCard(), here = cardById(S.assign.Element);
+      if (!attunedNow()) return `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
+      if (looseOnly()) return `✦ ATTUNED loosely — half bonus · Initiative`;
+      if (src && here && src !== here) return `Initiative — your Surge attuned the Spell`;
+      return `✦ ATTUNED — ${elOf(sp)} matches · Initiative`;
     }
     case 'Boost': {
       const sc = cardById(S.assign.Boost), el = cardById(S.assign.Element);
+      // ✦ Second Flame gives the Surge a second job — name it here or the slot lies about itself
+      if (hasCharm('secondflame') && sc && spellCard() && attunerCard() === sc)
+        return `✦ ATTUNES the Spell · +power now`;
       if (sc && el && elOf(sc) === elOf(el))
         return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, nothing now`;
       if (el) return `+power now — or match ${elOf(el)} to BANK it`;
@@ -3453,7 +3669,7 @@ function resolveDuel() {
   const L = (text, cls = '') => ({ text, cls });
   const beats = [];
   const b1 = [];
-  if (r.enhUsed) b1.push(L(`✦ ATTUNED — ${elem.def.name} is ${elOf(elem)} like ${spell.def.name} → strike ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`, 'good'));
+  if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
   if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst: +${r.bank} Emberwake for next beat`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));

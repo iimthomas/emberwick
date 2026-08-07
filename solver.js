@@ -457,6 +457,11 @@ const RUNSIM = (() => {
         }
         else eventChoose(0);
       }
+      // 🏕️ SETTING OUT — the opening class-charm pick. ⚠️ Every new PHASE must be taught to
+      // this loop or autoRun silently breaks out and reports garbage (it happened with 'wheel').
+      // Bot policy: take the first offer. It cannot price a rule-change across a whole run, so the
+      // CHOICE is meaningless to it — what these runs measure is that each charm is survivable.
+      else if (p === 'setout') { const o = (S.setout || [])[0]; if (o) pickSetout(o); else break; }
       else if (p === 'summary') {
         const lv = allCards().map(c => c.level);
         m.regionAvg.push(mean(lv)); m.regionMax.push(Math.max(...lv));
