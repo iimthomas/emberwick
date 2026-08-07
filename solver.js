@@ -451,9 +451,18 @@ const RUNSIM = (() => {
         const ev = S.event;
         if (ev.step === 'done') { m.events++; eventContinue(); }
         else if (ev.step === 'pickCard') {
-          const sacrifice = ev.id === 'pilgrim' || ev.id === 'toll'; // these SPEND a card — give up the weakest
-          const t = S.hand.slice().sort((a, b) => sacrifice ? a.level - b.level : b.level - a.level)[0];
-          eventPickCard(t.id);
+          // ⚠️ PICK FROM WHAT THE OPTION CAN ACTUALLY ACT ON (2026-08-05). Options now declare a
+          // `pick` predicate, and eventPickCard() ignores an ineligible id — so a bot that still
+          // chose "highest level" would hand a Lv4 card to a BRIGHTEN option, get silently refused,
+          // and spin in this phase until the guard broke the run.
+          const opt = currentEventDef().options[ev.opt];
+          const pool = eventPickable(opt);
+          if (!pool.length) { eventCancelPick(); }
+          else {
+            const sacrifice = ev.id === 'pilgrim' || ev.id === 'toll'; // these SPEND a card — give up the weakest
+            const t = pool.slice().sort((a, b) => sacrifice ? a.level - b.level : b.level - a.level)[0];
+            eventPickCard(t.id);
+          }
         }
         else eventChoose(0);
       }

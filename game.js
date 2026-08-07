@@ -2579,7 +2579,7 @@ const EVENTS = [
   { id: 'chandler', name: "The Chandler's Rest",
     flavor: "A woodcutter's hut, the hearth still warm. A night here is enough to mend a frayed tool.",
     options: [
-      { label: 'Mend one carefully — a card you choose gains +1 level', need: 'card', apply: ({ card }) => evLevel(card, +1) },
+      { label: 'Mend one carefully — a card you choose gains +1 level', need: 'card', pick: c => c.level < MAX_LEVEL, pickNote: 'already Lv4 — nothing to brighten', apply: ({ card }) => evLevel(card, +1) },
       { label: 'Work through the night — +1 level on TWO cards, but you arrive tired (Hardship next fight)', need: 'none',
         apply: () => [...evUpgradeRandom(2), evCurseNextFight()] },
       { label: 'Ask after what you have lost — a broken card returns at Lv1', need: 'none',
@@ -2617,10 +2617,10 @@ const EVENTS = [
       // ⚠️ REWRITTEN 2026-07-29. The old first option TRASHED a card for the whole run, and both
       // paying options gave +2 Pace — so the "choice" was one currency at two prices. These three
       // now pay in three different currencies: travel · deck power · coins.
-      { label: 'Let him read a page — a card you choose DIMS one level; the road ahead is blessed (+2 Pace, next two journeys)', need: 'card',
+      { label: 'Let him read a page — a card you choose DIMS one level; the road ahead is blessed (+2 Pace, next two journeys)', need: 'card', pick: c => c.level > 1, pickNote: 'already Lv1 — nothing to give up', 
         apply: ({ card }) => { const t = evLevel(card, -1); S.paceBless = 2; S.eventFlags.pilgrim = 'gave';
           return [t, 'The road ahead is blessed — +2 Pace on your next two journeys.', 'He reads it once, closes your book gently, and hands it back. "I will know you again."']; } },
-      { label: 'Share your supper — 🪙 −8 coins, and he tends your kit: a card you choose BRIGHTENS a level', need: 'card',
+      { label: 'Share your supper — 🪙 −8 coins, and he tends your kit: a card you choose BRIGHTENS a level', need: 'card', pick: c => c.level < MAX_LEVEL, pickNote: 'already Lv4 — nothing to brighten', when: () => S.coins >= 8,
         apply: ({ card }) => { if (S.coins < 8) return ['You have nothing to share; he wishes you well anyway.'];
           S.coins -= 8; S.eventFlags.pilgrim = 'fed';
           return [`You share what you have (−8 coins, ${S.coins} left).`, 'He works at it by the fire without being asked — ' + evLevel(card, +1), 'He eats every scrap and says nothing, which from him is thanks.']; } },
@@ -2662,7 +2662,7 @@ const EVENTS = [
     options: [
       { label: 'Bank your Arsenal — the night cannot snuff it for the rest of this region', need: 'none',
         apply: () => { S.emberShield = true; return [`Your Arsenal is warded — Nightfall cannot take it for the rest of ${RUN()[S.region - 1].name}.`]; } },
-      { label: 'Take the coal with you — a card you choose gains +1 level, the ward is spent', need: 'card',
+      { label: 'Take the coal with you — a card you choose gains +1 level, the ward is spent', need: 'card', pick: c => c.level < MAX_LEVEL, pickNote: 'already Lv4 — nothing to brighten', 
         apply: ({ card }) => ['You lift the everburning coal — ' + evLevel(card, +1)] },
       { label: 'Bargain with what sleeps here — 🪙 +14 coins, and a CURSE', need: 'none',
         apply: () => { S.coins += 14; return [`Something in the dark pays generously — +14 coins (you now hold ${S.coins}).`, evTakeCurse()]; } },
@@ -2671,7 +2671,7 @@ const EVENTS = [
   { id: 'toll', name: 'The Toll of Thorns',
     flavor: "A bramble-wall across the path. Force through and it takes something; or spend the time to find a way around.",
     options: [
-      { label: 'Cut through — a card you choose loses a level, but two others brighten', need: 'card',
+      { label: 'Cut through — a card you choose loses a level, but two others brighten', need: 'card', pick: c => c.level > 1, pickNote: 'already Lv1 — nothing to give up', 
         apply: ({ card }) => { const lines = ['You force the thorns — ' + evLevel(card, -1)]; lines.push('but win through to easier ground:', ...evUpgradeRandom(2, card.id)); return lines; } },
       { label: 'Pay the toll in coin — 🪙 −9 coins, pass untouched', need: 'none',
         apply: () => { if (S.coins < 9) return ['You cannot pay; the thorns let nothing through for free.'];
@@ -2725,8 +2725,10 @@ function eventChoose(i) {
   const opt = currentEventDef().options[i];
   // never ask for a card you cannot possibly give - the player would be stuck on a picker with
   // nothing to pick and only a "back" button to explain it
-  if (opt.need === 'card' && S.hand.length === 0) {
-    log(`You have no cards in hand to offer — that road is closed to you.`, 'bad');
+  if (opt.need === 'card' && !eventPickable(opt).length) {
+    log(S.hand.length
+      ? `Nothing in your hand can take that — that road is closed to you.`
+      : `You have no cards in hand to offer — that road is closed to you.`, 'bad');
     render();
     return;
   }
@@ -2734,10 +2736,27 @@ function eventChoose(i) {
   if (opt.need === 'card') { S.event.step = 'pickCard'; render(); return; }
   resolveEvent(opt, null, null);
 }
+// ⚠️ A PICKER MUST NEVER OFFER WHAT IT CANNOT ACT ON (bug found in play 2026-08-05, Thomas:
+// *"during the gray pilgrim event, i picked to level up a card, and a lvl 4 card was able to be
+// chosen, i clicked it and it didn't do anything"*).
+//
+// `need: 'card'` only ever said "this option wants a card" — never WHICH cards. So every hand card
+// got a Choose button, and picking an ineligible one resolved the event for nothing. On the
+// Pilgrim's supper it was worse than nothing: it charged 8 coins and then reported that the Lv4
+// card "already burns as bright as it can".
+//
+// 🔑 Two halves, and both are needed: an option now declares `pick` (which cards it can act on)
+// and `pickNote` (why the others cannot) — so the ineligible cards are still SHOWN and still say
+// why, rather than vanishing. Same rule as the barred card under ⚖️ Dead Weight: never state a
+// rule about an object without marking the object.
+function eventCanPick(opt, card) { return !opt || !opt.pick || opt.pick(card); }
+function eventPickable(opt) { return S.hand.filter(c => eventCanPick(opt, c)); }
 function eventPickCard(id) {
   const card = cardById(id); if (!card) return;
+  const opt = currentEventDef().options[S.event.opt];
+  if (!eventCanPick(opt, card)) return;   // belt and braces — the button is not drawn either
   S.event.targetId = id;
-  resolveEvent(currentEventDef().options[S.event.opt], card, null);
+  resolveEvent(opt, card, null);
 }
 function eventCancelPick() { S.event.step = 'options'; S.event.opt = null; S.event.wantElement = false; render(); }
 function resolveEvent(opt, card, el) {
@@ -3251,7 +3270,8 @@ function renderControls() {
       body = `<div class="event-flavor">${def.flavor}</div>` +
         `<div class="event-opts">` + def.options.map((o, i) =>
           (!o.when || o.when())
-            ? `<button onclick="eventChoose(${i})"${o.need === 'card' && !S.hand.length ? ' disabled title="no cards in hand"' : ''}>${o.label}</button>`
+            ? (() => { const blocked = o.need === 'card' && !eventPickable(o).length;
+                return `<button onclick="eventChoose(${i})"${blocked ? ` disabled title="${S.hand.length ? 'no card in hand can take this' : 'no cards in hand'}"` : ''}>${o.label}</button>`; })()
             : '').join('') + `</div>`;
     }
     c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
@@ -3512,7 +3532,10 @@ function cardHTML(card) {
     // Events used to pick a target from a list of bare NAMES — you couldn't see the stats you
     // were about to change, which on the Rewiring Pool means you couldn't see what the card
     // already seeks. Choose on the card itself, like soak/stack/upgrade already do.
-    action = `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`;
+    const opt = currentEventDef().options[S.event.opt];
+    action = eventCanPick(opt, card)
+      ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
+      : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
   } else if (S.phase === 'upgrade') {
     // show the cost on EVERY card so the economy is visible, greyed out when blocked
     if (card.level >= MAX_LEVEL) {
