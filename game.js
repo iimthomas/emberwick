@@ -820,7 +820,7 @@ const CHARMS = [
   { id: 'stormpin',    name: 'Storm Pin',        rarity: 'common', cost: 6,
     text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
   { id: 'nightveil',   name: 'Nightveil',        rarity: 'common', cost: 6,
-    text: '🌑 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
+    text: '🪨 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
   { id: 'swiftwick',   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
     text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
   { id: 'lanternpace', name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
@@ -831,14 +831,8 @@ const CHARMS = [
     text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse',   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
     text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
-  { id: 'forgemark',   name: 'Forge Mark',       rarity: 'common', cost: 6,
-    text: '⚔️ Spell-cards (FORCE) strike +2',        mods: { atk: 2, arch: 'FORCE' } },
-  { id: 'quickbrand',  name: 'Quickbrand',       rarity: 'common', cost: 6,
-    text: '💨 Catalyst-cards (SPARK) +2 Initiative', mods: { init: 2, arch: 'SPARK' } },
-  { id: 'wellstone',   name: 'Wellstone',        rarity: 'common', cost: 6,
-    text: '➕ Surge-cards (FLOW) give +2 more',      mods: { boost: 2, arch: 'FLOW' } },
-  { id: 'bulwarkpin',  name: 'Bulwark Pin',      rarity: 'common', cost: 6,
-    text: '🛡️ Guard-cards (WARD) soak +2',           mods: { soak: 2, arch: 'WARD' } },
+  // ❌ FOUR ARCHETYPE-GATED CHARMS WERE CUT HERE (2026-08-05, Thomas) — see the note above
+  // charmMod(). They named FORCE / SPARK / FLOW / WARD, which is printed on nothing.
   { id: 'brightwick',  name: 'Brightwick',       rarity: 'rare', cost: 14,
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
   { id: 'oathstone',   name: 'Oathstone',        rarity: 'rare', cost: 14,
@@ -850,7 +844,7 @@ const CHARMS = [
   { id: 'leadenwick',  name: 'Leaden Wick',      rarity: 'curse', curse: true, cost: 0,
     text: '💨 −2 Initiative on every card',          mods: { init: -2 } },
   { id: 'dulledge',    name: 'Dulled Edge',      rarity: 'curse', curse: true, cost: 0,
-    text: '⚔️ Spell-cards (FORCE) strike −2',        mods: { atk: -2, arch: 'FORCE' } },
+    text: '⚔️ Every card strikes −1',                 mods: { atk: -1 } },
   { id: 'dampwick',    name: 'Damp Wick',        rarity: 'curse', curse: true, cost: 0,
     text: '➕ Your Surge gives −2',                  mods: { boost: -2 } },
   { id: 'thinplate',   name: 'Thin Plate',       rarity: 'curse', curse: true, cost: 0,
@@ -920,21 +914,25 @@ const charmById = id => CHARMS.find(c => c.id === id);
 // rare to be felt. Replaced by levelling-as-sharpening (02_Progression/).
 const displayName = card => card.def.name;
 function hasCharm(id) { return !!(S && S.charms && S.charms.includes(id)); }
-// sum a mod across held charms; `el` restricts element-gated charms to matching cards
-// 🔑 TWO CLASSIFICATION AXES. A charm can be gated by ELEMENT (Fire cards...) or by ARCHETYPE
-// (all your Spell cards...). The archetype gate is the one that PORTS ACROSS CLASSES - every
-// class has a FORCE/SPARK/FLOW/WARD shape even when it calls them something else, whereas only
-// the mage has Fire cards. Ungated "all cards" charms stay rare and expensive: with the deck at
-// 4 of each element and 4 of each archetype, a gate hits exactly a quarter of your 16 cards, so
-// an ungated charm is worth four times as much and should cost like it.
-function charmMod(key, el, arch) {
+// ⚠️ A CHARM MAY ONLY NAME SOMETHING PRINTED ON THE CARD (2026-08-05, Thomas: *"you are
+// calling them their role, but thats not ever shown to the player"*).
+//
+// Four charms and a curse used to gate on ARCHETYPE — *"Spell-cards (FORCE) strike +2"*,
+// *"Guard-cards (WARD) soak +2"*. FORCE / SPARK / FLOW / WARD are an authoring tool for the 16-card
+// brief; they are printed on NOTHING, so the player could not tell which four of their sixteen
+// cards a charm even applied to. "Guard-cards" was worse again — not a word the game uses anywhere,
+// and it collides with the 🧱 GUARD defence shape.
+//
+// 🔑 Same rule that governs enemy effects: NEVER STATE A RULE ABOUT AN OBJECT WITHOUT MARKING THE
+// OBJECT. The archetype gate is gone entirely rather than left unused, so nobody adds another
+// invisible-property charm to it. ELEMENT gating stays — an element is on the card's face.
+function charmMod(key, el) {
   if (!S || !S.charms) return 0;
   let t = 0;
   for (const id of S.charms) {
     const c = charmById(id);
     if (!c || c.mods[key] == null) continue;
-    if (c.mods.el && c.mods.el !== el) continue;       // element-gated, this card doesn't match
-    if (c.mods.arch && c.mods.arch !== arch) continue; // archetype-gated, ditto
+    if (c.mods.el && c.mods.el !== el) continue;   // element-gated, and an element is PRINTED
     t += c.mods[key];
   }
   return t;
@@ -1229,8 +1227,8 @@ function eff(card) {
   const [v, ev, init, boost, armor, armorEl, cost] = d.lv[card.level - 1];
   // run-layer reforge mods (from Events): +armor / −attack, floored at 0. Move is untouched.
   // Charms stack on top, element-gated ones only for cards of that element.
-  const am = charmMod('armor', d.element, d.arch);
-  const at = charmMod('atk', d.element, d.arch);
+  const am = charmMod('armor', d.element);
+  const at = charmMod('atk', d.element);
   const adj = x => x == null ? null : Math.max(0, x + at);
   // ONE VALUE (2026-07-26, redesign step 2). A card no longer prints a separate Attack and
   // Move: it prints how much it ACCOMPLISHES. In a fight that is damage, on a journey it is
@@ -1252,8 +1250,8 @@ function eff(card) {
     // from the Catalyst slot, which breaks the 16-card brief's own test (every card wanted in ≥2
     // slots). The floor keeps SPARK enormously faster (13 vs 3 at Lv4) — it stops the rest being
     // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
-    init: Math.max(INIT_FLOOR, init + charmMod('init', d.element, d.arch)),
-    boost: boost + charmMod('boost', d.element, d.arch), armor: Math.max(0, armor + am), cost,
+    init: Math.max(INIT_FLOOR, init + charmMod('init', d.element)),
+    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
   };
 }
 
@@ -1917,7 +1915,7 @@ function soakValue(card) {
   if (armor <= 0) return 0;
   const v = verbOf(card);
   const frost = v && v.name === 'Frostbite' ? 4 : 0;      // ✦ Frostbite soaks well beyond its plate
-  return armor + frost + charmMod('soak', card.def.element, card.def.arch);
+  return armor + frost + charmMod('soak', card.def.element);
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
