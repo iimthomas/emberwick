@@ -583,19 +583,19 @@ let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned
 // ⚠️ IT IS A GUIDE, NOT A VERDICT. At stage 4, decks below par still win 24% of the time and
 // decks above it still lose. Never phrase it as a prediction, and never gate anything on it.
 const DRAGONS = [
-  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 40,
+  { stage: 1, name: 'Cindermaw', stir: 0, sleeps: 'it sleeps like the dead in its own heat', par: 36, element: 'Fire', init: 10, breath: 6, hp: 40,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 44,
+  { stage: 2, name: 'Skyrender', stir: 3, sleeps: 'a light sleeper — one wing always half-open', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 44,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 56,
+  { stage: 3, name: 'Cragmourn', stir: -1, sleeps: 'it barely sleeps, and barely stirs', par: 48, element: 'Stone', init: 7, breath: 5, hp: 56,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 44,
+  { stage: 4, name: 'Fathomdread', stir: 2, sleeps: 'it rests in the current, and the current tells it things', par: 52, element: 'Water', init: 10, breath: 7, hp: 44,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -849,7 +849,51 @@ function dragonForStage(n) { return DRAGONS.find(d => d.stage === n) || DRAGONS[
 
 // THE APPROACH — two ordinary journey-beats racing to the lair (element = the dragon's
 // weakness, so you can Attune toward the crack). Complete both → shatter its weakest shield.
-const APPROACH = { mp: 13, timePenalty: 2, nightfall: 6 };
+// 🐉 THE SLEEPING DRAGON (2026-08-05, Thomas) — replaces the two-journey Approach.
+//
+// 🔑 WHY THE APPROACH HAD TO GO. In the source game the final journey worked because MOVE WAS
+// ITS OWN STAT: the cards you spent on the road were not the cards you fought with. We collapsed
+// to ONE VALUE PER CARD in July, and the moment we did, the Approach stopped being a different
+// question — it was two more turns of the identical puzzle in a journey's clothes. Its costs went
+// phantom for the same reason: a Time Penalty burns deck and Nightfall takes your Arsenal, and
+// both were re-gathered at the lair a moment later. Measured: failing BOTH approach journeys cost
+// 0.2 of a card. The numbers on screen were a lie.
+//
+// 🔑 WHAT REPLACES IT IS A PRESS-YOUR-LUCK, because that is the one structure that produces a
+// story every single time. You are in the dark, it has not woken, and every step closer is worth
+// more and risks more. Stop whenever you like.
+//
+// 🕯️ AND THE CANDLE FINALLY HAS TEETH. Lit, you can see where to put your feet — the STIR of
+// the next step is shown. Snuffed, you step blind. Since only a Complete keeps it lit, the whole
+// road now pays off at the lair, and it does so through information rather than through a number.
+//
+// ⚠️ EVERY CARD YOU COMMIT IS SPENT, and there is no second gather — so a step really is duel
+// stamina. Measured exchange rate: 1 card of stamina ≈ 8 points of win rate, 1 dragon HP ≈ 2
+// points, so 1 card ≈ 4-5 HP. The gain curve is set just above that so pushing is tempting and
+// never free.
+// ⚠️ THE STIR IS A ROLL, NOT A NUMBER - and that is the whole mechanic (found by measuring,
+// 2026-08-05). The first build used a FIXED stir per step, and with a lit candle that is not a
+// press-your-luck at all: you can see the number, you can see your cards' Initiative, so every
+// step is arithmetic and the bot never once gambled (it woke the dragon 0% of the time over 1,000
+// runs). 🔑 A GAMBLE NEEDS HIDDEN ODDS. So the stir rolls inside a band:
+//     🕯️ candle LIT  -> you are told the BAND ("it stirs at 3-6"). Known odds.
+//     🕯️ candle OUT  -> you are told nothing. Unknown odds.
+// The candle no longer removes the gamble, it prices it - which is a far better reward than a
+// number, and it is the first time the candle changes a decision you can actually feel.
+// ⚠️ THE BAND IS FLAT, NOT RISING (2026-08-05, after measuring). A rising ladder cannot work
+// with the mage's Initiative range: cards sit mostly 1-7 with a floor of 3, and sharpening LOWERS
+// initiative on most of them, so steps taken never exceeded 1.0 across four stir curves and three
+// gain curves. Make the ladder climbable and step 1 is free; make it meaningful and step 2 is
+// impossible.
+// 🔑 AND FLAT IS BETTER DESIGN ANYWAY: in a press-your-luck the tension is not supposed to come
+// from each step being HARDER, it comes from each step having MORE TO LOSE. Blackjack does not
+// deal worse cards as you go. Step one you risk 4 damage; step three you risk 15 and a wake takes
+// all of it. The natural brake is that you RUN OUT OF FAST CARDS - and the fast ones are exactly
+// the cards you want as Catalysts in the duel, which was the good tension all along.
+const SNEAK_STIR = [2, 2, 2, 2];     // the FLOOR of the band your 💨 Initiative must beat
+const SNEAK_SPREAD = 3;              // the band is [floor, floor + SNEAK_SPREAD]
+const SNEAK_GAIN = [4, 9, 15, 22];   // CUMULATIVE damage your opening strike carries
+const SNEAK_STEPS = 4;
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 // dragonWeakness CUT 2026-07-29 — "weakness = the elements it does not shield" cannot survive
 // the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
@@ -1122,7 +1166,7 @@ function saveGame() {
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
-      approachOutcomes: S.approachOutcomes, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
+      sneak: S.sneak, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
@@ -1170,7 +1214,7 @@ function loadGame() {
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
       beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
-      approachOutcomes: d.approachOutcomes || [], duelBeat: d.duelBeat || 0, duelResult: null,
+      sneak: d.sneak || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
       pendingEvent: d.pendingEvent || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
@@ -1182,21 +1226,80 @@ function loadGame() {
     };
     if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
     // the finale's encounter is synthetic (not in the region tables) — rebuild it for the saved beat
-    if (S.finalMode) {
-      if (S.finalPhase === 'duel') {
-        S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
-          init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
-      } else {
-        const weak = S.dragon.element;
-        const beat = (S.approachOutcomes.length || 0) + 1;
-        S.encounter = { type: 'journey', name: `Approach to the ${S.dragon.name} · ${beat}/2`,
-          mp: APPROACH.mp, timePenalty: APPROACH.timePenalty, nightfall: APPROACH.nightfall,
-          element: weak, xp: 0, finale: true };
-      }
+    // the finale's encounter is synthetic; the sneak has no encounter at all
+    if (S.finalMode && S.finalPhase === 'duel') {
+      S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
+        init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
     }
     render();
     return true;
   } catch (err) { return false; }
+}
+
+// ============================================================
+// 🔧 THE DEV MENU (2026-08-05, Thomas: *"let me teleport to the dragon fight with some sort of
+// mediocre deck, so i can test out the dragon. i should be able to do it for any stage, 1-4"*).
+//
+// 🔑 IT EXISTS BECAUSE THE BOSS IS 20 MINUTES INTO A RUN. Every feel-question about the lair -
+// does the sneak read, is the duel tense, does a dragon's attack land as a problem or a tax -
+// costs a full run to ask ONCE. That is why the finale has been measured far more than it has been
+// PLAYED, and the solver cannot answer a feel question at all.
+//
+// ⚠️ IT BUILDS A REAL RUN AND THEN FAST-FORWARDS IT. Nothing here is a special case the engine
+// has to learn: it deals the normal 16 cards, shapes them to a deck total, sets the candle, grants
+// a charm, and then calls the SAME beginFinalBattle() a finished run calls. If a dev jump behaves
+// differently from a real run, that is a bug in the jump, not a mode.
+//
+// 🃏 Deck quality is expressed against the dragon's own `par` - the measured deck total at
+// which that dragon is a coin flip - so "mediocre" means the same thing at every stage.
+// ============================================================
+const DEV_DECKS = {
+  weak:     { label: 'Weak',     cards: 13, offset: -10, hint: 'a run that went badly' },
+  mediocre: { label: 'Mediocre', cards: 15, offset: -2,  hint: 'about par — a coin flip' },
+  strong:   { label: 'Strong',   cards: 16, offset: +6,  hint: 'a run that went well' },
+};
+function showDev() {
+  S = S || {};
+  S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '' };
+  S.phase = 'dev';
+  S.encounter = null;
+  render();
+}
+function devSet(k, v) {
+  if (!S.dev) return;
+  S.dev[k] = (k === 'stage') ? +v : (k === 'candle') ? (v === 'true' || v === true) : v;
+  render();
+}
+// shape the fresh 16 into a deck of `cards` cards totalling `target` levels.
+// ⚠️ freshGame() leaves FOUR CARDS ALREADY IN HAND (deck 12, hand 4) - shaping only S.deck
+// silently left those four untouched, so every quality came out 16 cards and +8 levels.
+function devShapeDeck(cards, target) {
+  const all = [...S.hand, ...S.deck];
+  while (all.length > cards) S.trashed.push(all.pop());
+  all.forEach(c => { c.level = 1; });
+  let total = all.length, i = 0, guard = 0;
+  while (total < target && guard++ < 800) {
+    const c = all[i % all.length];
+    if (c.level < MAX_LEVEL) { c.level++; total++; }
+    i++;
+    if (all.every(x => x.level >= MAX_LEVEL)) break;
+  }
+  S.hand = []; S.deck = all;   // beginFinalBattle() gathers them anyway
+}
+function devJump() {
+  const d = S.dev, cfg = DEV_DECKS[d.deck] || DEV_DECKS.mediocre;
+  const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
+  freshGame(stage);
+  S.dev = d;
+  devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
+  S.candle = !!d.candle;
+  if (d.charm && charmById(d.charm)) S.charms.push(d.charm);
+  S.region = REGIONS.length;
+  S.turn = 20;                    // so the log and the grade read like a real arrival
+  S.encounterQueue = [];
+  S.coins = 0;
+  log(`🔧 DEV — jumped to stage ${stage} (${cfg.label} deck: ${S.deck.length} cards, ${deckLevels()} levels vs par ${S.dragon.par}) · candle ${S.candle ? 'lit' : 'out'}${d.charm ? ' · ' + charmById(d.charm).name : ''}`, 'good');
+  beginFinalBattle();
 }
 
 // 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
@@ -1315,9 +1418,9 @@ function freshGame(stage) {
     stack: null,          // 🃏 mid-exchange: { ids, order } while you stack the deck
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
-    finalPhase: null,     // 'approach' | 'duel'
+    finalPhase: null,     // 'sneak' | 'duel'
     dragonState: null,    // { hp, maxHp, boon } — the persistent dragon
-    approachOutcomes: [], // outcome of each of the 2 approach beats (both Complete → a boon)
+    sneak: null,          // 🐉 the press-your-luck at the lair mouth
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
@@ -2013,7 +2116,7 @@ function finishResolve() {
   // a Gray Pilgrim / Mirror Fen blessing covers a limited number of journeys — spend a charge
   if (r.type === 'journey' && (S.paceBless || 0) > 0) S.paceBless--;
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
-  if (S.finalMode && S.finalPhase === 'approach') S.approachOutcomes.push(r.outcome);
+
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
   else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
   if (r.banks) S.wakePending = r.bank;
@@ -2153,6 +2256,7 @@ function exitSoak() {
   const dest = S.afterSoak;
   S.afterSoak = 'upgrade';
   if (dest === 'turnEnd') finishTurn();
+  else if (dest === 'sneakEnd') startDuel();
   else if (dest === 'duelNext') duelCleanupAndNext();
   else startUpgrade();
 }
@@ -2928,16 +3032,7 @@ function renderEncounter() {
         `<div class="enc-hint">${dragonDemand(S.dragon)} — <b>${S.dragon.teaches}</b>.</div>`;
       return;
     }
-    // THE APPROACH — an ordinary journey-beat, with the dragon looming
-    const e = S.encounter;
-    const beatTag = e ? (e.name.split('· ')[1] || '') : '';
-    panel.className = 'journey';
-    panel.innerHTML =
-      `<div class="enc-type">🐉 THE APPROACH${beatTag ? ` — beat ${beatTag}` : ''}</div>` + dragonBar +
-      (e ? `<div class="enc-stats"><span>👣 MP <b>${e.mp}</b> (half ${Math.ceil(e.mp / 2)})</span>` +
-        `<span>🌙 Nightfall <b>${e.nightfall}</b></span><span>⏳ Time Penalty <b>${e.timePenalty}</b></span>` +
-        `</div>` +
-        `<div class="enc-hint">Complete BOTH approach beats and you arrive with the advantage — its guard softened before a blow is struck.</div>` : '');
+    // (the Approach panel was deleted with the Approach — the sneak draws its own screen)
     return;
   }
   if (S.phase === 'intro' || S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
@@ -2993,7 +3088,7 @@ function renderControls() {
     const boostRow = '';
     const duel = S.finalPhase === 'duel';
     const phaseLabel = S.finalMode
-      ? (duel ? `🐉 THE DUEL — beat ${S.duelBeat}` : `🐉 THE APPROACH — beat ${S.approachOutcomes.length + 1} of 2`)
+      ? (duel ? `🐉 THE DUEL — beat ${S.duelBeat}` : `🐉 THE LAIR`)
       : `PHASE 2 — ACTION`;
     const resolveBtn = duel
       ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
@@ -3068,6 +3163,32 @@ function renderControls() {
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
       `. Tap a card to blunt it — it soaks its 🛡️ armour value. ` +
       `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
+  } else if (S.phase === 'sneak') {
+    // 🔑 SHOW THE OBJECT, AND SHOW THE PRICE. Every step names what it costs (a card, spent)
+    // and what it buys (the strike so far → the strike if you clear the next one). The one thing
+    // that may be hidden is the STIR, and only because your candle went out.
+    const st = S.sneak || { step: 0 };
+    const nextBand = st.step < SNEAK_STEPS ? sneakBand(st.step) : null;
+    const nextGain = st.step < SNEAK_STEPS ? SNEAK_GAIN[st.step] : null;
+    const best = S.hand.slice().sort((a, b) => eff(b).init - eff(a).init)[0];
+    c.innerHTML =
+      `<div class="phase-label">🐉 THE SLEEPING DRAGON</div>` +
+      `<div class="sneak">` +
+      `<p class="sneak-story">${st.step === 0
+        ? `${S.dragon.sleeps || 'It sleeps'} — and it has not heard you yet.`
+        : `You are <b>${SNEAK_STEPS - st.step}</b> step${SNEAK_STEPS - st.step === 1 ? '' : 's'} away. Nothing has changed in its breathing.`}</p>` +
+      `<div class="sneak-rows">` +
+        `<div class="sneak-row"><span>Your opening strike</span><b class="good">${sneakGain()}</b></div>` +
+        (nextBand !== null ? `<div class="sneak-row"><span>One more step would carry</span><b>${nextGain}</b></div>` +
+          `<div class="sneak-row"><span>🕯️ Its stir</span><b class="${sneakVisible() ? '' : 'bad'}">` +
+            `${sneakVisible() ? `${nextBand[0]}–${nextBand[1]}` : '? — your candle is out'}</b></div>` +
+          `<div class="sneak-row"><span>Your fastest card</span><b>💨 ${best ? eff(best).init : 0}</b></div>` : '') +
+      `</div>` +
+      (canSneak()
+        ? `<p class="sneak-ask">Tap a card to creep with it — <b>it is spent either way</b>. Fail and it wakes.</p>`
+        : `<p class="sneak-ask">You can go no closer.</p>`) +
+      `<button class="sneak-stop" onclick="sneakStop()">${sneakGain() > 0 ? `Strike now for ${sneakGain()}` : 'Back away and let it wake'}</button>` +
+      `</div>`;
   } else if (S.phase === 'setout') {
     // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
     // three RULES, so all three rules are on screen in full, with what each one is FOR underneath.
@@ -3156,6 +3277,33 @@ function renderControls() {
           `<button class="primary" onclick="introNext(1)">${last ? 'Begin ▸' : 'Next ▸'}</button>` +
         `</div>` +
       `</div>`;
+  } else if (S.phase === 'dev') {
+    const d = S.dev;
+    const dragon = DRAGONS.find(x => x.stage === d.stage) || DRAGONS[0];
+    const cfg = DEV_DECKS[d.deck];
+    const pick = (k, val, label, on) =>
+      `<button class="dev-pick${on ? ' on' : ''}" onclick="devSet('${k}','${val}')">${label}</button>`;
+    c.innerHTML =
+      `<div class="phase-label">🔧 DEV — JUMP TO THE LAIR</div>` +
+      `<div class="dev">` +
+      `<div class="dev-row"><span>Stage</span><div>` +
+        DRAGONS.map(x => pick('stage', x.stage, `${x.stage} · ${x.name}`, d.stage === x.stage)).join('') +
+      `</div></div>` +
+      `<div class="dev-row"><span>Deck</span><div>` +
+        Object.keys(DEV_DECKS).map(k => pick('deck', k, DEV_DECKS[k].label, d.deck === k)).join('') +
+      `</div></div>` +
+      `<div class="dev-row"><span>🕯️ Candle</span><div>` +
+        pick('candle', 'true', 'Lit', d.candle) + pick('candle', 'false', 'Out', !d.candle) +
+      `</div></div>` +
+      `<div class="dev-row"><span>Charm</span><div>` +
+        pick('charm', '', 'none', !d.charm) +
+        CHARMS.filter(x => x.mage).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
+      `</div></div>` +
+      `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
+      `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
+      `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
+      `<button onclick="showStages()">Back</button>` +
+      `</div>`;
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
     c.innerHTML =
@@ -3171,7 +3319,8 @@ function renderControls() {
           `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>` +
           `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
           `</button>`;
-      }).join('');
+      }).join('') +
+      `<button class="dev-open" onclick="showDev()">🔧 Dev — jump straight to a dragon</button>`;
   } else if (S.phase === 'victory') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -3331,6 +3480,14 @@ function cardHTML(card) {
   if (S.diverting) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
 
+  } else if (S.phase === 'sneak') {
+    // ⚠️ NAME THE PRICE ON THE OBJECT. The card says what it is worth here and that it is gone.
+    const band = canSneak() ? sneakBand(S.sneak.step) : null;
+    const init = eff(card).init;
+    action = canSneak()
+      ? `<div class="card-action"><button onclick="sneakStep(${card.id})">Creep — 💨 ${init}` +
+        `${sneakVisible() ? ` vs ${band[0]}–${band[1]}` : ''} · spent</button></div>`
+      : '';
   } else if (isAssignPhase() && S.selectedId === card.id) {
     action = roleButtons(card);
   }
@@ -3433,14 +3590,15 @@ function renderLog() {
 // ============================================================
 function beginFinalBattle() {
   S.finalMode = true;
-  S.finalPhase = 'approach';
-  S.approachOutcomes = [];
+  S.finalPhase = 'sneak';
   S.duelBeat = 0;
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
   // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
-  // clean Approach buys — one tick of the shape softened for the whole duel (see finishApproach).
+  // the boon fields survive the Approach's deletion because the duel maths reads them.
   S.dragonState = {
     hp: S.dragon.hp, maxHp: S.dragon.hp,
+    // ⚠️ the clean-Approach boon is GONE with the Approach (2026-08-05). The fields stay at 0
+    // because duelArmour()/duelStrike() read them; a future reward may fill them again.
     boon: { armourCut: 0, unseen: 0, calm: 0 },
     active: null, next: null,   // 🐉 what it is doing now, and what it has telegraphed
   };
@@ -3450,58 +3608,91 @@ function beginFinalBattle() {
   S.hardship = null;
   S.downgraded = new Set();
   S.damage = 0; S.poison = 0; S.loseReserve = null; S.afterSoak = 'upgrade';
-  logHeader(`— 🐉 THE ${S.dragon.name.toUpperCase()}: THE APPROACH —`);
-  log(`Region 4 is behind you. Two hard journeys race to the lair — Complete BOTH and you arrive with the advantage, softening its guard before a blow is struck. Then the duel begins.`);
-  startApproachBeat();
+  log(`Region 4 is behind you. The road ends at a mouth in the rock.`);
+  startSneak();
 }
 
-// ---------- THE APPROACH: two ordinary journey-beats ----------
-function startApproachBeat() {
-  if (S.hand.length === 0) { finishApproach(); return; } // nothing left to travel with → straight to the lair
-  const beat = S.approachOutcomes.length + 1;
-  const weak = S.dragon.element; // the approach carries the dragon's own colour — flavour only
-  S.encounter = { type: 'journey', name: `Approach to the ${S.dragon.name} · ${beat}/2`,
-    mp: APPROACH.mp, timePenalty: APPROACH.timePenalty, nightfall: APPROACH.nightfall,
-    element: weak, xp: 0, finale: true };
-  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
-  S.boostTarget = 'Move'; S.hardship = null; S.rangedDodge = false;
-  S.divertsUsed = 0; S.diverting = false;
-  S.loseReserve = null; S.afterSoak = 'upgrade';
-  S.damage = 0; S.damageEl = null;
-  // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
-  // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
-  S.emberguardUsed = false;
-  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
-  S.phase = 'assign';
-  logHeader(`— 🐉 The Approach · beat ${beat} of 2 —`);
-  logChallenge();
+// ---------- 🐉 THE SLEEPING DRAGON ----------
+// the band you are betting against — shown when lit, hidden when not
+function sneakBand(step) {
+  const lo = SNEAK_STIR[step] + (S.dragon.stir || 0);
+  return [lo, lo + SNEAK_SPREAD];
+}
+// what it actually stirs at, this step, this time
+function sneakRoll(step) {
+  const [lo, hi] = sneakBand(step);
+  return lo + Math.floor(rnd() * (hi - lo + 1));
+}
+function sneakVisible() { return !!S.candle; }   // 🕯️ lit = you can see where to step
+function sneakGain() { const k = S.sneak ? S.sneak.step : 0; return k > 0 ? SNEAK_GAIN[k - 1] : 0; }
+function canSneak() { return !!(S.sneak && !S.sneak.done && S.sneak.step < SNEAK_STEPS && S.hand.length > 0); }
+
+function startSneak() {
+  S.sneak = { step: 0, done: false, woke: false };
+  S.phase = 'sneak';
+  logHeader(`— 🐉 THE LAIR OF THE ${S.dragon.name.toUpperCase()} —`);
+  log(`It has not woken. ${S.dragon.sleeps || 'It sleeps.'} You are four steps from it, in the dark.`);
+  log(S.candle
+    ? `🕯️ Your candle is lit — you can see where to put your feet.`
+    : `🕯️ Your candle is out. You will be stepping blind.`, S.candle ? 'good' : 'bad');
+  saveGame();
   render();
 }
 
-// called from finishTurn() after each finale beat's cleanup
-function finaleAfterTurn() {
-  if (S.finalPhase !== 'approach') return; // the Duel sequences its own beats
-  if (S.approachOutcomes.length >= 2) finishApproach();
-  else startApproachBeat();
+// commit one card to a step. Spent either way - that is the price of the gamble.
+function sneakStep(cardId) {
+  if (!canSneak()) return;
+  const card = cardById(cardId); if (!card) return;
+  const stir = sneakRoll(S.sneak.step);
+  const init = eff(card).init;
+  // ⚠️ SPENT, AND NOT RE-GATHERED. startDuel() no longer rebuilds the deck from the discard, so
+  // a card left on the stones here is a card missing from the duel. That is the whole cost.
+  S.hand = S.hand.filter(c => c.id !== cardId);
+  S.discard.push(card);
+  if (init > stir) {
+    S.sneak.step++;
+    log(`You set ${displayName(card)} down and move — ${init} against a stir of ${stir}. Closer. ` +
+        `Your opening strike would carry <b>${sneakGain()}</b>.`, 'good');
+    if (S.sneak.step >= SNEAK_STEPS) { log(`You are standing over it.`, 'good'); sneakStop(); return; }
+  } else {
+    log(`${displayName(card)} scrapes the stone — ${init} against a stir of ${stir}. <b>It wakes.</b>`, 'bad result');
+    sneakWake();
+    return;
+  }
+  saveGame();
+  render();
 }
 
-function finishApproach() {
-  const outcomes = S.approachOutcomes;
-  const bothComplete = outcomes.length >= 2 && outcomes.every(o => o === 'Complete');
-  logHeader(`— 🐉 The lair of the ${S.dragon.name} —`);
-  // A clean Approach softens ONE TICK of whatever the dragon's shape is — so the reward always
-  // speaks the same language as the problem, whichever stage you are on.
-  if (bothComplete) {
-    const b = S.dragonState.boon, said = [];
-    if (hasShape('armour')) { b.armourCut = 2; said.push(`you found where the slag has split — 🛡️ Armour ${S.dragon.shapeV} → ${duelArmour()}`); }
-    if (hasShape('evasion')) { b.unseen = 2; said.push(`you come out of the dark unseen — 🌀 its Evasion sleeps for 2 beats`); }
-    if (hasShape('relentless')) { b.calm = 2; said.push(`you arrive rested — ⏳ its breath holds steady for 2 beats before it starts to grow`); }
-    log(`A clean approach: ${said.join(' · ')}.`, 'good result');
+// stop and take what you have earned
+function sneakStop() {
+  if (!S.sneak || S.sneak.done) return;
+  S.sneak.done = true;
+  const dmg = sneakGain();
+  if (dmg > 0) {
+    // 🔑 UNOPPOSED BY THE SHAPE. It is asleep: nothing is armoured and nothing is evading. That
+    // is what creeping buys, and it is why the strike is worth a card.
+    S.dragonState.hp = Math.max(0, S.dragonState.hp - dmg);
+    log(`You strike the sleeping ${S.dragon.name} for <b>${dmg}</b> — unarmoured, unguarded. ` +
+        `${S.dragonState.hp} of ${S.dragonState.maxHp} HP remain.`, 'good result');
   } else {
-    log(`You reach the lair battered and late — the ${S.dragon.name} meets you at its full strength.`);
+    log(`You back away without touching it. It wakes on its own terms.`);
   }
   startDuel();
 }
+
+function sneakWake() {
+  S.sneak.done = true; S.sneak.woke = true;
+  log(`The ${S.dragon.name} comes awake all at once and roars — you lose the opening entirely.`, 'bad');
+  S.damage = S.dragon.breath;
+  S.damageEl = null;
+  S.downgraded = new Set();
+  S.afterSoak = 'sneakEnd';
+  log(`Its first breath catches you flat: ${S.damage} damage to soak.`, 'bad');
+  startSoak();
+}
+
+// the Duel sequences its own beats, and the sneak is not a turn — nothing to do here any more
+function finaleAfterTurn() {}
 
 // ---------- THE DUEL: one-set fight-beats vs the persistent dragon ----------
 // 🐉 SHAPED DEFENCE AT BOSS SCALE (2026-07-29). Elemental shields are gone; a dragon defends with
@@ -3565,16 +3756,19 @@ function staminaBar() {
 function startDuel() {
   S.finalPhase = 'duel';
   S.duelBeat = 0;
+  S.sneak = S.sneak || { step: 0, done: true, woke: false };
   // steel yourself at the lair's mouth: gather every card you still hold (spent-set and all)
   // into a fresh deck — this is your finite duel stamina. Only cards TRASHED on the approach
   // (Lv1 soak losses) are gone; a clean approach preserves your full hand AND cracked a shield.
-  S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]);
-  S.hand = []; S.discard = [];
+  // ⚠️ NO SECOND GATHER (2026-08-05). Everything was already gathered when you left region 4;
+  // rebuilding the deck here would hand back every card the sneak spent, which is exactly how the
+  // old Approach's Time Penalty and Nightfall became phantom costs. What you spent in the dark
+  // stays spent.
   // 🔑 THE DUEL IS A RACE AND THE PLAYER COULDN'T SEE IT (2026-07-29). You lose when your CARDS
   // RUN OUT, not when a health bar empties — the single most important fact about the fight, and
   // nothing on screen said it. Remember what you arrived with so the race can be drawn.
-  S.duelStamina0 = S.deck.length;
-  log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
+  S.duelStamina0 = S.deck.length + S.hand.length;
+  log(`The ${S.dragon.name} ${S.sneak.woke ? 'is already on its feet' : 'rears'} — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
   startDuelBeat();
 }
 

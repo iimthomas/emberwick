@@ -49,7 +49,7 @@ const MEASURE = (() => {
     o.assign = { ...s.assign };
     o.results = { ...s.results };
     o.charms = (s.charms || []).slice();
-    o.approachOutcomes = (s.approachOutcomes || []).slice();
+    o.sneak = s.sneak ? { ...s.sneak } : null;
     o.encounterQueue = (s.encounterQueue || []).slice();
     o.downgraded = new Set(s.downgraded || []);
     o.stats = { ...s.stats };
