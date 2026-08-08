@@ -1583,6 +1583,13 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ Every effect lasts THIS TURN only unless it says otherwise, and `S.potionFx` is wiped in
 // nextTurn() and in the finale's beat-starts. A potion that outlived its turn would be a charm.
 // ============================================================
+// 🪙 A COMPLETE PAYS BETTER THAN A NARROW (2026-08-05, Thomas: *"i don't get enough gold to
+// both upgrade and or buy charms or potions. wonder if a complete victory should give more gold"*).
+//
+// ⚠️ Until now they paid EXACTLY THE SAME - the award was gated on `outcome !== 'Loss'` - so a
+// Narrow cost you damage and your 🕯️ candle and nothing else. Paying for the clean win is the
+// obvious missing incentive, and it raises income without inflating a Loss.
+const COMPLETE_BONUS = 3;
 const POTION_CAP = 3;
 const POTIONS = [
   // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
@@ -2289,10 +2296,10 @@ function finishResolve() {
   // is a state with no way back, and it silently taxed every future encounter too.
   // The log also printed "+-2 coins", which is its own small lie about what happened.
   if (r.outcome !== 'Loss') {
-    const g = e.xp + charmMod('coin');
+    const g = e.xp + charmMod('coin') + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0);
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
     S.coins = Math.max(0, S.coins + g);
-    if (got >= 0) log(`+${got} coins (you now hold ${S.coins})`, 'good');
+    if (got >= 0) log(`+${got} coins${r.outcome === 'Complete' ? ` (${e.xp} + ${COMPLETE_BONUS} for the clean win)` : ''} (you now hold ${S.coins})`, 'good');
     else log(`${got} coins — ${e.xp ? `${e.xp} earned, but the Tithe takes its share` : 'the Tithe takes its share'} (you now hold ${S.coins})`, 'bad');
   }
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
@@ -2495,6 +2502,15 @@ function startUpgrade() {
     if (S.finalPhase === 'duel') duelCleanupAndNext(); else finishTurn();
     return;
   }
+  // 🔑 THE WHEEL COMES FIRST, AND THAT IS THE REAL FIX (2026-08-05). Measured: the bot spent
+  // **93% of all income on card levels** (54 of 58 coins a run) and bought 0.1 charms. Not because
+  // charms are bad - because SHARPENING RAN FIRST and had no budget. A level costs 3-4 and is
+  // always affordable, so the purse was always empty by the time the shop opened.
+  // Opening the shop first makes the money a CHOICE: this charm, or three levels?
+  startWheel(false);
+}
+// called by the Wheel when you are done shopping — what is left goes to the forge
+function startSharpen() {
   S.upgradePick = null;
   S.phase = 'upgrade';
   render();
@@ -2517,7 +2533,7 @@ function buyUpgrade(id) {
   S.upgradePick = null;
   render();
 }
-function doneUpgrades() { startWheel(false); }
+function doneUpgrades() { endTurn(); }
 
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
@@ -2549,7 +2565,7 @@ function wheelDone() {
   const camp = S.wheel && S.wheel.rich;
   S.wheel = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
-  endTurn();
+  startSharpen();
 }
 
 // kept as an alias so the solver/older callers still work — coins now simply roll over
