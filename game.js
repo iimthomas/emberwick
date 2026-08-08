@@ -358,6 +358,8 @@ function lightCandle(why) {
 }
 function snuffCandle(why) {
   if (!S.candle) return;
+  // 🧪 Tallow Stub — one turn's insurance on the thing the whole road pays for
+  if (S.potionFx && S.potionFx.keepCandle) { log(`🕯️ The tallow holds — your candle survives ${why}.`, 'good'); return; }
   S.candle = false;
   log(`🕯️ Your candle gutters out — ${why}. You cannot see what is coming.`, 'bad');
 }
@@ -1218,7 +1220,7 @@ function loadGame() {
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
-      potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, swap: {} },
+      potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
       upgradePick: null,
       stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
@@ -1420,7 +1422,7 @@ function freshGame(stage) {
     selectedId: null, // tap-to-place selection (touch)
     potions: [],      // 🧪 carried, max POTION_CAP
     potionPick: null, // 🧪 a targeted potion waiting for a card
-    potionFx: { init: 0, value: 0, soak: 0, swap: {} },  // ⚠️ wiped every turn
+    potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },  // ⚠️ wiped every turn
     upgradePick: null,// 🔼 the card whose upgraded form is being previewed
     stack: null,          // 🃏 mid-exchange: { ids, order } while you stack the deck
     // the Dragon Duel finale:
@@ -1583,6 +1585,28 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ============================================================
 const POTION_CAP = 3;
 const POTIONS = [
+  // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
+  // fill up these things as well"*). Cheap, small, and correct about one turn in five.
+  //
+  // 🔑 A POOL OF ALL BANGERS HAS NO TEXTURE. Fodder does three jobs at once: it makes the good
+  // ones feel rare, it gives a broke player something to actually buy, and it widens the pool so
+  // the Wheel stops offering the same three excellent things. It is also the cheapest content in
+  // the game - every one of these is a number on an existing hook.
+  // ⚠️ THE BAR IS STILL "CORRECT SOMETIME", NOT "USELESS". Every one of these wins a turn you
+  // would otherwise have lost by one or two points. A potion that can never be right is litter,
+  // and litter in a shop is worse than an empty shelf.
+  { id: 'chalkwater', name: 'Chalkwater', cost: 2, rarity: 'common',
+    text: '💨 <b>+2 Initiative</b> this turn' },
+  { id: 'broth',    name: 'Thin Broth',   cost: 2, rarity: 'common',
+    text: '⚔️ <b>+2</b> to your action this turn' },
+  { id: 'grit',     name: 'Grit',         cost: 2, rarity: 'common',
+    text: '🛡️ every card <b>soaks +1</b> this turn' },
+  { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common',
+    text: '➕ your <b>Surge gives +3</b> more this turn' },
+  { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
+    text: '🌙 <b>+3 Pace</b> against the dark this turn' },
+  { id: 'tallow',   name: 'Tallow Stub',  cost: 3, rarity: 'common',
+    text: '🕯️ your candle <b>cannot be snuffed</b> this turn' },
   // ---- generic: every class inherits these unchanged ----
   { id: 'haste',   name: 'Draught of Haste', cost: 6, rarity: 'common',
     text: '💨 <b>+5 Initiative</b> this turn' },
@@ -1646,6 +1670,12 @@ function spendPotion(id) {
 }
 function applyPotion(p, card) {
   const fx = S.potionFx;
+  if (p.id === 'chalkwater'){ fx.init += 2;  log(`🧪 ${p.name} — 💨 +2 Initiative this turn.`, 'good'); }
+  if (p.id === 'broth')    { fx.value += 2; log(`🧪 ${p.name} — ⚔️ +2 to your action this turn.`, 'good'); }
+  if (p.id === 'grit')     { fx.soak += 1;  log(`🧪 ${p.name} — 🛡️ every card soaks +1 this turn.`, 'good'); }
+  if (p.id === 'bitterroot'){ fx.boost += 3; log(`🧪 ${p.name} — ➕ your Surge gives +3 more this turn.`, 'good'); }
+  if (p.id === 'roaddust') { fx.pace += 3;  log(`🧪 ${p.name} — 🌙 +3 Pace against the dark.`, 'good'); }
+  if (p.id === 'tallow')   { fx.keepCandle = true; log(`🧪 ${p.name} — 🕯️ your candle will hold, whatever happens.`, 'good'); }
   if (p.id === 'haste')    { fx.init += 5;  log(`🧪 ${p.name} — 💨 +5 Initiative this turn.`, 'good'); }
   if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
   if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
@@ -1761,7 +1791,7 @@ function nextTurn() {
   S.damage = 0;
   S.damageEl = null;
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -1969,8 +1999,9 @@ function computeAction(reserve) {
   const ability = e.ability || null;
   const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
-  const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
-  const nightCut = boostVal - boostEff;
+  const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
+  const boostEff = h === 'Night Travel' ? Math.max(0, boostRaw - elemInit) : boostRaw;
+  const nightCut = boostRaw - boostEff;
 
   if (e.type === 'fight') {
     // ✦ Lv4 CATALYST verbs shape the race itself
@@ -2032,7 +2063,7 @@ function computeAction(reserve) {
   const value = withBoost + reserveBonus;
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
-  const pace = elemInit + paceBless + charmMod('pace');   // Pace belongs to the Catalyst alone
+  const pace = elemInit + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace && !(S.potionFx && S.potionFx.noNight);   // 🧪 Nightglass
   // Steep peril: the journey's MP grows by your Arsenal's Boost
@@ -2409,7 +2440,13 @@ function rollOffer(rich) {
   const roomForPotion = (S.potions || []).length < POTION_CAP;
   const mkCharm = () => { const c = rand(charmPool);
     return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost }; };
-  const mkPotion = () => { const p = rand(potPool);
+  // 🥄 WEIGHTED: commons show up three times as often as rares, so the shelf reads like a
+  // shop — mostly cheap things, occasionally something you actually want.
+  const weight = p => p.rarity === 'common' ? 3 : p.rarity === 'uncommon' ? 2 : 1;
+  const mkPotion = () => {
+    const bag = [];
+    for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
+    const p = rand(bag);
     return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
   const wantPotion = roomForPotion && potPool.length && rnd() < (rich ? 0.45 : 0.55);
   if (wantPotion) return mkPotion();
@@ -3940,7 +3977,7 @@ function startLastMile() {
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -4082,7 +4119,7 @@ function startDuelBeat() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
