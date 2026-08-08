@@ -995,6 +995,21 @@ const RULE_CHARMS = [
 CHARMS.push(...RULE_CHARMS);
 // (`hasCharm()` already exists further down — every rule below asks it.)
 
+// 🧪 hand over a potion from an Event. Respects the carry cap, and says so rather than
+// silently eating it — a reward you cannot take must explain itself.
+function evGrantPotion(id) {
+  const p = potionById(id);
+  if (!p) return 'Nothing comes of it.';
+  if ((S.potions || []).length >= POTION_CAP) return `Your kit is full — you leave the ${p.name} where it is.`;
+  S.potions.push(id);
+  return `🧪 ${p.name} goes in your kit — ${p.text}`;
+}
+// a random potion you can actually carry, biased to the cheap ones for free gifts
+function evRandomPotion(rare) {
+  const pool = potionPool().filter(p => rare ? true : p.rarity !== 'rare');
+  return pool.length ? evGrantPotion(rand(pool).id) : 'Nothing here suits you.';
+}
+
 // grant a charm (or a curse) from an Event. Returns a log line.
 function evGrantCharm(id) {
   const c = charmById(id);
@@ -1580,14 +1595,25 @@ const POTIONS = [
   { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
     text: '✨ <b>restore a card a level</b> — undo what the road took',
     can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
+  { id: 'nightglass', name: 'Nightglass', cost: 6, rarity: 'common',
+    text: '🌙 the dark <b>cannot catch you</b> this journey' },
+  { id: 'breath',  name: 'Second Breath',  cost: 10, rarity: 'rare',
+    text: '✦ your <b>Spell is not spent</b> this turn' },
+  { id: 'quench',  name: 'Quenching Draught', cost: 11, rarity: 'rare',
+    text: "🛡️ the enemy's <b>defence does nothing</b> this turn" },
+  { id: 'gravewax', name: 'Grave Wax',     cost: 8, rarity: 'uncommon',
+    when: () => (S.trashed || []).length > 0,
+    text: '✨ the last card you <b>lost returns</b>, at Lv1' },
   // ---- mage: it names an ELEMENT, which is the mage's suit ----
   { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', mage: true, pick: true,
     text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
+  { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
+    text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
 ];
 const potionById = id => POTIONS.find(p => p.id === id) || null;
-const potionPool = () => POTIONS.filter(p => !p.mage || CLASS.id === 'mage');
+const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
 
@@ -1624,6 +1650,11 @@ function applyPotion(p, card) {
   if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
   if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
   if (p.id === 'clarity')  { lightCandle('the draught clears your sight'); }
+  if (p.id === 'nightglass'){ fx.noNight = true; log(`🧪 ${p.name} — 🌙 the dark cannot catch you this journey.`, 'good'); }
+  if (p.id === 'breath')   { fx.unspent = true; log(`🧪 ${p.name} — ✦ your Spell survives this casting.`, 'good'); }
+  if (p.id === 'quench')   { fx.noShape = true; log(`🧪 ${p.name} — 🛡️ its guard means nothing this turn.`, 'good'); }
+  if (p.id === 'solvent')  { fx.holdCatalyst = true; log(`🧪 ${p.name} — ✦ your Catalyst stays in hand.`, 'good'); }
+  if (p.id === 'gravewax') { log(`🧪 ${p.name} — ` + evRecoverCard('last'), 'good'); }
   if (p.id === 'salve')    { card.level++; log(`🧪 ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
   if (p.id === 'prism')    {
     const el = elOf(spellCard());
@@ -1964,8 +1995,10 @@ function computeAction(reserve) {
     // (🧱 GUARD - a breakable pool beaten by MANY hits - is deliberately absent: the mage lands
     //  exactly one hit, so it has nothing to bite on. It is the rogue's lock, not the mage's.)
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
-    const armorCut = (e.shape === 'armour' && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
-    const evaded = e.shape === 'evasion' && vS !== 'Landslide' && (e.init > evInit);
+    // 🧪 Quenching Draught — the shape simply does not apply this turn
+    const quenched = !!(S.potionFx && S.potionFx.noShape);
+    const armorCut = (!quenched && e.shape === 'armour' && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
+    const evaded = !quenched && e.shape === 'evasion' && vS !== 'Landslide' && (e.init > evInit);
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
@@ -2001,7 +2034,7 @@ function computeAction(reserve) {
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
   const pace = elemInit + paceBless + charmMod('pace');   // Pace belongs to the Catalyst alone
   const nightfall = e.nightfall || 0;
-  const nightCaught = nightfall > pace;
+  const nightCaught = nightfall > pace && !(S.potionFx && S.potionFx.noNight);   // 🧪 Nightglass
   // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
   const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
@@ -2508,6 +2541,12 @@ function endTurn() {
   // this is the biggest rule in the game to bend: it turns "what is my biggest card" into "what is
   // the smallest card that still Completes", which is exactly the decision the Spell slot has
   // never had (measured: the biggest card is correct 78% of the time).
+  // 🧪 Second Breath — the one-shot Unspent, and it does not need a Complete
+  if (S.potionFx && S.potionFx.unspent && spentIds.length) {
+    const saved = S.hand.filter(c => spentIds.includes(c.id));
+    if (saved.length) log(`✦ Second Breath — ${saved.map(c => displayName(c)).join(', ')} survives the casting.`, 'good');
+    spentIds = [];
+  }
   if (hasCharm('unspent') && S.lastOutcome === 'Complete' && spentIds.length) {
     const saved = S.hand.filter(c => spentIds.includes(c.id));
     if (saved.length) log(`✦ Unspent — ${saved.map(c => displayName(c)).join(', ')} survives the casting.`, 'good');
@@ -2529,7 +2568,8 @@ function endTurn() {
   }
   // ✦ HELD EMBER - attuning normally costs you the Catalyst for a while. This makes the pair
   // free, so you stop weighing "can I afford to spend this card as fuel" and start hunting matches.
-  const held = (hasCharm('heldember') && S.lastAttuned) ? cardById(S.assign.Element) : null;
+  const held = ((hasCharm('heldember') && S.lastAttuned) || (S.potionFx && S.potionFx.holdCatalyst))
+    ? cardById(S.assign.Element) : null;   // 🧪 Solvent is the one-shot Held Ember
   if (held && held !== kept && S.hand.includes(held))
     log(`✦ Held Ember — ${displayName(held)} stays in your hand.`, 'good');
   const returning = S.hand.filter(c => c !== kept && c !== held);
@@ -2650,6 +2690,150 @@ function evCurseNextFight() { S.curseNextFight = true; return 'A ward bites — 
 const rand = arr => arr[Math.floor(rnd() * arr.length)];
 
 const EVENTS = [
+  // ============================================================
+  // 🗺️ REGION-FLAVOURED AND POTION-BEARING EVENTS (added 2026-08-05, Thomas: *"add more
+  // events as well, that may give out potions. im already tired of seeing the same events"*).
+  //
+  // 🔑 THE PROBLEM WAS ARITHMETIC, NOT WRITING. The pool held TEN events and a run draws six or
+  // seven — so you saw most of the game's writing every single run. Doubling the pool roughly
+  // halves the repetition; REGION gating does the rest, because a Wilding Marches event simply
+  // cannot appear on the Verdant Edge road.
+  // ⚠️ Every option still pays in a DIFFERENT currency (travel · deck · coins · kit · nothing),
+  // and any option needing a card declares `pick` + `pickNote` — a picker must never offer what
+  // it cannot act on.
+  // ============================================================
+  { id: 'glassblower', name: "The Glassblower's Wagon",
+    flavor: "A wagon with its side folded down into a counter, and a woman inside blowing something small and violently orange. She does not look up. 'Two minutes. Don't breathe on it.'",
+    options: [
+      { label: '🪙 −7 — buy whatever she has finished', need: 'none',
+        when: () => S.coins >= 7,
+        apply: () => { S.coins -= 7; return [`You put the coins on the counter (−7, ${S.coins} left).`, evRandomPotion(true)]; } },
+      { label: 'Hold the bellows for her — a card you choose DIMS a level, and she pays you in glass', need: 'card',
+        pick: c => c.level > 1, pickNote: 'already Lv1 — nothing to give up',
+        apply: ({ card }) => ['You work the bellows until your arms shake — ' + evLevel(card, -1), evRandomPotion(true), evRandomPotion(false)] },
+      { label: 'Watch her work and move on', need: 'none',
+        apply: () => ['You watch the glass go from orange to gold to nothing at all. She still does not look up.'] },
+    ] },
+
+  { id: 'rainbarrel', name: 'The Rain-Barrel',
+    flavor: "Someone has left a barrel at the crossroads with a tin cup chained to it, and a note: FOR THE ROAD. NOT FOR THE GREEDY.",
+    options: [
+      { label: 'Take one cup, as asked', need: 'none',
+        apply: () => [evRandomPotion(false), 'You hang the cup back on its chain.'] },
+      { label: 'Take three', need: 'none',
+        apply: () => [evRandomPotion(true), evRandomPotion(true), 'Something in the water disagrees with you.', evTakeCurse()] },
+      { label: 'Fill the barrel instead — 🪙 −4, and the road remembers it', need: 'none',
+        when: () => S.coins >= 4,
+        apply: () => { S.coins -= 4; S.paceBless = 2; return [`You pay a carter to top it up (−4 coins, ${S.coins} left).`, 'The road ahead is kind to you — +2 Pace on your next two journeys.']; } },
+    ] },
+
+  { id: 'lamplighter', name: 'The Last Lamplighter',
+    flavor: "An old man on a ladder, working along a road with no lamps left on it. He is lighting the brackets anyway.",
+    options: [
+      { label: 'Light one with him — 🕯️ your candle catches', need: 'none',
+        apply: () => { const was = S.candle; lightCandle('you lit one together'); return [was ? 'Your candle was already lit; you light his instead, and he lets you.' : 'He cups his hand around yours until it takes.']; } },
+      { label: 'Ask why he bothers — he gives you something for the dark', need: 'none',
+        apply: () => ['"Somebody comes after," he says, as though that settled it.', evGrantPotion('nightglass')] },
+      { label: 'Take the oil from his can — 🪙 +9, and he says nothing at all', need: 'none',
+        apply: () => { S.coins += 9; return [`You take what is left in the can (+9 coins, ${S.coins}).`, 'He goes on lighting brackets behind you.', evTakeCurse()]; } },
+    ] },
+
+  { id: 'saltline', name: 'The Salt Line',
+    when: () => curseCount() > 0,
+    flavor: "A line of coarse salt poured across the road, ankle to ankle, still white. Someone drew it recently, and from this side.",
+    options: [
+      { label: 'Step across and leave something behind', need: 'none',
+        apply: () => ['You step over. Something does not follow.', evLiftCurse()] },
+      { label: 'Gather the salt — 🪙 +7, and whatever it was kept out is now walking with you', need: 'none',
+        apply: () => { S.coins += 7; return [`Good salt sells (+7 coins, ${S.coins}).`, evTakeCurse()]; } },
+      { label: 'Go the long way around', need: 'none',
+        apply: () => ['It costs you an hour and nothing else.'] },
+    ] },
+
+  { id: 'sunkenbell', name: 'The Sunken Bell', region: [2, 3],
+    flavor: "A bell-tower up to its shoulders in the marsh. The bell is still in it, and the water is still moving.",
+    options: [
+      { label: 'Ring it once — every card you hold rings with it (a card BRIGHTENS)', need: 'card',
+        pick: c => c.level < MAX_LEVEL, pickNote: 'already Lv4 — nothing to brighten',
+        apply: ({ card }) => ['The note goes out flat across the water — ' + evLevel(card, +1), 'Something a long way off stops moving to listen.', evCurseNextFight()] },
+      { label: 'Dive for what people threw in — 🪙 +11', need: 'none',
+        apply: () => { S.coins += 11; return [`You come up with a fistful of wishes (+11 coins, ${S.coins}).`]; } },
+      { label: 'Leave the bell alone', need: 'none',
+        apply: () => ['You walk past it. It rings anyway, once, behind you.'] },
+    ] },
+
+  { id: 'stormcrow', name: 'The Stormcrow', region: [3, 4],
+    flavor: "A bird the size of a dog on a milestone, entirely uninterested in you, watching the weather come.",
+    options: [
+      { label: 'Read the weather off it — 🕯️ you can see the road ahead again', need: 'none',
+        apply: () => { lightCandle('the bird shows you where the sky breaks'); return ['It tilts its head at the horizon, and you follow the line of its beak.']; } },
+      { label: 'Trade it your supper — 🪙 −5 for something it has been keeping', need: 'none',
+        when: () => S.coins >= 5,
+        apply: () => { S.coins -= 5; return [`It takes the bread with terrible dignity (−5 coins, ${S.coins} left).`, evRandomPotion(true)]; } },
+      { label: 'Throw a stone at it', need: 'none',
+        apply: () => ['It does not move. You feel worse about it than you expected.', evTakeCurse()] },
+    ] },
+
+  { id: 'quietforge', name: 'The Quiet Forge', region: [1, 2],
+    flavor: "A smithy with a cold fire and every tool hung exactly where it belongs. A slate by the door reads: BACK SOON — HELP YOURSELF, HONESTLY.",
+    options: [
+      { label: 'Do the work yourself — TWO cards brighten, and you arrive tired (Hardship next fight)', need: 'none',
+        apply: () => [...evUpgradeRandom(2), 'You leave the fire banked and your hands black.', evCurseNextFight()] },
+      { label: 'Leave honest payment — 🪙 −10, and take a finished piece', need: 'none',
+        when: () => S.coins >= 10,
+        apply: () => { S.coins -= 10; return [`You leave the coins on the slate (−10, ${S.coins} left).`, ...evUpgradeRandom(1), evRandomPotion(false)]; } },
+      { label: 'Take a tool and go', need: 'none',
+        apply: () => { S.coins += 8; return [`It is worth something to someone (+8 coins, ${S.coins}).`, 'The slate is still there when you look back.', evTakeCurse()]; } },
+    ] },
+
+  { id: 'longtable', name: 'The Long Table', region: [2, 3, 4],
+    flavor: "Twenty feet of trestle table in the middle of nowhere, laid for a great many people, none of whom are here. The food is warm.",
+    options: [
+      { label: 'Sit down and eat properly', need: 'none',
+        apply: () => ['You eat like someone who has been walking for a week, which you have.', evRandomPotion(false), ...evUpgradeRandom(1)] },
+      { label: 'Fill your pockets and keep walking', need: 'none',
+        apply: () => { S.coins += 6; return [`You take what will travel (+6 coins, ${S.coins}).`, evRandomPotion(false)]; } },
+      { label: 'Lay a place for whoever is late', need: 'none',
+        apply: () => { S.emberShield = true; S.paceBless = 2; return ['You set out one more cup and go.', 'The road treats you as one of its own — +2 Pace, and the night cannot take your Arsenal in this region.']; } },
+    ] },
+
+  { id: 'beggarking', name: 'The Beggar King', region: [3, 4],
+    flavor: "A man in the ruin of something that was once extremely expensive, holding out a hand with genuine authority.",
+    options: [
+      { label: 'Pay what he asks — 🪙 −12', need: 'none',
+        when: () => S.coins >= 12,
+        apply: () => { S.coins -= 12; return [`You put it in his hand (−12, ${S.coins} left).`, '"Good," he says, as if you had passed something.', ...evUpgradeRandom(2), evRandomPotion(true)]; } },
+      { label: 'Ask what he is king of', need: 'none',
+        apply: () => { const d = S.dragon ? S.dragon.name : 'it'; return [`"This road," he says. "All of it. Right up to where the ${d} starts being king instead."`, evRandomPotion(false)]; } },
+      { label: 'Walk past', need: 'none',
+        apply: () => ['He watches you the whole way, without resentment.'] },
+    ] },
+
+  { id: 'ashfall', name: 'Ashfall', region: [4],
+    flavor: "It has been snowing grey since noon and it is not snow. It settles on your shoulders and your pack and the road, and it is warm.",
+    options: [
+      { label: 'Push through it — a card DIMS, but you make up the ground (+2 Pace, next two journeys)', need: 'card',
+        pick: c => c.level > 1, pickNote: 'already Lv1 — nothing left to give',
+        apply: ({ card }) => { S.paceBless = 2; return ['You go on through it — ' + evLevel(card, -1), 'and come out ahead of where you should be.']; } },
+      { label: 'Shelter until it passes — rest, and drink something warm', need: 'none',
+        apply: () => ['You get under an overhang and wait it out.', evRandomPotion(false), evGrantPotion('clarity')] },
+      { label: 'Fill a jar with it — 🪙 +10 from someone who wants it', need: 'none',
+        apply: () => { S.coins += 10; return [`Someone always wants a jar of the mountain (+10 coins, ${S.coins}).`]; } },
+    ] },
+
+  { id: 'apothecary', name: 'The Roadside Apothecary',
+    flavor: "A shopfront built into the side of a hill, all little drawers, and a boy of about eleven minding it who clearly knows exactly what everything does.",
+    options: [
+      { label: 'Buy the good stuff — 🪙 −9', need: 'none',
+        when: () => S.coins >= 9,
+        apply: () => { S.coins -= 9; return [`He wraps it without being asked (−9 coins, ${S.coins} left).`, evRandomPotion(true)]; } },
+      { label: 'Trade a page of your book for two — a card you choose DIMS', need: 'card',
+        pick: c => c.level > 1, pickNote: 'already Lv1 — he cannot use it',
+        apply: ({ card }) => ['He reads it twice and copies nothing, which you appreciate — ' + evLevel(card, -1), evRandomPotion(false), evRandomPotion(false)] },
+      { label: 'Ask what he would take for the whole hill', need: 'none',
+        apply: () => { S.coins += 5; return ['"You could not," he says, "but here," and gives you back your own coin plus interest.', `(+5 coins, ${S.coins}.)`]; } },
+    ] },
+
   { id: 'wayshrine', name: 'The Guttered Wayshrine',
     flavor: "A pilgrim's candle-shrine, long cold. Relight the wick and the old craft repays the warmth — though a greedy flame may draw it from somewhere else.",
     options: [
@@ -2795,7 +2979,12 @@ function currentEventDef() { return EVENTS.find(e => e.id === S.event.id); }
 // — the run gets a story instead of a series of unrelated screens, and it costs one filter.
 function eventPool() {
   const seen = S.eventsSeen || [];
-  return EVENTS.filter(e => !(e.once && seen.includes(e.id)) && (!e.when || e.when()));
+  // 🗺️ an event may belong to a REGION (a number or a list). This is the cheap half of
+  // "stages are places" — the road through the Wilding Marches stops offering you the same
+  // wayshrine you saw in the Verdant Edge, at the cost of one field per event.
+  const here = e => !e.region || (Array.isArray(e.region) ? e.region.includes(S.region) : e.region === S.region);
+  const live = EVENTS.filter(e => !(e.once && seen.includes(e.id)) && (!e.when || e.when()) && here(e));
+  return live.length ? live : EVENTS.filter(e => !(e.once && seen.includes(e.id)) && (!e.when || e.when()));
 }
 function startEvent() {
   if (S.hand.length === 0) { finishRegionCheck(); return; } // nothing to act on
@@ -3791,9 +3980,10 @@ function duelArmour() {
 }
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
-  const armour = duelArmour() + (duelFx().armour || 0);   // 🐉 Bank the Forge
+  const quenched = !!(S.potionFx && S.potionFx.noShape);   // 🧪 Quenching Draught works on a dragon too
+  const armour = quenched ? 0 : duelArmour() + (duelFx().armour || 0);   // 🐉 Bank the Forge
   // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
-  const evaded = hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
+  const evaded = !quenched && hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
   let toHp = Math.max(0, r.value - armour);
   if (evaded) toHp = Math.floor(toHp / 2);
   return { toHp, armour, evaded };
