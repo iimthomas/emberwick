@@ -471,30 +471,8 @@ const RUNSIM = (() => {
       // Bot policy: take the first offer. It cannot price a rule-change across a whole run, so the
       // CHOICE is meaningless to it — what these runs measure is that each charm is survivable.
       else if (p === 'setout') { const o = (S.setout || [])[0]; if (o) pickSetout(o); else break; }
-      // 🐉 THE SLEEPING DRAGON — a press-your-luck, so the bot needs a POLICY, not a best play.
-      // SNEAK_POLICY is the measurement dial: how many steps it will attempt. It always commits the
-      // SLOWEST card that still clears the stir, keeping its fast cards for the duel.
-      else if (p === 'sneak') {
-        const st = S.sneak;
-        if (!canSneak() || st.step >= (window.SNEAK_POLICY == null ? 2 : window.SNEAK_POLICY)) { sneakStop(); }
-        else {
-          // 🎲 the stir is a BAND, so the bot bets like a player: it commits the slowest card
-          // whose Initiative clears at least the band's FLOOR, i.e. it accepts a real risk of
-          // waking it. A bot that only ever played guaranteed steps never gambled at all, which is
-          // how the fixed-stir version measured a 0% wake rate over a thousand runs.
-          // ⚠️ A BOT POLICY CAN INVERT THE THING YOU ARE MEASURING. The first version committed the
-          // slowest card clearing the band's FLOOR, which meant a LOWER stir made it pick a WORSE
-          // card - so lowering the stir raised the wake rate to 79% and the sweep read backwards.
-          // A player would never do that. Policy now: spend the cheapest card that is SAFE (clears
-          // the band's top); if none is safe, gamble with the fastest card you have.
-          const [lo, hi] = sneakBand(st.step);
-          const safe = S.hand.filter(c => eff(c).init > hi).sort((a, b) => eff(a).init - eff(b).init);
-          const fastest = S.hand.slice().sort((a, b) => eff(b).init - eff(a).init)[0];
-          if (safe.length) sneakStep(safe[0].id);
-          else if (fastest && eff(fastest).init > lo) sneakStep(fastest.id);
-          else sneakStop();
-        }
-      }
+      // ⚔️ THE LAST MILE is an ordinary journey turn — the 'assign' branch above already plays it,
+      // which is the whole point of Thomas's design: no new phase for the bot OR the player to learn.
       else if (p === 'summary') {
         const lv = allCards().map(c => c.level);
         m.regionAvg.push(mean(lv)); m.regionMax.push(Math.max(...lv));
@@ -508,8 +486,7 @@ const RUNSIM = (() => {
     }
     m.dragon = S.dragon.name;
     m.duelBeats = S.duelBeat;
-    m.sneakSteps = S.sneak ? S.sneak.step : 0;
-    m.sneakWoke = !!(S.sneak && S.sneak.woke);
+    m.lastMile = S.lastMileOutcome || null;
     m.dragonHPleft = S.dragonState ? S.dragonState.hp : null;
     m.res = { ...S.results };
     return m;

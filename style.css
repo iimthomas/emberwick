@@ -519,19 +519,8 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   background: #1c1810; border-color: #3a352b; color: #8a8577; }
 .dev-open:hover { opacity: 1; }
 
-/* 🐉 THE SLEEPING DRAGON — the press-your-luck at the lair mouth. Dark, quiet, and it states
-   every term: what you have earned, what one more step is worth, and what it is listening for. */
-.sneak { display: flex; flex-direction: column; gap: 8px; }
-.sneak-story { margin: 0; font-size: 13.5px; line-height: 1.55; color: #cbbf9f; }
-.sneak-rows { display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 10px; border-radius: 8px; border: 1px solid #3a352b; background: rgba(10,8,6,.45); }
-.sneak-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: #b3a488; }
-.sneak-row b { color: #f0e2c6; font-variant-numeric: tabular-nums; }
-.sneak-row b.good { color: #8fcf9a; }
-.sneak-row b.bad  { color: #e79a8a; }
-.sneak-ask { margin: 2px 0 0; font-size: 12.5px; color: #e8c67a; font-style: italic; }
-.sneak-stop { width: 100%; margin: 0; min-height: 44px; font-size: 13.5px;
-  background: #3f3a24; border-color: #c9b458; color: #f3e6c4; }
+/* ⚔️ THE LAST MILE — the deal, stated in the encounter box, because the deal IS the mechanic */
+.lastmile-deal { line-height: 1.6; }
 
 /* 🏕️ SETTING OUT — the opening class-charm pick. Deliberately unlike the Wheel: no prices, no
    grid, no shop furniture. It is a quiet moment before the road, so it reads as prose with three
