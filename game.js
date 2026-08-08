@@ -1153,7 +1153,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
-      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle,
+      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1203,6 +1203,8 @@ function loadGame() {
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
+      potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, swap: {} },
+      upgradePick: null,
       stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
@@ -1401,6 +1403,10 @@ function freshGame(stage) {
     pendingR: null,
     beatTimer: null,
     selectedId: null, // tap-to-place selection (touch)
+    potions: [],      // 🧪 carried, max POTION_CAP
+    potionPick: null, // 🧪 a targeted potion waiting for a card
+    potionFx: { init: 0, value: 0, soak: 0, swap: {} },  // ⚠️ wiped every turn
+    upgradePick: null,// 🔼 the card whose upgraded form is being previewed
     stack: null,          // 🃏 mid-exchange: { ids, order } while you stack the deck
     // the Dragon Duel finale:
     finalMode: false,     // true once Region 4 is cleared and the finale begins
@@ -1540,9 +1546,101 @@ function enhElOf(card) { return elOf(card); }
 // one action set for every turn — normal turns, the Approach, and the Duel all share it
 function activeZones() { return ZONES; }
 function isAssignPhase() { return S.phase === 'assign'; }
+
+// ============================================================
+// 🧪 POTIONS (2026-08-05, Thomas) — one-time, carried, spent on the turn you need them.
+//
+// 🔑 WHY THEY DO NOT BREAK *LATERAL POWER, NOT VERTICAL*: a potion is CONSUMED. It cannot
+// inflate a run the way a permanent stat would, and it cannot make a card better than it is - it
+// buys you ONE turn where the arrangement you wanted is legal. That is the same thing a charm does
+// (change what is correct) compressed into a single use, which is why they can be much louder.
+//
+// 🔑 AND THEY GIVE COINS A THIRD JOB. Coins bought levels and charms - both permanent, both
+// bought long before the turn that needs them. A potion is the first thing you can buy NOW and
+// spend LATER at a moment of your choosing, which is the only consumable decision in the game.
+//
+// ⚠️ HOLD THREE. A cap is what stops them becoming a savings account, and three is small enough
+// that taking one is a decision rather than an accumulation.
+// ⚠️ CLASS-GATED LIKE CHARMS: a potion may only name something PRINTED ON THE CARD, and one that
+// names an ELEMENT is a mage potion (`mage: true`) - a rogue's vial would say something else.
+// ⚠️ Every effect lasts THIS TURN only unless it says otherwise, and `S.potionFx` is wiped in
+// nextTurn() and in the finale's beat-starts. A potion that outlived its turn would be a charm.
+// ============================================================
+const POTION_CAP = 3;
+const POTIONS = [
+  // ---- generic: every class inherits these unchanged ----
+  { id: 'haste',   name: 'Draught of Haste', cost: 6, rarity: 'common',
+    text: '💨 <b>+5 Initiative</b> this turn' },
+  { id: 'ember',   name: 'Emberdraught',     cost: 7, rarity: 'common',
+    text: '⚔️ <b>+6</b> to your action this turn' },
+  { id: 'ironskin',name: 'Ironskin Tonic',   cost: 6, rarity: 'common',
+    text: '🛡️ every card <b>soaks +3</b> this turn' },
+  { id: 'clarity', name: 'Draught of Clarity', cost: 5, rarity: 'uncommon',
+    text: '🕯️ <b>relight your candle</b> — see the road ahead again' },
+  { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
+    text: '✨ <b>restore a card a level</b> — undo what the road took',
+    can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
+  // ---- mage: it names an ELEMENT, which is the mage's suit ----
+  { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', mage: true, pick: true,
+    text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
+    can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
+    why: 'nothing to change here' },
+];
+const potionById = id => POTIONS.find(p => p.id === id) || null;
+const potionPool = () => POTIONS.filter(p => !p.mage || CLASS.id === 'mage');
+function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
+function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
+
+// 🧪 drink it. Untargeted potions fire at once; a `pick` potion arms a card picker.
+function usePotion(id) {
+  if (!isAssignPhase()) return;
+  const p = potionById(id); if (!p || !(S.potions || []).includes(id)) return;
+  if (p.pick) {
+    if (!potionTargets(p).length) { log(`Nothing in your hand can take the ${p.name}.`, 'bad'); render(); return; }
+    S.potionPick = (S.potionPick === id) ? null : id;
+    render();
+    return;
+  }
+  spendPotion(id);
+  applyPotion(p, null);
+  render();
+}
+function usePotionOn(cardId) {
+  const p = potionById(S.potionPick); if (!p) return;
+  const card = cardById(cardId); if (!card || !potionCan(p, card)) return;
+  S.potionPick = null;
+  spendPotion(p.id);
+  applyPotion(p, card);
+  render();
+}
+function cancelPotion() { S.potionPick = null; render(); }
+function spendPotion(id) {
+  const i = (S.potions || []).indexOf(id);
+  if (i >= 0) S.potions.splice(i, 1);
+}
+function applyPotion(p, card) {
+  const fx = S.potionFx;
+  if (p.id === 'haste')    { fx.init += 5;  log(`🧪 ${p.name} — 💨 +5 Initiative this turn.`, 'good'); }
+  if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
+  if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
+  if (p.id === 'clarity')  { lightCandle('the draught clears your sight'); }
+  if (p.id === 'salve')    { card.level++; log(`🧪 ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
+  if (p.id === 'prism')    {
+    const el = elOf(spellCard());
+    fx.swap[card.id] = el;
+    log(`🧪 ${p.name} — ${card.def.name} runs ${el} for this turn.`, 'good');
+  }
+}
 function zoneOf(cardId) { return ZONES.find(z => S.assign[z] === cardId) || null; }
 
-function elOf(card) { return card.def.element; }
+// 🧪 a Prism Vial rewrites what a card IS for one turn — and because every element check in
+// the game funnels through here (attuning, banking, charms, Three of a Kind), that is the whole
+// implementation. One hook, no exceptions scattered through the maths.
+function elOf(card) {
+  const sw = S.potionFx && S.potionFx.swap;
+  if (sw && card && sw[card.id]) return sw[card.id];
+  return card.def.element;
+}
 
 // ============================================================
 // logging
@@ -1632,6 +1730,7 @@ function nextTurn() {
   S.damage = 0;
   S.damageEl = null;
   S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -1837,7 +1936,7 @@ function computeAction(reserve) {
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = a.init;
+  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostEff = h === 'Night Travel' ? Math.max(0, boostVal - elemInit) : boostVal;
   const nightCut = boostVal - boostEff;
@@ -1855,7 +1954,7 @@ function computeAction(reserve) {
     if (h === 'Ambush') early *= 2;
     if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
-    const base = pileVal;
+    const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
     const withBoost = base + boostEff;
     // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
     // an elemental attack - a rule no non-elemental class could ever join - but a SHAPE, stated
@@ -1891,7 +1990,7 @@ function computeAction(reserve) {
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
   }
   const wrongType = false;
-  const base = pileVal;
+  const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
@@ -2171,7 +2270,7 @@ function soakValue(card) {
   if (armor <= 0) return 0;
   const v = verbOf(card);
   const frost = v && v.name === 'Frostbite' ? 4 : 0;      // ✦ Frostbite soaks well beyond its plate
-  return armor + frost + charmMod('soak', card.def.element);
+  return armor + frost + charmMod('soak', card.def.element) + (S.potionFx ? S.potionFx.soak : 0);   // 🧪 Ironskin
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -2266,49 +2365,26 @@ function upgradable(card) {
 }
 
 // build one offer; `rich` (camp) leans rarer
+// 🔑 THE WHEEL SELLS WHAT ONLY A SHOP CAN SELL. Card levels moved out on 2026-08-05 - you now
+// choose those freely in the 🔼 upgrade phase - so what is left here is 🎁 CHARMS (permanent rule
+// changes) and 🧪 POTIONS (one-time, carried, spent when you decide). That is a cleaner division
+// than "three random things": the shop sells POWER, and sharpening your own deck is not shopping.
 function rollOffer(rich) {
-  const roll = rnd();
-  const heldCharms = S.charms || [];
-  const pool = CHARMS.filter(c => !heldCharms.includes(c.id) && !c.curse &&
-    (rich ? true : c.rarity !== 'rare'));
-  // a Charm shows up more often at camp
-  if (pool.length && roll < (rich ? 0.5 : 0.28)) {
-    const c = rand(pool);
-    return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost };
-  }
-  // 🔑 CARD OFFERS COME FROM YOUR HAND ONLY (2026-07-26). Upgrading a name in a list you haven't
-  // seen for five turns is abstract and unsatisfying - you buy without knowing what you bought.
-  // Offering the four cards in front of you makes the purchase tangible, and it interlocks with
-  // the Stack: to sharpen a particular card, STACK IT TO RETURN SOON and buy it when it lands.
-  // The timing is already right - the Wheel fires before Cleanup, so you can still see which
-  // cards you poured into the spell (leaving for the region) and which are sliding back under
-  // the deck (returning soon). That is the decision: invest in later, or in sooner.
-  const owned = S.hand.slice();
-  const hurt = owned.filter(c => c.level < MAX_LEVEL && c.level <= 2);
-  if (hurt.length && roll < (rich ? 0.62 : 0.42)) {
-    const c = rand(hurt);
-    return { kind: 'repair', cardId: c.id, name: c.def.name,
-             text: `Mend ${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: Math.max(2, c.level) };
-  }
-  // 🔑 YOU MAY NOT UPGRADE WHAT YOU JUST BLUNTED (bug fixed 2026-07-29). The old upgrade menu
-  // enforced this via upgradable(); the Wheel replaced that menu and never inherited the check,
-  // so you could be KNOCKED OUT, have four cards downgraded, and buy one straight back up in the
-  // same breath. Damage has to stick for at least the turn or coins are an undo button.
-  // ⚠️ This matters far more once Lv4 abilities land: losing a verb and re-buying it in the same
-  // shop would gut the whole "a verb you can LOSE is what makes protecting it a decision".
-  // `repair` offers are the sanctioned way to mend damage — deliberately a separate, priced kind.
-  const up = owned.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id));
-  if (!up.length) return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
-  const c = rand(up);
-  return { kind: 'upgrade', cardId: c.id, name: c.def.name,
-           text: `${c.def.name} → Lv${c.level + 1}<div class="wo-delta">${levelDeltaText(c)}</div>`, rarity: 'common', cost: eff(c).cost || 2 };
+  const held = S.charms || [];
+  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && (rich ? true : c.rarity !== 'rare'));
+  const potPool = potionPool();
+  const roomForPotion = (S.potions || []).length < POTION_CAP;
+  const mkCharm = () => { const c = rand(charmPool);
+    return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost }; };
+  const mkPotion = () => { const p = rand(potPool);
+    return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
+  const wantPotion = roomForPotion && potPool.length && rnd() < (rich ? 0.45 : 0.55);
+  if (wantPotion) return mkPotion();
+  if (charmPool.length) return mkCharm();
+  if (roomForPotion && potPool.length) return mkPotion();
+  return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
 }
 
-// ONE OFFER PER CARD (2026-07-26). The match jackpot - the same card twice at half price - made
-// sense when offers came from all 17 owned cards and a repeat was a rare windfall. Now that they
-// come from a 4-card hand, repeats are common and the "jackpot" is just a way to buy two levels
-// at once: a Lv2 card could reach Lv4 in a single shop, skipping the whole progression arc. The
-// second offer's printed delta was stale too (it still showed Lv2->Lv3 while selling Lv3->Lv4).
 function spinWheel(rich) {
   const offers = [];
   const taken = new Set();
@@ -2316,9 +2392,9 @@ function spinWheel(rich) {
     let o = null;
     for (let tries = 0; tries < 12; tries++) {
       o = rollOffer(rich);
-      if (!o.cardId || !taken.has(o.cardId)) break;
+      if (!o.id || !taken.has(o.id)) break;
     }
-    if (o && o.cardId) taken.add(o.cardId);
+    if (o && o.id) taken.add(o.id);
     offers.push(o);
   }
   return offers;
@@ -2329,6 +2405,19 @@ function spinWheel(rich) {
 // nobody out there selling you anything. Mechanically it matters too: the duel is a race between
 // its HP and your remaining cards, and a shop mid-race lets you buy your way out of the very
 // pressure the fight is made of. Coins keep, so nothing is lost — you spend them next run.
+// 🔼 UPGRADING IS A FREE CHOICE AGAIN (2026-08-05, Thomas: *"i want you to pick whatever card
+// you want to upgrade in your hand like the original game"*).
+//
+// The Wheel had been rolling three random offers, one of which might be an upgrade. That made the
+// purchase tangible (it offered cards from your hand rather than names in a list) but it also made
+// it a LOTTERY: the card you wanted to sharpen simply might not appear. Choosing is the older,
+// better version - and it leaves the Wheel to do the thing only a shop can do, which is sell you
+// 🎁 charms and 🧪 potions.
+//
+// ⚠️ THE COST OF THE CHANGE, STATED: the Wheel's randomness was a soft brake on always sharpening
+// your best card. Free choice removes it, so *sharpening solves the Spell slot* (biggest-card-is-
+// correct rises with deck level) gets slightly worse. Watch it; the answer if it bites is a
+// steeper cost curve, never taking the choice back.
 function startUpgrade() {
   // ⚠️ the two finale phases resume differently: the Approach runs the normal turn tail, the Duel
   // sequences its own beats. Sending the Duel through finishTurn() would stall the fight outright.
@@ -2336,8 +2425,29 @@ function startUpgrade() {
     if (S.finalPhase === 'duel') duelCleanupAndNext(); else finishTurn();
     return;
   }
-  startWheel(false);
+  S.upgradePick = null;
+  S.phase = 'upgrade';
+  render();
 }
+
+// 🔼 tap a card to see what it BECOMES; tap again to buy it
+function pickUpgrade(id) {
+  if (S.phase !== 'upgrade') return;
+  S.upgradePick = (S.upgradePick === id) ? null : id;
+  render();
+}
+function buyUpgrade(id) {
+  if (S.phase !== 'upgrade') return;
+  const card = cardById(id); if (!card || !upgradable(card)) return;
+  const cost = eff(card).cost;
+  S.coins -= cost;
+  card.level++;
+  log(`🔼 ${card.def.name} sharpens to Lv${card.level} (−${cost} coins, ${S.coins} left).` +
+      (card.level >= MAX_LEVEL && VERBS[card.def.name] ? ` ✦ It gains <b>${VERBS[card.def.name].name}</b>.` : ''), 'good result');
+  S.upgradePick = null;
+  render();
+}
+function doneUpgrades() { startWheel(false); }
 
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
@@ -2349,31 +2459,19 @@ function wheelBuy(i) {
   const w = S.wheel; if (!w) return;
   const o = w.offers[i];
   if (!o || o.kind === 'none' || o.bought || o.cost > S.coins) return;
-  // The match jackpot deliberately offers the SAME card twice — buying both would push it past
-  // Lv4 and off the end of its level table. Validate BEFORE the coins leave your hand.
-  if (o.kind === 'upgrade' || o.kind === 'repair') {
-    const c = anyCardById(o.cardId);
-    if (!c || c.level >= MAX_LEVEL) { o.bought = true; log(`${o.name} is already at its peak — nothing to buy.`); render(); return; }
+  if (o.kind === 'potion' && (S.potions || []).length >= POTION_CAP) {
+    log(`You can carry only ${POTION_CAP} potions.`, 'bad'); render(); return;
   }
   S.coins -= o.cost;
   if (o.kind === 'charm') {
     S.charms.push(o.id);
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
-  } else {
-    const card = anyCardById(o.cardId);
-    if (!card) return;
-    card.level++;
-    log(`${o.kind === 'repair' ? 'Mended' : 'Upgraded'} ${card.def.name} to Lv${card.level} (−${o.cost} coins)`, 'good');
+  } else if (o.kind === 'potion') {
+    S.potions.push(o.id);
+    log(`🧪 ${o.name} goes in your kit — ${o.text} (−${o.cost} coins)`, 'good result');
   }
   o.bought = true;
-  render();
-}
-
-function wheelReroll() {
-  if (!S.wheel || S.coins < REROLL_COST) return;
-  S.coins -= REROLL_COST;
-  S.wheel.offers = spinWheel(S.wheel.rich);
-  log(`Re-spun the wheel (−${REROLL_COST} coins, ${S.coins} left)`);
+  saveGame();
   render();
 }
 
@@ -2385,7 +2483,7 @@ function wheelDone() {
 }
 
 // kept as an alias so the solver/older callers still work — coins now simply roll over
-function doneUpgrading() { wheelDone(); }
+function doneUpgrading() { if (S.phase === 'upgrade') { doneUpgrades(); return; } wheelDone(); }
 
 // ---------- Phase 5: cleanup (automatic — the Reserve is always kept) ----------
 // 🔑 CLEANUP (2026-07-26). What you POURED INTO THE SPELL is spent - discarded, gone for the
@@ -3127,6 +3225,17 @@ function renderControls() {
         `<span class="lesson-btns"><button class="primary" onclick="learned('${L.id}')">got it</button>` +
         `<button onclick="S.lessonsOff=true;render()">hide tips</button></span></div>`
       : '';
+    // 🧪 YOUR KIT. Potions are useless if you forget you have them, so they sit ON the turn
+    // screen with their full text, not behind a menu.
+    const kit = (S.potions || []).map(id => potionById(id)).filter(Boolean);
+    const potionRow = kit.length
+      ? `<div class="kit-row">` + kit.map((p, i) =>
+          `<button class="kit-potion${S.potionPick === p.id ? ' arming' : ''}" onclick="usePotion('${p.id}')">` +
+          `<b>🧪 ${p.name}</b><span class="kit-text">${p.text}</span></button>`).join('') +
+        (S.potionPick ? `<div class="kit-ask">Tap a card to use the <b>${potionById(S.potionPick).name}</b> on it — ` +
+          `<button onclick="cancelPotion()">cancel</button></div>` : '') +
+        `</div>`
+      : '';
     const wakeRow = S.wake > 0
       ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
         Object.keys(WAKE_TARGETS).map(k =>
@@ -3144,6 +3253,7 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
+      potionRow +
       wakeRow +
       boostRow +
       resolveBtn +
@@ -3197,6 +3307,16 @@ function renderControls() {
         `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
         (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
       `</div>`;
+  } else if (S.phase === 'upgrade') {
+    const can = S.hand.filter(c => upgradable(c));
+    const cheapest = S.hand.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id))
+      .map(c => eff(c).cost).filter(x => x != null).sort((a, b) => a - b)[0];
+    c.innerHTML =
+      `<div class="phase-label">🔼 SHARPEN — 🪙 ${S.coins}</div>` +
+      `<div class="hint">Tap any card to see <b>exactly what it becomes</b>, then sharpen it. ` +
+      (can.length ? `` : cheapest != null ? `You need <b>🪙 ${cheapest}</b> for the cheapest. ` : `Nothing here can be sharpened. `) +
+      `A level makes a card <b>more itself</b> — its best stat rises and its worst falls.</div>` +
+      `<button class="primary" onclick="doneUpgrades()">Done sharpening →</button>`;
   } else if (S.phase === 'wheel') {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
@@ -3454,6 +3574,13 @@ function roleButtons(card) {
 }
 
 function cardHTML(card) {
+  // 🔼 THE UPGRADE PREVIEW. Thomas: *"it should basically look like the card but in its upgraded
+  // form. i don't want to just see text saying what number changes to what number."*
+  // 🔑 So we render THE SAME CARD RENDERER against a card one level higher. A hand-written preview
+  // could drift from the real thing; this one cannot, by construction - it is the real thing.
+  const real = card;
+  const previewing = S.phase === 'upgrade' && S.upgradePick === card.id && card.level < MAX_LEVEL;
+  if (previewing) card = { ...card, level: card.level + 1 };
   const v = eff(card);
   const d = card.def;
   const wasDowngraded = S.downgraded.has(card.id);
@@ -3474,7 +3601,13 @@ function cardHTML(card) {
   if (S.diverting) {
     action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
 
-    } else if (isAssignPhase() && S.selectedId === card.id) {
+    } else if (isAssignPhase() && S.potionPick) {
+    // ⚠️ A PICKER MUST NEVER OFFER WHAT IT CANNOT ACT ON — same rule the event pickers learned.
+    const p = potionById(S.potionPick);
+    action = potionCan(p, card)
+      ? `<div class="card-action"><button onclick="usePotionOn(${card.id})">🧪 Use the ${p.name} here</button></div>`
+      : `<div class="card-action muted">${p.why || 'not this one'}</div>`;
+  } else if (isAssignPhase() && S.selectedId === card.id) {
     action = roleButtons(card);
   }
   if (S.phase === 'stack') {
@@ -3503,16 +3636,20 @@ function cardHTML(card) {
       ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
       : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
   } else if (S.phase === 'upgrade') {
-    // show the cost on EVERY card so the economy is visible, greyed out when blocked
-    if (card.level >= MAX_LEVEL) {
-      action = `<div class="card-action muted">max level</div>`;
-    } else if (wasDowngraded) {
-      action = `<div class="card-action muted">downgraded — can't upgrade</div>`;
+    // ⚠️ every number here reads off `real`, never the previewed copy — the cost of the NEXT
+    // level is not the cost printed by the level you are looking at.
+    if (real.level >= MAX_LEVEL) {
+      action = `<div class="card-action muted">already at Lv${MAX_LEVEL}</div>`;
+    } else if (S.downgraded.has(real.id)) {
+      action = `<div class="card-action muted">blunted this turn — can't sharpen</div>`;
     } else {
-      const cost = eff(card).cost;
+      const cost = eff(real).cost;
       const ok = cost <= S.coins;
-      action = `<div class="card-action"><button onclick="upgrade(${card.id})" ${ok ? '' : 'disabled'}>Upgrade to Lv${card.level + 1} — 🪙 ${cost}${ok ? '' : ' (not enough)'}</button>` +
-        `<div class="wo-delta">${levelDeltaText(card)}</div></div>`;
+      action = previewing
+        ? `<div class="card-action"><button class="primary" onclick="buyUpgrade(${real.id})" ${ok ? '' : 'disabled'}>` +
+          `Sharpen to Lv${real.level + 1} — 🪙 ${cost}${ok ? '' : ' (not enough)'}</button>` +
+          `<button onclick="pickUpgrade(${real.id})">back</button></div>`
+        : `<div class="card-action"><button onclick="pickUpgrade(${real.id})">See Lv${real.level + 1} — 🪙 ${cost}</button></div>`;
     }
   }
 
@@ -3534,7 +3671,7 @@ function cardHTML(card) {
       : placementBan(card.id, 'Element') ? '🐌 too fast for the CATALYST' : null)
     : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
-  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '');
+  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') + (previewing ? ' card-preview' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';
 
@@ -3614,6 +3751,7 @@ function startLastMile() {
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -3754,6 +3892,7 @@ function startDuelBeat() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);

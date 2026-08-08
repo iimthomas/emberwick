@@ -519,6 +519,27 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   background: #1c1810; border-color: #3a352b; color: #8a8577; }
 .dev-open:hover { opacity: 1; }
 
+/* 🧪 POTIONS — your kit sits on the turn screen, because a potion you forget you own is
+   a potion that does nothing. Full text, not an icon. */
+.kit-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.kit-potion { display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  margin: 0; padding: 5px 9px; text-align: left; max-width: 100%;
+  border: 1px solid #4a6a7a; border-radius: 8px;
+  background: linear-gradient(160deg, #16262e, #131b22); color: #cfe4ee; }
+.kit-potion:hover:not(:disabled) { background: linear-gradient(160deg, #1d3540, #17222b); border-color: #7ab6cf; }
+.kit-potion.arming { border-color: #c9b458; box-shadow: 0 0 0 2px rgba(201,180,88,.35); }
+.kit-potion b { font-size: 12.5px; }
+.kit-text { font-size: 11px; color: #9fb8c4; line-height: 1.35; font-weight: 400; }
+.kit-ask { flex: 1 0 100%; font-size: 12px; color: #e8c67a; font-style: italic; }
+.kit-ask button { margin: 0 0 0 6px; padding: 1px 8px; font-size: 11px; }
+
+/* 🔼 the upgrade preview — the card, one level up. Marked so you never mistake it for the
+   card you own; everything inside it is the real renderer, so it cannot drift. */
+.card.card-preview { border-color: #c9b458; box-shadow: 0 0 0 2px rgba(201,180,88,.45), 0 0 22px rgba(201,180,88,.18); }
+.card.card-preview .card-level { color: #ffe6a3; }
+.preview-tag { position: absolute; top: 0; right: 0; padding: 2px 8px; font-size: 10px;
+  letter-spacing: .1em; background: #c9b458; color: #201c10; border-radius: 0 8px 0 8px; font-weight: bold; }
+
 /* ⚔️ THE LAST MILE — the deal, stated in the encounter box, because the deal IS the mechanic */
 .lastmile-deal { line-height: 1.6; }
 

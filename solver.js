@@ -433,15 +433,23 @@ const RUNSIM = (() => {
         if (next) stackPick(next.id); else break;
       }
       else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
-      else if (p === 'upgrade') { const up = S.hand.filter(c => upgradable(c)).sort((a, b) => b.level - a.level)[0]; if (up) upgrade(up.id); else doneUpgrading(); }
+      // 🔼 SHARPEN — free choice from hand now (the Wheel stopped selling levels 2026-08-05).
+      // Bot policy: buy the most expensive card it can afford, i.e. sharpen the sharpest, then stop.
+      else if (p === 'upgrade') {
+        const up = S.hand.filter(c => upgradable(c)).sort((a, b) => eff(b).cost - eff(a).cost)[0];
+        if (up) buyUpgrade(up.id); else doneUpgrades();
+      }
       // THE WHEEL (replaced the upgrade menu). Bot policy: never re-spin (coins bank fine),
       // buy the best affordable offer — upgrade > repair > charm — then close.
       else if (p === 'wheel') {
         const w = S.wheel;
-        const rank = { upgrade: 3, repair: 2, charm: 1 };
+        // ⚠️ the Wheel now sells CHARMS and POTIONS only. The bot never DRINKS a potion (it
+        // scores one encounter and cannot price a saved consumable), so potion buys are noise to it.
+        const rank = { charm: 2, potion: 1 };
         const buyable = w.offers
           .map((o, i) => ({ o, i }))
           .filter(x => x.o && x.o.kind !== 'none' && !x.o.bought && x.o.cost <= S.coins)
+          .filter(x => x.o.kind !== 'potion' || (S.potions || []).length < POTION_CAP)
           .sort((a, b) => (rank[b.o.kind] || 0) - (rank[a.o.kind] || 0));
         if (buyable.length) { m.buys = (m.buys || 0) + 1; wheelBuy(buyable[0].i); }
         else wheelDone();
