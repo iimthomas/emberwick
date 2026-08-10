@@ -735,7 +735,7 @@ const TUTORIAL = {
       text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
-      text: 'Your spent cards slide back <b>under your deck</b> — and you choose the order. Tap them in the order you want to see them again.' },
+      text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
     { id: 'wheel', when: () => S.phase === 'wheel',
       point: '#controls-panel',
       text: 'Coins buy levels. A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else.' },
@@ -1004,8 +1004,8 @@ const RULE_CHARMS = [
     text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
     why: 'the smallest sufficient Spell becomes the whole game' },
   { id: 'reversed', tier: 1, name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
-    text: '🃏 When your cards return, send each one to the <b>TOP</b> or the <b>BOTTOM</b>',
-    why: 'the Stack gains a second axis — not just the order, but how soon' },
+    text: '🃏 <b>Choose</b> where your returning cards go — each to the <b>TOP</b> or the <b>BOTTOM</b> of your deck',
+    why: 'without it they return in slot order; this is control over your own deck' },
   { id: 'slowfoot', tier: 3, name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
@@ -1367,7 +1367,20 @@ function gradeBadge(stage) {
 // ⚠️ PLACEHOLDERS MUST SAY THEY ARE PLACEHOLDERS. The 🚫 ban list needs the real unlock system
 // first ([[Charm_Pools]]); the Collection screen states that outright rather than showing a
 // button that lies.
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+// ⚠️ A SAVE THAT CANNOT LOAD MUST NOT OFFER TO CONTINUE. `hasSave()` used to answer "is there
+// a blob?", so a save from an older build (or a corrupt one) put a Continue button on the menu
+// that silently dumped you on the stages screen with your run gone and no explanation. That is
+// the same silent-failure class as the v:4-vs-v:3 bug of 2026-07-29 — and it will happen to every
+// playtester the next time card or dragon data changes. Say it out loud instead.
+function saveState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return 'none';
+    const d = JSON.parse(raw);
+    return (d && d.v === SAVE_VERSION) ? 'ok' : 'stale';
+  } catch (e) { return 'stale'; }
+}
+function hasSave() { return saveState() === 'ok'; }
 function showMenu() {
   S = S || {};
   S.phase = 'menu';
@@ -2811,8 +2824,23 @@ function endTurn() {
   // returning cards is a question with no possible answer - exactly the weightless decision the
   // tempo doc warns about ("a weightless decision is not a rest, it is homework").
   const noStack = S.finalMode && S.finalPhase === 'lastmile';
-  const stackWorth = returning.length > 1 || (hasCharm('reversed') && returning.length === 1);
-  if (stackWorth && !noStack) { startStack(returning, poured.length, kept); return; }
+  // 🃏 THE STACK IS NO LONGER A PHASE BY DEFAULT (2026-08-05). Thomas: *"the reordering of the
+  // 2 cards in hand is still an annoying step at the end"* — and the measurement had already said
+  // exactly that: the Stack spans **2 points** of Complete rate across a whole run, and it fired on
+  // **94% of turns**. For a human all four slots are always filled, so the returning set is almost
+  // always exactly TWO cards: a two-option choice, every single turn, worth almost nothing.
+  //
+  // 🔑 That is the definition of the thing [[Tempo_And_The_Watch]] warns about — *a weightless
+  // decision is not a rest, it is homework*. So the default is now automatic (cards return in SLOT
+  // ORDER, left to right, which you already chose when you arranged the row), and 🃏 REVERSED is
+  // what brings the phase back.
+  //
+  // 🔑 AND THAT MAKES REVERSED A BETTER CHARM: it is no longer "the same decision, relocated" —
+  // it is *the charm that gives you control over your deck order at all*. The phase only exists
+  // when you bought the right to it.
+  if (hasCharm('reversed') && returning.length && !noStack) {
+    startStack(returning, poured.length, kept); return;
+  }
   finishCleanup(returning, poured.length, false, kept);
 }
 
@@ -2848,6 +2876,12 @@ function finishStack() {
 }
 
 function finishCleanup(returning, spentCount, ordered, kept, topList) {
+  // 🃏 with no Stack phase, the row you arranged IS the order — Catalyst returns before Surge.
+  // Position is already the role; now it is the schedule too, at no extra tap.
+  if (!ordered) {
+    const seat = c => { const z = zoneOf(c.id); const i = ZONES.indexOf(z); return i < 0 ? 99 : i; };
+    returning = returning.slice().sort((a, b) => seat(a) - seat(b));
+  }
   S.hand = S.hand.filter(c => !returning.includes(c));
   // 🃏 REVERSED (rewritten 2026-08-05, Thomas: *"that + arsenal, every hand will look the same
   // pretty much? maybe the charm gives you a choice to put that card at the top or bottom"*).
@@ -3867,8 +3901,13 @@ function renderControls() {
     c.innerHTML =
       `<div class="menu">` +
       `<p class="menu-tag">A candle, sixteen cards, and something old at the end of the road.</p>` +
-      (hasSave() ? `<button class="primary menu-item" onclick="resumeRun()"><b>▶ Continue</b>` +
-        `<span>pick up the run you left</span></button>` : '') +
+      (saveState() === 'ok'
+        ? `<button class="primary menu-item" onclick="resumeRun()"><b>▶ Continue</b>` +
+          `<span>pick up the run you left</span></button>`
+        : saveState() === 'stale'
+        ? `<div class="menu-note">⚠️ Your last run can't be restored — the game changed underneath it. ` +
+          `Your cleared stages and grades are safe.</div>`
+        : '') +
       `<button class="${hasSave() ? '' : 'primary '}menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
         `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'begin — stage 0 teaches the game'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
       `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
