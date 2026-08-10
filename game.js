@@ -838,6 +838,41 @@ function dragonDemand(d) {
 
 // ---------- THE LADDER'S MEMORY (survives runs; separate key from the run save) ----------
 const LADDER_KEY = 'emberwick-ladder-1';
+
+// ============================================================
+// 🏆 THE WALL (2026-08-05) — the grade, kept.
+//
+// 🔑 WHY THIS IS THE RETENTION FIX AND NOT A COSMETIC. [[Market_And_Retention]] found that
+// Emberwick has no BUILD DISCOVERY by design, so the genre's usual reason to replay is switched
+// off — and what replaces it has to be MASTERY. The grade already scores mastery; it just
+// evaporated the moment you closed the run. A board you can see is what turns "I beat it" into
+// "I beat it with a C", which is the whole of Balatro's 15 decks × 8 stakes in miniature.
+//
+// ⚠️ IT KEEPS THE BEST, NEVER THE LAST — a wall you can lose progress on is a punishment, and
+// the grade already grades a LOSS (a perfect losing run reaches ~75). Its own key, separate from
+// the run save, so wiping a run never wipes the record.
+const GRADE_KEY = 'emberwick-grades-1';
+function bestGrades() {
+  try { return JSON.parse(localStorage.getItem(GRADE_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function recordGrade(stage, g, won) {
+  if (stage == null) return;
+  try {
+    const all = bestGrades(), key = String(stage), prev = all[key];
+    if (!prev || g.total > prev.total) {
+      all[key] = { total: g.total, letter: g.letter, won: !!won };
+      localStorage.setItem(GRADE_KEY, JSON.stringify(all));
+    }
+  } catch (e) {}
+}
+// the one-line summary of the whole board — what is left to do, not what is done
+function wallSummary() {
+  const all = bestGrades();
+  const stages = [0, ...DRAGONS.map(d => d.stage)];
+  const got = stages.filter(n => all[String(n)]).length;
+  const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
+  return { graded: got, total: stages.length, perfect: s_ };
+}
 function stagesCleared() {
   try { return Math.max(0, Math.min(DRAGONS.length, +localStorage.getItem(LADDER_KEY) || 0)); }
   catch (e) { return 0; }
@@ -1170,7 +1205,7 @@ function saveGame() {
       pendingEvent: S.pendingEvent, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
-      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions,
+      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1220,6 +1255,7 @@ function loadGame() {
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
+      contract: d.contract || null,
       potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
       upgradePick: null,
       stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
@@ -1305,6 +1341,14 @@ function devJump() {
   S.coins = 0;
   log(`🔧 DEV — jumped to stage ${stage} (${cfg.label} deck: ${S.deck.length} cards, ${deckLevels()} levels vs par ${S.dragon.par}) · candle ${S.candle ? 'lit' : 'out'}${d.charm ? ' · ' + charmById(d.charm).name : ''}`, 'good');
   beginFinalBattle();
+}
+
+// 🏆 the badge on a stage button — your best, and what is still above it
+function gradeBadge(stage) {
+  const g = bestGrades()[String(stage)];
+  if (!g) return `<span class="grade-badge none" title="not yet graded">—</span>`;
+  return `<span class="grade-badge g-${g.letter}" title="best: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
+    `${g.letter}<span class="gb-score">${g.total}</span></span>`;
 }
 
 // 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
@@ -1420,6 +1464,7 @@ function freshGame(stage) {
     pendingR: null,
     beatTimer: null,
     selectedId: null, // tap-to-place selection (touch)
+    contract: null,   // 📜 { id, n } — one at a time, expires at the region break
     potions: [],      // 🧪 carried, max POTION_CAP
     potionPick: null, // 🧪 a targeted potion waiting for a card
     potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },  // ⚠️ wiped every turn
@@ -1472,6 +1517,7 @@ function newGame() {
 
 function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
+  expireContract();   // 📜 the bound is what makes it a bet
   S.regionTurn = 0;
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
@@ -1594,6 +1640,63 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // pays more than a scrape, which was the point — it just stopped being an income firehose.
 const COMPLETE_BONUS = 2;
 const POTION_CAP = 3;
+
+// ============================================================
+// 📜 QUEST CONTRACTS (2026-08-05, Thomas — from *GuildRun*: *"you could buy some items that
+// gives you a quest to complete… win 3 combats, get 25 gold, and it costed like 7 gold"*).
+//
+// 🔑 YOU SPEND COINS TO BUY A GOAL, AND THE GOAL PAYS OUT IF YOU MEET IT. A shop slot that
+// sells not power but **a reason to play the next five turns differently** — which is exactly the
+// kind of variety this game is allowed to have: *variety comes from PROBLEMS, never from powers*
+// ([[Quest_Contracts]]). A contract is a second, self-imposed problem laid over the encounters you
+// were going to face anyway.
+//
+// 🔑 IT COSTS NO NEW RULES. Every contract reads engine state the engine already tracks —
+// outcomes, Initiative, attunement, damage taken. No verb on a card, no exception to the turn.
+// ⚠️ ONE AT A TIME, AND IT EXPIRES AT THE REGION BREAK. That bound is what makes it a GAMBLE
+// against your own play rather than a slow-burning bonus you always take.
+// ⚠️ Declarative on purpose (`track` + `need`), so the whole table ports as data and only
+// `contractTick()` is behaviour — see the port-ready rule in CLAUDE.md.
+const CONTRACTS = [
+  { id: 'ledger',  name: 'The Clean Ledger', cost: 7, reward: 22, need: 3, track: 'complete',
+    text: '⚔️ <b>Complete 3</b> encounters this region' },
+  { id: 'swift',   name: 'Swift Passage',    cost: 6, reward: 18, need: 4, track: 'initiative',
+    text: '💨 <b>Win Initiative 4</b> times this region' },
+  { id: 'woven',   name: 'The Woven Road',   cost: 6, reward: 18, need: 4, track: 'attune',
+    text: '✦ <b>Attune 4</b> times this region' },
+  { id: 'untouched', name: 'Untouched',      cost: 8, reward: 26, need: 3, track: 'unhurt',
+    text: '🛡️ Finish <b>3</b> encounters <b>taking no damage</b>' },
+  { id: 'longwalk', name: 'The Long Walk',   cost: 5, reward: 16, need: 2, track: 'journey',
+    text: '👣 <b>Complete 2 journeys</b> this region' },
+];
+const contractById = id => CONTRACTS.find(c => c.id === id) || null;
+function activeContract() { return S.contract ? contractById(S.contract.id) : null; }
+
+// 📜 one place reads the turn and moves the counter. Everything else is data.
+function contractTick(r) {
+  const c = activeContract(); if (!c || !r) return;
+  const hurt = (r.early || 0) + (r.combatDmg || 0) + (r.timePenalty || 0) + (r.treacherousDmg || 0);
+  let hit = false;
+  if (c.track === 'complete')   hit = r.outcome === 'Complete';
+  if (c.track === 'initiative') hit = r.type === 'fight' && !r.initLost;
+  if (c.track === 'attune')     hit = !!r.enhUsed;
+  if (c.track === 'unhurt')     hit = hurt === 0 && r.outcome !== 'Loss';
+  if (c.track === 'journey')    hit = r.type === 'journey' && r.outcome === 'Complete';
+  if (!hit) return;
+  S.contract.n++;
+  if (S.contract.n >= c.need) {
+    S.coins += c.reward;
+    log(`📜 <b>${c.name}</b> — kept. 🪙 +${c.reward} (you now hold ${S.coins}).`, 'good result');
+    S.contract = null;
+  } else {
+    log(`📜 ${c.name}: ${S.contract.n} of ${c.need}.`);
+  }
+}
+function expireContract() {
+  const c = activeContract(); if (!c) return;
+  log(`📜 <b>${c.name}</b> lapses unkept — ${S.contract.n} of ${c.need}. The coin is gone.`, 'bad');
+  S.contract = null;
+}
 const POTIONS = [
   // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
   // fill up these things as well"*). Cheap, small, and correct about one turn in five.
@@ -2291,6 +2394,7 @@ function finishResolve() {
   const e = S.encounter;
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   S.results[r.outcome]++;
+  contractTick(r);   // 📜 a contract reads the turn the engine already resolved
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
   S.lastOutcome = r.outcome;
@@ -2481,11 +2585,32 @@ function rollOffer(rich) {
     for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
     const p = rand(bag);
     return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
-  const wantPotion = roomForPotion && potPool.length && rnd() < (rich ? 0.45 : 0.55);
-  if (wantPotion) return mkPotion();
-  if (charmPool.length) return mkCharm();
-  if (roomForPotion && potPool.length) return mkPotion();
-  return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
+  // 📜 a contract only appears when you have none — never at camp (which sits on the region
+  // break, where a fresh one would expire before you could keep it), and ⚠️ NEVER WHEN THERE IS
+  // NO LONGER TIME TO KEEP IT. Measured before this gate: the bot bought 9.4 contracts a run and
+  // kept 0.76, burning ~50 coins on promises the region ended before it could meet. That is the
+  // picker rule again — an offer you cannot act on is a trap, not a gamble.
+  const turnsLeft = Math.max(0, REGION_ENCOUNTERS - (S.regionTurn || 0));
+  // ⚠️ AND IT NEEDS SLACK, NOT JUST ROOM. `need === turnsLeft` means a perfect run or nothing,
+  // which is a coin-flip dressed as a goal; measured that way the keep rate sat near 23%. Demanding
+  // one spare encounter turns it into a bet you can actually plan around.
+  if (!S.contract && !rich && turnsLeft >= 3 && rnd() < 0.28) {
+    const fits = CONTRACTS.filter(x => x.need < turnsLeft);
+    if (!fits.length) return mkCharmOrPotion();
+    const c = rand(fits);
+    return { kind: 'contract', id: c.id, name: c.name, text: c.text +
+      `<div class="wo-delta">🪙 pays <b>${c.reward}</b> · <b>${turnsLeft}</b> encounter${turnsLeft === 1 ? '' : 's'} left this region</div>`,
+      rarity: 'uncommon', cost: c.cost };
+  }
+  return mkCharmOrPotion();
+
+  function mkCharmOrPotion() {
+    const wantPotion = roomForPotion && potPool.length && rnd() < (rich ? 0.45 : 0.55);
+    if (wantPotion) return mkPotion();
+    if (charmPool.length) return mkCharm();
+    if (roomForPotion && potPool.length) return mkPotion();
+    return { kind: 'none', name: 'Nothing here', text: 'Nothing to be had this spin', rarity: 'common', cost: 0 };
+  }
 }
 
 function spinWheel(rich) {
@@ -2578,6 +2703,10 @@ function wheelBuy(i) {
   if (o.kind === 'charm') {
     S.charms.push(o.id);
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
+  } else if (o.kind === 'contract') {
+    const c = contractById(o.id);
+    S.contract = { id: o.id, n: 0 };
+    log(`📜 You take on <b>${c.name}</b> — ${c.text} (−${o.cost} coins). Keep it and it pays 🪙 ${c.reward}.`, 'good result');
   } else if (o.kind === 'potion') {
     S.potions.push(o.id);
     log(`🧪 ${o.name} goes in your kit — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -3322,6 +3451,11 @@ function carried() {
   if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
   if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
   if (S.curseNextFight) out.push({ curse: true, name: 'Followed', text: '⚠️ next fight carries a Hardship' });
+  // 📜 a contract is a run-layer promise with a deadline — exactly the thing the 2026-07-29
+  // rule says must be on screen every turn, with its PROGRESS, not just its name
+  const ct = activeContract();
+  if (ct) out.push({ curse: false, name: ct.name,
+    text: `📜 ${S.contract.n}/${ct.need} · pays 🪙 ${ct.reward}` });
   return out;
 }
 const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
@@ -3692,13 +3826,17 @@ function renderControls() {
       `<div class="phase-label">🗺️ THE STAGES</div>` +
       `<div class="summary"><p>Each stage is a different <b>question</b>, not simply a bigger number. ` +
       `Beat one and the next opens — but every stage you have cleared stays open, so you can always go back.</p></div>` +
-      `<button class="primary stage" onclick="startStage(0)"><b>🎓 Stage 0 — the Emberling</b>` +
+      (() => { const w = wallSummary();
+        return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} stages graded` +
+          (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') +
+          `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
+      `<button class="primary stage" onclick="startStage(0)"><b>🎓 Stage 0 — the Emberling</b>${gradeBadge(0)}` +
       `<span class="stage-shape">a short, gentle run that teaches the game · always open</span></button>` +
       DRAGONS.map(d => {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
-          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>` +
+          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? gradeBadge(d.stage) : ''}` +
           `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
           `</button>`;
       }).join('') +
@@ -4273,6 +4411,8 @@ function duelCleanupAndNext() {
 
 function defeat(msg) {
   log(`💀 DEFEAT — ${msg}`, 'bad result');
+  // 🏆 a graded loss still goes on the wall — death is part of the game, not a blank
+  if (S.dragon) recordGrade(S.dragon.stage, gradeRun(false), false);
   S.defeatMsg = msg;
   S.phase = 'defeat';
   render();
@@ -4347,6 +4487,7 @@ function victory() {
   const score = survivors.reduce((t, c) => t + c.level, 0);
   const was = stagesCleared();
   clearStage(S.dragon.stage);
+  recordGrade(S.dragon.stage, gradeRun(true), true);
   const next = dragonForStage(S.dragon.stage + 1);
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
   if (next && S.dragon.stage > was) log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');

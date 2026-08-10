@@ -445,11 +445,17 @@ const RUNSIM = (() => {
         const w = S.wheel;
         // ⚠️ the Wheel now sells CHARMS and POTIONS only. The bot never DRINKS a potion (it
         // scores one encounter and cannot price a saved consumable), so potion buys are noise to it.
-        const rank = { charm: 2, potion: 1 };
+        // ⚠️ THE BOT NEVER BUYS A 📜 CONTRACT. It scores one encounter and cannot price a promise
+        // about the next three, so it bought 6 a run and kept 1.4 — pure noise that dragged every
+        // stage number down by ~8 points. Same blind spot as the Emberwake bank and Unspent:
+        // anything paying off in the FUTURE reads as a cost to it. Contract value is a feel
+        // question and only a human answers it.
+        const rank = { charm: 3, potion: 1 };
         const buyable = w.offers
           .map((o, i) => ({ o, i }))
           .filter(x => x.o && x.o.kind !== 'none' && !x.o.bought && x.o.cost <= S.coins)
           .filter(x => x.o.kind !== 'potion' || (S.potions || []).length < POTION_CAP)
+          .filter(x => x.o.kind !== 'contract')
           .sort((a, b) => (rank[b.o.kind] || 0) - (rank[a.o.kind] || 0));
         if (buyable.length) { m.buys = (m.buys || 0) + 1; wheelBuy(buyable[0].i); }
         else wheelDone();

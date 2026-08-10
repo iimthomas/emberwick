@@ -519,6 +519,21 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   background: #1c1810; border-color: #3a352b; color: #8a8577; }
 .dev-open:hover { opacity: 1; }
 
+/* 🏆 THE WALL — the grade kept, on the stage it was earned on. Quiet until it has something
+   to say; the S is the only one that shouts. */
+.wall-line { font-size: 12.5px; color: #b3a488; margin: 0 0 8px; }
+.wall-line .dim { color: #8a8577; }
+.grade-badge { float: right; min-width: 34px; text-align: center; margin-left: 8px;
+  padding: 1px 7px; border-radius: 7px; font-size: 13px; font-weight: bold;
+  background: #1c1810; border: 1px solid #4a4436; color: #cfc9ba; }
+.grade-badge.none { color: #55514a; border-style: dashed; font-weight: normal; }
+.grade-badge .gb-score { display: block; font-size: 9.5px; font-weight: normal; opacity: .7; }
+.grade-badge.g-S { border-color: #e8c67a; color: #ffe6a3; box-shadow: 0 0 12px rgba(232,198,122,.28); }
+.grade-badge.g-A { border-color: #8fcf9a; color: #b6e6bd; }
+.grade-badge.g-B { border-color: #7ab6cf; color: #b0dcec; }
+.grade-badge.g-C { border-color: #a09070; color: #cbbf9f; }
+.grade-badge.g-D { border-color: #8a5a52; color: #e0b0a8; }
+
 /* 🧪 POTIONS — your kit sits on the turn screen, because a potion you forget you own is
    a potion that does nothing. Full text, not an icon. */
 .kit-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
