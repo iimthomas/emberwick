@@ -519,6 +519,36 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
   background: #1c1810; border-color: #3a352b; color: #8a8577; }
 .dev-open:hover { opacity: 1; }
 
+/* the shell screens have no run behind them — give the controls the whole stage */
+body.shell #status-bar, body.shell #encounter-panel, body.shell #slots-panel { display: none; }
+body.shell #scene { display: none; }
+
+/* 🏠 THE MAIN MENU — a shelf, deliberately plain. Continue is the only loud thing. */
+.menu { display: flex; flex-direction: column; gap: 7px; }
+.menu-tag { margin: 2px 0 8px; font-size: 13px; color: #b3a488; font-style: italic; line-height: 1.5; }
+.menu-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; margin: 0; padding: 10px 13px; text-align: left; min-height: 54px; }
+.menu-item b { font-size: 15px; }
+.menu-item span { font-size: 12px; color: #b3a488; font-weight: 400; }
+.menu-item.quiet { opacity: .6; }
+.menu-item.quiet:hover { opacity: 1; }
+
+/* 🎁 THE COLLECTION — what can be offered, and when */
+.coll { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.coll-tier h4 { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: #c9b458; margin-bottom: 4px; font-weight: 600; }
+.coll-tier h4 .dim { color: #8a8577; font-weight: 400; letter-spacing: 0; }
+.coll-row { padding: 4px 9px; margin-bottom: 3px; border-radius: 6px;
+  background: #1c1810; border-left: 2px solid #4a4436; font-size: 12.5px; }
+.coll-row.is-mage { border-left-color: #b58ee0; }
+.coll-row b { color: #f0e2c6; margin-right: 6px; }
+.coll-tag { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: #b58ee0; margin-right: 6px; }
+.coll-text { color: #b3a488; }
+.coll-soon { margin: 8px 0; padding: 8px 11px; border-radius: 7px;
+  background: rgba(201,180,88,.07); border: 1px dashed #4a4436;
+  font-size: 12.5px; color: #b3a488; line-height: 1.5; }
+
 /* 🏆 THE WALL — the grade kept, on the stage it was earned on. Quiet until it has something
    to say; the S is the only one that shouts. */
 .wall-line { font-size: 12.5px; color: #b3a488; margin: 0 0 8px; }

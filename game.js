@@ -1351,6 +1351,32 @@ function gradeBadge(stage) {
     `${g.letter}<span class="gb-score">${g.total}</span></span>`;
 }
 
+// ============================================================
+// 🏠 THE MAIN MENU (2026-08-05, Thomas: *"wonder if we should make an actual main menu?
+// feels like we will need some sort of placeholder one with all these features coming in,
+// especially the charm and banning stuff"*).
+//
+// 🔑 IT IS A SHELF, NOT A FEATURE. The meta layer has been accumulating with nowhere to live —
+// the wall, the charm pool, the dev jump — and all of it was being bolted onto the stages screen,
+// which was turning the first thing you see into a junk drawer. A menu is where run-layer things
+// (stages) and META-layer things (what you have unlocked) stop competing for the same screen.
+//
+// ⚠️ CONTINUE COMES FIRST AND IT IS THE DEFAULT. Emberwick is played daily as an installed PWA;
+// booting into a menu instead of a run would put a tap between Thomas and the game he opened it
+// to play. One tap, top of the list, only shown when a save exists.
+// ⚠️ PLACEHOLDERS MUST SAY THEY ARE PLACEHOLDERS. The 🚫 ban list needs the real unlock system
+// first ([[Charm_Pools]]); the Collection screen states that outright rather than showing a
+// button that lies.
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function showMenu() {
+  S = S || {};
+  S.phase = 'menu';
+  S.encounter = null;
+  render();
+}
+function resumeRun() { if (loadGame()) render(); else showStages(); }
+function showCollection() { S = S || {}; S.phase = 'collection'; S.encounter = null; render(); }
+
 // 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
 // so picking one is the same act as choosing which problem you want to solve tonight.
 function showStages() {
@@ -1512,7 +1538,7 @@ function freshGame(stage) {
 
 // always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
 function newGame() {
-  if (confirm('Start a new run? Your current run will be lost.')) showStages();
+  if (confirm('Leave this run? It will be lost.')) showMenu();
 }
 
 function nextRegion() {
@@ -3411,7 +3437,27 @@ function renderScene() {
     `<div class="scene-vig"></div>`;
 }
 
+// 🏠 THE SHELL — screens that exist OUTSIDE a run and must not assume one.
+// ⚠️ The stages screen only ever worked because boot used to call freshGame() first, so `S`
+// always held a run even on a menu. Booting to a real menu broke that assumption immediately
+// (`renderStatus` reads `S.deck[0]`). Anything reachable before a run starts belongs in here.
+const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev'];
+const isShell = () => SHELL_PHASES.includes(S && S.phase);
+
 function render() {
+  if (isShell()) {
+    document.body.className = 'phase-' + S.phase + ' shell';
+    $('turn-indicator').textContent = `build ${BUILD}`;
+    $('status-bar').innerHTML = '';
+    $('encounter-panel').innerHTML = ''; $('encounter-panel').className = '';
+    $('slots-panel').innerHTML = '';
+    const sc = $('scene'); if (sc) sc.innerHTML = '';
+    renderControls();
+    // ⚠️ the log belongs to a RUN. On the shell there may be no run at all, so show the last
+    // one's entries if they exist and nothing if they don't — never assume the array is there.
+    if (S.logEntries) renderLog(); else $('log').innerHTML = '';
+    return;
+  }
   normalizeAssign();
   saveGame();
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
@@ -3793,6 +3839,44 @@ function renderControls() {
           `<button class="primary" onclick="introNext(1)">${last ? 'Begin ▸' : 'Next ▸'}</button>` +
         `</div>` +
       `</div>`;
+  } else if (S.phase === 'menu') {
+    const w = wallSummary();
+    const cleared = stagesCleared();
+    c.innerHTML =
+      `<div class="menu">` +
+      `<p class="menu-tag">A candle, sixteen cards, and something old at the end of the road.</p>` +
+      (hasSave() ? `<button class="primary menu-item" onclick="resumeRun()"><b>▶ Continue</b>` +
+        `<span>pick up the run you left</span></button>` : '') +
+      `<button class="${hasSave() ? '' : 'primary '}menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
+        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'begin — stage 0 teaches the game'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
+        `<span>the charms and potions you can be offered</span></button>` +
+      `<button class="menu-item quiet" onclick="showDev()"><b>🔧 Dev</b>` +
+        `<span>jump straight to a dragon</span></button>` +
+      `</div>`;
+  } else if (S.phase === 'collection') {
+    // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
+    // the only meta fact the player currently has — and says plainly that unlocking and banning
+    // are not built yet, rather than showing a button that lies.
+    const tierName = t => ['', 'stage 1+', 'stage 2+', 'stage 3+', 'stage 4'][t] || 'always';
+    const group = t => CHARMS.filter(x => !x.curse && (x.tier || 1) === t);
+    const rows = [1, 2, 3, 4].map(t => {
+      const list = group(t); if (!list.length) return '';
+      return `<div class="coll-tier"><h4>${tierName(t)} <span class="dim">· ${list.length}</span></h4>` +
+        list.map(x => `<div class="coll-row${x.mage ? ' is-mage' : ''}">` +
+          `<b>${x.name}</b>${x.mage ? '<span class="coll-tag">mage</span>' : ''}` +
+          `<span class="coll-text">${x.text}</span></div>`).join('') + `</div>`;
+    }).join('');
+    c.innerHTML =
+      `<div class="phase-label">🎁 COLLECTION</div>` +
+      `<div class="hint">Charms are offered by <b>stage</b> for now — a stand-in for unlocking them by play. ` +
+      `Deeper stages draw from a wider pool, so later dragons are met by a stronger mage.</div>` +
+      `<div class="coll">${rows}</div>` +
+      `<div class="coll-soon">🚧 <b>Not built yet:</b> unlocking charms by <b>runs played</b>, and the ` +
+      `🚫 <b>ban list</b> — one charm disabled per five unlocked, so you shape the pool without ` +
+      `pre-solving the run. Both wait on the real unlock system.</div>` +
+      `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
+      `<button class="primary" onclick="showMenu()">← Back</button>`;
   } else if (S.phase === 'dev') {
     const d = S.dev;
     const dragon = DRAGONS.find(x => x.stage === d.stage) || DRAGONS[0];
@@ -3818,7 +3902,7 @@ function renderControls() {
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
-      `<button onclick="showStages()">Back</button>` +
+      `<button onclick="showMenu()">← Menu</button>` +
       `</div>`;
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
@@ -3840,7 +3924,7 @@ function renderControls() {
           `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
           `</button>`;
       }).join('') +
-      `<button class="dev-open" onclick="showDev()">🔧 Dev — jump straight to a dragon</button>`;
+      `<button class="dev-open" onclick="showMenu()">← Menu</button>`;
   } else if (S.phase === 'victory') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -4497,4 +4581,5 @@ function victory() {
 }
 
 // go — restore a saved run if one exists, else start fresh
-if (!loadGame()) freshGame();
+// 🏠 boot to the menu. A saved run is offered, never forced — and never silently discarded.
+showMenu();
