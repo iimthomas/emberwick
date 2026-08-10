@@ -1300,6 +1300,7 @@ const DEV_DECKS = {
   strong:   { label: 'Strong',   cards: 16, offset: +6,  hint: 'a run that went well' },
 };
 function showDev() {
+  if (!DEV_ENABLED) return;   // 🔧 not in the playtest build
   S = S || {};
   S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '' };
   S.phase = 'dev';
@@ -1381,6 +1382,24 @@ function saveState() {
   } catch (e) { return 'stale'; }
 }
 function hasSave() { return saveState() === 'ok'; }
+
+// 🔧 THE PLAYTEST BUILD IS A URL FLAG, NOT A SECOND PAGE (2026-08-05).
+//
+// Thomas: *"maybe we need to make a separate build/page for the playtesting build?"* — the need is
+// real (a tester who clicks 🔧 Dev jumps straight to a dragon and never sees the run, which wastes
+// the whole session), but a second HTML file would mean two cache-busters and two script lists to
+// keep in step, and stale HTML has already cost us a debugging session once.
+//
+// So: `?dev` shows the dev tools, and the bare URL does not.
+//   • friends get   https://iimthomas.github.io/emberwick/
+//   • Thomas gets   https://iimthomas.github.io/emberwick/?dev
+// 🔑 And because it is the START URL that matters for a PWA, installing from the ?dev link keeps
+// the tools on his home screen while everyone else's install has none. One build, no drift.
+// ⚠️ It is a courtesy, not a lock — anyone can type ?dev. That is fine; the point is that nobody
+// stumbles into it.
+const DEV_ENABLED = (() => {
+  try { return /(^|[?&])dev\b/.test(location.search); } catch (e) { return false; }
+})();
 function showMenu() {
   S = S || {};
   S.phase = 'menu';
@@ -3908,12 +3927,17 @@ function renderControls() {
         ? `<div class="menu-note">⚠️ Your last run can't be restored — the game changed underneath it. ` +
           `Your cleared stages and grades are safe.</div>`
         : '') +
-      `<button class="${hasSave() ? '' : 'primary '}menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
-        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'begin — stage 0 teaches the game'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      // 📖 the tutorial gets its own door. It used to be the first button on the STAGES screen,
+      // which meant a new player had to go looking for the thing that teaches them the game.
+      `<button class="${(hasSave() || cleared) ? '' : 'primary '}menu-item" onclick="startStage(0)">` +
+        `<b>📖 Tutorial</b>${gradeBadge(0)}` +
+        `<span>learn the game in one short run · always open</span></button>` +
+      `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
+        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
       `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
         `<span>the charms and potions you can be offered</span></button>` +
-      `<button class="menu-item quiet" onclick="showDev()"><b>🔧 Dev</b>` +
-        `<span>jump straight to a dragon</span></button>` +
+      (DEV_ENABLED ? `<button class="menu-item quiet" onclick="showDev()"><b>🔧 Dev</b>` +
+        `<span>jump straight to a dragon</span></button>` : '') +
       `</div>`;
   } else if (S.phase === 'collection') {
     // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
@@ -3975,8 +3999,8 @@ function renderControls() {
         return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} stages graded` +
           (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') +
           `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
-      `<button class="primary stage" onclick="startStage(0)"><b>🎓 Stage 0 — the Emberling</b>${gradeBadge(0)}` +
-      `<span class="stage-shape">a short, gentle run that teaches the game · always open</span></button>` +
+      // 📖 the tutorial lives on the MENU now — one door per thing
+
       DRAGONS.map(d => {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
