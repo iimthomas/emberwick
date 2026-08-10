@@ -426,11 +426,17 @@ const RUNSIM = (() => {
         const pool = st.ids.filter(id => !st.order.includes(id)).map(id => cardById(id)).filter(Boolean);
         // 📏 the stack POLICY is switchable so measure.js can A/B it. If ordering the returned
         // cards never moves a run-level number, the Stack is decoration and should be told so.
+        // 🃏 under Reversed the Stack has a SECOND axis. Bot policy: send the biggest card up
+        // (it wants it again next hand) and everything else down — a plausible human split, and
+        // one that never degenerates into "all top", which is the trap the charm now allows.
+        const rev = hasCharm('reversed');
         const pol = HOOK.stackPolicy || 'big';
         const next = pol === 'random' ? pool[Math.floor(Math.random() * pool.length)]
           : pol === 'small' ? pool.slice().sort((a, b) => bigness(a) - bigness(b))[0]
           : pool.slice().sort((a, b) => bigness(b) - bigness(a))[0];
-        if (next) stackPick(next.id); else break;
+        if (!next) break;
+        if (rev) stackPick(next.id, st.order.length === 0 ? 'top' : 'bottom');
+        else stackPick(next.id);
       }
       else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
       // 🔼 SHARPEN — free choice from hand now (the Wheel stopped selling levels 2026-08-05).

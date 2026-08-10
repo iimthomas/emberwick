@@ -1004,8 +1004,8 @@ const RULE_CHARMS = [
     text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
     why: 'the smallest sufficient Spell becomes the whole game' },
   { id: 'reversed', tier: 1, name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
-    text: '🃏 Returning cards go to the <b>TOP</b> of your deck, not the bottom',
-    why: 'the Stack stops being a schedule and becomes next turn\'s hand' },
+    text: '🃏 When your cards return, send each one to the <b>TOP</b> or the <b>BOTTOM</b>',
+    why: 'the Stack gains a second axis — not just the order, but how soon' },
   { id: 'slowfoot', tier: 3, name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
@@ -2811,21 +2811,25 @@ function endTurn() {
   // returning cards is a question with no possible answer - exactly the weightless decision the
   // tempo doc warns about ("a weightless decision is not a rest, it is homework").
   const noStack = S.finalMode && S.finalPhase === 'lastmile';
-  if (returning.length > 1 && !noStack) { startStack(returning, poured.length, kept); return; }
+  const stackWorth = returning.length > 1 || (hasCharm('reversed') && returning.length === 1);
+  if (stackWorth && !noStack) { startStack(returning, poured.length, kept); return; }
   finishCleanup(returning, poured.length, false, kept);
 }
 
 // 🃏 THE STACK - you choose the order your returning cards come back in, so you aren't dealt
 // next turn's hand, you write it.
 function startStack(cards, spentCount, kept) {
-  S.stack = { ids: cards.map(c => c.id), order: [], spent: spentCount, keptId: kept ? kept.id : null };
+  // 🃏 `dest` only exists under 🃏 Reversed — without it every card goes to the bottom as always
+  S.stack = { ids: cards.map(c => c.id), order: [], dest: {}, spent: spentCount, keptId: kept ? kept.id : null };
   S.phase = 'stack';
   render();
 }
-function stackPick(id) {
+// 🃏 `where` is 'top' | 'bottom', and only 🃏 Reversed ever passes it.
+function stackPick(id, where) {
   const st = S.stack; if (!st) return;
   if (!st.ids.includes(id) || st.order.includes(id)) return;
   st.order.push(id);
+  if (where === 'top') st.dest[id] = 'top';
   if (st.order.length >= st.ids.length) { finishStack(); return; }
   render();
 }
@@ -2833,20 +2837,35 @@ function stackClear() { if (S.stack) { S.stack.order = []; render(); } }
 function finishStack() {
   const st = S.stack; if (!st) return;
   const rest = st.ids.filter(id => !st.order.includes(id));
-  const ordered = [...st.order, ...rest].map(id => cardById(id)).filter(Boolean);
+  const seq = [...st.order, ...rest];
+  const ordered = seq.map(id => cardById(id)).filter(Boolean);
+  // 🃏 the cards you sent UP, in the order you sent them
+  const top = seq.filter(id => st.dest[id] === 'top').map(id => cardById(id)).filter(Boolean);
   const spent = st.spent || 0;
   const kept = st.keptId ? cardById(st.keptId) : null;
   S.stack = null;
-  finishCleanup(ordered, spent, true, kept);
+  finishCleanup(ordered, spent, true, kept, top);
 }
 
-function finishCleanup(returning, spentCount, ordered, kept) {
+function finishCleanup(returning, spentCount, ordered, kept, topList) {
   S.hand = S.hand.filter(c => !returning.includes(c));
-  // 🃏 REVERSED - the Stack normally schedules cards several turns out, which the measurement
-  // said is worth about 2 points of Complete rate. Put them on TOP and the same ordering decision
-  // is about the hand you are holding NEXT TURN. Same rule, completely different weight.
-  if (hasCharm('reversed')) S.deck.unshift(...returning);
-  else S.deck.push(...returning);
+  // 🃏 REVERSED (rewritten 2026-08-05, Thomas: *"that + arsenal, every hand will look the same
+  // pretty much? maybe the charm gives you a choice to put that card at the top or bottom"*).
+  //
+  // ⚠️ HE IS RIGHT, AND THE FIRST VERSION WAS ACTIVELY BAD. Sending EVERY returning card to the
+  // top meant your next hand was: the Arsenal you kept + the Catalyst + the Surge + one new card.
+  // Three of four cards the same, every single turn - and because you never cycle past them, the
+  // rest of the deck stops arriving at all. A charm that makes the hand REPEAT is the exact
+  // opposite of "variety comes from the problems and the hand".
+  //
+  // 🔑 So it is a CHOICE PER CARD now, which also fixes the other thing measurement complained
+  // about: the Stack was worth ~2 points of Complete rate, i.e. nearly weightless homework.
+  // Two axes - the order AND how soon - is a real decision, and "send everything up" is still
+  // available but self-punishing, which is what makes picking correctly a skill.
+  const up = (topList || []).filter(c => returning.includes(c));
+  const down = returning.filter(c => !up.includes(c));
+  if (up.length) S.deck.unshift(...up);
+  if (down.length) S.deck.push(...down);
   const before = S.hand.length;
   draw(HAND_SIZE - S.hand.length);
   log(`Cleanup: ${spentCount} spent on the spell — gone. ` +
@@ -3722,7 +3741,10 @@ function renderControls() {
     const left = st.ids.length - st.order.length;
     c.innerHTML =
       `<div class="phase-label">🃏 STACK THE DECK</div>` +
-      `<div class="hint">Your spent cards slide back <b>under the deck</b>. Tap them in the order you want to <b>draw them again</b> — ① comes back soonest. ` +
+      (hasCharm('reversed')
+        ? `<div class="hint">🃏 <b>Reversed</b> — send each card to the <b>↑ top</b> (you will draw it next hand) or the <b>↓ bottom</b> (much later). ` +
+          `⚠️ Send everything up and you stop seeing the rest of your deck. `
+        : `<div class="hint">Your spent cards slide back <b>under the deck</b>. Tap them in the order you want to <b>draw them again</b> — ① comes back soonest. `) +
       `<b>${left}</b> left to place. <span class="note">(${S.deck.length} cards ahead of them` +
       `${st.keptId ? ` — your Arsenal ${displayName(cardById(st.keptId))} stays in hand` : ''})</span></div>` +
       // There must ALWAYS be a way forward. Without this the phase had no button at all, so a
@@ -4104,9 +4126,18 @@ function cardHTML(card) {
     const st = S.stack;
     if (st && st.ids.includes(card.id)) {
       const pos = st.order.indexOf(card.id);
-      action = pos >= 0
-        ? `<div class="card-action muted">${'①②③④'[pos]} returns ${pos === 0 ? 'first' : pos === st.ids.length - 1 ? 'last' : 'next'}</div>`
-        : `<div class="card-action"><button onclick="stackPick(${card.id})">Place ${'①②③④'[st.order.length]} — draw this back ${st.order.length === 0 ? 'soonest' : 'after'}</button></div>`;
+      const rev = hasCharm('reversed');
+      if (pos >= 0) {
+        const where = st.dest[card.id] === 'top' ? '↑ top of the deck' : '↓ under the deck';
+        action = `<div class="card-action muted">${'①②③④'[pos]} · ${rev ? where : (pos === 0 ? 'returns first' : pos === st.ids.length - 1 ? 'returns last' : 'returns next')}</div>`;
+      } else if (rev) {
+        // 🃏 the charm's whole decision, on the card it is about
+        action = `<div class="card-action stack-two">` +
+          `<button onclick="stackPick(${card.id},'top')">↑ Top — next hand</button>` +
+          `<button onclick="stackPick(${card.id},'bottom')">↓ Bottom — much later</button></div>`;
+      } else {
+        action = `<div class="card-action"><button onclick="stackPick(${card.id})">Place ${'①②③④'[st.order.length]} — draw this back ${st.order.length === 0 ? 'soonest' : 'after'}</button></div>`;
+      }
     } else {
       action = `<div class="card-action muted">stays in hand</div>`;
     }

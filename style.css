@@ -523,6 +523,10 @@ body.phase-soak .card .s-boost, body.phase-soak .card .card-enh { opacity: .3; }
 body.shell #status-bar, body.shell #encounter-panel, body.shell #slots-panel { display: none; }
 body.shell #scene { display: none; }
 
+/* 🃏 Reversed turns the Stack into two buttons per card — order AND destination */
+.card-action.stack-two { display: flex; gap: 4px; }
+.card-action.stack-two button { flex: 1 1 0; font-size: 11.5px; padding: 5px 4px; }
+
 /* 🏠 THE MAIN MENU — a shelf, deliberately plain. Continue is the only loud thing. */
 .menu { display: flex; flex-direction: column; gap: 7px; }
 .menu-tag { margin: 2px 0 8px; font-size: 13px; color: #b3a488; font-style: italic; line-height: 1.5; }
