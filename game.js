@@ -585,19 +585,19 @@ let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned
 // ⚠️ IT IS A GUIDE, NOT A VERDICT. At stage 4, decks below par still win 24% of the time and
 // decks above it still lose. Never phrase it as a prediction, and never gate anything on it.
 const DRAGONS = [
-  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 44,
+  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 52,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 47,
+  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 55,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 60,
+  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 68,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 42,
+  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 50,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -1589,7 +1589,10 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ Until now they paid EXACTLY THE SAME - the award was gated on `outcome !== 'Loss'` - so a
 // Narrow cost you damage and your 🕯️ candle and nothing else. Paying for the clean win is the
 // obvious missing incentive, and it raises income without inflating a Loss.
-const COMPLETE_BONUS = 3;
+// ⚠️ TRIMMED 3 → 1 on 2026-08-05 after the level-table fix made cards much stronger: Thomas
+// reported "charms and potions are really good too, getting completes easy". The clean win still
+// pays more than a scrape, which was the point — it just stopped being an income firehose.
+const COMPLETE_BONUS = 2;
 const POTION_CAP = 3;
 const POTIONS = [
   // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
