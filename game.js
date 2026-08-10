@@ -898,29 +898,29 @@ function shapeText(e) {
 //   mods: armor/atk (optionally element-gated) · init · pace · boost · soak · coin
 // ============================================================
 const CHARMS = [
-  { id: 'emberheart',  name: 'Emberheart',      rarity: 'common', cost: 5,
+  { id: 'emberheart', tier: 1,  name: 'Emberheart',      rarity: 'common', cost: 5,
     text: '🔥 Fire cards gain +1 armor',            mods: { armor: 1, el: 'Fire' } },
-  { id: 'tideglass',   name: 'Tideglass Bead',   rarity: 'common', cost: 5,
+  { id: 'tideglass', tier: 1,   name: 'Tideglass Bead',   rarity: 'common', cost: 5,
     text: '💧 Water cards gain +1 armor',           mods: { armor: 1, el: 'Water' } },
-  { id: 'stormpin',    name: 'Storm Pin',        rarity: 'common', cost: 6,
+  { id: 'stormpin', tier: 1,    name: 'Storm Pin',        rarity: 'common', cost: 6,
     text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
-  { id: 'nightveil',   name: 'Nightveil',        rarity: 'common', cost: 6,
+  { id: 'nightveil', tier: 1,   name: 'Nightveil',        rarity: 'common', cost: 6,
     text: '🪨 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
-  { id: 'swiftwick',   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
+  { id: 'swiftwick', tier: 2,   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
     text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
-  { id: 'lanternpace', name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
+  { id: 'lanternpace', tier: 2, name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
     text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
-  { id: 'tinderbox',   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
+  { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
     text: '➕ Your Surge gives +1 more',            mods: { boost: 1 } },
-  { id: 'wardstone',   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
+  { id: 'wardstone', tier: 2,   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
     text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
-  { id: 'coinpurse',   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
+  { id: 'coinpurse', tier: 1,   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
     text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
   // ❌ FOUR ARCHETYPE-GATED CHARMS WERE CUT HERE (2026-08-05, Thomas) — see the note above
   // charmMod(). They named FORCE / SPARK / FLOW / WARD, which is printed on nothing.
-  { id: 'brightwick',  name: 'Brightwick',       rarity: 'rare', cost: 14,
+  { id: 'brightwick', tier: 3,  name: 'Brightwick',       rarity: 'rare', cost: 14,
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
-  { id: 'oathstone',   name: 'Oathstone',        rarity: 'rare', cost: 14,
+  { id: 'oathstone', tier: 3,   name: 'Oathstone',        rarity: 'rare', cost: 14,
     text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
 
   // ☠️ CURSES — charms with negative mods. Never sold on the Wheel; you take one as the PRICE of
@@ -965,32 +965,32 @@ const CHARMS = [
 // free by every class we add; a mage charm dies with the mage.
 const RULE_CHARMS = [
   // ---- GENERIC: engine rules, so every future class inherits these unchanged ----
-  { id: 'unspent',  name: 'Unspent',       rarity: 'rare', cost: 13, rule: true,
+  { id: 'unspent', tier: 4,  name: 'Unspent',       rarity: 'rare', cost: 13, rule: true,
     text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
     why: 'the smallest sufficient Spell becomes the whole game' },
-  { id: 'reversed', name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
+  { id: 'reversed', tier: 1, name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
     text: '🃏 Returning cards go to the <b>TOP</b> of your deck, not the bottom',
     why: 'the Stack stops being a schedule and becomes next turn\'s hand' },
-  { id: 'slowfoot', name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
+  { id: 'slowfoot', tier: 3, name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
   // ---- MAGE: the one rule this class owns is PAIRING ----
-  { id: 'threekind', name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, mage: true,
+  { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, mage: true,
     text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
     why: 'pair attunes, three resonates' },
-  { id: 'looseweave', name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, mage: true,
+  { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, mage: true,
     text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>half</b> the bonus',
     why: 'ceiling traded for consistency' },
-  { id: 'secondflame', name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, mage: true,
+  { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, mage: true,
     text: '✦ Your <b>Surge</b> can attune the Spell too — freeing the Catalyst to be pure speed',
     why: 'the Catalyst stops serving two masters' },
-  { id: 'coldiron', name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, mage: true,
+  { id: 'coldiron', tier: 3, name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, mage: true,
     text: '✦ Your <b>unattuned</b> strikes are <b>+3</b>',
     why: 'the anti-pairing build — and it makes a hand with no pair a plan instead of a punishment' },
-  { id: 'kindledarsenal', name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, mage: true,
+  { id: 'kindledarsenal', tier: 4, name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, mage: true,
     text: '✦ Your <b>Arsenal</b> can attune the Spell as well',
     why: 'the one slot with no job in the maths gets one' },
-  { id: 'heldember', name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, mage: true,
+  { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, mage: true,
     text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
     why: 'attuning stops costing you tempo' },
 ];
@@ -1347,7 +1347,7 @@ function introNext(d) {
 // ⚠️ CLASS charms only. The generic pool is what the Wheel sells; the opening pick is where the
 // class shows you what IT can do, so a rogue's three will look nothing like these.
 // ⚠️ Not in the tutorial — stage 0 is deterministic and teaches the turn, not the meta.
-function mageCharmPool() { return CHARMS.filter(c => c.mage && !c.curse); }
+function mageCharmPool() { return CHARMS.filter(c => c.mage && !c.curse && charmUnlocked(c)); }
 function rollSetout() {
   const pool = mageCharmPool().slice();
   const offers = [];
@@ -1646,6 +1646,29 @@ const POTIONS = [
   { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
     text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
 ];
+// 🔓 CHARM TIERS — a STAND-IN for meta-progression (2026-08-05, Thomas: *"since we will have
+// meta progression to unlock better ones, maybe we can simulate it for now — you'll only have
+// crappy ones in the pool in stage 1, but stage 2-4 will have progressively better ones… that way
+// when i test the other stages, we will have a somewhat closer representation of difficulty"*).
+//
+// 🔑 IT FIXES A MEASUREMENT ERROR AS MUCH AS A DESIGN ONE. Every stage number until now was
+// measured against the SAME charm pool - so stage 1 was flattered and stage 4 was slandered,
+// because a real player reaching stage 4 will have unlocked far more than one on stage 1.
+// This is [[Difficulty_Philosophy]]'s own rule finally implemented: *tune stage N assuming ~N
+// stages' worth of unlocks* - while never tuning the UNLOCKED state as the baseline, which is how
+// a roguelite gets a miserable first ten hours. Stage 1 keeps only the starter pool.
+//
+// ⚠️ IT IS A SIMULATION, NOT THE UNLOCK SYSTEM. The real one gates on RUNS PLAYED, never on
+// dragons felled ([[Charm_Pools]]) - gating behind victories takes options from exactly the player
+// who needs more of them. When that ships, this filter is what it replaces.
+// ⚠️ Curses carry no tier: you take those as a price, not as a reward.
+// ⚠️ AND STAGE 1 MUST HOLD MAGE CHARMS OF ITS OWN. The first tiering gave it none, which
+// silently SKIPPED 🏕️ Setting Out on stage 1 - the one screen a new player meets first. Three of
+// the mildest rule-changers (Loose Weave, Held Ember, Reversed) live in tier 1 for that reason:
+// they are lateral, not powerful, and they teach what a rule-charm even is.
+function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.dragon.stage) : 1; }
+function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
+
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
@@ -2445,7 +2468,7 @@ function upgradable(card) {
 // than "three random things": the shop sells POWER, and sharpening your own deck is not shopping.
 function rollOffer(rich) {
   const held = S.charms || [];
-  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && (rich ? true : c.rarity !== 'rare'));
+  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && charmUnlocked(c) && (rich ? true : c.rarity !== 'rare'));
   const potPool = potionPool();
   const roomForPotion = (S.potions || []).length < POTION_CAP;
   const mkCharm = () => { const c = rand(charmPool);
@@ -2898,7 +2921,7 @@ const EVENTS = [
           if (rnd() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
       { label: 'Swear to tend it — take a CHARM, and a CURSE to carry with it', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
           return [good.length ? evGrantCharm(rand(good).id) : 'The shrine has no gift left.', evTakeCurse()]; } },
       { label: 'Take the oil instead — 🪙 +6 coins, the shrine stays cold', need: 'none',
         apply: () => { S.coins += 6; return [`You pocket the oil — +6 coins (you now hold ${S.coins}).`]; } },
@@ -2931,7 +2954,7 @@ const EVENTS = [
     flavor: "A cartographer's mark scratched on a stone — someone buried something here, and warded it.",
     options: [
       { label: 'Dig it up — a charm lies buried, but the ward may cling to you', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
           const lines = good.length ? [evGrantCharm(rand(good).id)] : evUpgradeRandom(2);
           if (rnd() < 0.4) lines.push(evTakeCurse());
           return lines; } },
