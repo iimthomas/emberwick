@@ -3979,6 +3979,15 @@ function sceneVars(e, isFight) {
 // Godot unchanged, the same way the numbers in Balance_Log transfer. `#foe-slot` was always
 // specified as the animation slot; this is that slot doing its job a little early.
 const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// 🎭 THE MAGE. Same mechanism as a foe, its own folder, because she is not content - she is
+// the CLASS, and a rogue will drop `art/hero/rogue.png` beside her without touching this code.
+// ⚠️ Her art obeys the layout rule from July: hat, face and casting arm must live in the UPPER
+// HALF of the plate, because the scene is full-bleed BEHIND the UI and the card row occludes
+// everything below roughly 40% of her height.
+function heroArt() {
+  return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}.png?v=${BUILD}" ` +
+    `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
+}
 function foeArt(name) {
   if (!name) return '';
   // ⚠️ THE ART URL MUST CARRY THE BUILD. Everything else here is versioned - style.css,
@@ -4014,7 +4023,7 @@ function renderScene() {
   el.innerHTML =
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
-    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
+    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
     `<div class="scene-name">${S.finalMode ? S.dragon.name : e ? e.name : ''}</div>` +
     `<div class="scene-vig"></div>`;
 }

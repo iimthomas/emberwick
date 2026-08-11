@@ -336,7 +336,9 @@ label.radio { margin-right: 14px; cursor: pointer; }
    plane. Anchoring both to bottom:0 made them look like they stood on the same line. */
 /* the mage is WIDER and SHORTER than the first pass — that hat is enormous, and cropping at the
    waist (as in the Maya mock) frees the whole top-left of the frame for the fight panel. */
-.mage { position: absolute; left: 1%; bottom: -2%; width: 30%; height: 64%; fill: #070605; z-index: 2; }
+/* 🎭 width is the binding constraint on her size (a 2:3 plate in this box fits by width),
+   so 30% -> 34% is what actually makes her read as "large in the near foreground". */
+.mage { position: absolute; left: 1%; bottom: -2%; width: 34%; height: 72%; fill: #070605; z-index: 2; }
 .foe { position: absolute; z-index: 1; }
 /* the foe fills the top-right properly now — it was reading as a distant detail rather than the
    thing you are fighting. Depth still comes from it sitting HIGHER, not from it being small. */
@@ -899,6 +901,20 @@ button.stage.locked .stage-shape { font-style: italic; }
 }
 .foe.has-art .foe-img { opacity: 1; }
 .foe.has-art > svg { opacity: 0; }   /* the silhouette steps aside, but stays for the anim hooks */
+
+/* 🎭 the mage, same deal. She is anchored bottom-left and the card row covers her legs by
+   design, so the art is composed with everything that matters in its upper half. */
+.mage-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  /* ⚠️ TOP-anchored, not bottom. The card row starts around 62% down her slot, so bottom
+     anchoring pushed her face to within a few pixels of the cut line. Her boots are hidden
+     either way - the floor is behind the UI - so the plate is aligned by what must be SEEN. */
+  object-fit: contain; object-position: top left;
+  opacity: 0; transition: opacity .5s ease;
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, .6));
+}
+.mage.has-art .mage-img { opacity: 1; }
+.mage.has-art > svg { opacity: 0; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
