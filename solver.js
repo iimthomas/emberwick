@@ -289,13 +289,23 @@ const RUNSIM = (() => {
     const hand = S.hand, isFight = S.encounter.type === 'fight';
     const scoreOf2 = scoreOf;   // RUNSIM's own scorer;
     let best = null;
+    // ⚠️ THE BOT USED TO IGNORE PLACEMENT BANS ENTIRELY (found 2026-08-05). It builds arrangements
+    // directly instead of going through the UI, and nothing here asked `slotLegal` — so ⚖️ Dead
+    // Weight and 🐌 Mire, the two hardships whose whole content is a ban, were invisible to every
+    // measurement we have ever taken. The bot simply played the arrangement a human is forbidden.
+    // 🔑 A RULE THE ENGINE ENFORCES ONLY AT THE UI IS A RULE THE INSTRUMENT CANNOT SEE. Anything
+    // that constrains a human must be asked here too, or its measured cost is zero by construction.
+    const ok = (c, z) => !c || slotLegal(c.id, z);
     for (let w = 0; w < hand.length; w++) {
       const spell = hand[w], rest = hand.filter((_, i) => i !== w);
+      if (!ok(spell, 'Spell')) continue;
       const opts = [null, ...rest];
       for (const spark of opts) for (const tinder of opts) {
         if (tinder && tinder === spark) continue;
+        if (!ok(spark, 'Element') || !ok(tinder, 'Boost')) continue;
         for (const ember of opts) {
           if (ember && (ember === spark || ember === tinder)) continue;
+          if (!ok(ember, 'Reserve')) continue;
           S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                        Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
           const r = computeAction(ember); if (!r) continue;
@@ -333,13 +343,21 @@ const RUNSIM = (() => {
     const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
     let best = null;
     const n = hand.length;
+    // ⚠️ the SAME placement-ban gate as pickArrangement — and the reason both need it is that this
+    // is a SECOND COPY of the arrangement search. Patching one left ⚖️ Dead Weight and 🌀 Vertigo
+    // still violated on the path autoRun actually walks. 🔑 Two searches over the same rules drift
+    // exactly the way a forked duel-maths copy did in July; if a third is ever needed, extract it.
+    const ok = (c, z) => !c || slotLegal(c.id, z);
     for (let w = 0; w < n; w++) {                          // every card as the Spell
       const spell = hand[w], rest = hand.filter((_, i) => i !== w);
+      if (!ok(spell, 'Spell')) continue;
       const opts = [null, ...rest];
       for (const spark of opts) for (const tinder of opts) {
         if (tinder && tinder === spark) continue;
+        if (!ok(spark, 'Element') || !ok(tinder, 'Boost')) continue;
         for (const ember of opts) {
           if (ember && (ember === spark || ember === tinder)) continue;
+          if (!ok(ember, 'Reserve')) continue;
           for (const bt of bts) {
             S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                          Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };

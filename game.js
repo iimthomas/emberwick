@@ -104,9 +104,25 @@ const HARDSHIPS = {
   // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
   // mage that means no attuning, for a rogue it would mean no chain.
   'Dead Air':     'Your cards find no accord — nothing attunes this encounter.',
+  // 🌪️ STAGE 2's OWN TWO (2026-08-05). A land should press on the thing its dragon presses on,
+  // so Skyrender's country attacks SPEED from both ends — one takes your fast card away from the
+  // race, the other makes the race a condition on your class rule.
+  //
+  // 🔃 Vertigo is the INVERSE of Mire, and that is the point: Mire bars your fastest card from
+  // the Catalyst, Vertigo nails it INTO the Spell. Same card, opposite instruction, and both are
+  // stated in engine terms (`init`), so a rogue meets them unchanged.
+  'Vertigo':      'The ground falls away — your <b>fastest</b> card must be your <b>Spell</b>.',
+  // ⚡ Squall puts a SECOND condition on the Catalyst, which is the one card already serving two
+  // masters. ⚠️ We measured in July that a permanent second condition produces search, not
+  // sacrifice — with 12 arrangements you can usually satisfy both. A HARDSHIP is where that
+  // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
+  // problem you solve rather than a tax you route around forever.
+  'Squall':       'The air will not hold — your cards find accord <b>only if you win Initiative</b>.',
 };
-const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air'];
-const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air'];
+const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall'];
+// ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
+// road it would either never fire or always fire. A hardship that cannot be answered is weather.
+const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air', 'Vertigo'];
 
 // 🔑 the placement bans are ENGINE rules, not class rules — they read `value` and `init`, which
 // every class has. A class's own canPlace() is consulted separately, so the two never collide.
@@ -122,6 +138,8 @@ function fastestId() {
 function placementBan(id, zone) {
   if (S.hardship === 'Dead Weight' && zone === 'Spell' && id === heaviestId()) return '⚖️ Dead Weight — your heaviest card cannot be your Spell';
   if (S.hardship === 'Mire' && zone === 'Element' && id === fastestId()) return '🐌 Mire — your fastest card cannot be your Catalyst';
+  // 🌀 Vertigo pins the fastest card INTO the Spell, so it is barred from everywhere else
+  if (S.hardship === 'Vertigo' && zone !== 'Spell' && id === fastestId()) return '🌀 Vertigo — your fastest card must be your Spell';
   return null;
 }
 function slotLegal(id, zone) { return !placementBan(id, zone) && CLASS.canPlace(id, zone); }
@@ -130,11 +148,21 @@ const ABILITIES = {
   'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
   'Poison': 'If it damages you, +1 damage to your next drawn hand (+2 if both Early and Combat).',
   'Ranged': 'It shoots from range — you take Early Damage even when you strike first. Speed cannot save you here.',
+  // 🌬️ WINDSHEAR turns Initiative from a COIN into a GRADIENT. Everywhere else in the game the
+  // race is binary — you win or you lose — so a Catalyst one point short costs exactly as much as
+  // one six points short, and "fast enough" is the only question. Against this, losing NARROWLY is
+  // cheap and losing BADLY is ruinous, which makes the second-fastest card a real answer.
+  'Windshear': 'Lose Initiative and its Early Damage grows by how far you were outpaced (up to +3).',
 };
 
 const PERILS = {
   'Steep':       "The journey's MP is increased by your Arsenal's Boost.",
   'Treacherous': 'Fail to attain Complete Victory → suffer 1 damage after the Time Penalty.',
+  // 🏔️ UPDRAFT is the mirror of Steep, and the first peril that PAYS. A road hazard that can
+  // only ever cost you makes the peril line something to dread and skim past; one that rewards the
+  // stat the land is about makes you read it. It also gives the Catalyst's Initiative a job on a
+  // JOURNEY, where the race is otherwise only about Nightfall.
+  'Updraft':     "The wind is with you — the journey's MP is reduced by your Catalyst's Initiative.",
 };
 
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
@@ -212,6 +240,84 @@ const REGIONS = [
     { type: 'journey', name: 'Tempest Ridge',  mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 4, peril: 'Steep' },
   ]},
 ];
+
+
+// ============================================================
+// 🗺️ THE ROADS (2026-08-05) — one land per dragon
+// ============================================================
+// Thomas: *"i don't want the same exact runs for stages 2-4, it should be completely different with
+// new monsters, new events, new journeys as well… they got different hardships to deal with."*
+// Until now every stage walked the SAME four regions and only the dragon at the end changed, so
+// stages 2–4 were one road with a harder ending — and the whole difficulty curve lived in the
+// last four beats of a twenty-turn run.
+//
+// 🔑 THE ORGANISING RULE, AND IT IS WHAT STOPS THIS BEING A RESKIN: **a land presses on the same
+// thing its dragon presses on.** The mage can answer exactly two creature shapes, so new monsters
+// alone would be stage 1's roster with new names. What makes a road genuinely a different problem
+// is that its creatures, its hardships and its perils all lean the same way — so the road is the
+// dragon's demand met in small, twenty times, before you meet it full size.
+//   🛡️ stage 1  Cindermaw   — ARMOUR, hit big     → a land of things that shrug off small blows
+//   🌀 stage 2  Skyrender   — EVASION, hit first  → a land that punishes being slow
+//   ⏳ stage 3  Cragmourn   — RELENTLESS          → (to be written)
+//   🛡️🌀 stage 4  Fathomdread — both              → (to be written)
+//
+// ⚠️ A road is CONTENT, and content is CLASS-BLIND. Every stat here is `hp`/`init`/`atk`/`mp`,
+// which every class has; nothing on a road may name an element, a pair or a chain.
+const ROAD_STORMREACH = [
+  // 🍃 Windward Steps — no hardships: the same teaching grace stage 1 opens with. High, open,
+  // and mercifully empty; what it teaches is that up here things are FASTER than you.
+  { name: 'Windward Steps', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
+    { type: 'fight',   name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4 },
+    { type: 'fight',   name: 'Rill Otter',   hp: 10, init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 4 },
+    { type: 'fight',   name: 'Scarp Ram',    hp: 14, init: 2, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'journey', name: 'Kestrel Stair',   mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Whistling Gap',   mp: 9,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 2 },
+    { type: 'journey', name: 'Sunlit Terrace',  mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Cloudmere Path',  mp: 10, timePenalty: 1, element: 'Stone',     nightfall: 4, xp: 3 },
+  ]},
+  // 🦅 The Shrike Downs — hunting country. Everything here reaches you first, and 🌀 Vertigo
+  // arrives to take the one card that could have answered that.
+  { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
+    { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Gorsewind Run',    mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Cairn Ladder',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 3, peril: 'Steep' },
+  ]},
+  // ⚡ Thunderhead Reach — the storm itself. ⚡ Squall lives here: your cards hold together only
+  // if you were fast enough, which is Skyrender's whole demand rehearsed one encounter at a time.
+  { name: 'Thunderhead Reach', hardshipChance: 0.5, hardships: ['Squall', 'Storm', 'Night Travel', 'Vertigo'], encounters: [
+    { type: 'fight',   name: 'Levinbeast',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Anvil Toad',      hp: 18, init: 2, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Fulgurite Wolf',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Skylash Serpent', hp: 13, init: 4, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'journey', name: 'Thunder Stair',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Static Flats',   mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Rainshadow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Long Gale',  mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
+  ]},
+  // 🐉 The Riven Sky — under its wings. Everything is faster than you and the ground is gone.
+  { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
+    { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Cloudbreak Run',  mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Wingshadow Pass', mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 4 },
+  ]},
+];
+
+// 🗺️ stage → road. ⚠️ A stage with no road of its own FALLS BACK to stage 1's rather than
+// crashing or shipping an empty region — stages 3 and 4 are not written yet, and a missing road
+// must degrade to "the old run" instead of to a dead end.
+const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH };
+function roadFor(stage) { return ROADS[stage] || REGIONS; }
 
 const ROLES = ['Spell', 'Element', 'Boost'];
 const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
@@ -369,8 +475,16 @@ function nextEncounter() {
   return S.encounterQueue && S.encounterQueue.length ? S.encounterQueue[0] : null;
 }
 
+// ⚡ SQUALL — accord only at speed. Stated class-blind (the ENGINE asks "did you win Initiative",
+// the CLASS decides what accord means), so a rogue's chain would be gated the same way.
+function squallBlocks() {
+  if (S.hardship !== 'Squall' || !S.encounter || S.encounter.type !== 'fight') return false;
+  const el = cardById(S.assign.Element);
+  return !el || eff(el).init < S.encounter.init;
+}
 function attunedNow() {
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
+  if (squallBlocks()) return false;              // ⚡ Squall — too slow to hold together
   if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
   const sp = spellCard(); if (!sp) return false;
   const el = cardById(S.assign.Element);
@@ -775,7 +889,11 @@ function nextLesson() {
 function learned(id) { S.taught = [...(S.taught || []), id]; render(); }
 
 // 🔑 ONE ACCESSOR, so the tutorial is a dataset rather than a branch
-function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
+// 🗺️ the road you are actually walking — the tutorial's, or your stage's
+function RUN() {
+  if (S && S.tutorial) return TUTORIAL.regions;
+  return roadFor(S && S.dragon ? S.dragon.stage : 1);
+}
 
 // ============================================================
 // 🐉 DRAGON ATTACKS (2026-07-29, Thomas). The duel is the ONLY multi-beat fight in the game —
@@ -1368,7 +1486,7 @@ function devJump() {
   devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
   S.candle = !!d.candle;
   if (d.charm && charmById(d.charm)) S.charms.push(d.charm);
-  S.region = REGIONS.length;
+  S.region = RUN().length;
   S.turn = 20;                    // so the log and the grade read like a real arrival
   S.encounterQueue = [];
   S.coins = 0;
@@ -1540,7 +1658,8 @@ function freshGame(stage) {
     hand: [],
     discard: [],
     trashed: [],
-    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(REGIONS[0].encounters),
+    // ⚠️ S does not exist yet, so RUN() cannot be asked — resolve the road from the picked dragon
+    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(roadFor(pick.stage)[0].encounters),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
     setout: null,       // 🏕️ the three class charms offered before turn 1
 
@@ -2351,6 +2470,9 @@ function computeAction(reserve) {
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
+    // 🌬️ Windshear — the MARGIN matters, not just the verdict. Capped so a very slow hand is
+    // punished hard but never arbitrarily; the cap is what keeps it a problem instead of a wall.
+    if (ability === 'Windshear' && initLost) early += Math.min(3, Math.max(0, e.init - init));
     if (h === 'Ambush') early *= 2;
     if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
@@ -2407,7 +2529,9 @@ function computeAction(reserve) {
   // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
   const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
-  const mpEff = e.mp + steepAdd;
+  // 🏔️ Updraft — speed shortens the road (never below 1 MP: a journey you cannot fail is not one)
+  const updraftCut = peril === 'Updraft' ? elemInit : 0;
+  const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
   const half = Math.ceil(mpEff / 2);
   const outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
   const timePenalty = outcome !== 'Complete' ? e.timePenalty : 0;
@@ -2419,7 +2543,7 @@ function computeAction(reserve) {
   const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
-           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
+           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
