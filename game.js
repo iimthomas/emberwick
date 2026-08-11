@@ -4045,14 +4045,22 @@ function renderScene() {
   el.className = isFight ? 'is-fight' : 'is-journey';
   el.setAttribute('style', sceneVars(e, isFight));
   el.innerHTML =
-    // 🗺️ WHAT PLACE ARE WE IN? A JOURNEY is its own place. A FIGHT happens somewhere - in its
-    // REGION, not in a place named after the creature, which would be 32 files that can never
-    // sensibly exist. And the FINALE happens in the dragon's LAIR.
-    // 🔑 Three scales of place, one lookup: the road, the country, and the lair at the end of it.
+    // 🗺️ WHAT PLACE ARE WE IN?
+    //   JOURNEY  its own painting - a journey IS a place, and travelling is what you are doing
+    //   FINALE   the dragon's lair - the one fight that has earned a stage
+    //   FIGHT    nothing. The dark.
+    //
+    // ⚠️ CREATURE FIGHTS GET NO BACKDROP, and that is a considered reversal (2026-08-11). Region
+    // paintings were built and tried, and they read WORSE: a creature is a cutout dropped onto a
+    // photographic-depth painting, so the composite fights itself - two different spaces claiming
+    // to be one. Against the plain dark the creature is simply the thing you are facing.
+    // 🔑 A place is for TRAVELLING THROUGH or ARRIVING AT. A fight is not somewhere, it is
+    // something. The dragons keep their lairs because arriving at one is the whole point of a run.
+    // ⚠️ The four region paintings are KEPT on disk, unused, rather than deleted - this is a
+    // feel judgement and feel judgements get revisited.
     placeArt(S.finalMode ? S.dragon.name + ' lair'
-      : !e ? null
-      : e.type === 'journey' ? e.name
-      : RUN()[S.region - 1].name) +
+      : (e && e.type === 'journey') ? e.name
+      : null) +
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
