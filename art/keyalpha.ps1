@@ -53,7 +53,8 @@ param(
   [int]$Width = 900,
   [int]$Threshold = 14,
   [int]$Radius = 6,
-  [double]$HolePercent = 0.05
+  [double]$HolePercent = 0.05,
+  [int]$EdgeFade = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -193,6 +194,32 @@ $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQuality
 $g.Clear([System.Drawing.Color]::Transparent)
 $g.DrawImage($keyed, 0, 0, $Width, $h)
 $g.Dispose(); $keyed.Dispose()
+
+# 🔥 EDGE FADE. If the artwork RUNS OFF the plate - the mage's spell exits the top-right
+# corner at full brightness - the rectangle slices it, and a hard straight cut across a glow
+# reads as a visible box in the scene. Ramping alpha to nothing over the outer band turns that
+# slice into the light simply falling away. Only needed when something bleeds off the edge.
+if ($EdgeFade -gt 0) {
+  $fd = $out.LockBits((New-Object System.Drawing.Rectangle 0, 0, $out.Width, $out.Height),
+        [System.Drawing.Imaging.ImageLockMode]::ReadWrite,
+        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $len = [Math]::Abs($fd.Stride) * $out.Height
+  $px = New-Object byte[] $len
+  [System.Runtime.InteropServices.Marshal]::Copy($fd.Scan0, $px, 0, $len)
+  for ($y = 0; $y -lt $out.Height; $y++) {
+    $dy = [Math]::Min($y, $out.Height - 1 - $y)
+    for ($x = 0; $x -lt $out.Width; $x++) {
+      $dx = [Math]::Min($x, $out.Width - 1 - $x)
+      $d = [Math]::Min($dx, $dy)
+      if ($d -lt $EdgeFade) {
+        $p = $y * $fd.Stride + $x * 4
+        $px[$p + 3] = [byte]([int]$px[$p + 3] * $d / $EdgeFade)
+      }
+    }
+  }
+  [System.Runtime.InteropServices.Marshal]::Copy($px, 0, $fd.Scan0, $len)
+  $out.UnlockBits($fd)
+}
 
 $out.Save($Dest, [System.Drawing.Imaging.ImageFormat]::Png)
 
