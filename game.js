@@ -3960,6 +3960,25 @@ function sceneVars(e, isFight) {
          ` --gx:${p.gx}%; --gy:${p.gy}%; --night:${night.toFixed(3)};`;
 }
 
+// 🖼️ ART BY NAME (2026-08-10) — a foe wears its own picture the moment the file exists.
+//
+// 🔑 THE WHOLE POINT IS THAT NOTHING BREAKS WHILE THE FOLDER IS EMPTY. There are 69 creatures
+// and they arrive one at a time over days; a build that needs all of them, or that shows a broken
+// image icon for the 68 that have not been drawn yet, would make the art a blocking dependency.
+// So: the silhouette renders as it always did, an <img> is laid over it, and the picture only
+// takes over `onload`. A miss removes itself and you never see that it tried.
+//
+// ⚠️ These are PLACEHOLDERS, and the standing rule still holds — we are not building
+// presentation. What makes this the exception is that a PNG is an ASSET, not a system: it ports to
+// Godot unchanged, the same way the numbers in Balance_Log transfer. `#foe-slot` was always
+// specified as the animation slot; this is that slot doing its job a little early.
+const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function foeArt(name) {
+  if (!name) return '';
+  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.jpg" ` +
+    `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
+}
+
 function renderScene() {
   const el = $('scene');
   if (!el) return;
@@ -3971,8 +3990,8 @@ function renderScene() {
   const duel = S.finalMode && S.finalPhase === 'duel';
   const isFight = duel || (e && e.type === 'fight');
   let foe;
-  if (duel) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}</div>`;
-  else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}</div>`;
+  if (duel) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}${foeArt(S.dragon.name)}</div>`;
+  else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}${foeArt(e.name)}</div>`;
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
   el.className = isFight ? 'is-fight' : 'is-journey';
   el.setAttribute('style', sceneVars(e, isFight));

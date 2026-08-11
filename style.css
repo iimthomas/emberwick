@@ -887,6 +887,21 @@ button.stage.locked .stage-shape { font-style: italic; }
 .handoff p { margin: 0 0 8px; line-height: 1.5; }
 .handoff p:last-child { margin-bottom: 0; }
 
+/* 🖼️ FOE ART. The picture sits over the placeholder silhouette and only shows once it has
+   actually loaded (`.has-art`), so an undrawn creature simply keeps its silhouette. */
+.foe-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; opacity: 0; transition: opacity .5s ease;
+  /* 🔑 the plate is drawn on FLAT BLACK, and the scene is #16140f — close, but not identical.
+     A soft radial mask feathers the rectangle's edges into the scene so there is no visible box.
+     This is why we did not need real transparency: black + a feather reads as a cutout, and it
+     costs one CSS line instead of an alpha-keying pass over 69 files. */
+  -webkit-mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 55%, transparent 97%);
+  mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 55%, transparent 97%);
+}
+.foe.has-art .foe-img { opacity: 1; }
+.foe.has-art > svg { opacity: 0; }   /* the silhouette steps aside, but stays for the anim hooks */
+
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
 /* ============================================================
