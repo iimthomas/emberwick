@@ -338,7 +338,14 @@ label.radio { margin-right: 14px; cursor: pointer; }
    waist (as in the Maya mock) frees the whole top-left of the frame for the fight panel. */
 /* 🎭 width is the binding constraint on her size (a 2:3 plate in this box fits by width),
    so 30% -> 34% is what actually makes her read as "large in the near foreground". */
-.mage { position: absolute; left: 1%; bottom: -2%; width: 34%; height: 72%; fill: #070605; z-index: 2; }
+/* 🎭 She stands on the VISIBLE floor, not the scene's own bottom edge - `--stage-floor` is
+   the height of the UI covering the scene, measured per render by stageFloor(). The 34px lifts
+   her back up so the card row crops her shins rather than swallowing her whole. */
+.mage {
+  position: absolute; left: 1%; width: 38%; height: 96%;
+  bottom: calc(var(--stage-floor, 0px) - 34px);
+  fill: #070605; z-index: 2;
+}
 .foe { position: absolute; z-index: 1; }
 /* the foe fills the top-right properly now — it was reading as a distant detail rather than the
    thing you are fighting. Depth still comes from it sitting HIGHER, not from it being small. */
@@ -906,10 +913,11 @@ button.stage.locked .stage-shape { font-style: italic; }
    design, so the art is composed with everything that matters in its upper half. */
 .mage-img {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  /* ⚠️ TOP-anchored, not bottom. The card row starts around 62% down her slot, so bottom
-     anchoring pushed her face to within a few pixels of the cut line. Her boots are hidden
-     either way - the floor is behind the UI - so the plate is aligned by what must be SEEN. */
-  object-fit: contain; object-position: top left;
+  /* 🎭 BOTTOM-anchored: she belongs in the near foreground, standing on the floor of the
+     scene with her legs running down behind the card row. Top-anchoring floated her in the
+     middle of the frame with dead space underneath, which threw away the depth the whole
+     layout is built on. Her boots being hidden is the intended reading, not a loss. */
+  object-fit: contain; object-position: bottom left;
   opacity: 0; transition: opacity .5s ease;
   filter: drop-shadow(0 8px 22px rgba(0, 0, 0, .6));
 }

@@ -4026,7 +4026,28 @@ function renderScene() {
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
     `<div class="scene-name">${S.finalMode ? S.dragon.name : e ? e.name : ''}</div>` +
     `<div class="scene-vig"></div>`;
+  stageFloor();
 }
+
+// 📏 WHERE THE VISIBLE STAGE ACTUALLY ENDS (2026-08-10).
+//
+// The scene is full-bleed BEHIND the UI, so the bottom of `#scene` and the bottom of what you can
+// SEE are different lines - separated by the height of the card row. That gap is a few hundred
+// pixels and it changes with every viewport, so no percentage in the stylesheet can express it:
+// bottom-anchoring the mage to the scene buried her face behind the cards on a tall window, and
+// top-anchoring left her floating in mid-air with dead space underneath on a short one.
+//
+// 🔑 So measure it once per render and hand CSS the number. The mage then stands on the
+// VISIBLE floor at every size, with her legs running down behind the cards where they belong.
+// ⚠️ Layout only - nothing here feeds the rules, and it is the first thing Godot replaces.
+function stageFloor() {
+  const sc = $('scene'), cards = $('slots-panel');
+  if (!sc || !cards) return;
+  const s = sc.getBoundingClientRect(), c = cards.getBoundingClientRect();
+  const hidden = Math.max(0, Math.round(s.bottom - c.top));
+  sc.style.setProperty('--stage-floor', hidden + 'px');
+}
+try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !isShell()) stageFloor(); }); } catch (e) {}
 
 // 🏠 THE SHELL — screens that exist OUTSIDE a run and must not assume one.
 // ⚠️ The stages screen only ever worked because boot used to call freshGame() first, so `S`
