@@ -893,9 +893,14 @@ function recordGrade(stage, g, won) {
   } catch (e) {}
 }
 // the one-line summary of the whole board — what is left to do, not what is done
+// ⚠️ THE TUTORIAL IS NOT ON THE WALL (fixed 2026-08-05). It used to be counted here, so the
+// Stages line read "0/5 graded" for four stages — a board whose total does not match the number
+// of things on it. The tutorial carries its own badge on its own menu button now, which is the
+// whole reason it stopped belonging in this total. 🔑 When something moves to a new screen,
+// find every count that still includes it.
 function wallSummary() {
   const all = bestGrades();
-  const stages = [0, ...DRAGONS.map(d => d.stage)];
+  const stages = DRAGONS.map(d => d.stage);
   const got = stages.filter(n => all[String(n)]).length;
   const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
   return { graded: got, total: stages.length, perfect: s_ };
@@ -1595,9 +1600,27 @@ function freshGame(stage) {
   render();
 }
 
-// always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
+// 🏠 THE WAY OUT (2026-08-05). The header used to hold one button, ⟳ New Run, which quietly
+// did neither thing: it dumped you on the menu and abandoned the run. Two buttons now, and each
+// does exactly what it says.
+//
+// 🔑 LEAVING IS NOT LOSING. The run auto-saves at every stable phase, so the menu is a DOOR,
+// not a discard — ▶ Continue is waiting on the other side. That is why this one does not ask for
+// a confirmation: there is nothing to confirm.
+function toMenu() {
+  showMenu();   // the last auto-save stands; ▶ Continue picks it back up
+}
+
+// ⟳ NEW RUN = the same stage, from the top. Thomas: *"new run should just restart you whatever
+// stage you are in."* The old behaviour sent you to the menu to re-pick the stage you were
+// already playing, which is three taps to express "again". A stage is a PROBLEM you are trying
+// to solve; wanting another go at the same one is the normal case, not the exception.
+// ⚠️ This one DOES discard the run (freshGame wipes the save), so it asks first.
 function newGame() {
-  if (confirm('Leave this run? It will be lost.')) showMenu();
+  if (!S || isShell()) { showMenu(); return; }
+  const st = S.tutorial ? 0 : (S.dragon && S.dragon.stage) || 1;
+  const what = st === 0 ? 'the tutorial' : `stage ${st} — ${S.dragon.name}`;
+  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st);
 }
 
 function nextRegion() {
