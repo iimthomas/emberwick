@@ -1383,8 +1383,10 @@ function tutorialHandoffHTML() {
   return `<div class="handoff">` +
     `<p>That was the shallow end. Everything past here is the same four slots and the same sixteen ` +
     `cards — what changes is <b>what stands in front of you</b>.</p>` +
+    // ❌ and no shape here either — the briefing on turn 1 is moments away and it is the
+    // designed place to learn what you are walking into.
     `<p><b>${d.name}</b> ${elIcon(d.element)} waits at the end of the first road. ` +
-    `${dragonShapeText(d)}: ${dragonDemand(d)}. <b>It asks one thing of you: ${d.teaches}.</b></p>` +
+    `You will be told what it is the moment you set out.</p>` +
     `</div>` +
     `<button class="primary" onclick="startStage(1)">⚔️ Set out for the ${d.name} — Stage 1</button>` +
     `<button onclick="showStages()">🗺️ Stages</button>`;
@@ -4152,7 +4154,17 @@ function renderControls() {
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
           `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? gradeBadge(d.stage) : ''}` +
-          `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
+          // ❌ THE PICKER DOES NOT SPOIL THE DRAGON (2026-08-05, Thomas: *"lets remove what the
+          // boss does, don't think we really need to show that off"*). It used to print the SHAPE
+          // and the demand on every stage button.
+          // 🔑 The turn-1 BRIEFING is where that belongs, and it is a designed moment: the run is
+          // *soft-directional* because you learn the problem the instant it starts and then spend
+          // twenty turns preparing for it. Printing the same facts on the menu spends the reveal
+          // before the run exists, and turns choosing a stage into reading a stat block.
+          // What the button says instead is about YOU — what you have done here, not what it does.
+          `<span class="stage-shape">${!open ? 'locked — clear stage ' + (d.stage - 1) + ' to open'
+            : done ? 'felled — go again for a better grade'
+            : 'not yet felled'}</span>` +
           `</button>`;
       }).join('') +
       `<button class="dev-open" onclick="showMenu()">← Menu</button>`;
