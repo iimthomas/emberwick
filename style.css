@@ -922,7 +922,20 @@ button.stage.locked .stage-shape { font-style: italic; }
 .place-img {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center;
-  opacity: .55; z-index: 0;
+  /* 🔑 DIM IN THE GAME, NOT IN THE ART. The first backdrop was PROMPTED dark for legibility
+     and then dimmed again here - two darkenings compounding into mud, and an asset that could
+     never be made brighter without regenerating it. The painting is now made luminous and this
+     layer is the only place it gets knocked back, so the balance is one number to tune. */
+  opacity: .62; z-index: 0;
+}
+/* 🌑 THE SCRIM. Legibility is not uniform: the UI does not sit evenly on the scene, it
+   crowds the BOTTOM and the LEFT (card row, mage, encounter panel) while the upper right is
+   open sky. So darken where the text is instead of darkening the whole picture. */
+#scene .place-scrim {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(to top, rgba(12,10,8,.92) 0%, rgba(12,10,8,.55) 22%, transparent 55%),
+    linear-gradient(to right, rgba(12,10,8,.72) 0%, transparent 42%);
 }
 
 /* 🎭 the mage, same deal. She is anchored bottom-left and the card row covers her legs by

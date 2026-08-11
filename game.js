@@ -3984,8 +3984,16 @@ const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').r
 // ⚠️ Her art obeys the layout rule from July: hat, face and casting arm must live in the UPPER
 // HALF of the plate, because the scene is full-bleed BEHIND the UI and the card row occludes
 // everything below roughly 40% of her height.
+// 🚶 SHE HAS TWO POSES, AND THE SCENE PICKS ONE. A fighting stance is wrong on an empty road:
+// a journey is travel, not a duel, and the mage throwing a fireball at a hillside says the scene
+// does not know what is happening in it. `cast` for anything with a foe, `walk` for the road.
+// ⚠️ Poses are per CLASS, so a rogue needs rogue-cast.png and rogue-walk.png and no code.
+function heroPose() {
+  if (S.finalMode) return 'cast';
+  return (S.encounter && S.encounter.type === 'journey') ? 'walk' : 'cast';
+}
 function heroArt() {
-  return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}.png?v=${BUILD}" ` +
+  return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}-${heroPose()}.png?v=${BUILD}" ` +
     `onload="this.parentNode.classList.add('has-art'); stageFloor();" onerror="this.remove()">`;
 }
 // 🗺️ A PLACE, NOT A THING (2026-08-10). A creature is an object IN the scene; a journey IS
@@ -3999,7 +4007,10 @@ function heroArt() {
 function placeArt(name) {
   if (!name) return '';
   return `<img class="place-img" alt="" src="art/places/${artSlug(name)}.jpg?v=${BUILD}" ` +
-    `onerror="this.remove()">`;
+    // ⚠️ the scrim must die WITH the image. Left behind on its own it would darken the plain
+    // gradient scene of every place that has no painting yet, i.e. almost all of them.
+    `onerror="var s=this.nextElementSibling; if(s&&s.className==='place-scrim')s.remove(); this.remove();">` +
+    `<div class="place-scrim"></div>`;
 }
 function foeArt(name) {
   if (!name) return '';
