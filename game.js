@@ -118,11 +118,23 @@ const HARDSHIPS = {
   // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
   // problem you solve rather than a tax you route around forever.
   'Squall':       'The air will not hold — your cards find accord <b>only if you win Initiative</b>.',
+  // ⏳ STAGE 3's TWO. Cragmourn's demand is *waste nothing*, so its land takes away the slack
+  // you did not know you were relying on.
+  // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
+  // just pays nothing, so no slot is sealed and no choice is removed (sealed slots shipped once and
+  // were killed the same day).
+  'Rationed':     'Nothing is spare here — your <b>Surge adds nothing</b> this encounter.',
+  // ⚖️ Exacting is the mountain's own logic: half-measures are nothing. It is the harshest
+  // hardship in the game and it is deliberately confined to late Fellgrind regions.
+  'Exacting':     'It gives no half credit — a <b>Narrow counts as a Loss</b>.',
+  // 🌊 STAGE 4's. The Arsenal is the one slot that is identical in every class, and this is the
+  // only rule that takes the carry itself — the exam's way of saying *nothing you save is safe*.
+  'Riptide':      'The current takes what you held — your <b>Arsenal is spent</b>, not kept.',
 };
-const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall'];
+const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
 // ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
 // road it would either never fire or always fire. A hardship that cannot be answered is weather.
-const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air', 'Vertigo'];
+const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air', 'Vertigo', 'Rationed', 'Exacting', 'Riptide'];
 
 // 🔑 the placement bans are ENGINE rules, not class rules — they read `value` and `init`, which
 // every class has. A class's own canPlace() is consulted separately, so the two never collide.
@@ -153,6 +165,12 @@ const ABILITIES = {
   // one six points short, and "fast enough" is the only question. Against this, losing NARROWLY is
   // cheap and losing BADLY is ruinous, which makes the second-fastest card a real answer.
   'Windshear': 'Lose Initiative and its Early Damage grows by how far you were outpaced (up to +3).',
+  // 💢 BACKLASH is the answer to the most-solved thing in the game. Sharpening drives
+  // "the Spell is simply your biggest card" from 83% toward 94%, because overkill has never cost
+  // anything — there has been no reason in twenty turns to hit for exactly enough. Against this,
+  // every point past its HP comes back at you. 🔑 It INVERTS Armour: Armour says *bigger*,
+  // Backlash says *exact*, and a hand that answers one is wrong for the other.
+  'Backlash': 'Strike it harder than it can take and the excess rebounds on you (up to 3).',
 };
 
 const PERILS = {
@@ -163,6 +181,8 @@ const PERILS = {
   // stat the land is about makes you read it. It also gives the Catalyst's Initiative a job on a
   // JOURNEY, where the race is otherwise only about Nightfall.
   'Updraft':     "The wind is with you — the journey's MP is reduced by your Catalyst's Initiative.",
+  // ⏳ the road that does not forgive: falling short costs twice
+  'Toll':        'Fail to Complete and the <b>Time Penalty is doubled</b>.',
 };
 
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
@@ -258,8 +278,8 @@ const REGIONS = [
 // dragon's demand met in small, twenty times, before you meet it full size.
 //   🛡️ stage 1  Cindermaw   — ARMOUR, hit big     → a land of things that shrug off small blows
 //   🌀 stage 2  Skyrender   — EVASION, hit first  → a land that punishes being slow
-//   ⏳ stage 3  Cragmourn   — RELENTLESS          → (to be written)
-//   🛡️🌀 stage 4  Fathomdread — both              → (to be written)
+//   ⏳ stage 3  Cragmourn   — RELENTLESS, waste nothing → a land that takes away your slack
+//   🛡️🌀 stage 4  Fathomdread — both, big AND first   → the exam: all three lands at once
 //
 // ⚠️ A road is CONTENT, and content is CLASS-BLIND. Every stat here is `hp`/`init`/`atk`/`mp`,
 // which every class has; nothing on a road may name an element, a pair or a chain.
@@ -316,7 +336,109 @@ const ROAD_STORMREACH = [
 // 🗺️ stage → road. ⚠️ A stage with no road of its own FALLS BACK to stage 1's rather than
 // crashing or shipping an empty region — stages 3 and 4 are not written yet, and a missing road
 // must degrade to "the old run" instead of to a dead end.
-const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH };
+
+// ⏳ THE FELLGRIND (stage 3) — Cragmourn's country. Its demand is **waste nothing**: the breath
+// grows every beat, so a long duel is one you have already lost. The road rehearses that by taking
+// away slack — ⏳ Rationed pays nothing for your Surge, ⚖️ Exacting gives no half credit, 💢
+// Backlash makes overkill rebound, ⏳ Toll doubles the price of falling short.
+// 🔑 Backlash is the load-bearing one: it is the first thing in the game that makes the BIGGEST
+// card the wrong card, which is the single most-solved decision we have measured.
+const ROAD_FELLGRIND = [
+  { name: 'The Sloughs', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Sump Toad',     hp: 10, init: 3, atk: 2, atkEl: 'Water', xp: 4 },
+    { type: 'fight',   name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'fight',   name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash' },
+    { type: 'fight',   name: 'Fen Ox',        hp: 16, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 6 },
+    { type: 'journey', name: 'The Slow Ford',   mp: 12, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 4 },
+    { type: 'journey', name: 'Turfcutter Way',  mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Reedlight Path',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'The Long Bank',   mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
+  ]},
+  { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
+    { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
+    { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
+    { type: 'journey', name: 'Ashfall Steps',   mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Cold Furrow',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 3 },
+    { type: 'journey', name: 'The Iron Cut',    mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Steep' },
+  ]},
+  { name: 'The Unquiet Deep', hardshipChance: 0.5, hardships: ['Rationed', 'Dead Air', 'Night Travel', 'Dead Weight'], encounters: [
+    { type: 'fight',   name: 'Deepdelver',     hp: 18, init: 3, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Cavern Shrike',  hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash' },
+    { type: 'fight',   name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Winding Cut', mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5 },
+    { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+  ]},
+  { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
+    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
+    { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
+    { type: 'journey', name: 'The Grinding Pass', mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Shoulderfall',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'The Last Furrow',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5 },
+    { type: 'journey', name: 'Thunderfoot Road',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Treacherous' },
+  ]},
+];
+
+// 🌊 THE SUNLESS FATHOM (stage 4) — Fathomdread's country, and the exam. Its demand is **big
+// AND first**, which four cards cannot give at once.
+// 🔑 THE EXAM IS NOT A NEW RULE, IT IS THE OTHER THREE ARRIVING TOGETHER. Its hardship pool
+// draws from all three lands, and its creatures are the first in the game to carry BOTH shapes —
+// 🛡️ Armour wants the attuned blow, 🌀 Evasion wants the fast Catalyst, and one card cannot be
+// both. That is Fathomdread's whole question, asked twenty times before you meet it.
+// ⚠️ DOUBLE-SHAPED CREATURES ARE KEPT SMALL AND SOFT. A creature that is big, armoured, evasive
+// AND hits hard is not an exam question, it is a wall — the Stormreach already taught us that a
+// shape and a stat enforcing the same thing multiply.
+const ROAD_FATHOM = [
+  { name: 'The Tidewrack', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'The Ebb Path',    mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 4 },
+  ]},
+  { name: 'Drowned Kell', hardshipChance: 0.35, hardships: ['Riptide', 'Vertigo', 'Rationed', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Kell Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 6 },
+    { type: 'fight',   name: 'Silt Crawler',   hp: 17, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Drowned Piper',  hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'fight',   name: 'Anchorback',     hp: 16, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Kell Stair',  mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Bell Causeway',   mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Weedlight Reach', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'The Undertow',    mp: 15, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+  ]},
+  { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
+    { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7 },
+    { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Sounding',    mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5 },
+  ]},
+  { name: "Fathomdread's Trench", hardshipChance: 0.6, hardships: ['Riptide', 'Exacting', 'Squall', 'Vertigo', 'Dead Weight', 'Rationed'], encounters: [
+    { type: 'fight',   name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear' },
+    { type: 'fight',   name: 'Pressureback',   hp: 19, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7, ability: 'Backlash' },
+    { type: 'fight',   name: 'The Pale Herald',hp: 14, init: 5, atk: 5, atkEl: 'Fire',  shapes: ['armour', 'evasion'], shapeV: 1, xp: 7, ability: 'Freeze' },
+    { type: 'journey', name: 'The Trench Road', mp: 14, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 6, peril: 'Toll' },
+    { type: 'journey', name: 'Deadlight Deep',  mp: 14, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Long Descent',mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Stormfathom',     mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 7, xp: 6, peril: 'Updraft' },
+  ]},
+];
+
+const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH, 3: ROAD_FELLGRIND, 4: ROAD_FATHOM };
 function roadFor(stage) { return ROADS[stage] || REGIONS; }
 
 const ROLES = ['Spell', 'Element', 'Boost'];
@@ -1069,10 +1191,21 @@ const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 // the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
 // briefing tells you what the dragon demands, and the whole run is your preparation for it.
 // how a creature defends, in one phrase — this is the question the encounter is asking you
+// 🛡️🌀 A CREATURE MAY CARRY TWO SHAPES (2026-08-10, for stage 4). Fathomdread's demand is
+// *big AND first*, which is exactly what four cards cannot give at once — so its land is full of
+// small things that ask the same question. 🔑 The exam is not a new rule, it is two old rules
+// arriving together, which is the cheapest hard content in the game.
+// ⚠️ `shape` (one) stays legal everywhere; `shapes` (many) is the superset. Everything reads
+// this helper so no site can be left behind.
+const shapesOf = e => (e && e.shapes) || (e && e.shape ? [e.shape] : []);
+// ⚠️ named foeHas, not hasShape — hasShape() already exists for the DRAGON and takes one
+// argument. Two same-named helpers with different arities is a crash waiting for a rename.
+const foeHas = (e, k) => shapesOf(e).includes(k);
 function shapeText(e) {
-  if (e.shape === 'armour') return `🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`;
-  if (e.shape === 'evasion') return `🌀 <b>Evasion</b> — halves your hit unless you strike first`;
-  return '— unguarded';
+  const bits = [];
+  if (foeHas(e, 'armour')) bits.push(`🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`);
+  if (foeHas(e, 'evasion')) bits.push(`🌀 <b>Evasion</b> — halves your hit unless you strike first`);
+  return bits.join(' + ') || '— unguarded';
 }
 
 // ============================================================
@@ -2005,6 +2138,17 @@ const CONTRACTS = [
   // 6-encounter window would ask for three of roughly three chances — the 23% trap again.
   { id: 'longwalk', name: 'The Long Walk',   cost: 6, reward: 20, need: 3, window: 9, track: 'journey',
     text: '👣 <b>Complete 3 journeys</b>' },
+  // 🗺️ ONE QUEST PER LAND, tiered like the charms (2026-08-10, Thomas: *"each stage should
+  // have some new quests and maybe potions to buy as well to help"*).
+  // 🔑 Each names the thing ITS land is about, so a quest is a second reason to play the road
+  // the way the road already wants — and a stage's whole shop leans the same direction as its
+  // dragon. ⚠️ Every track still reads state the engine already records; no new bookkeeping.
+  { id: 'fleet',   name: 'The Fleet Ledger', tier: 2, cost: 8, reward: 26, need: 3, window: 7, track: 'cleanfast',
+    text: '💨 <b>Complete 3</b> encounters <b>having won Initiative</b>' },
+  { id: 'thrift',  name: 'Nothing Spared',   tier: 3, cost: 8, reward: 30, need: 3, window: 8, track: 'thrift',
+    text: '⚖️ <b>Complete 3</b> encounters with <b>2 or less to spare</b>' },
+  { id: 'deep',    name: 'The Deep Ledger',  tier: 4, cost: 10, reward: 38, need: 3, window: 9, track: 'flawless',
+    text: '🌊 <b>Complete 3</b> encounters <b>fast and untouched</b>' },
 ];
 const contractWindow = c => c.window || 6;
 const contractById = id => CONTRACTS.find(c => c.id === id) || null;
@@ -2022,6 +2166,10 @@ function contractTick(r) {
   if (c.track === 'attune')     hit = !!r.enhUsed;
   if (c.track === 'unhurt')     hit = hurt === 0 && r.outcome !== 'Loss';
   if (c.track === 'journey')    hit = r.type === 'journey' && r.outcome === 'Complete';
+  // 🗺️ the three land quests — still nothing but fields the turn already produced
+  if (c.track === 'cleanfast')  hit = r.outcome === 'Complete' && !r.initLost;
+  if (c.track === 'thrift')     hit = r.outcome === 'Complete' && r.target != null && (r.value - r.target) <= 2;
+  if (c.track === 'flawless')   hit = r.outcome === 'Complete' && !r.initLost && hurt === 0;
   if (hit) S.contract.n++;
   if (S.contract.n >= c.need) {
     S.coins += c.reward;
@@ -2086,6 +2234,19 @@ const POTIONS = [
     text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
+  // ---- 🗺️ ONE POTION PER LAND (2026-08-10). Each is the single-turn answer to the thing its
+  // road keeps asking, which is what makes a stage's shelf feel like it belongs to that stage.
+  // ⚠️ Same gate as always: a potion may only name something PRINTED ON THE CARD or on the foe.
+  // ⚠️ And they are CONSUMED, which is why they do not break *lateral power, not vertical* —
+  // a potion buys ONE turn where the arrangement you wanted is legal.
+  { id: 'skyglass',  name: 'Skyglass',   tier: 2, cost: 5, rarity: 'uncommon',
+    text: '🌀 Your blow <b>cannot be halved</b> this turn' },
+  { id: 'stillwater', name: 'Stillwater', tier: 3, cost: 6, rarity: 'uncommon',
+    text: '🛡️ Nothing <b>strikes back</b> at you this turn' },
+  { id: 'hardtack',  name: 'Hardtack',   tier: 3, cost: 2, rarity: 'common',
+    text: '⏳ Any <b>Time Penalty is 1 less</b> this turn' },
+  { id: 'deepcurrent', name: 'Deepcurrent', tier: 4, cost: 9, rarity: 'rare',
+    text: '💨 You <b>win Initiative</b> this turn, whatever it is' },
   { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
     text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
 ];
@@ -2113,7 +2274,9 @@ function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.
 function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
-const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()));
+// 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
+const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()) &&
+                                             (!p.tier || p.tier <= stageTier()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
 
@@ -2159,6 +2322,10 @@ function applyPotion(p, card) {
   if (p.id === 'nightglass'){ fx.noNight = true; log(`🧪 ${p.name} — 🌙 the dark cannot catch you this journey.`, 'good'); }
   if (p.id === 'breath')   { fx.unspent = true; log(`🧪 ${p.name} — ✦ your Spell survives this casting.`, 'good'); }
   if (p.id === 'quench')   { fx.noShape = true; log(`🧪 ${p.name} — 🛡️ its guard means nothing this turn.`, 'good'); }
+  if (p.id === 'skyglass') { fx.noEvade = true; log(`🧪 ${p.name} — 🌀 it cannot slip your blow this turn.`, 'good'); }
+  if (p.id === 'stillwater'){ fx.noCounter = true; log(`🧪 ${p.name} — 🛡️ nothing strikes back this turn.`, 'good'); }
+  if (p.id === 'hardtack') { fx.tpCut += 1; log(`🧪 ${p.name} — ⏳ any Time Penalty is 1 lighter.`, 'good'); }
+  if (p.id === 'deepcurrent'){ fx.winInit = true; log(`🧪 ${p.name} — 💨 you move first, whatever it is.`, 'good'); }
   if (p.id === 'solvent')  { fx.holdCatalyst = true; log(`🧪 ${p.name} — ✦ your Catalyst stays in hand.`, 'good'); }
   if (p.id === 'gravewax') { log(`🧪 ${p.name} — ` + evRecoverCard('last'), 'good'); }
   if (p.id === 'salve')    { card.level++; log(`🧪 ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
@@ -2267,7 +2434,7 @@ function nextTurn() {
   S.damage = 0;
   S.damageEl = null;
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2476,7 +2643,8 @@ function computeAction(reserve) {
   const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
-  const boostEff = h === 'Night Travel' ? Math.max(0, boostRaw - elemInit) : boostRaw;
+  const boostEff = h === 'Rationed' ? 0                                   // ⏳ nothing is spare
+    : h === 'Night Travel' ? Math.max(0, boostRaw - elemInit) : boostRaw;
   const nightCut = boostRaw - boostEff;
 
   if (e.type === 'fight') {
@@ -2485,7 +2653,7 @@ function computeAction(reserve) {
     const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
-    const initLost = vE === 'Outpace' ? false : e.init > init;
+    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -2507,8 +2675,10 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
-    const armorCut = (!quenched && e.shape === 'armour' && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
-    const evaded = !quenched && e.shape === 'evasion' && vS !== 'Landslide' && (e.init > evInit);
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
+    // 🧪 Skyglass — the blow simply cannot be halved
+    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
+                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
@@ -2519,18 +2689,24 @@ function computeAction(reserve) {
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
-    const outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+    let outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+    if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
+    // 💢 Backlash — the excess comes back. Note it fires on a CLEAN KILL, which is the point:
+    // the only encounter in the game where a bigger blow is worse than a sufficient one.
+    const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk : 0;
+    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk
+      : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
     // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
+    if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
-             combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
+             combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
   const wrongType = false;
   const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
@@ -2552,17 +2728,21 @@ function computeAction(reserve) {
   const updraftCut = peril === 'Updraft' ? elemInit : 0;
   const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
   const half = Math.ceil(mpEff / 2);
-  const outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
-  const timePenalty = outcome !== 'Complete' ? e.timePenalty : 0;
+  let outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+  if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
+  // ⏳ Toll — the road that does not forgive. 🧪 Hardtack takes a point back off any penalty.
+  let timePenalty = outcome !== 'Complete' ? e.timePenalty * (peril === 'Toll' ? 2 : 1) : 0;
+  if (timePenalty && S.potionFx && S.potionFx.tpCut) timePenalty = Math.max(0, timePenalty - S.potionFx.tpCut);
   const stormDmg = h === 'Storm' ? timePenalty : 0;
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
-  const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
+  const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
+    : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
-           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg,
+           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
@@ -2938,7 +3118,9 @@ function rollOffer(rich) {
   const runLeft = Math.max(0, (RUN().length - (S.region || 1)) * REGION_ENCOUNTERS +
                              (REGION_ENCOUNTERS - (S.regionTurn || 0)));
   if (!S.contract && !rich && rnd() < 0.28) {
-    const fits = CONTRACTS.filter(x => Math.min(contractWindow(x), runLeft) > x.need);
+    // 🗺️ a land's own quest only appears from that stage on — same simulated unlock as charms
+    const fits = CONTRACTS.filter(x => (!x.tier || x.tier <= stageTier()) &&
+                                       Math.min(contractWindow(x), runLeft) > x.need);
     if (!fits.length) return mkCharmOrPotion();
     const c = rand(fits);
     return { kind: 'contract', id: c.id, name: c.name, text: c.text +
@@ -4665,7 +4847,7 @@ function startLastMile() {
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -4807,7 +4989,7 @@ function startDuelBeat() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
