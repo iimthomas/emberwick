@@ -3986,7 +3986,7 @@ const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').r
 // everything below roughly 40% of her height.
 function heroArt() {
   return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}.png?v=${BUILD}" ` +
-    `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
+    `onload="this.parentNode.classList.add('has-art'); stageFloor();" onerror="this.remove()">`;
 }
 function foeArt(name) {
   if (!name) return '';
@@ -4040,12 +4040,26 @@ function renderScene() {
 // 🔑 So measure it once per render and hand CSS the number. The mage then stands on the
 // VISIBLE floor at every size, with her legs running down behind the cards where they belong.
 // ⚠️ Layout only - nothing here feeds the rules, and it is the first thing Godot replaces.
+// 🎭 WHERE THE CARD ROW CUTS HER. Thomas: *"cut her at the waist"* - she should loom in the
+// near foreground with the cards crossing her mid-body, not stand whole on a shelf.
+// ⚠️ This CANNOT be a CSS percentage. `bottom: N%` resolves against the container's HEIGHT, but
+// how far she must drop depends on how TALL SHE IS DRAWN - and a 2:3 plate in her box fits by
+// WIDTH, so her drawn height tracks the scene's width. The two are unrelated. Measure instead.
+const MAGE_CUT = 0.55;   // fraction of the plate left ABOVE the cards (0.55 ~ her waist)
 function stageFloor() {
   const sc = $('scene'), cards = $('slots-panel');
   if (!sc || !cards) return;
   const s = sc.getBoundingClientRect(), c = cards.getBoundingClientRect();
   const hidden = Math.max(0, Math.round(s.bottom - c.top));
   sc.style.setProperty('--stage-floor', hidden + 'px');
+
+  const box = $('mage-slot'), img = box && box.querySelector('.mage-img');
+  if (!img || !img.naturalWidth) return;
+  const b = box.getBoundingClientRect();
+  // replicate object-fit: contain to find how tall she is actually painted
+  const scale = Math.min(b.width / img.naturalWidth, b.height / img.naturalHeight);
+  const drawn = img.naturalHeight * scale;
+  sc.style.setProperty('--mage-drop', Math.round((1 - MAGE_CUT) * drawn) + 'px');
 }
 try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !isShell()) stageFloor(); }); } catch (e) {}
 

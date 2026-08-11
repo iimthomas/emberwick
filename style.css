@@ -339,11 +339,13 @@ label.radio { margin-right: 14px; cursor: pointer; }
 /* 🎭 width is the binding constraint on her size (a 2:3 plate in this box fits by width),
    so 30% -> 34% is what actually makes her read as "large in the near foreground". */
 /* 🎭 She stands on the VISIBLE floor, not the scene's own bottom edge - `--stage-floor` is
-   the height of the UI covering the scene, measured per render by stageFloor(). The 34px lifts
-   her back up so the card row crops her shins rather than swallowing her whole. */
+   the height of the UI covering the scene, and `--mage-drop` is how far below it she sits so the
+   cards cross her at the waist. Both are measured per render by stageFloor(), because neither
+   can be a percentage: `bottom: N%` resolves against HEIGHT, while her drawn size tracks the
+   scene's WIDTH. */
 .mage {
   position: absolute; left: 1%; width: 38%; height: 96%;
-  bottom: calc(var(--stage-floor, 0px) - 34px);
+  bottom: calc(var(--stage-floor, 0px) - var(--mage-drop, 34px));
   fill: #070605; z-index: 2;
 }
 .foe { position: absolute; z-index: 1; }
