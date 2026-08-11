@@ -3990,7 +3990,12 @@ function renderScene() {
   const duel = S.finalMode && S.finalPhase === 'duel';
   const isFight = duel || (e && e.type === 'fight');
   let foe;
-  if (duel) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}${foeArt(S.dragon.name)}</div>`;
+  // 🐉 THE DRAGON IS ON SCREEN FOR THE WHOLE FINALE, not just the duel beats (2026-08-10).
+  // The Last Mile is a JOURNEY, so it used to draw the empty road - while the enemy panel showed
+  // "Cindermaw 52/52" and the log said the lair was in sight. Three parts of the UI describing the
+  // same moment, one of them saying nothing is there.
+  // 🔑 The scene must agree with the panel. You are at the lair mouth; the thing is right there.
+  if (S.finalMode) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}${foeArt(S.dragon.name)}</div>`;
   else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}${foeArt(e.name)}</div>`;
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
   el.className = isFight ? 'is-fight' : 'is-journey';
@@ -3999,7 +4004,7 @@ function renderScene() {
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
-    `<div class="scene-name">${duel ? S.dragon.name : e ? e.name : ''}</div>` +
+    `<div class="scene-name">${S.finalMode ? S.dragon.name : e ? e.name : ''}</div>` +
     `<div class="scene-vig"></div>`;
 }
 
