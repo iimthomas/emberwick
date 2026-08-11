@@ -3981,7 +3981,12 @@ function sceneVars(e, isFight) {
 const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function foeArt(name) {
   if (!name) return '';
-  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.png" ` +
+  // ⚠️ THE ART URL MUST CARRY THE BUILD. Everything else here is versioned - style.css,
+  // game.js, and index.html revalidates - but an image filename never changes, so a browser that
+  // cached cindermaw.png once will serve that copy forever. Re-keying the alpha and re-deploying
+  // looked exactly like the key had failed, because the old picture kept arriving. Third time this
+  // project has lost time to a cache: HTML, then the PWA, now assets.
+  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.png?v=${BUILD}" ` +
     `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
 }
 
