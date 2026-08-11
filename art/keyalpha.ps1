@@ -1,32 +1,55 @@
 # =============================================================================
 #  KEY A FLAT-BLACK PLATE TO REAL ALPHA
 # =============================================================================
-#  Our creature plates are drawn on pure #000000. This turns that background
-#  into true transparency and writes a web-sized PNG.
+#  Our creature plates are drawn on pure black. This turns that background into
+#  true transparency and writes a web-sized PNG with a real alpha channel.
 #
-#  WHY FLOOD FILL AND NOT A LUMINANCE KEY:
-#  A luminance key ("anything dark becomes transparent") would eat the subject.
-#  These creatures are deliberately dark -- Cindermaw is charcoal armour with
-#  ember cracks -- so a brightness threshold dissolves the body and leaves
-#  floating glow. Instead we flood-fill inward from the image border: only
-#  black that is CONNECTED to the edge is background. Dark pixels enclosed by
-#  the creature are left completely alone.
+#  ---------------------------------------------------------------------------
+#  WHY THIS IS NOT A BRIGHTNESS THRESHOLD, AND NOT A PLAIN FLOOD FILL EITHER
+#  ---------------------------------------------------------------------------
+#  Measured on Cindermaw: the background sits at luminance 4-6, but 25% of the
+#  pixels INSIDE the creature are below 10 and some are pure black. The dragon
+#  is charcoal armour by design. So:
 #
-#  Edges are then feathered one pixel so the cutout does not look stamped.
+#    * A brightness key ("dark = transparent") dissolves the body outright.
+#    * A plain flood fill from the border leaks through the gaps between scales
+#      and hollows the creature out -- it looks see-through, which is exactly
+#      what shipped in build 190.
 #
-#  Usage:  ./keyalpha.ps1 -Source <in.png> -Dest <out.png> [-Width 900] [-Threshold 30]
+#  What separates background from body is not COLOUR, it is THICKNESS. The
+#  backdrop is a wide open region; the paths into the body are a few pixels
+#  wide. So the fill only travels through channels wider than -Radius:
+#
+#    1. dark   = luminance <= Threshold                    (candidate background)
+#    2. core   = dark eroded by Radius                     (thin necks vanish)
+#    3. reach  = flood fill from the border, within core   (only the true backdrop)
+#    4. bg     = reach dilated by Radius, clipped to dark  (restored to the edge)
+#
+#  Steps 2 and 4 are box morphology done with integral images, so the whole
+#  thing is O(pixels) regardless of radius.
+#
+#  Edges are then feathered by scaling alpha with brightness on the boundary,
+#  and the key runs at FULL resolution before downscaling so the alpha ramp
+#  comes from real anti-aliased edges instead of interpolated ones.
+#
+#  Usage:
+#    ./keyalpha.ps1 -Source raw.png -Dest ../art/foes/name.png [-Width 900]
+#                   [-Threshold 14] [-Radius 6]
+#
+#  If a creature still looks see-through, RAISE -Radius (the leak channel is
+#  wider than you thought). If a thin tail or wingtip gets cut off, LOWER it.
 # =============================================================================
 param(
   [Parameter(Mandatory = $true)][string]$Source,
   [Parameter(Mandatory = $true)][string]$Dest,
   [int]$Width = 900,
-  [int]$Threshold = 30
+  [int]$Threshold = 14,
+  [int]$Radius = 6
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-# Pixel work in C# -- a PowerShell loop over four million bytes takes minutes.
 $cs = @"
 using System;
 using System.Drawing;
@@ -35,7 +58,27 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 
 public static class AlphaKey {
-  public static Bitmap Key(Bitmap src, int threshold) {
+
+  // box-sum over a boolean field via integral image -- O(1) per pixel
+  static int[] Integral(bool[] f, int w, int h) {
+    int[] I = new int[(w + 1) * (h + 1)];
+    for (int y = 0; y < h; y++) {
+      int rowSum = 0;
+      for (int x = 0; x < w; x++) {
+        rowSum += f[y * w + x] ? 1 : 0;
+        I[(y + 1) * (w + 1) + (x + 1)] = I[y * (w + 1) + (x + 1)] + rowSum;
+      }
+    }
+    return I;
+  }
+  static int BoxSum(int[] I, int w, int h, int x, int y, int r) {
+    int x0 = Math.Max(0, x - r), y0 = Math.Max(0, y - r);
+    int x1 = Math.Min(w - 1, x + r), y1 = Math.Min(h - 1, y + r);
+    return I[(y1 + 1) * (w + 1) + (x1 + 1)] - I[y0 * (w + 1) + (x1 + 1)]
+         - I[(y1 + 1) * (w + 1) + x0] + I[y0 * (w + 1) + x0];
+  }
+
+  public static Bitmap Key(Bitmap src, int threshold, int radius) {
     int w = src.Width, h = src.Height;
     Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
     using (Graphics g = Graphics.FromImage(bmp)) { g.DrawImage(src, 0, 0, w, h); }
@@ -45,61 +88,79 @@ public static class AlphaKey {
     byte[] buf = new byte[bytes];
     Marshal.Copy(d.Scan0, buf, 0, bytes);
 
-    bool[] bg = new bool[w * h];
-    Stack<int> stack = new Stack<int>();
-
-    // seed from every border pixel that is dark enough to be background
-    for (int x = 0; x < w; x++) { Seed(buf, bg, stack, d.Stride, w, x, 0, threshold); Seed(buf, bg, stack, d.Stride, w, x, h - 1, threshold); }
-    for (int y = 0; y < h; y++) { Seed(buf, bg, stack, d.Stride, w, 0, y, threshold); Seed(buf, bg, stack, d.Stride, w, w - 1, y, threshold); }
-
-    while (stack.Count > 0) {
-      int idx = stack.Pop();
-      int x = idx % w, y = idx / w;
-      if (x > 0)     Seed(buf, bg, stack, d.Stride, w, x - 1, y, threshold);
-      if (x < w - 1) Seed(buf, bg, stack, d.Stride, w, x + 1, y, threshold);
-      if (y > 0)     Seed(buf, bg, stack, d.Stride, w, x, y - 1, threshold);
-      if (y < h - 1) Seed(buf, bg, stack, d.Stride, w, x, y + 1, threshold);
-    }
-
-    // alpha = 0 on background. Then feather: a kept pixel touching background
-    // gets alpha scaled by its own brightness, so anti-aliased rims stay soft.
-    for (int y = 0; y < h; y++) {
+    // 1. candidate background: dark enough
+    bool[] dark = new bool[w * h];
+    int[] lum = new int[w * h];
+    for (int y = 0; y < h; y++)
       for (int x = 0; x < w; x++) {
         int p = y * d.Stride + x * 4;
-        int i = y * w + x;
+        int L = (buf[p + 2] * 30 + buf[p + 1] * 59 + buf[p] * 11) / 100;
+        lum[y * w + x] = L;
+        dark[y * w + x] = L <= threshold;
+      }
+
+    // 2. erode: a core pixel has NO bright pixel within radius, so any channel
+    //    narrower than the radius disappears entirely
+    bool[] notDark = new bool[w * h];
+    for (int i = 0; i < dark.Length; i++) notDark[i] = !dark[i];
+    int[] Ind = Integral(notDark, w, h);
+    bool[] core = new bool[w * h];
+    for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+        core[y * w + x] = BoxSum(Ind, w, h, x, y, radius) == 0;
+
+    // 3. flood from the border, travelling only through core
+    bool[] reach = new bool[w * h];
+    Stack<int> st = new Stack<int>();
+    for (int x = 0; x < w; x++) { Push(core, reach, st, w, x, 0); Push(core, reach, st, w, x, h - 1); }
+    for (int y = 0; y < h; y++) { Push(core, reach, st, w, 0, y); Push(core, reach, st, w, w - 1, y); }
+    while (st.Count > 0) {
+      int i = st.Pop(); int x = i % w, y = i / w;
+      if (x > 0)     Push(core, reach, st, w, x - 1, y);
+      if (x < w - 1) Push(core, reach, st, w, x + 1, y);
+      if (y > 0)     Push(core, reach, st, w, x, y - 1);
+      if (y < h - 1) Push(core, reach, st, w, x, y + 1);
+    }
+
+    // 4. dilate the reached core back out, clipped to dark -- restores the
+    //    background right up against the creature without re-entering it
+    int[] Ire = Integral(reach, w, h);
+    bool[] bg = new bool[w * h];
+    for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+        bg[y * w + x] = dark[y * w + x] && BoxSum(Ire, w, h, x, y, radius) > 0;
+
+    // alpha, with a brightness-scaled feather on the boundary
+    for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++) {
+        int i = y * w + x, p = y * d.Stride + x * 4;
         if (bg[i]) { buf[p + 3] = 0; continue; }
-        bool edge = (x > 0 && bg[i - 1]) || (x < w - 1 && bg[i + 1]) || (y > 0 && bg[i - w]) || (y < h - 1 && bg[i + w]);
+        bool edge = (x > 0 && bg[i - 1]) || (x < w - 1 && bg[i + 1]) ||
+                    (y > 0 && bg[i - w]) || (y < h - 1 && bg[i + w]);
         if (edge) {
-          int lum = (buf[p + 2] * 30 + buf[p + 1] * 59 + buf[p] * 11) / 100;
-          int a = lum * 255 / Math.Max(1, threshold * 2);
-          buf[p + 3] = (byte)Math.Min(255, Math.Max(0, a));
+          int a = lum[i] * 255 / Math.Max(1, threshold * 3);
+          buf[p + 3] = (byte)Math.Min(255, Math.Max(40, a));
         }
       }
-    }
 
     Marshal.Copy(buf, 0, d.Scan0, bytes);
     bmp.UnlockBits(d);
     return bmp;
   }
 
-  static void Seed(byte[] buf, bool[] bg, Stack<int> stack, int stride, int w, int x, int y, int threshold) {
+  static void Push(bool[] core, bool[] reach, Stack<int> st, int w, int x, int y) {
     int i = y * w + x;
-    if (bg[i]) return;
-    int p = y * stride + x * 4;
-    int lum = (buf[p + 2] * 30 + buf[p + 1] * 59 + buf[p] * 11) / 100;
-    if (lum > threshold) return;
-    bg[i] = true;
-    stack.Push(i);
+    if (reach[i] || !core[i]) return;
+    reach[i] = true; st.Push(i);
   }
 }
 "@
 Add-Type -TypeDefinition $cs -ReferencedAssemblies System.Drawing
 
 $img = [System.Drawing.Image]::FromFile((Resolve-Path $Source))
-$keyed = [AlphaKey]::Key($img, $Threshold)
+$keyed = [AlphaKey]::Key($img, $Threshold, $Radius)
 $img.Dispose()
 
-# downscale AFTER keying: full-resolution edges make a much cleaner alpha ramp
 $h = [int]($keyed.Height * $Width / $keyed.Width)
 $out = New-Object System.Drawing.Bitmap $Width, $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $g = [System.Drawing.Graphics]::FromImage($out)
@@ -109,7 +170,14 @@ $g.DrawImage($keyed, 0, 0, $Width, $h)
 $g.Dispose(); $keyed.Dispose()
 
 $out.Save($Dest, [System.Drawing.Imaging.ImageFormat]::Png)
+
+# report how much of the frame was actually removed -- a sanity check that
+# catches both failure modes: ~0% means nothing keyed, >85% means it ate the art
+$clear = 0
+for ($y = 0; $y -lt $out.Height; $y += 3) { for ($x = 0; $x -lt $out.Width; $x += 3) { if ($out.GetPixel($x, $y).A -lt 8) { $clear++ } } }
+$tot = [math]::Ceiling($out.Height / 3) * [math]::Ceiling($out.Width / 3)
+$pct = [int](100 * $clear / $tot)
 $out.Dispose()
 
 $f = Get-Item $Dest
-Write-Host ("  keyed -> {0}  ({1} x {2}, {3} KB)" -f $f.Name, $Width, $h, [int]($f.Length / 1KB))
+Write-Host ("  keyed -> {0}  ({1} x {2}, {3} KB, {4}% transparent)" -f $f.Name, $Width, $h, [int]($f.Length / 1KB), $pct)
