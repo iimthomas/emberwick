@@ -892,12 +892,10 @@ button.stage.locked .stage-shape { font-style: italic; }
 .foe-img {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: contain; opacity: 0; transition: opacity .5s ease;
-  /* 🔑 the plate is drawn on FLAT BLACK, and the scene is #16140f — close, but not identical.
-     A soft radial mask feathers the rectangle's edges into the scene so there is no visible box.
-     This is why we did not need real transparency: black + a feather reads as a cutout, and it
-     costs one CSS line instead of an alpha-keying pass over 69 files. */
-  -webkit-mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 55%, transparent 97%);
-  mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 55%, transparent 97%);
+  /* 🗝️ THE MASK IS GONE — the PNG carries real alpha now (art/keyalpha.ps1), so there is no
+     rectangle to hide. The feather was a workaround for a plate that still had its background;
+     keeping it would now eat the creature's own silhouette at the edges of the frame. */
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .55));
 }
 .foe.has-art .foe-img { opacity: 1; }
 .foe.has-art > svg { opacity: 0; }   /* the silhouette steps aside, but stays for the anim hooks */

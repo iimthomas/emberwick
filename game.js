@@ -3968,6 +3968,12 @@ function sceneVars(e, isFight) {
 // So: the silhouette renders as it always did, an <img> is laid over it, and the picture only
 // takes over `onload`. A miss removes itself and you never see that it tried.
 //
+// 🗝️ REAL ALPHA (2026-08-10). The plates are drawn on flat #000000 and `art/keyalpha.ps1`
+// keys that to true transparency, so a creature is a genuine cutout rather than a dark rectangle
+// feathered into a dark scene. ⚠️ IT FLOOD-FILLS FROM THE BORDER, IT DOES NOT THRESHOLD BRIGHTNESS
+// — these creatures are deliberately dark, so "anything black becomes transparent" would dissolve
+// the armour and leave floating ember veins. Only black CONNECTED to the edge is background.
+//
 // ⚠️ These are PLACEHOLDERS, and the standing rule still holds — we are not building
 // presentation. What makes this the exception is that a PNG is an ASSET, not a system: it ports to
 // Godot unchanged, the same way the numbers in Balance_Log transfer. `#foe-slot` was always
@@ -3975,7 +3981,7 @@ function sceneVars(e, isFight) {
 const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function foeArt(name) {
   if (!name) return '';
-  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.jpg" ` +
+  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.png" ` +
     `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
 }
 
