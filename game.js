@@ -1376,6 +1376,20 @@ function devJump() {
   beginFinalBattle();
 }
 
+// 📖 what the tutorial hands you on to — stage 1, named, with its one demand
+function tutorialHandoffHTML() {
+  const d = dragonForStage(1);
+  if (!d) return `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`;
+  return `<div class="handoff">` +
+    `<p>That was the shallow end. Everything past here is the same four slots and the same sixteen ` +
+    `cards — what changes is <b>what stands in front of you</b>.</p>` +
+    `<p><b>${d.name}</b> ${elIcon(d.element)} waits at the end of the first road. ` +
+    `${dragonShapeText(d)}: ${dragonDemand(d)}. <b>It asks one thing of you: ${d.teaches}.</b></p>` +
+    `</div>` +
+    `<button class="primary" onclick="startStage(1)">⚔️ Set out for the ${d.name} — Stage 1</button>` +
+    `<button onclick="showStages()">🗺️ Stages</button>`;
+}
+
 // 🏆 the badge on a stage button — your best, and what is still above it
 function gradeBadge(stage) {
   const g = bestGrades()[String(stage)];
@@ -1598,6 +1612,84 @@ function freshGame(stage) {
   // you can already name.
   log(`🐉 STAGE ${S.dragon.stage} — beyond Region ${RUN().length} waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
   render();
+}
+
+// ============================================================
+// 📋 THE REPORT (2026-08-05) — the playtest's only instrument
+// ============================================================
+// A friend who hits a bug can only tell you *"it broke on the dragon"*, and neither of us can act
+// on that. Everything needed to reproduce it — the stage, the turn, the phase, what the deck had
+// become, what the log just said — is sitting right there in their browser and has no way out.
+//
+// 🔑 THIS IS THE SAME PRINCIPLE AS THE GRADE AND THE STANDING: state the TERMS. A playtester
+// is an instrument, and an instrument that cannot export a reading is a rumour.
+//
+// ⚠️ It is deliberately a COPY, not a send. No endpoint, no account, no network — the game
+// stays a static page you can open from a file, and the tester chooses what to paste and where.
+function reportText() {
+  const L = [];
+  const p = (k, v) => L.push(k + ': ' + v);
+  p('build', BUILD + ' (' + CHANNEL + ')');
+  p('url', (() => { try { return location.href; } catch (e) { return '?'; } })());
+  p('screen', (() => { try { return innerWidth + 'x' + innerHeight; } catch (e) { return '?'; } })());
+  p('agent', (() => { try { return navigator.userAgent; } catch (e) { return '?'; } })());
+  if (!S || isShell()) { p('state', 'no run (' + ((S && S.phase) || 'boot') + ')'); return L.join('\n'); }
+  p('stage', (S.tutorial ? '0 (tutorial)' : (S.dragon ? S.dragon.stage + ' — ' + S.dragon.name : '?')));
+  p('where', S.finalMode ? ('the lair · ' + (S.finalPhase || 'duel')) : ('region ' + S.region + ' · turn ' + S.turn));
+  p('phase', S.phase + (S.encounter ? ' · ' + S.encounter.type + ' · ' + S.encounter.name : ''));
+  if (S.finalMode && S.dragonState) p('dragon', S.dragonState.hp + ' hp · breath ' + (S.dragonState.breath || '?'));
+  p('deck', S.deck.length + ' deck / ' + S.hand.length + ' hand / ' + S.discard.length + ' discard · ' +
+      deckLevels() + ' levels' + (S.dragon && S.dragon.par ? ' vs par ' + S.dragon.par : '') +
+      ' · lost ' + S.trashed.length);
+  p('hand', S.hand.map(c => displayName(c) + ' Lv' + c.level + ' [' + (zoneOf(c.id) || '—') + ']').join(' | ') || 'none');
+  p('carried', (carried() || []).map(x => x.name).join(', ') || 'nothing');
+  p('potions', (S.potions || []).map(id => (potionById(id) || {}).name || id).join(', ') || 'none');
+  p('coins', S.coins + (S.contract ? ' · contract: ' + S.contract.id : ''));
+  p('results', 'C' + S.results.Complete + ' N' + S.results.Narrow + ' L' + S.results.Loss +
+      ' · candle ' + (S.candle ? 'lit' : 'out'));
+  // the last few turns of log, stripped of markup — the single most useful part of the whole report
+  const strip = t => String(t).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '');
+  L.push('');
+  L.push('--- log (most recent last) ---');
+  (S.logEntries || []).slice(0, 4).reverse().forEach(e => {
+    L.push('[' + strip(e.header) + ']');
+    e.lines.forEach(l => L.push('  ' + strip(l.text)));
+  });
+  return L.join('\n');
+}
+
+// ⚠️ THE CLIPBOARD CAN REFUSE and it refuses most often on exactly the devices a playtester
+// uses — an insecure origin, an iOS gesture that did not count, a browser that never had the API.
+// A copy button that silently fails is worse than none, so a refusal falls back to showing the
+// text in a box the tester can select by hand. Never leave them with nothing.
+function copyReport() {
+  const txt = reportText();
+  const done = ok => {
+    const b = $('report-btn'); if (!b) return;
+    b.textContent = ok ? '✓ Copied' : '📋 Select it';
+    setTimeout(() => { b.textContent = '📋 Report'; }, 2200);
+    if (!ok) showReportBox(txt);
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(() => done(true), () => done(false));
+      return;
+    }
+  } catch (e) {}
+  done(false);
+}
+function showReportBox(txt) {
+  let box = $('report-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'report-box';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = `<div class="rb-inner"><p>Copy this and send it along with what you were doing:</p>` +
+    `<textarea readonly></textarea>` +
+    `<button onclick="document.getElementById('report-box').remove()">Close</button></div>`;
+  const ta = box.querySelector('textarea');
+  ta.value = txt; ta.focus(); ta.select();
 }
 
 // 🏠 THE WAY OUT (2026-08-05). The header used to hold one button, ⟳ New Run, which quietly
@@ -4075,7 +4167,13 @@ function renderControls() {
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
-      `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`;
+      // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either
+      // becomes a player or closes the tab, and it used to end on the same generic stage picker a
+      // returning player gets. A picker is a question; what someone who has just been taught needs
+      // is the NEXT THING, named. So the tutorial's victory screen points at stage 1 by name, with
+      // the one demand it makes — the same briefing language the run itself uses.
+      (S.tutorial ? tutorialHandoffHTML()
+        : `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`);
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);

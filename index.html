@@ -13,12 +13,13 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=177">
+<link rel="stylesheet" href="style.css?v=178">
 </head>
 <body>
 <header>
   <h1><span class="mark">🕯️</span> Emberwick</h1>
   <div id="turn-indicator"></div>
+  <button id="report-btn" onclick="copyReport()" title="Copy what the game is doing right now, to paste into a bug report">📋 Report</button>
   <button id="menu-btn" onclick="toMenu()" title="Back to the main menu — your run is saved">🏠 Menu</button>
   <button id="newrun-btn" onclick="newGame()" title="Start this stage again from the beginning">⟳ New Run</button>
 </header>
@@ -40,6 +41,6 @@
   </div>
 </main>
 
-<script src="game.js?v=177"></script>
+<script src="game.js?v=178"></script>
 </body>
 </html>

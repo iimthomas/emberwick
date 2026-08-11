@@ -12,15 +12,17 @@ body {
 }
 
 header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
-#newrun-btn, #menu-btn {
+#report-btn, #newrun-btn, #menu-btn {
   margin: 0; padding: 5px 11px; font-size: 12px; align-self: center;
   background: #262b34; border: 1px solid #4a4a4a; color: #b9b4a5;
 }
-#newrun-btn:hover, #menu-btn:hover { background: #3a4150; color: #e6e2d8; }
-#menu-btn { margin-left: auto; }        /* the pair sits together at the right */
-#turn-indicator + #menu-btn { margin-left: 0; }
+#report-btn:hover, #newrun-btn:hover, #menu-btn:hover { background: #3a4150; color: #e6e2d8; }
+#report-btn { margin-left: auto; }      /* the group sits together at the right */
+#turn-indicator + #report-btn { margin-left: 0; }
 /* 🏠 nothing to leave and nothing to restart when you are already on the shell */
 body.shell #newrun-btn, body.shell #menu-btn { display: none; }
+/* 📋 the report stays reachable EVERYWHERE — a bug you cannot report from is the
+   one that never gets fixed, and the menu is where a crashed run lands you. */
 h1 { font-size: 22px; letter-spacing: 3px; font-weight: 600; color: #e9c26a; text-shadow: 0 0 14px rgba(233,178,74,0.25); }
 h1 .mark { filter: drop-shadow(0 0 6px rgba(255,180,74,0.6)); }
 h1 .sub { font-size: 12px; color: #8a8577; letter-spacing: 0; font-weight: normal; }
@@ -868,6 +870,22 @@ button.stage.locked .stage-shape { font-style: italic; }
 .menu-stamp { margin-top: 16px; text-align: center; font-size: .72rem; letter-spacing: .07em;
   text-transform: uppercase; color: #6b6152; }
 .menu-stamp b { color: #c9a227; }
+
+/* 📋 the fallback box, for when the clipboard says no */
+#report-box { position: fixed; inset: 0; z-index: 90; background: rgba(10,10,12,.82);
+  display: flex; align-items: center; justify-content: center; padding: 20px; }
+#report-box .rb-inner { background: #1f232b; border: 1px solid #4a4a4a; border-radius: 8px;
+  padding: 16px; width: min(560px, 100%); display: flex; flex-direction: column; gap: 10px; }
+#report-box p { margin: 0; color: #b9b4a5; font-size: .86rem; }
+#report-box textarea { width: 100%; height: 42vh; background: #14171c; color: #d8d3c6;
+  border: 1px solid #3a3f48; border-radius: 5px; padding: 8px; font: 12px/1.45 ui-monospace, monospace;
+  resize: vertical; }
+
+/* 📖 the tutorial's handoff to stage 1 */
+.handoff { background: #1d2129; border: 1px solid #3a3f48; border-left: 3px solid #c9a227;
+  border-radius: 6px; padding: 12px 14px; margin: 10px 0; }
+.handoff p { margin: 0 0 8px; line-height: 1.5; }
+.handoff p:last-child { margin-bottom: 0; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 
