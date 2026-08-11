@@ -22,8 +22,14 @@
 #
 #    1. dark   = luminance <= Threshold                    (candidate background)
 #    2. core   = dark eroded by Radius                     (thin necks vanish)
-#    3. reach  = flood fill from the border, within core   (only the true backdrop)
+#    3. reach  = every THICK dark region, not only the one touching the border
 #    4. bg     = reach dilated by Radius, clipped to dark  (restored to the edge)
+#
+#  Step 3 counts ENCLOSED pockets too, because a coiled creature encloses
+#  negative space -- the hole inside a tail loop is background you can see
+#  through, but no fill starting at the border can ever reach it. -HolePercent
+#  is what tells a real gap from a deep shadow between the scales: a pocket
+#  smaller than that is treated as part of the body.
 #
 #  Steps 2 and 4 are box morphology done with integral images, so the whole
 #  thing is O(pixels) regardless of radius.
@@ -38,13 +44,16 @@
 #
 #  If a creature still looks see-through, RAISE -Radius (the leak channel is
 #  wider than you thought). If a thin tail or wingtip gets cut off, LOWER it.
+#  If an enclosed gap stays black, LOWER -HolePercent; if a shadow inside the
+#  body punches through, RAISE it.
 # =============================================================================
 param(
   [Parameter(Mandatory = $true)][string]$Source,
   [Parameter(Mandatory = $true)][string]$Dest,
   [int]$Width = 900,
   [int]$Threshold = 14,
-  [int]$Radius = 6
+  [int]$Radius = 6,
+  [double]$HolePercent = 0.05
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,7 +87,7 @@ public static class AlphaKey {
          - I[(y1 + 1) * (w + 1) + x0] + I[y0 * (w + 1) + x0];
   }
 
-  public static Bitmap Key(Bitmap src, int threshold, int radius) {
+  public static Bitmap Key(Bitmap src, int threshold, int radius, int minHole) {
     int w = src.Width, h = src.Height;
     Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
     using (Graphics g = Graphics.FromImage(bmp)) { g.DrawImage(src, 0, 0, w, h); }
@@ -109,17 +118,32 @@ public static class AlphaKey {
       for (int x = 0; x < w; x++)
         core[y * w + x] = BoxSum(Ind, w, h, x, y, radius) == 0;
 
-    // 3. flood from the border, travelling only through core
+    // 3. every THICK dark region is background -- not just the one touching the
+    //    border. A coiled creature encloses negative space (the hole inside the
+    //    tail loop), and a border-only fill can never reach it, so those pockets
+    //    stayed black. Enclosed regions therefore count too, provided they are
+    //    big: minHole is what separates a real gap you can see through from a
+    //    deep shadow between the scales, which must stay part of the body.
     bool[] reach = new bool[w * h];
+    List<int> comp = new List<int>();
     Stack<int> st = new Stack<int>();
-    for (int x = 0; x < w; x++) { Push(core, reach, st, w, x, 0); Push(core, reach, st, w, x, h - 1); }
-    for (int y = 0; y < h; y++) { Push(core, reach, st, w, 0, y); Push(core, reach, st, w, w - 1, y); }
-    while (st.Count > 0) {
-      int i = st.Pop(); int x = i % w, y = i / w;
-      if (x > 0)     Push(core, reach, st, w, x - 1, y);
-      if (x < w - 1) Push(core, reach, st, w, x + 1, y);
-      if (y > 0)     Push(core, reach, st, w, x, y - 1);
-      if (y < h - 1) Push(core, reach, st, w, x, y + 1);
+    for (int seed = 0; seed < core.Length; seed++) {
+      if (reach[seed] || !core[seed]) continue;
+      comp.Clear();
+      bool touchesBorder = false;
+      reach[seed] = true; st.Push(seed);
+      while (st.Count > 0) {
+        int i = st.Pop(); comp.Add(i);
+        int x = i % w, y = i / w;
+        if (x == 0 || y == 0 || x == w - 1 || y == h - 1) touchesBorder = true;
+        if (x > 0)     Push(core, reach, st, w, x - 1, y);
+        if (x < w - 1) Push(core, reach, st, w, x + 1, y);
+        if (y > 0)     Push(core, reach, st, w, x, y - 1);
+        if (y < h - 1) Push(core, reach, st, w, x, y + 1);
+      }
+      // an enclosed pocket that is too small is shadow, not a hole -- put it back
+      if (!touchesBorder && comp.Count < minHole)
+        for (int k = 0; k < comp.Count; k++) reach[comp[k]] = false;
     }
 
     // 4. dilate the reached core back out, clipped to dark -- restores the
@@ -158,7 +182,8 @@ public static class AlphaKey {
 Add-Type -TypeDefinition $cs -ReferencedAssemblies System.Drawing
 
 $img = [System.Drawing.Image]::FromFile((Resolve-Path $Source))
-$keyed = [AlphaKey]::Key($img, $Threshold, $Radius)
+$minHole = [int]($img.Width * $img.Height * $HolePercent / 100)
+$keyed = [AlphaKey]::Key($img, $Threshold, $Radius, $minHole)
 $img.Dispose()
 
 $h = [int]($keyed.Height * $Width / $keyed.Width)
