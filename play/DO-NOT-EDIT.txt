@@ -1,0 +1,9 @@
+﻿This folder is a FROZEN SNAPSHOT of the game, cut from the live build.
+
+    playtest build 176
+
+Do not edit anything in here -- it is overwritten wholesale the next time
+cut-playtest.ps1 runs. Change the real files in prototype/ and cut a new drop.
+
+  friends   https://iimthomas.github.io/emberwick/play/
+  live      https://iimthomas.github.io/emberwick/         (?dev for tools)
