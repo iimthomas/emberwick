@@ -4045,9 +4045,14 @@ function renderScene() {
   el.className = isFight ? 'is-fight' : 'is-journey';
   el.setAttribute('style', sceneVars(e, isFight));
   el.innerHTML =
-    // 🗺️ a JOURNEY is its own place; a FIGHT happens somewhere - in its region. Asking for a
-    // backdrop named after the creature would mean 32 nonsense files that can never exist.
-    (e && !S.finalMode ? placeArt(e.type === 'journey' ? e.name : RUN()[S.region - 1].name) : '') +
+    // 🗺️ WHAT PLACE ARE WE IN? A JOURNEY is its own place. A FIGHT happens somewhere - in its
+    // REGION, not in a place named after the creature, which would be 32 files that can never
+    // sensibly exist. And the FINALE happens in the dragon's LAIR.
+    // 🔑 Three scales of place, one lookup: the road, the country, and the lair at the end of it.
+    placeArt(S.finalMode ? S.dragon.name + ' lair'
+      : !e ? null
+      : e.type === 'journey' ? e.name
+      : RUN()[S.region - 1].name) +
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
