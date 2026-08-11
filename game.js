@@ -3988,6 +3988,19 @@ function heroArt() {
   return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}.png?v=${BUILD}" ` +
     `onload="this.parentNode.classList.add('has-art'); stageFloor();" onerror="this.remove()">`;
 }
+// 🗺️ A PLACE, NOT A THING (2026-08-10). A creature is an object IN the scene; a journey IS
+// the scene. So a journey's art is a BACKDROP behind everything rather than a cutout in a slot -
+// which also fixes the emptiest screen in the game, since a journey has no foe to look at and
+// draws nothing but a road-glow today.
+//
+// ⚠️ NO KEYING, and it must stay DARK. The UI floats directly on the scene, so a bright or busy
+// backdrop costs legibility on every phase - the art is generated dusk-lit, dimmed further in CSS,
+// and the existing vignette sits on top of it.
+function placeArt(name) {
+  if (!name) return '';
+  return `<img class="place-img" alt="" src="art/places/${artSlug(name)}.jpg?v=${BUILD}" ` +
+    `onerror="this.remove()">`;
+}
 function foeArt(name) {
   if (!name) return '';
   // ⚠️ THE ART URL MUST CARRY THE BUILD. Everything else here is versioned - style.css,
@@ -4021,6 +4034,9 @@ function renderScene() {
   el.className = isFight ? 'is-fight' : 'is-journey';
   el.setAttribute('style', sceneVars(e, isFight));
   el.innerHTML =
+    // 🗺️ a JOURNEY is its own place; a FIGHT happens somewhere - in its region. Asking for a
+    // backdrop named after the creature would mean 32 nonsense files that can never exist.
+    (e && !S.finalMode ? placeArt(e.type === 'journey' ? e.name : RUN()[S.region - 1].name) : '') +
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
     `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +

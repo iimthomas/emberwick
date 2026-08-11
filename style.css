@@ -911,6 +911,20 @@ button.stage.locked .stage-shape { font-style: italic; }
 .foe.has-art .foe-img { opacity: 1; }
 .foe.has-art > svg { opacity: 0; }   /* the silhouette steps aside, but stays for the anim hooks */
 
+/* 🗺️ THE PLACE. Sits behind every other scene layer, dimmed hard because the UI reads
+   directly on top of it. `cover` because the scene's aspect ratio changes with the window and a
+   backdrop must never letterbox. */
+/* ⚠️ NO load-gated fade here, unlike the foe and the mage. Those start at opacity 0 and are
+   revealed by a class their onload adds; on the backdrop that combination computed 0 forever
+   even though an identical probe element in the same parent computed correctly. It was also
+   pointless: `onerror` already removes a missing file, so there is nothing to hide while
+   waiting. One declaration, no state, no failure mode. */
+.place-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  opacity: .55; z-index: 0;
+}
+
 /* 🎭 the mage, same deal. She is anchored bottom-left and the card row covers her legs by
    design, so the art is composed with everything that matters in its upper half. */
 .mage-img {
