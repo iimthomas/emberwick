@@ -482,7 +482,14 @@ const RUNSIM = (() => {
           .filter(x => x.o.kind !== 'contract')
           .sort((a, b) => (rank[b.o.kind] || 0) - (rank[a.o.kind] || 0));
         if (buyable.length) { m.buys = (m.buys || 0) + 1; wheelBuy(buyable[0].i); }
-        else wheelDone();
+        else {
+          // 🛒 ONE SHOP (2026-08-10) — sharpening happens on this screen now, not on a second one
+          // after it. ⚠️ The 'upgrade' phase no longer fires, so a bot that only sharpened there
+          // would silently stop buying levels entirely and report a game nobody plays. Same policy
+          // as before: buy the most expensive card it can afford, then close.
+          const up = S.hand.filter(cc => upgradable(cc)).sort((a, b) => eff(b).cost - eff(a).cost)[0];
+          if (up) buyUpgrade(up.id); else wheelDone();
+        }
       }
       else if (p === 'event') {
         if (!withEvents) { S.event = null; finishRegionCheck(); continue; }

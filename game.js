@@ -1838,7 +1838,7 @@ function newGame() {
 
 function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
-  expireContract();   // 📜 the bound is what makes it a bet
+  // 📜 a contract CROSSES the region break now — its own encounter window is the bound
   S.regionTurn = 0;
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
@@ -1974,28 +1974,47 @@ const POTION_CAP = 3;
 //
 // 🔑 IT COSTS NO NEW RULES. Every contract reads engine state the engine already tracks —
 // outcomes, Initiative, attunement, damage taken. No verb on a card, no exception to the turn.
-// ⚠️ ONE AT A TIME, AND IT EXPIRES AT THE REGION BREAK. That bound is what makes it a GAMBLE
-// against your own play rather than a slow-burning bonus you always take.
-// ⚠️ Declarative on purpose (`track` + `need`), so the whole table ports as data and only
-// `contractTick()` is behaviour — see the port-ready rule in CLAUDE.md.
+// ⚠️ ONE AT A TIME, AND IT CARRIES ITS OWN CLOCK (rewritten 2026-08-10, Thomas: *"not liking
+// the complete 2 journeys or fights or whatever for THIS region, i think it should carry over"*).
+//
+// It used to expire at the REGION BREAK, which made the same contract a different bet depending on
+// when the wheel happened to offer it — and the region boundary is a bookkeeping line, not
+// something the player is thinking about. Now every contract states a **window in encounters** and
+// that window crosses region breaks untouched.
+//
+// 🔑 THE WINDOW STAYS, AND THIS IS WHY: a goal with no deadline cannot be FAILED, only delayed,
+// so it stops being a gamble and becomes a slow bonus you always take. The bound is what makes it
+// a bet against your own play. What changed is that the bound is now the contract's own, stated on
+// the offer, and identical whenever you buy it.
+// ⚠️ EVERY WINDOW CARRIES SLACK over its `need` — measured 2026-08-05: at `need === turnsLeft`
+// the keep rate was 23%, a coin-flip dressed as a goal.
+// ⚠️ NOTHING ASKS FOR FEWER THAN 3 (Thomas: *"2 is maybe too low"*). Two of anything happens by
+// accident across six encounters; three is a thing you steered toward.
+// ⚠️ Declarative on purpose (`track` + `need` + `window`), so the whole table ports as data and
+// only `contractTick()` is behaviour — see the port-ready rule in CLAUDE.md.
 const CONTRACTS = [
-  { id: 'ledger',  name: 'The Clean Ledger', cost: 7, reward: 22, need: 3, track: 'complete',
-    text: '⚔️ <b>Complete 3</b> encounters this region' },
-  { id: 'swift',   name: 'Swift Passage',    cost: 6, reward: 18, need: 4, track: 'initiative',
-    text: '💨 <b>Win Initiative 4</b> times this region' },
-  { id: 'woven',   name: 'The Woven Road',   cost: 6, reward: 18, need: 4, track: 'attune',
-    text: '✦ <b>Attune 4</b> times this region' },
-  { id: 'untouched', name: 'Untouched',      cost: 8, reward: 26, need: 3, track: 'unhurt',
+  { id: 'ledger',  name: 'The Clean Ledger', cost: 7, reward: 22, need: 3, window: 6, track: 'complete',
+    text: '⚔️ <b>Complete 3</b> encounters' },
+  { id: 'swift',   name: 'Swift Passage',    cost: 6, reward: 18, need: 4, window: 7, track: 'initiative',
+    text: '💨 <b>Win Initiative 4</b> times' },
+  { id: 'woven',   name: 'The Woven Road',   cost: 6, reward: 18, need: 4, window: 7, track: 'attune',
+    text: '✦ <b>Attune 4</b> times' },
+  { id: 'untouched', name: 'Untouched',      cost: 8, reward: 26, need: 3, window: 6, track: 'unhurt',
     text: '🛡️ Finish <b>3</b> encounters <b>taking no damage</b>' },
-  { id: 'longwalk', name: 'The Long Walk',   cost: 5, reward: 16, need: 2, track: 'journey',
-    text: '👣 <b>Complete 2 journeys</b> this region' },
+  // 👣 the widest window in the table: only about half of all encounters are journeys, so a
+  // 6-encounter window would ask for three of roughly three chances — the 23% trap again.
+  { id: 'longwalk', name: 'The Long Walk',   cost: 6, reward: 20, need: 3, window: 9, track: 'journey',
+    text: '👣 <b>Complete 3 journeys</b>' },
 ];
+const contractWindow = c => c.window || 6;
 const contractById = id => CONTRACTS.find(c => c.id === id) || null;
 function activeContract() { return S.contract ? contractById(S.contract.id) : null; }
 
 // 📜 one place reads the turn and moves the counter. Everything else is data.
 function contractTick(r) {
   const c = activeContract(); if (!c || !r) return;
+  // ⏳ the clock runs on ENCOUNTERS, not regions, so a region break is invisible to it
+  S.contract.left = (S.contract.left == null ? contractWindow(c) : S.contract.left) - 1;
   const hurt = (r.early || 0) + (r.combatDmg || 0) + (r.timePenalty || 0) + (r.treacherousDmg || 0);
   let hit = false;
   if (c.track === 'complete')   hit = r.outcome === 'Complete';
@@ -2003,15 +2022,15 @@ function contractTick(r) {
   if (c.track === 'attune')     hit = !!r.enhUsed;
   if (c.track === 'unhurt')     hit = hurt === 0 && r.outcome !== 'Loss';
   if (c.track === 'journey')    hit = r.type === 'journey' && r.outcome === 'Complete';
-  if (!hit) return;
-  S.contract.n++;
+  if (hit) S.contract.n++;
   if (S.contract.n >= c.need) {
     S.coins += c.reward;
     log(`📜 <b>${c.name}</b> — kept. 🪙 +${c.reward} (you now hold ${S.coins}).`, 'good result');
     S.contract = null;
-  } else {
-    log(`📜 ${c.name}: ${S.contract.n} of ${c.need}.`);
+    return;
   }
+  if (S.contract.left <= 0) { expireContract(); return; }
+  if (hit) log(`📜 ${c.name}: ${S.contract.n} of ${c.need} · ${S.contract.left} encounters left.`);
 }
 function expireContract() {
   const c = activeContract(); if (!c) return;
@@ -2911,21 +2930,19 @@ function rollOffer(rich) {
     for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
     const p = rand(bag);
     return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
-  // 📜 a contract only appears when you have none — never at camp (which sits on the region
-  // break, where a fresh one would expire before you could keep it), and ⚠️ NEVER WHEN THERE IS
-  // NO LONGER TIME TO KEEP IT. Measured before this gate: the bot bought 9.4 contracts a run and
-  // kept 0.76, burning ~50 coins on promises the region ended before it could meet. That is the
-  // picker rule again — an offer you cannot act on is a trap, not a gamble.
-  const turnsLeft = Math.max(0, REGION_ENCOUNTERS - (S.regionTurn || 0));
-  // ⚠️ AND IT NEEDS SLACK, NOT JUST ROOM. `need === turnsLeft` means a perfect run or nothing,
-  // which is a coin-flip dressed as a goal; measured that way the keep rate sat near 23%. Demanding
-  // one spare encounter turns it into a bet you can actually plan around.
-  if (!S.contract && !rich && turnsLeft >= 3 && rnd() < 0.28) {
-    const fits = CONTRACTS.filter(x => x.need < turnsLeft);
+  // 📜 a contract only appears when you have none. ⚠️ IT NO LONGER NEEDS THE REGION-TIME GATE
+  // — a contract carries its OWN window now and crosses region breaks, so "will it fit before the
+  // region ends" is not a question any more. What replaced the gate is the check below: there must
+  // be enough RUN left to keep it. An offer you cannot act on is a trap, not a gamble, and that
+  // stays true whether the wall is the region or the lair.
+  const runLeft = Math.max(0, (RUN().length - (S.region || 1)) * REGION_ENCOUNTERS +
+                             (REGION_ENCOUNTERS - (S.regionTurn || 0)));
+  if (!S.contract && !rich && rnd() < 0.28) {
+    const fits = CONTRACTS.filter(x => Math.min(contractWindow(x), runLeft) > x.need);
     if (!fits.length) return mkCharmOrPotion();
     const c = rand(fits);
     return { kind: 'contract', id: c.id, name: c.name, text: c.text +
-      `<div class="wo-delta">🪙 pays <b>${c.reward}</b> · <b>${turnsLeft}</b> encounter${turnsLeft === 1 ? '' : 's'} left this region</div>`,
+      `<div class="wo-delta">🪙 pays <b>${c.reward}</b> · within <b>${contractWindow(c)}</b> encounters · carries across regions</div>`,
       rarity: 'uncommon', cost: c.cost };
   }
   return mkCharmOrPotion();
@@ -2986,21 +3003,28 @@ function startUpgrade() {
   // Opening the shop first makes the money a CHOICE: this charm, or three levels?
   startWheel(false);
 }
-// called by the Wheel when you are done shopping — what is left goes to the forge
-function startSharpen() {
-  S.upgradePick = null;
-  S.phase = 'upgrade';
-  render();
-}
+// 🛒 ONE SHOP (2026-08-10, Thomas: *"lets make it be the upgrading at the same time too, so i
+// can spend all my money at once and see all my options at once"*).
+//
+// The Wheel and the forge were two screens in a row, and that split the purse into two blind
+// halves: you priced a charm without knowing what a level would cost, then priced levels with
+// whatever survived. 🔑 A BUDGET DECISION YOU CANNOT SEE BOTH SIDES OF IS NOT A DECISION — it
+// is two guesses. Ordering them (shop first, 2026-08-05) fixed which half got starved; putting
+// them on ONE screen removes the starving.
+//
+// ⚠️ The `'upgrade'` phase is kept, unentered, so a save written mid-forge by an older build
+// still loads. It is dead code the day save version 5 stops mattering.
+function startSharpen() { doneUpgrades(); }
+const canSharpenNow = () => S.phase === 'upgrade' || S.phase === 'wheel';
 
 // 🔼 tap a card to see what it BECOMES; tap again to buy it
 function pickUpgrade(id) {
-  if (S.phase !== 'upgrade') return;
+  if (!canSharpenNow()) return;
   S.upgradePick = (S.upgradePick === id) ? null : id;
   render();
 }
 function buyUpgrade(id) {
-  if (S.phase !== 'upgrade') return;
+  if (!canSharpenNow()) return;
   const card = cardById(id); if (!card || !upgradable(card)) return;
   const cost = eff(card).cost;
   S.coins -= cost;
@@ -3031,8 +3055,8 @@ function wheelBuy(i) {
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
   } else if (o.kind === 'contract') {
     const c = contractById(o.id);
-    S.contract = { id: o.id, n: 0 };
-    log(`📜 You take on <b>${c.name}</b> — ${c.text} (−${o.cost} coins). Keep it and it pays 🪙 ${c.reward}.`, 'good result');
+    S.contract = { id: o.id, n: 0, left: contractWindow(c) };
+    log(`📜 You take on <b>${c.name}</b> — ${c.text} within <b>${contractWindow(c)} encounters</b> (−${o.cost} coins). Keep it and it pays 🪙 ${c.reward}.`, 'good result');
   } else if (o.kind === 'potion') {
     S.potions.push(o.id);
     log(`🧪 ${o.name} goes in your kit — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -3045,8 +3069,9 @@ function wheelBuy(i) {
 function wheelDone() {
   const camp = S.wheel && S.wheel.rich;
   S.wheel = null;
+  S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
-  startSharpen();
+  doneUpgrades();   // 🛒 sharpening happened right here; there is no second screen
 }
 
 // kept as an alias so the solver/older callers still work — coins now simply roll over
@@ -3841,7 +3866,7 @@ function carried() {
   // rule says must be on screen every turn, with its PROGRESS, not just its name
   const ct = activeContract();
   if (ct) out.push({ curse: false, name: ct.name,
-    text: `📜 ${S.contract.n}/${ct.need} · pays 🪙 ${ct.reward}` });
+    text: `📜 ${S.contract.n}/${ct.need} · ${S.contract.left != null ? S.contract.left + ' left · ' : ''}pays 🪙 ${ct.reward}` });
   return out;
 }
 const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
@@ -4112,11 +4137,26 @@ function renderControls() {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
     const canReroll = S.coins >= REROLL_COST;
+    // 🔼 the forge half of the same purse — stated here so both prices are on one screen
+    const canUp = S.hand.filter(cc => upgradable(cc));
+    const cheapUp = S.hand.filter(cc => cc.level < MAX_LEVEL && !S.downgraded.has(cc.id))
+      .map(cc => eff(cc).cost).filter(x => x != null).sort((a, b) => a - b)[0];
+    const sharpenLine = canUp.length
+      ? `🔼 <b>${canUp.length}</b> of your cards can be sharpened now — tap one below to see exactly what it becomes.`
+      : cheapUp != null ? `🔼 Sharpening the cheapest card below needs <b>🪙 ${cheapUp}</b>.`
+      : `🔼 Nothing in hand can be sharpened.`;
     const offers = w.offers.map((o, i) => {
       const afford = o.cost <= S.coins && o.kind !== 'none';
       const cls = `wheel-offer r-${o.rarity}${o.bought ? ' bought' : ''}`;
       return `<div class="${cls}">` +
-        `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity : o.kind === 'repair' ? 'MEND' : o.kind === 'none' ? '—' : 'UPGRADE'}` +
+        // 🏷️ every kind names ITSELF. Potions and contracts both fell through to the word
+        // "UPGRADE" — left over from when the Wheel sold card levels — so the shop labelled three
+        // different things with the name of a fourth that is no longer sold here.
+        `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity
+          : o.kind === 'potion' ? 'POTION · ' + o.rarity
+          : o.kind === 'contract' ? '📜 QUEST'
+          : o.kind === 'repair' ? 'MEND'
+          : o.kind === 'none' ? '—' : String(o.kind).toUpperCase()}` +
         `</div>` +
         `<div class="wo-name">${o.name}</div><div class="wo-text">${o.text}</div>` +
         (o.bought ? `<div class="wo-taken">taken</div>`
@@ -4125,8 +4165,10 @@ function renderControls() {
         `</div>`;
     }).join('');
     c.innerHTML =
-      `<div class="phase-label">${w.rich ? '🔥 CAMP — THE LONG WHEEL' : '🎰 THE WHEEL'}</div>` +
-      `<div class="hint">You hold <b style="color:#c9b458">🪙 ${S.coins}</b> — and coins keep. Buy what's worth it, re-spin for something better, or bank it all for a bigger pull later.</div>` +
+      `<div class="phase-label">${w.rich ? '🔥 CAMP — THE LONG WHEEL' : '🎰 THE WHEEL'} — 🪙 ${S.coins}</div>` +
+      `<div class="hint">You hold <b style="color:#c9b458">🪙 ${S.coins}</b> — and coins keep. ` +
+      `Buy from the wheel, <b>sharpen your own cards below</b>, or bank it for a bigger pull later.` +
+      (sharpenLine ? `<br>${sharpenLine}` : '') + `</div>` +
       `<div class="wheel-row">${offers}</div>` +
       `<button onclick="wheelReroll()" ${canReroll ? '' : 'disabled'}>🎲 Re-spin — 🪙 ${REROLL_COST}${canReroll ? '' : ' (short)'}</button>` +
       `<button class="primary" onclick="wheelDone()">${w.rich ? 'Break camp' : 'Move on'}</button>` +
@@ -4442,7 +4484,7 @@ function cardHTML(card) {
   // 🔑 So we render THE SAME CARD RENDERER against a card one level higher. A hand-written preview
   // could drift from the real thing; this one cannot, by construction - it is the real thing.
   const real = card;
-  const previewing = S.phase === 'upgrade' && S.upgradePick === card.id && card.level < MAX_LEVEL;
+  const previewing = canSharpenNow() && S.upgradePick === card.id && card.level < MAX_LEVEL;
   if (previewing) card = { ...card, level: card.level + 1 };
   const v = eff(card);
   const d = card.def;
@@ -4507,7 +4549,7 @@ function cardHTML(card) {
     action = eventCanPick(opt, card)
       ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
       : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
-  } else if (S.phase === 'upgrade') {
+  } else if (canSharpenNow()) {
     // ⚠️ every number here reads off `real`, never the previewed copy — the cost of the NEXT
     // level is not the cost printed by the level you are looking at.
     if (real.level >= MAX_LEVEL) {
