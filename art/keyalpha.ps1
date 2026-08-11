@@ -54,7 +54,8 @@ param(
   [int]$Threshold = 14,
   [int]$Radius = 6,
   [double]$HolePercent = 0.05,
-  [int]$EdgeFade = 0
+  [int]$EdgeFade = 0,
+  [double]$MinIslandPercent = 0.35
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,7 +89,7 @@ public static class AlphaKey {
          - I[(y1 + 1) * (w + 1) + x0] + I[y0 * (w + 1) + x0];
   }
 
-  public static Bitmap Key(Bitmap src, int threshold, int radius, int minHole) {
+  public static Bitmap Key(Bitmap src, int threshold, int radius, int minHole, int minIsland) {
     int w = src.Width, h = src.Height;
     Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
     using (Graphics g = Graphics.FromImage(bmp)) { g.DrawImage(src, 0, 0, w, h); }
@@ -155,6 +156,32 @@ public static class AlphaKey {
       for (int x = 0; x < w; x++)
         bg[y * w + x] = dark[y * w + x] && BoxSum(Ire, w, h, x, y, radius) > 0;
 
+    // 5. DROP STRAY ISLANDS. Anything opaque that is not part of the main subject is a speck:
+    //    a stray mark, a bit of ground shadow, or - as happened with three dragons - a tiny extra
+    //    figure the model painted because the prompt mentioned something off-frame to look at.
+    //    Keeping only components at least minIsland of the frame removes them without touching
+    //    the creature. ⚠️ Set this LOW: a genuinely detached wingtip or a flying spark is small
+    //    too, and there is no way to tell them apart by area alone.
+    if (minIsland > 0) {
+      bool[] seen = new bool[w * h];
+      List<int> comp2 = new List<int>();
+      Stack<int> st2 = new Stack<int>();
+      for (int seed = 0; seed < bg.Length; seed++) {
+        if (seen[seed] || bg[seed]) continue;
+        comp2.Clear(); seen[seed] = true; st2.Push(seed);
+        while (st2.Count > 0) {
+          int i = st2.Pop(); comp2.Add(i);
+          int x = i % w, y = i / w;
+          if (x > 0)     PushSubj(bg, seen, st2, w, x - 1, y);
+          if (x < w - 1) PushSubj(bg, seen, st2, w, x + 1, y);
+          if (y > 0)     PushSubj(bg, seen, st2, w, x, y - 1);
+          if (y < h - 1) PushSubj(bg, seen, st2, w, x, y + 1);
+        }
+        if (comp2.Count < minIsland)
+          for (int k = 0; k < comp2.Count; k++) bg[comp2[k]] = true;
+      }
+    }
+
     // alpha, with a brightness-scaled feather on the boundary
     for (int y = 0; y < h; y++)
       for (int x = 0; x < w; x++) {
@@ -173,6 +200,12 @@ public static class AlphaKey {
     return bmp;
   }
 
+  static void PushSubj(bool[] bg, bool[] seen, Stack<int> st, int w, int x, int y) {
+    int i = y * w + x;
+    if (seen[i] || bg[i]) return;
+    seen[i] = true; st.Push(i);
+  }
+
   static void Push(bool[] core, bool[] reach, Stack<int> st, int w, int x, int y) {
     int i = y * w + x;
     if (reach[i] || !core[i]) return;
@@ -184,7 +217,8 @@ Add-Type -TypeDefinition $cs -ReferencedAssemblies System.Drawing
 
 $img = [System.Drawing.Image]::FromFile((Resolve-Path $Source))
 $minHole = [int]($img.Width * $img.Height * $HolePercent / 100)
-$keyed = [AlphaKey]::Key($img, $Threshold, $Radius, $minHole)
+$minIsland = [int]($img.Width * $img.Height * $MinIslandPercent / 100)
+$keyed = [AlphaKey]::Key($img, $Threshold, $Radius, $minHole, $minIsland)
 $img.Dispose()
 
 $h = [int]($keyed.Height * $Width / $keyed.Width)
