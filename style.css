@@ -579,7 +579,8 @@ body.shell #scene { display: none; }
 .grade-badge { float: right; min-width: 34px; text-align: center; margin-left: 8px;
   padding: 1px 7px; border-radius: 7px; font-size: 13px; font-weight: bold;
   background: #1c1810; border: 1px solid #4a4436; color: #cfc9ba; }
-.grade-badge.none { color: #55514a; border-style: dashed; font-weight: normal; }
+/* `.grade-badge.none` deleted 2026-08-12 with the placeholder it styled — an ungraded stage now
+   draws no badge at all. A cut display goes in the same commit as the thing it displayed. */
 .grade-badge .gb-score { display: block; font-size: 9.5px; font-weight: normal; opacity: .7; }
 .grade-badge.g-S { border-color: #e8c67a; color: #ffe6a3; box-shadow: 0 0 12px rgba(232,198,122,.28); }
 .grade-badge.g-A { border-color: #8fcf9a; color: #b6e6bd; }

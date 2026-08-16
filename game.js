@@ -1777,7 +1777,14 @@ function tutorialHandoffHTML() {
 // 🏆 the badge on a stage button — your best, and what is still above it
 function gradeBadge(stage) {
   const g = bestGrades()[String(stage)];
-  if (!g) return `<span class="grade-badge none" title="not yet graded">—</span>`;
+  // ⚠️ NOTHING, not a placeholder (2026-08-12). An ungraded stage used to draw a dashed pill with
+  // an em-dash in it — and because `.grade-badge.none` inherited the FILLED dark background from
+  // the base class, it read as a small black BUTTON rather than an empty slot. Thomas, in play:
+  // *"why does the stages and tutorial button have a black button with a dash in it?"*
+  // 🔑 A PLACEHOLDER THAT HAS TO BE EXPLAINED IS WORSE THAN AN ABSENCE. Its only explanation was a
+  // `title` tooltip, which does not exist on the phone this is played on. The grade now simply
+  // appears when it is earned, which nobody has to be taught.
+  if (!g) return '';
   return `<span class="grade-badge g-${g.letter}" title="best: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
     `${g.letter}<span class="gb-score">${g.total}</span></span>`;
 }
