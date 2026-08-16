@@ -4160,7 +4160,7 @@ function renderScene() {
   const el = $('scene');
   if (!el) return;
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') {
-    el.innerHTML = ''; el.hidden = true; return;
+    el.innerHTML = ''; el.hidden = true; el.dataset.sceneKey = ''; return;
   }
   el.hidden = false;
   const e = S.encounter;
@@ -4175,8 +4175,30 @@ function renderScene() {
   if (S.finalMode) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}${foeArt(S.dragon.name)}</div>`;
   else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}${foeArt(e.name)}</div>`;
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
-  el.className = isFight ? 'is-fight' : 'is-journey';
-  el.setAttribute('style', sceneVars(e, isFight));
+  // 🔁 REBUILD ONLY WHEN THE SCENE ACTUALLY CHANGED (2026-08-12).
+  //
+  // 🐛 THE BUG, reported in play: "in the tutorial, everytime i click next, it flashes the images".
+  // `render()` runs on EVERY interaction — dismissing a lesson, swapping two cards, arming the
+  // bank — and this function rebuilt `innerHTML` each time. That destroys the <img> elements and
+  // creates new ones, so `.has-art` is gone until `onload` fires again and the opacity fade
+  // replays from zero. The art was re-decoding several times a turn and strobing every time.
+  //
+  // 🔑 A FADE-IN THAT IS KEYED TO ELEMENT CREATION BECOMES A FLICKER THE MOMENT ANYTHING
+  // RE-RENDERS. Either the element must survive the render, or the transition must not exist.
+  // Keeping the element is the right half: the picture is the same picture.
+  //
+  // The key covers everything that can change what is DRAWN — never anything that merely changes
+  // as you play a turn, or we are back to rebuilding constantly.
+  // ✅ Bonus fix: `fx()` puts transient classes on #scene (e.g. fx-dark on Nightfall) and the
+  // `el.className =` below used to wipe them on any render inside the animation's window.
+  const cls = isFight ? 'is-fight' : 'is-journey';
+  const style = sceneVars(e, isFight);
+  const key = [cls, style, S.finalMode ? 1 : 0, S.finalPhase || '',
+               S.dragon && S.dragon.name, e && e.name, e && e.type, heroPose()].join('|');
+  if (el.dataset.sceneKey === key) { stageFloor(); return; }   // layout can still shift under it
+  el.dataset.sceneKey = key;
+  el.className = cls;
+  el.setAttribute('style', style);
   el.innerHTML =
     // 🗺️ WHAT PLACE ARE WE IN?
     //   JOURNEY  its own painting - a journey IS a place, and travelling is what you are doing
@@ -4273,13 +4295,33 @@ function render() {
 // 🎓 SHOW, DON'T TELL. The lesson puts a ring around the thing it describes — the slot row, the
 // card that would attune, the enemy panel. This is the interactive half: you read a sentence and
 // the screen tells you where to look.
+// ⚠️ MADE LOUDER 2026-08-12 (Thomas: *"can we make it more obvious somehow?"*). The ring was a
+// 2px outline with a faint pulse, and it had two separate problems:
+//   1. it was quiet against a busy dark UI, and
+//   2. 🔑 ON A PHONE THE THING BEING POINTED AT IS OFTEN NOT ON SCREEN AT ALL. The layout stacks
+//      — enemy panel, then cards, then controls — so a lesson in the controls can ring a stat chip
+//      a thousand pixels above it. **No amount of brightness fixes a highlight you cannot see**,
+//      which is why the scroll matters more than the styling did.
+// The ring itself is now a heavy double ring + glow (see .lesson-point), and it re-plays its
+// attention animation whenever the TARGET changes — `lessonPointed` is what stops it restarting
+// on every unrelated render, which is the same flicker class as the scene rebuild.
+let lessonPointed = null;
 function pointAtLesson() {
-  document.querySelectorAll('.lesson-point').forEach(el => el.classList.remove('lesson-point'));
-  const L = nextLesson(); if (!L || !L.point) return;
+  document.querySelectorAll('.lesson-point').forEach(el => el.classList.remove('lesson-point', 'lesson-point-in'));
+  const L = nextLesson();
+  if (!L || !L.point) { lessonPointed = null; return; }
   let sel = L.point; if (typeof sel === 'function') { try { sel = sel(); } catch (e) { sel = null; } }
-  if (!sel) return;
+  if (!sel) { lessonPointed = null; return; }
   const el = document.querySelector(sel);
-  if (el) el.classList.add('lesson-point');
+  if (!el) { lessonPointed = null; return; }
+  el.classList.add('lesson-point');
+  const key = L.id + '|' + sel;
+  if (lessonPointed === key) return;      // same target as last render — don't restart anything
+  lessonPointed = key;
+  el.classList.add('lesson-point-in');    // the one-shot "look here" pop
+  // bring it into view, centred, but never fight a scroll the player is already making
+  try { if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); }
+  catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
 }
 
 // 🔑 EVERYTHING CURRENTLY MODIFYING YOUR MATHS, NAMED AND SIGNED (2026-07-29). Curses were

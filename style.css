@@ -838,14 +838,31 @@ button.stage.locked .stage-shape { font-style: italic; }
 .lesson-row button { flex: none; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
 .lesson-btns { display: flex; gap: 5px; flex: none; }
 
-/* 🎓 the pointer — a ring around whatever the lesson is describing. Show, don't tell. */
-.lesson-point { position: relative; z-index: 4;
-  outline: 2px solid rgba(127,200,230,.9); outline-offset: 3px; border-radius: 8px;
-  animation: lesson-pulse 1.6s ease-in-out infinite; }
+/* 🎓 the pointer — a ring around whatever the lesson is describing. Show, don't tell.
+   ⚠️ LOUDER 2026-08-12: the old version was a 2px outline and a pulse that faded to nothing, which
+   on a phone, on a dark busy UI, read as "some element has focus" rather than "LOOK HERE". Now a
+   heavy ring, a solid halo, and a pulse that stays visible at both ends of its cycle. */
+.lesson-point { position: relative; z-index: 6;
+  outline: 3px solid #8fd6f5; outline-offset: 4px; border-radius: 9px;
+  animation: lesson-pulse 1.5s ease-in-out infinite; }
 @keyframes lesson-pulse {
-  0%,100% { box-shadow: 0 0 0 0 rgba(127,200,230,.45); }
-  50%     { box-shadow: 0 0 0 7px rgba(127,200,230,0); } }
-@media (prefers-reduced-motion: reduce) { .lesson-point { animation: none; } }
+  0%,100% { box-shadow: 0 0 0 3px rgba(143,214,245,.30), 0 0 16px 3px rgba(143,214,245,.35); }
+  50%     { box-shadow: 0 0 0 10px rgba(143,214,245,.10), 0 0 26px 8px rgba(143,214,245,.60); } }
+
+/* The one-shot "look here" flash, replayed only when the TARGET changes (see pointAtLesson).
+   ⚠️ NO `transform: scale()` HERE, deliberately. Several lessons point at whole panels
+   (#slots-panel, #controls-panel, #status-bar); scaling one of those overflows the stage and
+   would reintroduce the horizontal scroll the layout works hard to avoid. A colour flash is
+   just as loud and cannot change anyone's size. */
+.lesson-point-in { animation: lesson-pulse 1.5s ease-in-out infinite, lesson-flash .5s ease-out 2; }
+@keyframes lesson-flash {
+  0%   { outline-color: #ffffff; outline-width: 4px; }
+  100% { outline-color: #8fd6f5; outline-width: 3px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* keep the RING — it is the information. Only the movement goes. */
+  .lesson-point, .lesson-point-in { animation: none;
+    box-shadow: 0 0 0 4px rgba(143,214,245,.28), 0 0 20px 5px rgba(143,214,245,.45); } }
 
 
 /* 📖 the opening brief — paged, and you go through all of it before the first card is dealt */
