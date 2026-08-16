@@ -323,16 +323,16 @@ const RUNSIM = (() => {
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
     // blind spot it has about the Spell being spent. Banking rates from RUNSIM are therefore
     // meaningless; only a human can price the future.
+    // ⚠️ READ THE TARGETS OFF WAKE_TARGETS, NEVER A LOCAL LIST. This loop hard-coded
+    // ['atk','init','armor'], so when 🛡️ armour was cut (2026-08-12) the bot would have gone on
+    // aiming at a target the rules no longer honour — and reported it as a choice. A bot holding a
+    // stale copy of an enum is the same class of bug as the placement bans it could not see.
     if (S.wake > 0) {
-      const isF = S.encounter.type === 'fight';
-      const before = computeAction(null);
       let bestT = 'atk', bestSc = null;
-      for (const t of ['atk', 'init', 'armor']) {
+      for (const t of Object.keys(WAKE_TARGETS)) {
         S.wakeTarget = t;
         const r = computeAction(null); if (!r) continue;
-        const sc = t === 'armor'
-          ? [0, -((r.early || 0) + (r.combatDmg || 0) - S.wake), 0]
-          : (scoreOf(r));
+        const sc = scoreOf(r);
         if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
       }
       S.wakeTarget = bestT;

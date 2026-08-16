@@ -12,6 +12,7 @@ const MAX_LEVEL = 4;
 let ATTUNE_BONUS = 1;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 const HAND_SIZE = 4;
+const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so it must stay ABOVE it
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
 // not plan when you would reach the dragon. 4 regions x 5 = a 20-turn run you can hold in your
@@ -503,8 +504,8 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // measured 13%, then 4% after doubling, because Initiative's payoff is CAPPED and Attack's is not.
 //
 // THE RULE: if your SURGE shares your CATALYST's element, its boost does not fire this turn - it
-// BANKS as a token worth half the boost, rounded up. At the start of your next turn you aim that
-// token at ⚔️ attack, 💨 initiative or 🛡️ armour.
+// BANKS as a token worth the WHOLE boost (it was half until 2026-08-12; see bankValueOf). At the
+// start of your next turn you aim that token at ⚔️ attack, 💨 initiative or 🛡️ armour.
 //
 // 🔑 WHY THIS IS THE GOOD VERSION: you bank BLIND but you spend INFORMED - next turn you can see
 // the encounter before choosing where the power lands. And the element pair becomes a currency you
@@ -540,12 +541,68 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // turns - one hand IS one creature - so that is the argument to watch for.)
 // ============================================================
 
+// 🔥 BANKING IS A CHOICE, NOT A COINCIDENCE (2026-08-12). It used to fire when your Surge shared
+// your Catalyst's element — and that gate is what killed the mechanic, for a reason worth keeping:
+//
+// 🔑 THE TRIGGER WAS RANDOM BUT THE REASON IS SITUATIONAL, AND THEY NEVER LINED UP.
+// You want to bank when THIS turn is already decided — measured at 33.7% of turns, where removing
+// the boost entirely changes nothing (15.4% stuck on Narrow · 9.4% lost anyway · 8.9% already won).
+// That is a property of the ENCOUNTER. You were ALLOWED to bank when the deal handed you two
+// same-element cards — a property of the SHUFFLE, ~54% of hands. Independent events. So the option
+// appeared when you did not want it and was missing when you did, and it read as a curiosity rather
+// than a tool. Thomas: "i feel like i have to choose to do it."
+//
+// ⚠️ AND AN ELEMENT-GATED RULE CAN NEVER LEAVE THE MAGE. Pairing is the one thing the CLASS owns;
+// a rogue has no elements, so an element-gated bank sits in the engine's slot ③ wired to a class
+// rule and could never be inherited. As a plain choice it is an ENGINE rule and all eight planned
+// classes get it free — the "+1 class = xN content" trade, on a rule-changer that should always
+// have been generic.
+//
+// What makes it HARD is already built: 🕯️ the candle. Lit, you can see the next encounter's HP,
+// Initiative and shape, so banking is informed. Out, it is a bet that next turn's problem is bigger
+// than this one's. An existing system does the work instead of a new rule.
 function banksNow() {
-  const surge = cardById(S.assign.Boost), elem = cardById(S.assign.Element);
-  return !!(surge && elem && elOf(surge) === elOf(elem));
+  return !!(S.bankArmed && cardById(S.assign.Boost));
 }
-function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost / 2) : 0; }
-const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative', armor: '🛡️ armour' };
+// ⚠️ ARMED PER TURN, CLEARED WITH THE TURN. Anything that outlived its turn would be a charm.
+function toggleBank() {
+  if (!isAssignPhase() || !cardById(S.assign.Boost)) return;
+  S.bankArmed = !S.bankArmed;
+  render();
+}
+// 🔥 THE BANK IS THE FULL BOOST (2026-08-12, was ceil(boost/2)). At half, banking paid you back
+// 50% for 100% — a 2:1 loss you could only justify if AIMING the token were worth 2×, and the
+// measured aim went to ⚔️ attack 100% of the time, i.e. at exactly what the unbanked boost was
+// already doing. Worth ~1×. So it was a tax wearing a fork's clothes, taken on 0.8% of turns.
+// ⚠️ AND THE ELEMENT GATE WAS NOT THE CAUSE: an arrangement that banks AND still attunes exists
+// in 53.6% of hands (combinatorics over all 1820 four-card hands). It was never unavailable —
+// it was never worth taking. At full value it is a pure tempo trade: move this boost to next
+// turn, and pick its target. Correct on the ~30% of turns the Surge already changes nothing.
+function bankValueOf(surge) { return surge ? eff(surge).boost : 0; }
+// ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
+// you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
+// hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
+// way for something to happen appears, every line that explains the FIRST way is now a lie.
+// One helper, asked by all four.
+function bankCostPhrase(surge) {
+  const v = verbOf(surge);
+  return (v && v.slot === 'Boost' && v.name === 'Motherlode')
+    ? '✦ Motherlode — and it still feeds this turn'
+    : 'so it feeds nothing now';
+}
+// 🔥 TWO TARGETS, NOT THREE (2026-08-12). 🛡️ armour was cut: measured over 3,357 turns at a FULL
+// -value token it was chosen 2.3% of the time, and it is the one target 🕯️ the candle cannot
+// inform — it prints the next encounter's HP, Initiative and shape, none of which argue for soaking.
+// ⚔️/💨 map exactly onto the two defence shapes, so the aim is now "hit harder, or get there first".
+//
+// 🔑 AND THE REASON 💨 LOOKED DEAD WAS A STALE COMMENT, NOT A DEAD OPTION. The old note here said
+// the Initiative gap was "a chasm and a token cannot bridge a chasm" (short by 5-9, not 1-3). It
+// asked for a floor under init as a separate change — INIT_FLOOR and creature init -2 SHIPPED, and
+// nobody came back to correct the note. Measured now: average deficit 3.0, median 3, and a
+// full-boost token (avg 5.9) closes it 84.6% of the time. 💨 reads low only because you lose the
+// race on just 16.4% of fights — and the bot aims at the creature in front of it, which is exactly
+// the case a human does NOT have: seeing on the candle that the next one is fast and banking for it.
+const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
 function wakeReady() { return S.wake > 0 && isAssignPhase(); }
 function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
@@ -691,13 +748,16 @@ const MAGE = {
     const vSpell = verbOf(spell), vElem = verbOf(elem);
     // 🔥 a banked Surge gives NOTHING this turn - that is the price of aiming it next turn
     const banks = banksNow();
-    // ✦ Motherlode banks the FULL boost · Backdraft doubles what it banks
+    // ✦ Motherlode pays the bank's PRICE for you · Backdraft doubles what it banks
     const vB = verbOf(boostC);
     let bank = banks ? bankValueOf(boostC) : 0;
     if (banks && vB && vB.slot === 'Boost') {
-      if (vB.name === 'Motherlode') bank = eff(boostC).boost;
       if (vB.name === 'Backdraft') bank *= 2;
     }
+    // ✦ MOTHERLODE (rewritten 2026-08-12). Its old job — "keeps the FULL boost, not half" — became
+    // a no-op the moment the bank went to full value. A verb must name what the rule COSTS you, so
+    // it now buys off the one price banking still charges: the boost fires this turn as well.
+    const lode = banks && vB && vB.slot === 'Boost' && vB.name === 'Motherlode';
     const w = S.wake || 0, wt = S.wakeTarget;
     return {
       value: Math.max(0, mageStrike(spell, attuned, elem, boostC) + (wt === 'atk' ? w : 0)
@@ -706,7 +766,7 @@ const MAGE = {
       element: spell.def.element,
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
-      boost: banks ? 0 : (boostC ? eff(boostC).boost : 0),
+      boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: 1,
       attuned, attBonus: st.attuned - st.value,
       banks, bank, wake: w, wakeTarget: wt,
@@ -758,7 +818,7 @@ const VERBS = {
   Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Banking from here DOUBLES the Emberwake.' },
   Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake banked from here lasts a second turn.' },
   Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Banking from here also gives +3 Initiative this turn.' },
-  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here keeps the FULL boost, not half.' },
+  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
   Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
   Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
@@ -890,21 +950,35 @@ const TUTORIAL = {
       body: 'There is a dragon at the end of the road, and you are what stands between it and everyone behind you.<br><br>' +
             'You carry <b>sixteen cards</b> — the whole of your craft. You will hold <b>four at a time</b>, ' +
             'and every turn you decide what those four are for.' },
+    // ⚠️ REWRITTEN 2026-08-12 (Thomas: *"doesn't explain what it does. we gotta explain what things
+    // do exactly"*). The old page said "fall short and you lose time" and "the dark catches you" —
+    // both name a consequence without defining it, which is the one thing a brief exists to do.
+    // 🔑 THE BAR: every stat must say what it SUBTRACTS FROM WHAT. If a sentence could be true of
+    // three different rules, it is flavour, not a brief.
     { title: 'A turn is an arrangement',
       body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
-            '<b>SPELL</b> is your action. It is <b>spent</b> afterwards, gone for the rest of the region.<br>' +
-            '<b>CATALYST</b> decides who strikes first — and if it shares your Spell\'s element, the Spell <b>attunes</b> and hits far harder.<br>' +
-            '<b>SURGE</b> adds its power now, or <b>banks</b> it for next turn.<br>' +
-            '<b>ARSENAL</b> is the one card you keep.' },
-    { title: 'Two kinds of encounter',
-      body: '⚔️ A <b>FIGHT</b> asks for damage. Beat its <b>HP</b> outright to <b>Complete</b> it; reach half for a <b>Narrow</b>, and it hits you back. ' +
-            'Each creature defends with a <b>shape</b> — 🛡️ <b>Armour</b> shaves a flat amount off any blow, so it wants one big hit; ' +
-            '🌀 <b>Evasion</b> halves you unless you strike first.<br><br>' +
-            '👣 A <b>JOURNEY</b> asks for distance. Beat its <b>MP</b> to arrive; fall short and you lose time. ' +
-            'It also has a <b>🌙 Nightfall</b> — if your Catalyst is too slow, the dark catches you.<br><br>' +
-            'Same four cards, two completely different questions.' },
+            '<b>SPELL</b> — its number is what you deal. Afterwards it is <b>spent</b>: into the discard, and you will not see it again until the region ends.<br>' +
+            '<b>CATALYST</b> — its <b>💨 Initiative</b> races the enemy\'s. And if it shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger <b>✦</b> number on its face instead.<br>' +
+            '<b>SURGE</b> — its <b>➕</b> is added to your Spell. Or <b>bank</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br>' +
+            '<b>ARSENAL</b> — the one card you <b>keep</b> into the next hand. Your Catalyst and Surge slide back under your deck.' },
+    { title: '⚔️ A fight asks for damage',
+      body: 'Your <b>Spell</b> (plus your Surge) is your blow, measured against its <b>❤️ HP</b>:<br><br>' +
+            '• <b>Complete</b> — you meet or beat its HP. It never touches you.<br>' +
+            '• <b>Narrow</b> — you reach <b>half</b> its HP. You still get past it, but it <b>hits back for its ⚔️</b>.<br>' +
+            '• <b>Loss</b> — below half. It hits back and you gain nothing. <i>You still move on</i> — an encounter is never the end of your run.<br><br>' +
+            '<b>💨 And the race is separate.</b> If your Catalyst is slower than its 💨, it <b>bites first for its ⚔️</b> — even if your blow then kills it. Speed is not damage; it is whether you get hurt on the way in.<br><br>' +
+            'Each creature also defends with a <b>shape</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
+    { title: '👣 A journey asks for distance',
+      body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
+            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. You do not bleed; you lose the cards you were about to draw. <i>(Only if your deck is already empty does it become damage.)</i><br><br>' +
+            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number the dark catches you: the card in your <b>ARSENAL</b> is discarded, and your 🕯️ candle goes out.<br><br>' +
+            'So a fight punishes you in <b>blood</b> and a journey punishes you in <b>cards and time</b>.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it — each drops a level, and a card at Lv1 <b>leaves your deck for good</b>.<br><br>' +
+      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it.<br><br>' +
+            '• Each card you blunt <b>drops one level</b> and soaks its printed <b>🛡️ armour</b>.<br>' +
+            '• A card showing <b>🛡️ —</b> cannot soak at all.<br>' +
+            '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
+            '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
             'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
             'You will lose runs. That is the game working — you learn the shapes, unlock more, and come back.' },
   ],
@@ -928,7 +1002,9 @@ const TUTORIAL = {
             'Reach the <b>half</b> and it is a <b>Narrow</b> — you win through, but it still hits you back.' },
     { id: 'f-init', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '💨 <b>Init</b> is the number your <b>Catalyst</b> has to beat. Beat it and you strike first; fail and it gets a hit in before you swing.' },
+      // ⚠️ initLost is `e.init > init`, so a TIE WINS. "Has to beat" was wrong by one.
+      text: '💨 <b>Init</b> is what your <b>Catalyst</b> must <b>match or beat</b> — a tie goes to you. ' +
+            'Win and it never touches you on the way in; lose and it <b>bites first for its ⚔️</b>, even if your blow then kills it.' },
     { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
       text: '⚔️ <b>Atk</b> is what it does to you — once if it strikes first, and again if you fail to Complete. ' +
@@ -957,24 +1033,71 @@ const TUTORIAL = {
     { id: 'spent', when: () => S.turn === 1 && isAssignPhase(),
       point: '.in-Spell',
       text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
+    { id: 'arsenal', when: () => S.turn === 1 && isAssignPhase(),
+      point: '.in-Reserve',
+      text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
+            'It is the only slot that works the same way for every class, so it is the one anchor that never moves.' },
+    // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
+    // decides whether banking is informed or a bet, and nothing had ever named it.
+    { id: 'candle', when: () => isAssignPhase() && S.candle && !!nextEncounter(),
+      point: '.candle',
+      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its shape. ' +
+            'Plan two encounters, not one.' },
+    { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
+      point: '.candle',
+      text: '🕯️ It went out. Only a <b>Complete</b> keeps it lit — a Narrow or a loss snuffs it, and you travel blind until you come through one cleanly. ' +
+            '<b>That is what a Narrow really costs you.</b>' },
     { id: 'couldattune', when: () => isAssignPhase() && !attunedNow() && handHasPair(),
       point: () => { const id = pairPartnerId(); return id ? '.in-' + (zoneOf(id) || 'Spell') : null; },
       text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
       text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
-    { id: 'bank', when: () => isAssignPhase() && banksNow(),
+    // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
+    // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
+    { id: 'bank', when: () => isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> matches your Catalyst, so it will <b>bank</b> instead of firing — nothing now, but next turn you aim it at attack, initiative or armour.' },
+      text: 'Your <b>SURGE</b> can fire now — or <b>bank</b> instead: nothing this turn, but next turn you aim its full power at your <b>strike</b> or your <b>speed</b>. ' +
+            'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
+    // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
+    // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
+    { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
+      point: '.wake-row:not(.bank-row)',
+      text: '🔥 You are holding an <b>Emberwake</b>. Aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
+            '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
       text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
       text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
+    // ⚠️ STALE UNTIL 2026-08-12 — this said only "coins buy levels", which described the Wheel from
+    // before sharpening was merged onto it. The screen now does BOTH, and the budget split between
+    // them is the actual decision, so a lesson naming one half taught the wrong thing.
     { id: 'wheel', when: () => S.phase === 'wheel',
       point: '#controls-panel',
-      text: 'Coins buy levels. A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else.' },
+      text: '🎰 <b>The Wheel.</b> One screen, one purse: <b>sharpen</b> your own cards, or <b>buy</b> what is on the shelf. ' +
+            'A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else. ' +
+            '<b>Deciding between the two IS the shop</b>, so spend knowing you cannot have both.' },
+    { id: 'charm', when: () => S.phase === 'wheel' && S.wheel && (S.wheel.offers || []).some(o => o && o.kind === 'charm'),
+      point: '#controls-panel',
+      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b> rather than a number — so it can make a different arrangement correct. ' +
+            'Everything you are carrying is shown in the bar at the top, always.' },
+    { id: 'potion', when: () => (S.potions || []).length > 0,
+      point: '.kit-row',
+      text: '🧪 A <b>potion</b> is one use, spent on a turn <b>you</b> choose, and it lasts that turn only. You can carry ' + POTION_CAP + '. ' +
+            'It buys you a single turn where the arrangement you wanted is legal — so hold it for the turn that needs it.' },
+    // ⚠️ CURSES ARE A DIFFERENT LESSON FROM CHARMS. They arrive without being bought, and the whole
+    // point of `carried()` is that a run-long penalty must be on screen every turn — so the lesson's
+    // job is to send you to the status bar, not to explain the individual curse.
+    { id: 'curse', when: () => (S.charms || []).some(id => { const c = charmById(id); return c && c.curse; }),
+      point: '#status-bar',
+      text: '⚠️ You picked up a <b>curse</b> — a charm that costs you instead of paying you. It sits in the same bar as your boons, ' +
+            'because a penalty you cannot see is one you cannot play around.' },
+    { id: 'event', when: () => S.phase === 'event',
+      point: '#controls-panel',
+      text: '📖 The road throws things at you between encounters. Read the options — some cost coins or a card, and one is usually just <b>walk on</b>. ' +
+            'An option you cannot afford says so instead of hiding.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
       text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
@@ -982,6 +1105,14 @@ const TUTORIAL = {
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
       text: 'All four elements, so <b>nothing can pair</b> — no Spell will attune this turn. Some hands simply cannot. Play the best plain line you have, and keep your best card for a hand that can.' },
+    // ⚠️ WRITTEN WRONG ONCE (2026-08-12) — the first draft described the press-your-luck "stir band"
+    // approach, which was CUT and replaced by this ordinary journey. It was copied out of CLAUDE.md,
+    // which still documented the cut version. The lesson must describe LAST_MILE, not the history.
+    { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
+      point: '#encounter-panel',
+      text: '⚔️ <b>The Last Mile</b> — one journey between you and the lair, and it <b>costs you nothing</b>: no Nightfall, no Time Penalty, no hardship, nothing kept. ' +
+            'Everything is reshuffled for the duel afterwards, so this is the one turn in the game where you should <b>empty the tank</b>. ' +
+            'Arrive cleanly and the ' + '<b>dragon starts wounded</b>; scrape in and it starts a little wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
       text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
@@ -1846,6 +1977,9 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
+    // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
+    bankArmed: false,
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
@@ -2093,7 +2227,9 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // reported "charms and potions are really good too, getting completes easy". The clean win still
 // pays more than a scrape, which was the point — it just stopped being an income firehose.
 const COMPLETE_BONUS = 2;
-const POTION_CAP = 3;
+// POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
+// it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
+// dead zone and threw at load. ⚠️ A `const` read by TUTORIAL's text must live ABOVE TUTORIAL.
 
 // ============================================================
 // 📜 QUEST CONTRACTS (2026-08-05, Thomas — from *GuildRun*: *"you could buy some items that
@@ -2435,6 +2571,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2776,7 +2913,7 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
     else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
@@ -2800,7 +2937,7 @@ function resolve() {
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
     else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
@@ -2977,12 +3114,8 @@ function finishResolve() {
       log(`Deck is empty — remaining Time Penalty ${overflow} becomes damage`, 'bad');
     }
   }
-  // 🛡️ an Emberwake aimed at armour simply takes the hit for you
-  if (S.wakeTarget === 'armor' && S.wake > 0 && damage > 0) {
-    const stop = Math.min(damage, S.wake);
-    damage -= stop;
-    log(`🔥 Emberwake holds — ${stop} damage turned aside`, 'good');
-  }
+  // ❌ the 🛡️ armour aim was CUT 2026-08-12 (chosen 2.3% of the time, and the one target the
+  // candle cannot inform) — its absorption branch goes with it, in the same commit as the rule.
   S.damage = damage;
   if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
@@ -4369,6 +4502,7 @@ function renderControls() {
       lessonRow +
       potionRow +
       wakeRow +
+      bankRowHTML() +
       boostRow +
       resolveBtn +
       divertBtn +
@@ -4711,14 +4845,33 @@ function zoneHint(zone) {
       // ✦ Second Flame gives the Surge a second job — name it here or the slot lies about itself
       if (hasCharm('secondflame') && sc && spellCard() && attunerCard() === sc)
         return `✦ ATTUNES the Spell · +power now`;
-      if (sc && el && elOf(sc) === elOf(el))
-        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, nothing now`;
-      if (el) return `+power now — or match ${elOf(el)} to BANK it`;
+      if (sc && S.bankArmed)
+        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, ${bankCostPhrase(sc)}`;
+      if (sc) return `+power now — or 🔥 bank it for next turn`;
       return '+power — returns to your deck';
     }
     case 'Reserve': return 'kept in hand for next turn';
   }
 }
+// 🔥 ARM THE BANK. It sits in the controls with the Emberwake's AIM row rather than on the Surge
+// card, so the whole mechanic reads in one place: arm it here, aim it here next turn.
+// ⚠️ It was drafted into the Surge slot's head first (the "decision belongs on the object" rule)
+// and pulled back out: `.slot-head` is a FIXED 46px on purpose — a taller head staggers the whole
+// four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
+// states what will happen to that card, which is the part that must live on the object.
+function bankRowHTML() {
+  if (!isAssignPhase()) return '';
+  const sc = cardById(S.assign.Boost);
+  if (!sc) return '';
+  const v = bankValueOf(sc);
+  const on = !!S.bankArmed;
+  return `<div class="wake-row bank-row"><span class="wake-lab">🔥 Your <b>Surge</b> — ` +
+    (on ? `<b>banking +${v}</b> for next turn` : `+${v} power now`) + `</span>` +
+    `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleBank()">` +
+    (on ? 'spend it now instead' : `bank it for next turn`) + `</button>` +
+    `<span class="wake-note">${on ? 'nothing this turn' : 'worth it when this turn is already decided'}</span></div>`;
+}
+
 // a one-word mark of the card's fate, shown on the card itself during the action phase
 function fateOf(zone) {
   if (zone === 'Spell') return { cls: 'fate-spent', text: '⊘ spent' };
@@ -4967,6 +5120,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -5109,6 +5263,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
@@ -5170,7 +5325,7 @@ function resolveDuel() {
   const b1 = [];
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst: +${r.bank} Emberwake for next beat`, 'good'));
+  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next beat`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
   if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
