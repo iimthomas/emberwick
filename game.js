@@ -664,6 +664,12 @@ function squallBlocks() {
   return !el || eff(el).init < S.encounter.init;
 }
 function attunedNow() {
+  // ⚠️ PAIRING IS THE MAGE'S RULE AND ONLY THE MAGE'S. Caught by the rogue seam proof: rogue cards
+  // carry `element: null`, and the match below is `elOf(c) === elOf(sp)` — so null === null read as
+  // ATTUNED and every rogue turn claimed a pair it does not have.
+  // 🔑 A CLASS RULE THAT COMPARES TWO FIELDS WILL HAPPILY MATCH TWO ABSENCES. Ask whose rule it is
+  // before you ask whether it fired.
+  if (!CLASS.pairs) return false;
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
   if (squallBlocks()) return false;              // ⚡ Squall — too slow to hold together
   if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
@@ -735,6 +741,9 @@ const MAGE = {
   id: 'mage',
   multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
+  defs: null,                           // set to CARD_DEFS below — the table is declared above it
+  deck() { return shuffle(CARD_DEFS.map(newCard)); },
+  pairs: true,                          // ✦ elements agree → the Spell attunes. The mage's one rule.
   // 🔥 THE EMBERWAKE IS THE MAGE'S FILL OF SLOT ③, NOT AN ENGINE RULE (corrected 2026-08-12).
   // ⚠️ I got this backwards earlier the same day. Making banking a plain choice fixed two REAL
   // faults — a trigger that came from the shuffle rather than the encounter, and a 2:1 exchange
@@ -789,7 +798,129 @@ const MAGE = {
     };
   },
 };
+// ============================================================
+// 🗡️ THE ROGUE — step 8 of the master plan, and the proof the CLASS SEAM is real.
+//
+// 🔑 ITS SOURCE OF POWER IS **SEQUENCE**, where the mage's is PAIRING. The mage asks a question
+// about the hand in front of you ("do two of these agree?"); the rogue asks one about the turn you
+// just played ("does one of these follow what I struck with?"). Different axis, so the two classes
+// can never collapse into each other — which is the whole point of the source-of-power rule.
+//
+// ⚠️ NO ELEMENTS ANYWHERE. Elements are the mage's one rule. A rogue card must not even be NAMED
+// for one, or a player would reasonably expect it to pair with something.
+//
+// THE DECK IS 8 CARDS x 2 COPIES, not 16 unique (Thomas, 2026-08-12). "16 unique" was the MAGE's
+// acceptance test, never an engine law. Duplicates are what make a NAME-matched combo possible at
+// all: a specific named card sits in a 4-card hand 25% of the time at one copy and 45% at two.
+// 🔑 And a sequence class can afford a smaller pool, because its variety comes from the CHAIN
+// rather than the deal — the same eight cards mean different things at different chain positions.
+//
+// THE COMBO: four MUTUAL PAIRS. Each card combos off its partner, so a chain alternates A,B,A,B
+// and is learnable as four two-beat moves instead of a graph. Each pair answers a different
+// problem, so which line you commit to is a real choice the encounter judges.
+// ============================================================
+MAGE.defs = CARD_DEFS;   // declared here because CARD_DEFS is defined far above MAGE
+
+const ROGUE_ABILITIES = {
+  outpace:  'you win Initiative automatically',
+  unhalved: 'this strike cannot be halved by 🌀 Evasion',
+  pierce:   'this strike ignores 🛡️ Armour',
+  onehit:   'this strike lands as ONE hit instead of several',
+  persist:  'the chain does not break next turn',
+  cycle:    'cycle a card without losing the chain',
+  unspent:  'this Strike is not spent — it returns to your hand',
+  doubled:  'your ARSENAL also counts as the previous card',
+};
+
+// 🔑 GENERATED FROM A RULE, NEVER HAND-AUTHORED — the same discipline the mage's level tables were
+// put back on after 12 of 16 cards were found to have a FLAT attuned strike. `base` is Lv1
+// [value, init, boost, armor]; the SPIKE rises +3 a level and every weakness drops ONCE (Lv1->Lv2)
+// then holds. Edit the spec, never a row.
+// ⚠️ THE NUMBERS BELOW ARE PLACEHOLDERS. They exist so the class can RUN and be measured; they are
+// not tuned and must not be quoted as balance until the bot can price a chain (see solver.js).
+const ROGUE_SPEC = [
+  // pair            name              combos off        ability     spike    base [val,init,boost,armor]
+  { pair: 'RUSH',    name: 'Viper Strike',   combo: 'Second Fang',    ability: 'outpace',  spike: 'init',  base: [3, 6, 2, 1] },
+  { pair: 'RUSH',    name: 'Second Fang',    combo: 'Viper Strike',   ability: 'unhalved', spike: 'boost', base: [4, 4, 3, 1] },
+  { pair: 'OPENING', name: 'Venom Needle',   combo: 'Lethal Dose',    ability: 'pierce',   spike: 'armor', base: [3, 3, 2, 3] },
+  { pair: 'OPENING', name: 'Lethal Dose',    combo: 'Venom Needle',   ability: 'onehit',   spike: 'value', base: [6, 2, 2, 1] },
+  { pair: 'HOLD',    name: 'Slow Poison',    combo: 'Sleight of Hand',ability: 'persist',  spike: 'boost', base: [4, 3, 3, 1] },
+  { pair: 'HOLD',    name: 'Sleight of Hand',combo: 'Slow Poison',    ability: 'cycle',    spike: 'init',  base: [3, 5, 2, 2] },
+  { pair: 'PAYOFF',  name: 'Ghostblade',     combo: 'Shadow Double',  ability: 'unspent',  spike: 'value', base: [6, 2, 1, 2] },
+  { pair: 'PAYOFF',  name: 'Shadow Double',  combo: 'Ghostblade',     ability: 'doubled',  spike: 'armor', base: [3, 3, 2, 3] },
+];
+const ROGUE_COST = [2, 3, 4, null];      // to next level, as the mage's
+const ROGUE_DEFS = ROGUE_SPEC.map(s => {
+  const idx = { value: 0, init: 1, boost: 2, armor: 3 };
+  const lv = [0, 1, 2, 3].map(L => {
+    const st = s.base.map((v, i) => {
+      if (i === idx[s.spike]) return v + 3 * L;           // the spike rises every level
+      return L === 0 ? v : Math.max(0, v - 1);            // every weakness drops ONCE, then holds
+    });
+    return [st[0], null, st[1], st[2], st[3], null, ROGUE_COST[L]];
+  });
+  return { name: s.name, element: null, arch: null, pair: s.pair,
+           combo: s.combo, ability: s.ability, lv };
+});
+
+// what the STRIKE played last turn was named, and how long the chain is (see nextTurn)
+function chainPartnerOf(card) { return card && card.def.combo ? card.def.combo : null; }
+function comboLive(card) {
+  if (!card || !card.def.combo) return false;
+  if (S.chainPersist) return true;                       // ✦ Slow Poison held it open
+  if (S.lastStrike && card.def.combo === S.lastStrike) return true;
+  // ✦ Shadow Double: the card you HELD also counts as what you played
+  return !!(S.doubledStrike && card.def.combo === S.doubledStrike);
+}
+
+const ROGUE = {
+  id: 'rogue',
+  multi: null,
+  labels: { Spell: 'Strike', Element: 'Combo', Boost: 'Momentum', Reserve: 'Arsenal' },
+  defs: ROGUE_DEFS,
+  deck() { return shuffle(ROGUE_DEFS.concat(ROGUE_DEFS).map(newCard)); },   // 8 x 2
+  emberwake: false,                     // 🔥 that is the MAGE's slot ③. The rogue's is extend-or-cycle.
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const strike = spellCard();
+    if (!strike) return null;
+    const combo = cardById(S.assign.Element), momentum = cardById(S.assign.Boost);
+    const st = eff(strike);
+    const lv4 = strike.level >= MAX_LEVEL;
+    // ✦ Lv4 = a FINISHER. The ability fires without the setup, but the card no longer continues
+    // the chain. 🔑 That is what keeps an all-Lv4 deck BAD — eight finishers cannot chain at all,
+    // so knowing when to stop sharpening stays the skill, exactly as it is for the mage.
+    const linked = comboLive(strike);
+    const fires = linked || lv4;
+    const ab = fires ? strike.def.ability : null;
+    const chain = linked && !lv4 ? (S.chain || 1) + 1 : 1;
+    // 🔑 HITS COME FROM THE CHAIN. This is the rogue's answer to 🧱 GUARD (a pool that wants many
+    // hits) and its weakness against 🛡️ Armour (which subtracts from EVERY hit) — the shape of the
+    // enemy decides whether your momentum is an asset or a liability, which is the class's fork.
+    const hits = ab === 'onehit' ? 1 : Math.max(1, chain);
+    return {
+      value: Math.max(0, st.value + (momentum ? eff(momentum).boost : 0) + (duelFx().value || 0)),
+      element: null,
+      // momentum is speed: a long chain arrives before they are ready
+      init: (combo ? eff(combo).init : 0) + (chain - 1) * 2,
+      boost: momentum ? eff(momentum).boost : 0,
+      hits,
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0, wakeTarget: null,
+      vSpell: null, vElem: null,
+      spell: strike, elem: combo, boostC: momentum,
+      attuner: null, loose: false,
+      // rogue-only, read by resolveAction and by nextTurn
+      rogue: { linked, lv4, ability: ab, chain, pair: strike.def.pair },
+    };
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE };
 let CLASS = MAGE;
+function setClass(c) { CLASS = c || MAGE; }
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
 // Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
@@ -846,7 +977,12 @@ function verbLive(name, zone) {
   return !!(c && c.def.name === name && verbOf(c));
 }
 
-const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' };
+// 🔤 SLOT VOCABULARY IS A DISPLAY LAYER AND IT IS PER CLASS — the mage reads Spell/Catalyst/
+// Surge/Arsenal, the rogue reads Strike/Combo/Momentum/Arsenal, off identical internal keys.
+// ⚠️ THIS WAS A FROZEN CONST AND THE ROGUE INHERITED THE MAGE'S WORDS. Caught by the seam proof:
+// the whole point of `CLASS.labels` is that it is the class's, so nothing may keep its own copy.
+// A Proxy so every existing `SLOT_LABEL.Spell` call site keeps working unchanged.
+const SLOT_LABEL = new Proxy({}, { get: (_, k) => (CLASS.labels || MAGE.labels)[k] });
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
 // ============================================================
@@ -1609,7 +1745,10 @@ function saveGame() {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
-      const o = { id: c.id, n: CARD_DEFS.indexOf(c.def), lv: c.level };
+      // ⚠️ INDEXED INTO THE CLASS'S OWN TABLE. Cards are stored by index because names duplicate;
+      // now that a second class exists, an index is only meaningful alongside `cls` (written below
+      // and restored BEFORE any card is decoded).
+      const o = { id: c.id, n: CLASS.defs.indexOf(c.def), lv: c.level };
       return o;
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({
@@ -1632,6 +1771,7 @@ function saveGame() {
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
+      cls: CLASS.id, lastStrike: S.lastStrike, chain: S.chain, doubledStrike: S.doubledStrike,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1645,8 +1785,11 @@ function loadGame() {
     if (!raw) return false;
     const d = JSON.parse(raw);
     if (d.v !== SAVE_VERSION) return false;
+    // ⚠️ THE CLASS MUST BE RESTORED BEFORE ANY CARD IS DECODED — a card index means nothing without
+    // knowing whose table it indexes into. Old saves have no `cls` and are mage runs by definition.
+    setClass(CLASSES[d.cls] || MAGE);
     const mk = s => {
-      const def = CARD_DEFS[s.n];
+      const def = CLASS.defs[s.n];
       if (!def) return null;
       const c = { id: s.id, def, level: s.lv };
       return c;
@@ -1923,9 +2066,12 @@ function freshGame(stage) {
   const tutorialRun = stage === 0;
   TSEED = 20260729;   // 🎲 the tutorial's fixed seed — same run, every time
   // 🎓 the tutorial deals from an authored order; every other run shuffles
+  // 🗡️ THE DECK IS THE CLASS'S, not the engine's — the mage deals 16 unique, the rogue 8 x 2.
+  // ⚠️ The tutorial's authored order is MAGE-only by construction (it names mage cards), which is
+  // correct: stage 0 teaches the engine through the class you start with.
   const cards = tutorialRun
     ? TUTORIAL.deckOrder.map(n => newCard(CARD_DEFS.find(d => d.name === n))).filter(Boolean)
-    : shuffle(CARD_DEFS.map(newCard));
+    : (CLASS.deck ? CLASS.deck() : shuffle(CLASS.defs.map(newCard)));
   // no argument (a cold boot, or the bot) → the highest stage you have unlocked, so a returning
   // player lands on the newest problem rather than replaying the tutorial.
   const tutorial = stage === 0;
@@ -1996,6 +2142,14 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 🗡️ THE CHAIN (rogue). `lastStrike` is the NAME of the card struck with last turn — the thing
+    // a combo checks against — and `chain` is how many links deep you are. Both are engine state
+    // rather than class state for the same reason `lastAttuned` and `lastOutcome` are: cleanup owns
+    // the moment they change, and cleanup is the engine's.
+    // ⚠️ `doubledStrike` is ✦ Shadow Double only: a SECOND name that also counts as "what you
+    // played". Same trap as ✦ Second Flame — the moment two things can satisfy one rule, every
+    // line that explains the rule has to ask, not assume.
+    lastStrike: null, chain: 1, doubledStrike: null, chainPersist: false,
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
@@ -2792,6 +2946,11 @@ function computeAction(reserve) {
   const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
   const attBonus = a.attBonus || 0;
   const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0, wakeTarget = a.wakeTarget || null;
+  // ⚠️ THE CLASS'S OWN PAYLOAD RIDES ALONG UNREAD. computeAction rebuilds its result field by
+  // field, so anything a class returns that the engine does not name is silently dropped — which
+  // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
+  // hands it straight back to the class. One line, so a third class needs no change here.
+  const classPayload = a.rogue ? { rogue: a.rogue } : null;
   const boostVal = a.boost;
 
   const h = S.hardship;
@@ -2860,7 +3019,7 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { ...classPayload, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -2896,7 +3055,7 @@ function computeAction(reserve) {
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
     : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { ...classPayload, type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -3081,6 +3240,19 @@ function finishResolve() {
   S.lastOutcome = r.outcome;
   if (S.finalMode && S.finalPhase === 'lastmile') S.lastMileOutcome = r.outcome;
   S.lastAttuned = !!r.enhUsed;
+  // 🗡️ ADVANCE THE CHAIN. Sits beside lastAttuned/lastOutcome because it is the same kind of thing:
+  // a breadcrumb the NEXT turn's class rule reads. The engine records it; only the rogue asks.
+  if (r.rogue) {
+    S.chain = r.rogue.chain;
+    S.lastStrike = r.spell ? r.spell.def.name : null;
+    // ✦ Slow Poison — the chain does not break next turn WHATEVER you play. A flag, not a fiddle
+    // with lastStrike: the name you struck with is a fact, and faking it would make every line
+    // that reads it lie. Re-set every rogue turn, so it can never outlive the turn that bought it.
+    S.chainPersist = r.rogue.ability === 'persist';
+    // ✦ Shadow Double — next turn your ARSENAL also counts as "what you played".
+    const held = cardById(S.assign.Reserve);
+    S.doubledStrike = (r.rogue.ability === 'doubled' && held) ? held.def.name : null;
+  }
   // a Gray Pilgrim / Mirror Fen blessing covers a limited number of journeys — spend a charge
   if (r.type === 'journey' && (S.paceBless || 0) > 0) S.paceBless--;
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
