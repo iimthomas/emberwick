@@ -4757,7 +4757,44 @@ function renderStatus() {
     `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
     `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>` +
     standingText() +
+    momentumText() +
     carriedText();
+}
+
+// 🗡️ THE MOMENTUM METER — PIPS, NOT PROSE (2026-08-17).
+//
+// ⚠️ THIRD ATTEMPT AT EXPLAINING THIS CLASS, AND THE FIRST TWO WERE BOTH WORDS. Thomas, after
+// two rewrites of the slot hints: *"finisher says spend 1, spend 1 what?"* / *"i don't get what
+// builder vs finisher is at a glance"*.
+//
+// 🔑 THE PROBLEM WAS NEVER THE WORDING, IT WAS THAT THE RESOURCE HAD NO BODY. Momentum was a
+// number inside a sentence, sitting among other sentences — nothing to look at, nothing to count.
+// WoW puts combo points on the target as pips and never explains them in a tooltip, because you
+// COUNT them. So: one glyph, ●, used in the meter, on the cards, and in every hint. A card that
+// says "+1 ●" next to a bar reading "●●○○○" needs no sentence at all.
+//
+// ⚠️ AND NEVER PRINT A BARE NUMBER AGAIN. "spends 1" was literally unanswerable — one what?
+// Every quantity in this class is written with its glyph attached.
+const PIP_ON = '●', PIP_OFF = '○';
+function pips(n, cap) {
+  const full = Math.max(0, Math.min(cap, n | 0));
+  return `<span class="pip-on">${PIP_ON.repeat(full)}</span><span class="pip-off">${PIP_OFF.repeat(cap - full)}</span>`;
+}
+// the chip in the status bar: always visible, so the meter is a THING you have rather than a fact
+// you are told. Sits beside 🏃 the Standing for the same reason — both are run-level state.
+function momentumText() {
+  if (!CLASS.feeds || !S || S.momentum === undefined) return '';
+  const m = isAssignPhase() ? momentumMath() : null;
+  const now = S.momentum || 0;
+  let tail = '';
+  if (m) {
+    if (m.fin) tail = ` <span class="mo-spend">→ spending all ${m.spent}</span>`;
+    else if (m.next > now) tail = ` <span class="good">→ ${m.next}</span>`;
+    else if (m.next < now) tail = ` <span class="bad">→ ${m.next} (slipping)</span>`;
+    else tail = ` <span class="dim">→ ${m.next} (holding)</span>`;
+  }
+  return `<span class="mo-chip" title="Momentum. Builders earn it, finishers spend it, and it slips by 1 every turn.">` +
+    `🗡️ ${pips(now, MOMENTUM_CAP)} <b>${now}</b>${tail}</span>`;
 }
 
 // 🕯️ what you can see of the road ahead — and, when the candle is out, that you cannot.
@@ -5294,21 +5331,21 @@ function rogueZoneHint(zone, isFight) {
       if (!st) return isFight ? 'your Attack' : 'your Move';
       if (st.def.type === 'finisher')
         return m.spent
-          ? `🗡️ FINISHER — spends ${m.spent}, striking ${m.spent}× for +${MOMENTUM_DMG * m.spent} · SPENT`
-          : `🗡️ FINISHER — no Momentum banked, so one plain hit · SPENT`;
-      return `BUILDER — +1 Momentum · SPENT, gone for the region`;
+          ? `FINISHER — spends all <b>${m.spent} ${PIP_ON}</b> to strike <b>${m.spent} times</b> for <b>+${MOMENTUM_DMG * m.spent}</b>`
+          : `FINISHER — you have <b>no ${PIP_ON}</b> to spend, so this is one ordinary hit`;
+      return `BUILDER — earns <b>+1 ${PIP_ON}</b> · spent, gone for the region`;
     }
     case 'Element': {
       if (!st) return 'Initiative — returns to your deck';
       const here = cardById(S.assign.Element);
-      if (pairedNow()) return `🗡️ PAIRED — +1 more Momentum · Initiative`;
-      return `Initiative — <b>${st.def.combo}</b> here would pair for +1 Momentum`;
+      if (pairedNow()) return `PAIRED with your Strike — <b>+1 ${PIP_ON}</b> · and your Initiative`;
+      return `your Initiative — put <b>${st.def.combo}</b> here for <b>+1 ${PIP_ON}</b>`;
     }
     case 'Boost': {
       const sc = cardById(S.assign.Boost);
-      if (!sc) return 'feed a card here for Momentum';
-      if (S.feedArmed) return `🗡️ FED — +1 Momentum, and this card is DISCARDED`;
-      return `+1 Momentum if you FEED it — otherwise it returns to your deck`;
+      if (!sc) return `put a card here to burn for <b>+1 ${PIP_ON}</b>`;
+      if (S.feedArmed) return `BURNING — <b>+1 ${PIP_ON}</b>, and this card is <b>gone for the region</b>`;
+      return `burn it for <b>+1 ${PIP_ON}</b>, or leave it and it returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
@@ -5330,23 +5367,22 @@ function rogueZoneHint(zone, isFight) {
 function momentumRowHTML() {
   if (!CLASS.feeds || !isAssignPhase()) return '';
   const m = momentumMath();
-  const bits = [];
-  if (m.fin) {
-    bits.push(`🗡️ <b>FINISHER</b> — spends <b>${m.spent}</b>` +
-      (m.spent ? `, striking <b>${Math.max(1, m.spent)}×</b> for <b>+${MOMENTUM_DMG * m.spent}</b>` : ' — nothing banked, so one plain hit'));
-  } else {
-    bits.push(`🗡️ Momentum <b>${S.momentum || 0}</b>` +
-      (m.gain ? ` +${m.gain}` : '') + ` → <b>${m.next}</b> next turn` +
-      (m.next < (S.momentum || 0) ? ' <span class="dim">(slipping)</span>' : ''));
-  }
-  const why = [];
-  if (pairedNow()) why.push('✓ paired');
-  else if (spellCard() && spellCard().def.combo) why.push(`pair with <b>${spellCard().def.combo}</b> for +1`);
+  const st = spellCard();
   const sc = cardById(S.assign.Boost);
-  return `<div class="wake-row bank-row"><span class="wake-lab">${bits.join(' ')}</span> ` +
+  // 🔑 LEAD WITH THE VERB, not the number. The meter itself lives in the status bar now, so this
+  // row's only job is to say what THIS turn does to it and offer the one button.
+  const head = !st ? `🗡️ Put a card under <b>STRIKE</b>.`
+    : m.fin
+      ? (m.spent
+          ? `🗡️ <b>Finishing</b> — spending all <b>${m.spent} ${PIP_ON}</b> for <b>${m.spent} hits</b>`
+          : `🗡️ <b>Finishing with nothing</b> — no ${PIP_ON} banked, so this is one ordinary hit`)
+      : `🗡️ <b>Building</b> — ${S.momentum || 0} ${PIP_ON} ${m.gain ? `+ ${m.gain}` : ''} − 1 (slip) = <b>${m.next} ${PIP_ON}</b> next turn`;
+  const why = [];
+  if (!m.fin && st && st.def.combo) why.push(pairedNow() ? `✓ paired` : `pair with ${st.def.combo}`);
+  return `<div class="wake-row bank-row"><span class="wake-lab">${head}</span> ` +
     (sc && !m.fin ? `<button class="wake-btn${S.feedArmed ? ' on' : ''}" onclick="toggleFeed()">` +
-      (S.feedArmed ? `burning ${displayName(sc)}` : 'feed a card +1') + `</button> ` : '') +
-    `<span class="wake-note">${why.join(' · ') || (m.fin ? 'a finisher banks nothing' : '')}</span></div>`;
+      (S.feedArmed ? `burning ${displayName(sc)}` : `burn a card +1 ${PIP_ON}`) + `</button> ` : '') +
+    `<span class="wake-note">${why.join(' · ')}</span></div>`;
 }
 
 function bankRowHTML() {
@@ -5391,7 +5427,19 @@ function renderSlots() {
 // Per-card visual identity (2026-07-06): each card wears its own arcane SIGIL — a mage's mark,
 // magic-as-craft — as a faint watermark, tinted by the element it SEEKS to Attune (its aura hints
 // what it becomes when attuned). Witch Hat register: crafted wonder, restrained. See Card_Identity_And_Attachment.
+// 🗡️ the rogue's eight. ⚠️ Without these the watermark falls back to '✦' — the MAGE's attune
+// glyph — on every rogue card, which is a third of the reason Thomas asked "why is there still a
+// star". A default that belongs to one class is not a default.
 const SIGIL = {
+  'Viper Strike': '➤',
+  'Second Fang': '⋀',
+  'Venom Needle': '⌇',
+  'Lethal Dose': '◈',
+  'Slow Poison': '≈',
+  'Sleight of Hand': '⤨',
+  'Shadow Double': '⧉',
+  'Ghostblade': '◊',
+
   'Emberfall': '✷',
   'Firstlight': '☀',
   'Bellowsbreath': '≋',
@@ -5525,7 +5573,9 @@ function cardHTML(card) {
   const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
     (CLASS.pairs
       ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
-      : (d.type ? `<span class="v-type v-type-${d.type}">${d.type === 'finisher' ? '🗡️ FINISHER' : '+1 BUILDER'}</span>` : '')) +
+      : (d.type ? `<span class="v-type v-type-${d.type}">${d.type === 'finisher'
+            ? `spends all ${PIP_ON}`
+            : `+1 ${PIP_ON}`}</span>` : '')) +
     `</div>`;
 
   const slot = zoneOf(card.id);

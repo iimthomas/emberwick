@@ -728,6 +728,12 @@ button.stage.locked .stage-shape { font-style: italic; }
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
 
+/* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them. */
+.mo-chip { white-space: nowrap; }
+.pip-on  { color: #f0a86a; letter-spacing: 1px; }
+.pip-off { color: #4a4436; letter-spacing: 1px; }
+.mo-spend { color: #ffd9a0; font-weight: bold; }
+
 /* 🗡️ BUILDER / FINISHER sits where the mage's ✦ attuned number sits — the card's second fact.
    A finisher is the loud one because it is the turn you were setting up. */
 .v-type { font-size: 11px; font-weight: bold; letter-spacing: .04em; opacity: .85; }
