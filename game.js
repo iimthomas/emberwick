@@ -739,6 +739,7 @@ function mageStrike(spell, attuned, elem, boostC) {
 
 const MAGE = {
   id: 'mage',
+  mark: '✦',
   multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
   defs: null,                           // set to CARD_DEFS below — the table is declared above it
@@ -868,6 +869,12 @@ function chainPartnerOf(card) { return card && card.def.combo ? card.def.combo :
 function comboLive(card) {
   if (!card || !card.def.combo) return false;
   if (S.chainPersist) return true;                       // ✦ Slow Poison held it open
+  // 🗡️ Twin Blades — a permanent Shadow Double. Asked HERE so there is one place that answers
+  // "does this continue the chain", rather than three that each know part of the rule.
+  if (hasCharm('twinblades')) {
+    const held = cardById(S.assign.Reserve);
+    if (held && card.def.combo === held.def.name) return true;
+  }
   if (S.lastStrike && card.def.combo === S.lastStrike) return true;
   // ✦ Shadow Double: the card you HELD also counts as what you played
   return !!(S.doubledStrike && card.def.combo === S.doubledStrike);
@@ -875,6 +882,7 @@ function comboLive(card) {
 
 const ROGUE = {
   id: 'rogue',
+  mark: '🗡️',
   multi: null,
   labels: { Spell: 'Strike', Element: 'Combo', Boost: 'Momentum', Reserve: 'Arsenal' },
   defs: ROGUE_DEFS,
@@ -897,13 +905,18 @@ const ROGUE = {
     const linked = comboLive(strike);
     const fires = linked || lv4;
     const ab = fires ? strike.def.ability : null;
-    const chain = linked && !lv4 ? (S.chain || 1) + 1 : 1;
+    // 🗡️ Dead Hand — a clean win advances the chain on its own. Read from the LAST outcome,
+    // the same breadcrumb ✦ Unspent uses, because this turn's outcome does not exist yet.
+    const carried = hasCharm('deadhand') && S.lastOutcome === 'Complete';
+    const chain = (linked || carried) && !lv4 ? (S.chain || 1) + 1 : 1;
     // 🔑 HITS COME FROM THE CHAIN. This is the rogue's answer to 🧱 GUARD (a pool that wants many
     // hits) and its weakness against 🛡️ Armour (which subtracts from EVERY hit) — the shape of the
     // enemy decides whether your momentum is an asset or a liability, which is the class's fork.
     const hits = ab === 'onehit' ? 1 : Math.max(1, chain);
     return {
-      value: Math.max(0, st.value + (momentum ? eff(momentum).boost : 0) + (duelFx().value || 0)),
+      // 🗡️ Lone Fang — paid only while the chain is cold, so it fights every other rogue charm
+      value: Math.max(0, st.value + (momentum ? eff(momentum).boost : 0) + (duelFx().value || 0)
+        + (hasCharm('lonefang') && chain === 1 ? 4 : 0)),
       element: null,
       // momentum is speed: a long chain arrives before they are ready
       init: (combo ? eff(combo).init : 0) + (chain - 1) * 2,
@@ -953,7 +966,10 @@ function cycleCard(id) {
   const drawn = S.deck.shift();
   if (drawn) S.hand.push(drawn);
   S.cycled = true;
-  if (S.freeCycle) {
+  // 🗡️ Second Nature — one free cycle a region, so slot ③'s fork survives the charm
+  const secondNature = hasCharm('secondnature') && !S.natureUsed;
+  if (secondNature) S.natureUsed = true;
+  if (S.freeCycle || secondNature) {
     S.freeCycle = false;
     log(`🗡️ Sleight of Hand — ${displayName(card)} goes under the deck for ${drawn ? displayName(drawn) : 'nothing'}, and the chain holds.`, 'good');
   } else {
@@ -1450,10 +1466,27 @@ const GRADE_KEY = 'emberwick-grades-1' + KEY_NS;
 function bestGrades() {
   try { return JSON.parse(localStorage.getItem(GRADE_KEY) || '{}') || {}; } catch (e) { return {}; }
 }
+// 🏆 THE WALL IS STAGES x CLASSES (2026-08-12) — a grade belongs to the class that earned it.
+//
+// 🔑 THIS IS WHY CLASSES ARE NOT BALANCED TO EQUAL WIN RATES. A cell only means something if it is
+// a real achievement, and the whole point of a second class is that the SAME dragon is a different
+// problem: 🛡️ Armour is easy for the mage and murder for the rogue, 🧱 Guard the reverse. Keeping
+// one grade per stage would average that away and turn the difference into a balance complaint
+// instead of the content it is. See Class_System.md.
+//
+// ⚠️ BACKWARD COMPATIBLE BY CONSTRUCTION: every grade recorded before today was a mage grade,
+// because the rogue did not exist. A bare `"2"` key is therefore read as `"mage:2"`, so nobody
+// loses their wall — and this needed no version bump, the same way `par` did not.
+function gradeKey(stage, clsId) { return (clsId || CLASS.id) + ':' + String(stage); }
+function gradeFor(stage, clsId) {
+  const all = bestGrades();
+  const id = clsId || CLASS.id;
+  return all[gradeKey(stage, id)] || (id === 'mage' ? all[String(stage)] : null) || null;
+}
 function recordGrade(stage, g, won) {
   if (stage == null) return;
   try {
-    const all = bestGrades(), key = String(stage), prev = all[key];
+    const all = bestGrades(), key = gradeKey(stage), prev = gradeFor(stage);
     if (!prev || g.total > prev.total) {
       all[key] = { total: g.total, letter: g.letter, won: !!won };
       localStorage.setItem(GRADE_KEY, JSON.stringify(all));
@@ -1466,12 +1499,19 @@ function recordGrade(stage, g, won) {
 // of things on it. The tutorial carries its own badge on its own menu button now, which is the
 // whole reason it stopped belonging in this total. 🔑 When something moves to a new screen,
 // find every count that still includes it.
+// ⚠️ THE TOTAL IS NOW STAGES x UNLOCKED CLASSES. Counting only the stages would have reported
+// "4 of 4 graded" to someone who has cleared the ladder as the mage and never touched the rogue —
+// a board that says you are finished when half of it is blank. Locked classes are excluded, so the
+// denominator never counts a cell you cannot reach.
 function wallSummary() {
-  const all = bestGrades();
   const stages = DRAGONS.map(d => d.stage);
-  const got = stages.filter(n => all[String(n)]).length;
-  const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
-  return { graded: got, total: stages.length, perfect: s_ };
+  const ids = Object.keys(CLASSES).filter(classUnlocked);
+  let got = 0, s_ = 0;
+  for (const id of ids) for (const n of stages) {
+    const g = gradeFor(n, id);
+    if (g) { got++; if (g.letter === 'S') s_++; }
+  }
+  return { graded: got, total: stages.length * ids.length, perfect: s_, classes: ids.length };
 }
 // ============================================================
 // 🗡️ CHOOSING A CLASS (2026-08-12). The rogue opens once you have felled stage 1.
@@ -1648,22 +1688,45 @@ const RULE_CHARMS = [
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
   // ---- MAGE: the one rule this class owns is PAIRING ----
-  { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, mage: true,
+  { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, cls: 'mage',
     text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
     why: 'pair attunes, three resonates' },
-  { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, mage: true,
+  { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, cls: 'mage',
     text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>half</b> the bonus',
     why: 'ceiling traded for consistency' },
-  { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, mage: true,
+  { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, cls: 'mage',
     text: '✦ Your <b>Surge</b> can attune the Spell too — freeing the Catalyst to be pure speed',
     why: 'the Catalyst stops serving two masters' },
-  { id: 'coldiron', tier: 3, name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, mage: true,
+  { id: 'coldiron', tier: 3, name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, cls: 'mage',
     text: '✦ Your <b>unattuned</b> strikes are <b>+3</b>',
     why: 'the anti-pairing build — and it makes a hand with no pair a plan instead of a punishment' },
-  { id: 'kindledarsenal', tier: 4, name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, mage: true,
+  { id: 'kindledarsenal', tier: 4, name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, cls: 'mage',
     text: '✦ Your <b>Arsenal</b> can attune the Spell as well',
     why: 'the one slot with no job in the maths gets one' },
-  { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, mage: true,
+  // 🗡️ THE ROGUE'S SIX. Same bar as the mage's: each must NAME SOMETHING PRINTED ON THE CARD
+  // (the combo partner is printed, so the chain is fair game), must make a DIFFERENT arrangement
+  // correct, and must still hand you a different hand tomorrow.
+  // ⚠️ Gating alone would have EMPTIED 🏕️ Setting Out for the rogue — the phase only starts if the
+  // offer list is non-empty, which is exactly how the first charm-tiering silently deleted that
+  // whole screen on stage 1. A pool filter without a pool is a missing feature, not a filter.
+  { id: 'whetstone', tier: 1, name: 'Whetstone',     rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
+    text: '🗡️ Every hit strikes <b>+1</b> — so a long chain gains the most' },
+  // 🔑 THE DELIBERATE ANTI-SYNERGY, and the rogue's Cold Iron: the one charm that makes a BROKEN
+  // chain something you wanted. Without it every rogue charm pulls the same way, and a class whose
+  // charms all agree has no build to discover.
+  { id: 'lonefang', tier: 1, name: 'Lone Fang',      rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
+    text: '🗡️ While your chain is <b>1</b>, your strike gains <b>+4</b>' },
+  { id: 'twinblades', tier: 2, name: 'Twin Blades',  rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
+    text: '🗡️ Your <b>Arsenal</b> always counts as the previous card' },
+  { id: 'deepcut', tier: 3, name: 'Deep Cut',        rarity: 'rare', cost: 13, rule: true, cls: 'rogue',
+    text: '🧱 <b>Guard</b> swallows one fewer hit' },
+  // ⚠️ FIRST PER REGION, NOT ALWAYS — "cycling never breaks the chain" would delete slot ③'s whole
+  // fork (fix your hand OR keep your momentum). A charm may bend the class's question, never answer it.
+  { id: 'secondnature', tier: 4, name: 'Second Nature', rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
+    text: '🗡️ The <b>first cycle</b> each region does not break your chain' },
+  { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
+    text: '🗡️ <b>Complete</b> an encounter and your chain advances, combo or not' },
+  { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
     text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
     why: 'attuning stops costing you tempo' },
 ];
@@ -1848,7 +1911,7 @@ function saveGame() {
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, lastStrike: S.lastStrike, chain: S.chain, doubledStrike: S.doubledStrike,
-      chainPersist: S.chainPersist, lastAbility: S.lastAbility, freeCycle: S.freeCycle, cycled: S.cycled,
+      chainPersist: S.chainPersist, lastAbility: S.lastAbility, freeCycle: S.freeCycle, cycled: S.cycled, natureUsed: S.natureUsed,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1886,7 +1949,7 @@ function loadGame() {
       // those are mage runs and never read them.
       lastStrike: d.lastStrike || null, chain: d.chain || 1, doubledStrike: d.doubledStrike || null,
       chainPersist: !!d.chainPersist, lastAbility: d.lastAbility || null,
-      freeCycle: !!d.freeCycle, cycled: !!d.cycled, cyclePick: false,
+      freeCycle: !!d.freeCycle, cycled: !!d.cycled, cyclePick: false, natureUsed: !!d.natureUsed,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -2012,8 +2075,8 @@ function tutorialHandoffHTML() {
 }
 
 // 🏆 the badge on a stage button — your best, and what is still above it
-function gradeBadge(stage) {
-  const g = bestGrades()[String(stage)];
+function gradeBadge(stage, clsId) {
+  const g = gradeFor(stage, clsId);
   // ⚠️ NOTHING, not a placeholder (2026-08-12). An ungraded stage used to draw a dashed pill with
   // an em-dash in it — and because `.grade-badge.none` inherited the FILLED dark background from
   // the base class, it read as a small black BUTTON rather than an empty slot. Thomas, in play:
@@ -2024,6 +2087,21 @@ function gradeBadge(stage) {
   if (!g) return '';
   return `<span class="grade-badge g-${g.letter}" title="best: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
     `${g.letter}<span class="gb-score">${g.total}</span></span>`;
+}
+
+// 🏆 one badge per unlocked class, so the WALL shows the difference instead of averaging it away.
+// 🔑 Two classes with the same grade on the same stage is the boring case; the interesting one is
+// an S as the rogue and a C as the mage on the very same dragon. That is the content, on screen.
+// While only the mage is unlocked this is byte-identical to the old single badge.
+function stageBadges(stage) {
+  const ids = Object.keys(CLASSES).filter(classUnlocked);
+  if (ids.length < 2) return gradeBadge(stage, ids[0]);
+  return ids.map(id => {
+    const g = gradeFor(stage, id);
+    if (!g) return '';
+    return `<span class="grade-badge g-${g.letter}" title="${id}: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
+      `${CLASSES[id].mark}${g.letter}</span>`;
+  }).join('');
 }
 
 // ============================================================
@@ -2128,9 +2206,23 @@ function introNext(d) {
 // ⚠️ CLASS charms only. The generic pool is what the Wheel sells; the opening pick is where the
 // class shows you what IT can do, so a rogue's three will look nothing like these.
 // ⚠️ Not in the tutorial — stage 0 is deterministic and teaches the turn, not the meta.
-function mageCharmPool() { return CHARMS.filter(c => c.mage && !c.curse && charmUnlocked(c)); }
+// 🎭 IS THIS FOR THE CLASS I AM PLAYING? (2026-08-12 — found in play by Thomas: *"with the rogue,
+// im starting out, but its giving me mage charms at the start"*.) `rollSetout` asked for MAGE
+// charms unconditionally, so the rogue's opening pick was three rules it does not have.
+//
+// ⚠️ AND THE SECOND HALF IS WORSE, BECAUSE IT IS SILENT: four generic charms are ELEMENT-gated
+// (`mods.el`). A rogue buying "⚡ Lightning cards strike +1" gets literally nothing and is never
+// told. That is exactly the archetype-gated bug that shipped for months doing invisible arithmetic,
+// and the rule it earned holds here: 🔑 A CHARM MAY ONLY NAME SOMETHING PRINTED ON THE CARD.
+// An element is printed nowhere on a rogue card, so `CLASS.pairs` gates them out entirely.
+function charmForClass(c) {
+  if (c.cls && c.cls !== CLASS.id) return false;
+  if (c.mods && c.mods.el && !CLASS.pairs) return false;   // an element the class cannot read
+  return true;
+}
+function classCharmPool() { return CHARMS.filter(c => c.cls === CLASS.id && !c.curse && charmUnlocked(c)); }
 function rollSetout() {
-  const pool = mageCharmPool().slice();
+  const pool = classCharmPool().slice();
   const offers = [];
   while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
   return offers.map(c => c.id);
@@ -2239,6 +2331,7 @@ function freshGame(stage) {
     lastStrike: null, chain: 1, doubledStrike: null, chainPersist: false,
     lastAbility: null,                  // the combo that actually RESOLVED, read by endTurn
     cycled: false, cyclePick: false, freeCycle: false,   // 🗡️ slot ③, once per turn
+    natureUsed: false,                  // 🗡️ Second Nature is once per REGION
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
@@ -2376,6 +2469,7 @@ function nextRegion() {
   S.hand = [];
   S.discard = [];
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
+  S.natureUsed = false;  // 🗡️ Second Nature recharges with the region, like the ward above
   S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
   nextTurn();
@@ -2475,7 +2569,7 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ HOLD THREE. A cap is what stops them becoming a savings account, and three is small enough
 // that taking one is a decision rather than an accumulation.
 // ⚠️ CLASS-GATED LIKE CHARMS: a potion may only name something PRINTED ON THE CARD, and one that
-// names an ELEMENT is a mage potion (`mage: true`) - a rogue's vial would say something else.
+// names an ELEMENT is a mage potion (`cls: 'mage'`) - a rogue's vial would say something else.
 // ⚠️ Every effect lasts THIS TURN only unless it says otherwise, and `S.potionFx` is wiped in
 // nextTurn() and in the finale's beat-starts. A potion that outlived its turn would be a charm.
 // ============================================================
@@ -2628,7 +2722,7 @@ const POTIONS = [
     when: () => (S.trashed || []).length > 0,
     text: '✨ the last card you <b>lost returns</b>, at Lv1' },
   // ---- mage: it names an ELEMENT, which is the mage's suit ----
-  { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', mage: true, pick: true,
+  { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', cls: 'mage', pick: true,
     text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
@@ -2645,7 +2739,7 @@ const POTIONS = [
     text: '⏳ Any <b>Time Penalty is 1 less</b> this turn' },
   { id: 'deepcurrent', name: 'Deepcurrent', tier: 4, cost: 9, rarity: 'rare',
     text: '💨 You <b>win Initiative</b> this turn, whatever it is' },
-  { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
+  { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', cls: 'mage',
     text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
 ];
 // 🔓 CHARM TIERS — a STAND-IN for meta-progression (2026-08-05, Thomas: *"since we will have
@@ -2673,7 +2767,7 @@ function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
-const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()) &&
+const potionPool = () => POTIONS.filter(p => (!p.cls || p.cls === CLASS.id) && (!p.when || p.when()) &&
                                              (!p.tier || p.tier <= stageTier()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
@@ -3111,12 +3205,18 @@ function computeAction(reserve) {
     // facing Guard is stuck — and being stuck is the stated reason to go and unlock the rogue.
     // Which is also why Guard must NOT be added to the existing four roads: content is class-blind,
     // and a shape only one class can answer belongs on the stage built for that class.
-    const guardPool = (!quenched && foeHas(e, 'guard')) ? (e.shapeV || 0) : 0;
+    // 🧱 Deep Cut shaves a hit off the pool · 🗡️ Whetstone sharpens every hit
+    const guardPool = (!quenched && foeHas(e, 'guard'))
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('deepcut') ? 1 : 0)) : 0;
     const landed = Math.max(0, hits - guardPool);
-    const perHit = hits > 1 ? Math.floor(withBoost / hits) : withBoost;
-    let value = guardPool
-      ? landed * Math.max(0, perHit - armorCut)
-      : (hits > 1 ? hits * Math.max(0, perHit - armorCut) : Math.max(0, withBoost - armorCut));
+    const whet = hasCharm('whetstone') ? 1 : 0;
+    // ⚠️ ONE PATH, NOT TWO. The single-hit case used to bypass perHit entirely, which meant
+    // 🗡️ Whetstone ("every hit strikes +1") did nothing at all on a one-hit turn — a charm that
+    // silently does nothing is the exact bug the element gate was just fixed for.
+    // 🔑 A SPECIAL CASE FOR THE COMMON PATH IS A PLACE FOR A RULE TO GO MISSING.
+    // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
+    const perHit = (hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
+    let value = (guardPool ? landed : hits) * Math.max(0, perHit - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
@@ -5043,7 +5143,7 @@ function renderControls() {
       // 📖 the tutorial gets its own door. It used to be the first button on the STAGES screen,
       // which meant a new player had to go looking for the thing that teaches them the game.
       `<button class="${(hasSave() || cleared) ? '' : 'primary '}menu-item" onclick="startStage(0)">` +
-        `<b>📖 Tutorial</b>${gradeBadge(0)}` +
+        `<b>📖 Tutorial</b>${gradeBadge(0, 'mage')}` +
         `<span>learn the game in one short run · always open</span></button>` +
       `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
         `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
@@ -5065,8 +5165,8 @@ function renderControls() {
     const rows = [1, 2, 3, 4].map(t => {
       const list = group(t); if (!list.length) return '';
       return `<div class="coll-tier"><h4>${tierName(t)} <span class="dim">· ${list.length}</span></h4>` +
-        list.map(x => `<div class="coll-row${x.mage ? ' is-mage' : ''}">` +
-          `<b>${x.name}</b>${x.mage ? '<span class="coll-tag">mage</span>' : ''}` +
+        list.map(x => `<div class="coll-row${x.cls ? ' is-mage' : ''}">` +
+          `<b>${x.name}</b>${x.cls ? `<span class="coll-tag">${x.cls}</span>` : ''}` +
           `<span class="coll-text">${x.text}</span></div>`).join('') + `</div>`;
     }).join('');
     c.innerHTML =
@@ -5099,7 +5199,7 @@ function renderControls() {
       `</div></div>` +
       `<div class="dev-row"><span>Charm</span><div>` +
         pick('charm', '', 'none', !d.charm) +
-        CHARMS.filter(x => x.mage).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
+        CHARMS.filter(x => x.cls === CLASS.id).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
       `</div></div>` +
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
@@ -5139,7 +5239,7 @@ function renderControls() {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
-          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? gradeBadge(d.stage) : ''}` +
+          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? stageBadges(d.stage) : ''}` +
           // ❌ THE PICKER DOES NOT SPOIL THE DRAGON (2026-08-05, Thomas: *"lets remove what the
           // boss does, don't think we really need to show that off"*). It used to print the SHAPE
           // and the demand on every stage button.
