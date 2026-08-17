@@ -745,6 +745,7 @@ const MAGE = {
   defs: null,                           // set to CARD_DEFS below — the table is declared above it
   deck() { return shuffle(CARD_DEFS.map(newCard)); },
   pairs: true,                          // ✦ elements agree → the Spell attunes. The mage's one rule.
+  boosts: true,                         // ➕ the Surge adds a printed number — the rogue's does not
   // 🔥 THE EMBERWAKE IS THE MAGE'S FILL OF SLOT ③, NOT AN ENGINE RULE (corrected 2026-08-12).
   // ⚠️ I got this backwards earlier the same day. Making banking a plain choice fixed two REAL
   // faults — a trigger that came from the shuffle rather than the encounter, and a 2:1 exchange
@@ -5247,8 +5248,15 @@ function attunedLineText(r, spell, verb) {
   if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives half → ${sums}`;
   return `✦ ATTUNED — ${nm} is ${src ? elOf(src) : r.spellEl} like ${spell.def.name} → ${sums}`;
 }
+// 🔑 THE SLOT HINT IS THE MOST-READ TEXT IN THE GAME — it is the one line under each label that
+// says what THAT card will do THIS turn. It was written entirely in mage: the Combo slot offered to
+// attune, and the Momentum slot offered to bank an Emberwake. Found in play 2026-08-17: *"the combo
+// slot description doesn't make sense either, same with momentum"*.
+// ⚠️ SLOT VOCABULARY WAS ALWAYS PER CLASS; THE SLOT'S EXPLANATION HAS TO BE TOO. Renaming
+// Surge -> Momentum and leaving the sentence underneath is worse than not renaming it.
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
+  if (CLASS.id === 'rogue') return rogueZoneHint(zone, isFight);
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -5275,6 +5283,39 @@ function zoneHint(zone) {
     case 'Reserve': return 'kept in hand for next turn';
   }
 }
+
+// 🗡️ The rogue's four lines. Every one names the MOMENTUM consequence, because that is the
+// only thing this class's turn is about — and the arithmetic is stated, never implied.
+function rogueZoneHint(zone, isFight) {
+  const st = spellCard();
+  const m = momentumMath();
+  switch (zone) {
+    case 'Spell': {
+      if (!st) return isFight ? 'your Attack' : 'your Move';
+      if (st.def.type === 'finisher')
+        return m.spent
+          ? `🗡️ FINISHER — spends ${m.spent}, striking ${m.spent}× for +${MOMENTUM_DMG * m.spent} · SPENT`
+          : `🗡️ FINISHER — no Momentum banked, so one plain hit · SPENT`;
+      return `BUILDER — +1 Momentum · SPENT, gone for the region`;
+    }
+    case 'Element': {
+      if (!st) return 'Initiative — returns to your deck';
+      const here = cardById(S.assign.Element);
+      if (pairedNow()) return `🗡️ PAIRED — +1 more Momentum · Initiative`;
+      return `Initiative — <b>${st.def.combo}</b> here would pair for +1 Momentum`;
+    }
+    case 'Boost': {
+      const sc = cardById(S.assign.Boost);
+      if (!sc) return 'feed a card here for Momentum';
+      if (S.feedArmed) return `🗡️ FED — +1 Momentum, and this card is DISCARDED`;
+      return `+1 Momentum if you FEED it — otherwise it returns to your deck`;
+    }
+    case 'Reserve': return hasCharm('twinblades')
+      ? 'kept — 🗡️ Twin Blades: it can pair too'
+      : 'kept in hand for next turn';
+  }
+}
+
 // 🔥 ARM THE BANK. It sits in the controls with the Emberwake's AIM row rather than on the Surge
 // card, so the whole mechanic reads in one place: arm it here, aim it here next turn.
 // ⚠️ It was drafted into the Surge slot's head first (the "decision belongs on the object" rule)
@@ -5302,9 +5343,9 @@ function momentumRowHTML() {
   if (pairedNow()) why.push('✓ paired');
   else if (spellCard() && spellCard().def.combo) why.push(`pair with <b>${spellCard().def.combo}</b> for +1`);
   const sc = cardById(S.assign.Boost);
-  return `<div class="wake-row bank-row"><span class="wake-lab">${bits.join('')}</span>` +
+  return `<div class="wake-row bank-row"><span class="wake-lab">${bits.join(' ')}</span> ` +
     (sc && !m.fin ? `<button class="wake-btn${S.feedArmed ? ' on' : ''}" onclick="toggleFeed()">` +
-      (S.feedArmed ? `burning ${displayName(sc)}` : 'feed a card +1') + `</button>` : '') +
+      (S.feedArmed ? `burning ${displayName(sc)}` : 'feed a card +1') + `</button> ` : '') +
     `<span class="wake-note">${why.join(' · ') || (m.fin ? 'a finisher banks nothing' : '')}</span></div>`;
 }
 
@@ -5475,8 +5516,17 @@ function cardHTML(card) {
   // numbers never leave (legible math), they just stop shouting all at once.
   // ONE value: the encounter decides whether it reads as damage or as progress.
   const valIcon = (S.encounter && S.encounter.type === 'journey') ? '👣' : '⚔️';
+  // ⚠️ THE ✦ ATTUNED NUMBER IS A MAGE FACT AND MUST NOT BE PRINTED FOR A CLASS THAT CANNOT
+  // ATTUNE (found in play 2026-08-17, Thomas: *"why is there still a attune number with a star"*).
+  // 🔑 I GATED THE RULE AND LEFT ITS DISPLAY BEHIND — exactly what "when a rule is cut, the same
+  // commit removes its display" exists to prevent. The rogue was showing a second number for a
+  // mechanic it does not have, which is worse than a missing number: it invites a wrong theory.
+  // A rogue card instead prints the one word that decides its whole turn.
   const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
-    `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span></div>`;
+    (CLASS.pairs
+      ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
+      : (d.type ? `<span class="v-type v-type-${d.type}">${d.type === 'finisher' ? '🗡️ FINISHER' : '+1 BUILDER'}</span>` : '')) +
+    `</div>`;
 
   const slot = zoneOf(card.id);
   const verb = verbOf(card);
@@ -5505,10 +5555,15 @@ function cardHTML(card) {
            `` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
-    `<div class="el-identity">${elChip(shownEl)}</div>` +
+    (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}</div>`
+                 : `<div class="el-identity pair-identity">🗡️ pairs with <b>${d.combo || '—'}</b></div>`) +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
-    `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
-    `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
+    // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
+    // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
+    (CLASS.boosts
+      ? `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
+        `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span>`
+      : '') + `</div>` +
     `<div class="card-vals">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +

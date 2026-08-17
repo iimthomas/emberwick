@@ -728,6 +728,14 @@ button.stage.locked .stage-shape { font-style: italic; }
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
 
+/* 🗡️ BUILDER / FINISHER sits where the mage's ✦ attuned number sits — the card's second fact.
+   A finisher is the loud one because it is the turn you were setting up. */
+.v-type { font-size: 11px; font-weight: bold; letter-spacing: .04em; opacity: .85; }
+.v-type-builder { color: #9fb6a4; }
+.v-type-finisher { color: #f0a86a; }
+.pair-identity { font-size: 10.5px; color: #8a8577; }
+.pair-identity b { color: #cfc9ba; }
+
 /* 🎭 CLASS PICKER on the stages screen. Two wide buttons, each stating what the class IS rather
    than naming it — "the rogue" means nothing before you have played one. */
 .class-row { display: flex; gap: 8px; margin: 0 0 10px; }
