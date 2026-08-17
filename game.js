@@ -880,6 +880,8 @@ const ROGUE = {
   defs: ROGUE_DEFS,
   deck() { return shuffle(ROGUE_DEFS.concat(ROGUE_DEFS).map(newCard)); },   // 8 x 2
   emberwake: false,                     // 🔥 that is the MAGE's slot ③. The rogue's is extend-or-cycle.
+  pairs: false,                         // ✦ no elements, so nothing ever attunes
+  cycles: true,                         // 🗡️ slot ③: fix your hand, or keep your momentum
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
@@ -917,6 +919,51 @@ const ROGUE = {
     };
   },
 };
+
+// ============================================================
+// 🗡️ SLOT ③ FOR THE ROGUE — THE CYCLE. Its signature fork, and the mirror of the mage's bank.
+//
+//   fix your hand, or keep your momentum. Never both.
+//
+// 🔑 IT MUST COST SOMETHING, and the price is the chain. The ❌ Prism was cut because a FREE fix
+// for a bad hand measured as better than a good hand, and the rule that earned is: **a
+// compensation for bad luck must leave you WORSE OFF than good luck.** Breaking the chain does
+// exactly that — you are never punished into a dead end, but you never profit from the bad draw.
+// ⚠️ The discarded card goes UNDER THE DECK, never out of the game: deck-as-health is untouched,
+// and the cost is TIME (you will not see it again this region), which is the currency the Time
+// Penalty already charges. Nothing new to teach.
+// ✦ Sleight of Hand's combo grants `freeCycle` for the NEXT turn — the one time you get both.
+// ============================================================
+function canCycle() {
+  return !!(CLASS.cycles && isAssignPhase() && !S.cycled && S.hand.length && S.deck.length);
+}
+function armCycle() {
+  if (!canCycle()) return;
+  S.cyclePick = !S.cyclePick;
+  S.selectedId = null;
+  render();
+}
+function cycleCard(id) {
+  S.cyclePick = false;
+  if (!canCycle()) { render(); return; }
+  const card = S.hand.find(c => c.id === id);
+  if (!card) { render(); return; }
+  S.hand = S.hand.filter(c => c.id !== id);
+  S.deck.push(card);                                  // under the deck, not out of the run
+  const drawn = S.deck.shift();
+  if (drawn) S.hand.push(drawn);
+  S.cycled = true;
+  if (S.freeCycle) {
+    S.freeCycle = false;
+    log(`🗡️ Sleight of Hand — ${displayName(card)} goes under the deck for ${drawn ? displayName(drawn) : 'nothing'}, and the chain holds.`, 'good');
+  } else {
+    S.lastStrike = null; S.chain = 1; S.chainPersist = false; S.doubledStrike = null;
+    log(`🗡️ You cycle ${displayName(card)} under the deck for ${drawn ? displayName(drawn) : 'nothing'} — the chain breaks.`, 'bad');
+  }
+  normalizeAssign();
+  saveGame();
+  render();
+}
 
 const CLASSES = { mage: MAGE, rogue: ROGUE };
 let CLASS = MAGE;
@@ -1772,6 +1819,7 @@ function saveGame() {
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, lastStrike: S.lastStrike, chain: S.chain, doubledStrike: S.doubledStrike,
+      chainPersist: S.chainPersist, lastAbility: S.lastAbility, freeCycle: S.freeCycle, cycled: S.cycled,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1805,6 +1853,11 @@ function loadGame() {
     S = {
       tutorial: !!d.tutorial, taught: d.taught || [], lessonsOff: !!d.lessonsOff,
       candle: d.candle !== false,
+      // 🗡️ the chain. Absent on any save written before the rogue existed, which is correct —
+      // those are mage runs and never read them.
+      lastStrike: d.lastStrike || null, chain: d.chain || 1, doubledStrike: d.doubledStrike || null,
+      chainPersist: !!d.chainPersist, lastAbility: d.lastAbility || null,
+      freeCycle: !!d.freeCycle, cycled: !!d.cycled, cyclePick: false,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -2150,6 +2203,8 @@ function freshGame(stage) {
     // played". Same trap as ✦ Second Flame — the moment two things can satisfy one rule, every
     // line that explains the rule has to ask, not assume.
     lastStrike: null, chain: 1, doubledStrike: null, chainPersist: false,
+    lastAbility: null,                  // the combo that actually RESOLVED, read by endTurn
+    cycled: false, cyclePick: false, freeCycle: false,   // 🗡️ slot ③, once per turn
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
@@ -2745,6 +2800,7 @@ function nextTurn() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.cycled = false; S.cyclePick = false;   // 🗡️ the cycle is once per turn (freeCycle is NOT reset — it is earned for next turn)
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2814,6 +2870,7 @@ function dropOn(ev, zone) {
 // ---------- the slot row: select a card, then swap it with another (or with a role) ----------
 function tapCard(id) {
   if (!isAssignPhase() || S.diverting) return;
+  if (S.cyclePick) { cycleCard(id); return; }   // 🗡️ armed to cycle — the tap picks the card to lose
   // a card is already picked up → tapping a second card SWAPS the two
   if (S.selectedId != null && S.selectedId !== id) {
     swapCards(S.selectedId, id);
@@ -2951,6 +3008,11 @@ function computeAction(reserve) {
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
   // hands it straight back to the class. One line, so a third class needs no change here.
   const classPayload = a.rogue ? { rogue: a.rogue } : null;
+  // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
+  // 🔑 Deliberately NOT a second system: outpace/pierce/unhalved answer the same three questions
+  // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
+  // rather than a parallel set. A class adds an ANSWER, never a new question.
+  const rAb = a.rogue ? a.rogue.ability : null;
   const boostVal = a.boost;
 
   const h = S.hardship;
@@ -2968,7 +3030,8 @@ function computeAction(reserve) {
     const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
-    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
+    // 🗡️ Viper Strike arrives before they are ready — same answer as ✦ Outpace, different class
+    const initLost = (vE === 'Outpace' || rAb === 'outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -2990,9 +3053,10 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
-    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
-    // 🧪 Skyglass — the blow simply cannot be halved
-    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
+    // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rAb !== 'pierce') ? (e.shapeV || 0) : 0;
+    // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
+    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) && rAb !== 'unhalved' &&
                    foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
@@ -3245,6 +3309,9 @@ function finishResolve() {
   if (r.rogue) {
     S.chain = r.rogue.chain;
     S.lastStrike = r.spell ? r.spell.def.name : null;
+    S.lastAbility = r.rogue.ability;      // read by endTurn (🗡️ Ghostblade) — finishResolve runs first
+    // ✦ Sleight of Hand — next turn's cycle is free, i.e. it does not break the chain
+    S.freeCycle = r.rogue.ability === 'cycle';
     // ✦ Slow Poison — the chain does not break next turn WHATEVER you play. A flag, not a fiddle
     // with lastStrike: the name you struck with is a fact, and faking it would make every line
     // that reads it lie. Re-set every rogue turn, so it can never outlive the turn that bought it.
@@ -3615,6 +3682,15 @@ function endTurn() {
   if (hasCharm('unspent') && S.lastOutcome === 'Complete' && spentIds.length) {
     const saved = S.hand.filter(c => spentIds.includes(c.id));
     if (saved.length) log(`✦ Unspent — ${saved.map(c => displayName(c)).join(', ')} survives the casting.`, 'good');
+    spentIds = [];
+  }
+  // 🗡️ GHOSTBLADE — the same bend, bought by the chain instead of by a charm. ⚠️ It reads the
+  // ability off the RESOLVED turn (`S.lastAbility`), not off the arrangement: by the time cleanup
+  // runs the player may have been shown three beats, and recomputing would ask a question whose
+  // answer has already been printed.
+  if (S.lastAbility === 'unspent' && spentIds.length) {
+    const saved = S.hand.filter(c => spentIds.includes(c.id));
+    if (saved.length) log(`🗡️ Ghostblade — ${saved.map(c => displayName(c)).join(', ')} never left your hand.`, 'good');
     spentIds = [];
   }
   const poured = S.hand.filter(c => spentIds.includes(c.id));
@@ -4736,6 +4812,7 @@ function renderControls() {
       potionRow +
       wakeRow +
       bankRowHTML() +
+      cycleRowHTML() +
       boostRow +
       resolveBtn +
       divertBtn +
@@ -5092,6 +5169,20 @@ function zoneHint(zone) {
 // and pulled back out: `.slot-head` is a FIXED 46px on purpose — a taller head staggers the whole
 // four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
 // states what will happen to that card, which is the part that must live on the object.
+// 🗡️ THE CYCLE ROW — the rogue's slot ③, sitting exactly where the mage's bank row does, because
+// they are the same kind of decision: the one thing this class does with the free slot.
+function cycleRowHTML() {
+  if (!CLASS.cycles || !isAssignPhase()) return '';
+  const free = !!S.freeCycle;
+  if (S.cycled) return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ You have already cycled this turn.</span></div>`;
+  if (!S.deck.length) return '';
+  return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Chain <b>${S.chain || 1}</b>` +
+    (S.lastStrike ? ` — follow <b>${S.lastStrike}</b>` : ' — no chain yet') + `</span>` +
+    `<button class="wake-btn${S.cyclePick ? ' on' : ''}" onclick="armCycle()">` +
+    (S.cyclePick ? 'tap a card to cycle it' : 'cycle a card') + `</button>` +
+    `<span class="wake-note">${free ? '✦ Sleight of Hand — this one is free' : 'it goes under your deck, and the chain breaks'}</span></div>`;
+}
+
 function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
@@ -5354,6 +5445,7 @@ function startLastMile() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.cycled = false; S.cyclePick = false;   // 🗡️ the cycle is once per turn (freeCycle is NOT reset — it is earned for next turn)
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -5497,6 +5589,7 @@ function startDuelBeat() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.cycled = false; S.cyclePick = false;   // 🗡️ the cycle is once per turn (freeCycle is NOT reset — it is earned for next turn)
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
