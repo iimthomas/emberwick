@@ -841,16 +841,40 @@ const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it neve
 // 🔑 ⚡ IS ONE NUMBER DOING TWO JOBS: what a card COSTS as your Strike, and what it PAYS when
 // burned for energy. That is the whole resource tension in a single column — your best cards are
 // also your best fuel, so a big turn is bought with something you wanted to play.
+// 🗡️ THE COMBO VERBS (2026-08-17). A card's verb fires when IT sits in ② beside its partner.
+//
+// ⚠️ THIS REPLACES "the pair cuts the cost by 1", which Thomas killed as *"a bit too abstract"* —
+// and he was right: a discount is bookkeeping, a verb is a thing that HAPPENS. It also gives the
+// ② card a job instead of making it a key that fits a lock.
+//
+// 🔑 THE STRUCTURE IS THE POINT: a pair has two cards, so WHICH VERB YOU GET DEPENDS ON WHICH
+// HALF YOU STRIKE WITH. Strike with Lethal Dose and Venom Needle sits in ② (ignore Armour); strike
+// with Venom Needle and Lethal Dose sits there instead (its ✦ for free). Eight cards, eight verbs,
+// sixteen different turns — and the encounter tells you which way round to play the pair.
+//
+// ⚠️ A VERB MUST NOT REPEAT ITS OWN CARD'S NUMBERS. Viper Strike is already the fastest card in
+// the deck at 💨 7, so giving it "win Initiative" would be free; its partner carries that instead.
+// A verb that restates the stat is a verb that never changes a decision.
+const ROGUE_VERBS = {
+  draw:      'you <b>draw a card</b>',
+  outpace:   'you <b>win Initiative</b> automatically',
+  pierce:    'your strike <b>ignores 🛡️ Armour</b>',
+  freepaid:  'your strike deals its <b>✦</b> even unpaid',
+  nocounter: 'it <b>does not counter</b> you',
+  cycle2:    'you <b>draw two cards</b>',
+  surge:     '<b>+2 ●</b> Momentum',
+  unspent:   'your Strike is <b>not spent</b>',
+};
 const ROGUE_SPEC = [
-  // pair          name               ⚡ pairs with          spike    base [val, init, armor]  ✦ paid bonus
-  { pair: 'RUSH',    name: 'Viper Strike',    energy: 1, combo: 'Second Fang',     spike: 'init',  base: [5, 7, 1], paid: 4 },
-  { pair: 'RUSH',    name: 'Second Fang',     energy: 2, combo: 'Viper Strike',    spike: 'init',  base: [6, 5, 1], paid: 5 },
-  { pair: 'OPENING', name: 'Venom Needle',    energy: 2, combo: 'Lethal Dose',     spike: 'value', base: [7, 4, 2], paid: 5 },
-  { pair: 'OPENING', name: 'Lethal Dose',     energy: 3, combo: 'Venom Needle',    spike: 'value', base: [8, 2, 1], paid: 7 },
-  { pair: 'HOLD',    name: 'Slow Poison',     energy: 2, combo: 'Sleight of Hand', spike: 'armor', base: [6, 3, 2], paid: 5 },
-  { pair: 'HOLD',    name: 'Sleight of Hand', energy: 1, combo: 'Slow Poison',     spike: 'init',  base: [5, 6, 1], paid: 4 },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   energy: 2, combo: 'Ghostblade',      spike: 'armor', base: [6, 3, 3], paid: 5 },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      energy: 3, combo: 'Shadow Double',   spike: 'value', base: [8, 3, 2], paid: 7 },
+  // pair          name               ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
+  { pair: 'RUSH',    name: 'Viper Strike',    energy: 1, combo: 'Second Fang',     spike: 'init',  base: [5, 7, 1], paid: 4, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Second Fang',     energy: 2, combo: 'Viper Strike',    spike: 'init',  base: [6, 5, 1], paid: 5, verb: 'outpace' },
+  { pair: 'OPENING', name: 'Venom Needle',    energy: 2, combo: 'Lethal Dose',     spike: 'value', base: [7, 4, 2], paid: 5, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     energy: 3, combo: 'Venom Needle',    spike: 'value', base: [8, 2, 1], paid: 7, verb: 'freepaid' },
+  { pair: 'HOLD',    name: 'Slow Poison',     energy: 2, combo: 'Sleight of Hand', spike: 'armor', base: [6, 3, 2], paid: 5, verb: 'nocounter' },
+  { pair: 'HOLD',    name: 'Sleight of Hand', energy: 1, combo: 'Slow Poison',     spike: 'init',  base: [5, 6, 1], paid: 4, verb: 'cycle2' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   energy: 2, combo: 'Ghostblade',      spike: 'armor', base: [6, 3, 3], paid: 5, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      energy: 3, combo: 'Shadow Double',   spike: 'value', base: [8, 3, 2], paid: 7, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
@@ -862,32 +886,44 @@ const ROGUE_DEFS = ROGUE_SPEC.map(s => {
     return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
   return { name: s.name, element: null, arch: null, pair: s.pair,
-           combo: s.combo, energy: s.energy, paid: s.paid, lv };
+           combo: s.combo, energy: s.energy, paid: s.paid, verb: s.verb, lv };
 });
 
 // ② the pair sits in the COMBO slot — the whole condition, on the table, checkable at a glance.
 // 🗡️ Twin Blades lets the ARSENAL complete it instead, which is that slot's job for this class.
-function pairedNow() {
-  const st = spellCard(); if (!st || !st.def.combo) return false;
+function pairedNow() { return !!comboCard(); }
+// 🔑 WHICH card is completing the pair — because it is that card's verb that fires, and three
+// different lines need to name it. ✦ Second Flame's lesson: the rule must name its own cause.
+// 🗡️ Twin Blades lets the ARSENAL complete it instead, which is that slot's job for this class.
+function comboCard() {
+  const st = spellCard(); if (!st || !st.def.combo) return null;
   const seats = [cardById(S.assign.Element)];
   if (hasCharm('twinblades')) seats.push(cardById(S.assign.Reserve));
-  return seats.some(c => c && c.def.name === st.def.combo);
+  return seats.find(c => c && c.def.name === st.def.combo) || null;
 }
+function comboVerb() { const c = comboCard(); return c ? c.def.verb : null; }
 // ⚠️ ONE FUNCTION FOR THE WHOLE TURN'S BOOKKEEPING, so the line on screen, the card face and the
 // damage in the reveal all read the same source — the `computeAction` rule, applied to a resource.
 function rogueMath() {
   const st = spellCard();
   if (!st) return null;
-  const paired = pairedNow();
+  const verb = comboVerb();
+  const paired = !!verb;
   const fuel = cardById(S.assign.Boost);
-  const cost = Math.max(0, (st.def.energy || 0) - (paired ? 1 : 0));
+  // ⚠️ NO MORE PAIR DISCOUNT — the pair pays in a VERB now, not in arithmetic.
+  const cost = st.def.energy || 0;
   const paid = fuel ? (fuel.def.energy || 0) : 0;
-  const full = paid >= cost;
-  const gain = paired ? 1 : 0;
+  const full = paid >= cost || verb === 'freepaid';     // 🗡️ Lethal Dose pays for you
+  // 🔑 MOMENTUM IS THE SURPLUS OF WHAT YOU SPEND. It used to come only from pairing, which is
+  // gated on slot ② — and ② is also your Initiative, so speed won and pairing measured at 17%.
+  // A meter fed by the one slot you always need for something else can never fill.
+  // Now it drips from a decision you are already making (which card to spend), and pairing feeds it
+  // only indirectly: 🗡️ Shadow Double's verb is the burst.
+  const gain = Math.max(0, paid - cost) + (verb === 'surge' ? 2 : 0);
   const pool = Math.min(MOMENTUM_CAP, (S.momentum || 0) + gain);
   const spend = S.moTarget ? pool : 0;
   const next = S.moTarget ? 0 : Math.max(0, pool - MOMENTUM_DECAY);
-  return { paired, cost, paid, full, fuel, gain, pool, spend, next, target: S.moTarget || null };
+  return { paired, verb, cost, paid, full, fuel, gain, pool, spend, next, target: S.moTarget || null };
 }
 // ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
 // is "is this the turn to cash out", not "yes or no".
@@ -919,7 +955,11 @@ const ROGUE = {
   // 16-card deck — and in a game where the deck IS the health bar that is an enormous hidden tax.
   // The cost of ③ is now what it should be: that card does nothing else this turn, and you will
   // not see it again for a while.
-  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  spentIds() {
+    // 🗡️ Ghostblade in ② — the Strike is not spent at all
+    if (comboVerb() === 'unspent') return [];
+    return S.assign.Spell ? [S.assign.Spell] : [];
+  },
   compose() {
     const strike = spellCard();
     if (!strike) return null;
@@ -946,7 +986,7 @@ const ROGUE = {
       attuner: null, loose: false,
       // 🌀 SLIP is stated as a REQUEST, not a verdict — computeAction owns the Initiative race, so
       // it is the only place that knows the margin. The class only says "this class can slip".
-      rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired,
+      rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
                pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
     };
   },
@@ -3102,7 +3142,7 @@ function computeAction(reserve) {
   // 🔑 Deliberately NOT a second system: outpace/pierce/unhalved answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
   // rather than a parallel set. A class adds an ANSWER, never a new question.
-  const rAb = a.rogue ? a.rogue.ability : null;
+  const rVerb = a.rogue ? a.rogue.verb : null;
   const boostVal = a.boost;
 
   const h = S.hardship;
@@ -3121,7 +3161,7 @@ function computeAction(reserve) {
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
     // 🗡️ Viper Strike arrives before they are ready — same answer as ✦ Outpace, different class
-    const initLost = (vE === 'Outpace' || rAb === 'outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
+    const initLost = (vE === 'Outpace' || rVerb === 'outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -3151,9 +3191,9 @@ function computeAction(reserve) {
     // the deck IS the health bar, that is real value with no ceiling.
     const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
-    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rAb !== 'pierce') ? (e.shapeV || 0) : 0;
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce') ? (e.shapeV || 0) : 0;
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
-    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) && rAb !== 'unhalved' &&
+    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
                    foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
     // 🗡️ MULTI-HIT — and the rule is that hits do NOT add damage, they DIVIDE it, with 🛡️ Armour
     // paid on EVERY one. That is the entire reason a long chain is a liability against Armour and
@@ -3220,7 +3260,8 @@ function computeAction(reserve) {
     const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
     // 🌀 a slipped rogue is gone before it can swing back
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow' && !slipped) ? e.atk
+    // 🗡️ Slow Poison in ② — it simply does not answer
+    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow' && !slipped && rVerb !== 'nocounter') ? e.atk
       : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
@@ -5373,16 +5414,19 @@ function rogueZoneHint(zone, isFight) {
     }
     case 'Element': {
       if (!st) return 'your Initiative — returns to your deck';
-      if (m.paired) return `PAIRED — cost −1 and <b>+1 ●</b> · and your Initiative`;
-      return `your Initiative — <b>${st.def.combo}</b> here cuts the cost and earns <b>+1 ●</b>`;
+      // 🔑 name the VERB, not the fact that a verb happened. "PAIRED" tells you nothing.
+      if (m.verb) return `🗡️ COMBO — ${ROGUE_VERBS[m.verb]} · and your Initiative`;
+      return `your Initiative — <b>${st.def.combo}</b> here would fire its combo`;
     }
     case 'Boost': {
       const fuel = cardById(S.assign.Boost);
       if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
       if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to spend`;
+      const over = Math.max(0, m.paid - m.cost);
       return m.full
-        ? `spends <b>⚡ ${m.paid}</b> — pays the <b>${m.cost}</b> · returns to your deck`
+        ? `spends <b>⚡ ${m.paid}</b> for a cost of <b>${m.cost}</b>` +
+          (over ? ` — <b>+${over} ●</b> from the surplus` : '') + ` · returns to your deck`
         : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
@@ -5650,6 +5694,10 @@ function cardHTML(card) {
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}</div>`
                  : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b> · pairs with <b>${d.combo || '—'}</b></div>`) +
+    // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
+    // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
+    (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : ''}">` +
+      `<b>🗡️ Combo</b><span>${ROGUE_VERBS[d.verb]}</span></div>` : '') +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
     // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
     // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
