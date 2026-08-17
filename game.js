@@ -1391,6 +1391,7 @@ function dragonShapeText(d) {
   const bits = [];
   if (d.shapes.includes('armour')) bits.push(`🛡️ <b>Armour ${d.shapeV}</b>`);
   if (d.shapes.includes('evasion')) bits.push(`🌀 <b>Evasion</b>`);
+  if (d.shapes.includes('guard')) bits.push(`🧱 <b>Guard ${d.shapeV}</b>`);
   if (d.shapes.includes('relentless')) bits.push(`⏳ <b>Relentless</b>`);
   return bits.join(' + ') || '— unguarded';
 }
@@ -1398,6 +1399,7 @@ function dragonDemand(d) {
   const bits = [];
   if (d.shapes.includes('armour')) bits.push(`it shaves <b>${d.shapeV}</b> off every blow`);
   if (d.shapes.includes('evasion')) bits.push(`it <b>halves</b> any blow it saw coming`);
+  if (d.shapes.includes('guard')) bits.push(`its plates <b>swallow your first ${d.shapeV} hit${d.shapeV === 1 ? '' : 's'} whole</b>`);
   if (d.shapes.includes('relentless')) bits.push(`its breath <b>grows +${RELENTLESS_STEP} every beat</b>`);
   return bits.join(' · ');
 }
@@ -1531,6 +1533,9 @@ function shapeText(e) {
   const bits = [];
   if (foeHas(e, 'armour')) bits.push(`🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`);
   if (foeHas(e, 'evasion')) bits.push(`🌀 <b>Evasion</b> — halves your hit unless you strike first`);
+  // 🧱 states the demand in HITS, because that is the unit it charges in — "absorbs 2 damage" would
+  // be a lie about a pool that counts blows, and a shape you misread is a shape you cannot answer.
+  if (foeHas(e, 'guard')) bits.push(`🧱 <b>Guard ${e.shapeV}</b> — swallows your first ${e.shapeV} hit${e.shapeV === 1 ? '' : 's'} whole; needs MANY`);
   return bits.join(' + ') || '— unguarded';
 }
 
@@ -3066,8 +3071,23 @@ function computeAction(reserve) {
     // decoration, which is why teaching the bot to chain moved the win rate by zero.
     // 🔑 A FIELD THE ENGINE CARRIES BUT NEVER READS IS NOT A MECHANIC, IT IS A COMMENT.
     // Mage behaviour is byte-identical: hits === 1 takes the original path.
+    // 🧱 GUARD — BUILT 2026-08-12, the third shape, specified at step 5 and deliberately left out
+    // until a class existed that could answer it.
+    //
+    // THE RULE: a pool of N that eats your first N HITS whole. Hits beyond it land in full.
+    // So one enormous blow accomplishes NOTHING against Guard 1, and four small ones get through.
+    // 🔑 THAT IS THE EXACT INVERSE OF ARMOUR, and it is why the two shapes cannot be answered by
+    // the same turn: Armour is paid per hit and wants ONE, Guard consumes hits and wants MANY.
+    // ⚠️ IT IS UNANSWERABLE FOR THE MAGE ON PURPOSE. The mage lands exactly one hit, so a mage
+    // facing Guard is stuck — and being stuck is the stated reason to go and unlock the rogue.
+    // Which is also why Guard must NOT be added to the existing four roads: content is class-blind,
+    // and a shape only one class can answer belongs on the stage built for that class.
+    const guardPool = (!quenched && foeHas(e, 'guard')) ? (e.shapeV || 0) : 0;
+    const landed = Math.max(0, hits - guardPool);
     const perHit = hits > 1 ? Math.floor(withBoost / hits) : withBoost;
-    let value = hits > 1 ? hits * Math.max(0, perHit - armorCut) : Math.max(0, withBoost - armorCut);
+    let value = guardPool
+      ? landed * Math.max(0, perHit - armorCut)
+      : (hits > 1 ? hits * Math.max(0, perHit - armorCut) : Math.max(0, withBoost - armorCut));
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
