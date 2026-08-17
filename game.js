@@ -561,12 +561,14 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // What makes it HARD is already built: 🕯️ the candle. Lit, you can see the next encounter's HP,
 // Initiative and shape, so banking is informed. Out, it is a bet that next turn's problem is bigger
 // than this one's. An existing system does the work instead of a new rule.
+// ⚠️ EVERY Emberwake consumer asks the CLASS first — it is the mage's slot ③, not the engine's.
+function hasEmberwake() { return !!(CLASS && CLASS.emberwake); }
 function banksNow() {
-  return !!(S.bankArmed && cardById(S.assign.Boost));
+  return !!(hasEmberwake() && S.bankArmed && cardById(S.assign.Boost));
 }
 // ⚠️ ARMED PER TURN, CLEARED WITH THE TURN. Anything that outlived its turn would be a charm.
 function toggleBank() {
-  if (!isAssignPhase() || !cardById(S.assign.Boost)) return;
+  if (!hasEmberwake() || !isAssignPhase() || !cardById(S.assign.Boost)) return;
   S.bankArmed = !S.bankArmed;
   render();
 }
@@ -604,7 +606,7 @@ function bankCostPhrase(surge) {
 // the case a human does NOT have: seeing on the candle that the next one is fast and banking for it.
 const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
-function wakeReady() { return S.wake > 0 && isAssignPhase(); }
+function wakeReady() { return hasEmberwake() && S.wake > 0 && isAssignPhase(); }
 function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
 
 // ============================================================
@@ -733,6 +735,16 @@ const MAGE = {
   id: 'mage',
   multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
+  // 🔥 THE EMBERWAKE IS THE MAGE'S FILL OF SLOT ③, NOT AN ENGINE RULE (corrected 2026-08-12).
+  // ⚠️ I got this backwards earlier the same day. Making banking a plain choice fixed two REAL
+  // faults — a trigger that came from the shuffle rather than the encounter, and a 2:1 exchange
+  // rate — but I then argued it should therefore be generic "so every class inherits it".
+  // 🔑 THAT IS THE ONE SLOT NO RULE MAY BE GENERIC IN. The slot contract says ①②④ each feed an
+  // engine system and are therefore constrained, and ③ feeds nothing — which is exactly why it is
+  // the free space where a CLASS poses its signature fork. A generic rule sitting in ③ does not
+  // give every class a gift; it spends the only room each class had.
+  // So: flag it, and gate every consumer. A rogue's ③ is its own (extend the chain, or cycle).
+  emberwake: true,
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
@@ -1055,7 +1067,7 @@ const TUTORIAL = {
       text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
     // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
-    { id: 'bank', when: () => isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
+    { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
       text: 'Your <b>SURGE</b> can fire now — or <b>bank</b> instead: nothing this turn, but next turn you aim its full power at your <b>strike</b> or your <b>speed</b>. ' +
             'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
@@ -4340,7 +4352,7 @@ function pointAtLesson() {
 function carried() {
   const out = [];
   for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
-  if (S.wake > 0) out.push({ curse: false, name: 'Emberwake',
+  if (hasEmberwake() && S.wake > 0) out.push({ curse: false, name: 'Emberwake',
     text: S.wakeTarget ? `🔥 +${S.wake} → ${WAKE_TARGETS[S.wakeTarget]}` : `🔥 +${S.wake} — unaimed` });
   if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
   if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
@@ -4532,7 +4544,7 @@ function renderControls() {
           `<button onclick="cancelPotion()">cancel</button></div>` : '') +
         `</div>`
       : '';
-    const wakeRow = S.wake > 0
+    const wakeRow = hasEmberwake() && S.wake > 0
       ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
         Object.keys(WAKE_TARGETS).map(k =>
           `<button class="wake-btn${S.wakeTarget === k ? ' on' : ''}" onclick="aimWake('${k}')">${WAKE_TARGETS[k]}</button>`).join('') +
@@ -4909,7 +4921,7 @@ function zoneHint(zone) {
 // four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
 // states what will happen to that card, which is the part that must live on the object.
 function bankRowHTML() {
-  if (!isAssignPhase()) return '';
+  if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
   if (!sc) return '';
   const v = bankValueOf(sc);
