@@ -865,16 +865,30 @@ const ROGUE_VERBS = {
   surge:     '<b>+2 ●</b> Momentum',
   unspent:   'your Strike is <b>not spent</b>',
 };
+// ⚠️ POLARISED 2026-08-17. The pairs used to be roughly symmetric — both halves mid-weight —
+// and pairing measured 64% AVAILABLE but only 25% TAKEN, against attuning's 86/66. So the pair was
+// not hard to find, it was **not worth what it cost**: slot ② is your Initiative, and a situational
+// verb loses to speed you need every single turn.
+//
+// 🔑 THE FIX IS NOT TO MAKE PAIRING STRONGER, IT IS TO MAKE IT FREE. Each pair is now a BLADE and
+// a TOOL, and the tool is the card you wanted in ② anyway:
+//     BLADE  heavy ⚔️, expensive ⚡, slow 💨   → it belongs in ①
+//     TOOL   light ⚔️, cheap ⚡, FAST 💨         → it belongs in ② whatever you were doing
+// So completing a pair stops being a sacrifice and the question moves to a better place: not
+// "can I afford to pair?" but "which pair can I complete, and is that the verb this creature wants?"
+//
+// ⚠️ A TOOL'S VERB IS WHAT FIRES WHEN YOU SWING THE BLADE, so the tools carry the verbs you want
+// on a big turn (pierce, draw, +●) and the blades carry the ones you want when you cannot swing.
 const ROGUE_SPEC = [
-  // pair          name               ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
-  { pair: 'RUSH',    name: 'Viper Strike',    energy: 1, combo: 'Second Fang',     spike: 'init',  base: [5, 7, 1], paid: 4, verb: 'draw' },
-  { pair: 'RUSH',    name: 'Second Fang',     energy: 2, combo: 'Viper Strike',    spike: 'init',  base: [6, 5, 1], paid: 5, verb: 'outpace' },
-  { pair: 'OPENING', name: 'Venom Needle',    energy: 2, combo: 'Lethal Dose',     spike: 'value', base: [7, 4, 2], paid: 5, verb: 'pierce' },
-  { pair: 'OPENING', name: 'Lethal Dose',     energy: 3, combo: 'Venom Needle',    spike: 'value', base: [8, 2, 1], paid: 7, verb: 'freepaid' },
-  { pair: 'HOLD',    name: 'Slow Poison',     energy: 2, combo: 'Sleight of Hand', spike: 'armor', base: [6, 3, 2], paid: 5, verb: 'nocounter' },
-  { pair: 'HOLD',    name: 'Sleight of Hand', energy: 1, combo: 'Slow Poison',     spike: 'init',  base: [5, 6, 1], paid: 4, verb: 'cycle2' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   energy: 2, combo: 'Ghostblade',      spike: 'armor', base: [6, 3, 3], paid: 5, verb: 'surge' },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      energy: 3, combo: 'Shadow Double',   spike: 'value', base: [8, 3, 2], paid: 7, verb: 'unspent' },
+  // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦   verb
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 9, 1], paid: 4, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [9, 2, 1], paid: 6, verb: 'outpace' },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [5, 8, 2], paid: 4, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [10, 2, 0], paid: 7, verb: 'freepaid' },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 9, 1], paid: 4, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [9, 2, 3], paid: 6, verb: 'nocounter' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [5, 8, 3], paid: 4, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [10, 2, 1], paid: 7, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
@@ -885,7 +899,7 @@ const ROGUE_DEFS = ROGUE_SPEC.map(s => {
     const st = s.base.map((v, i) => (i === idx[s.spike] ? v + 3 * L : (L === 0 ? v : Math.max(0, v - 1))));
     return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
-  return { name: s.name, element: null, arch: null, pair: s.pair,
+  return { name: s.name, element: null, arch: null, pair: s.pair, role: s.role,
            combo: s.combo, energy: s.energy, paid: s.paid, verb: s.verb, lv };
 });
 
@@ -5738,7 +5752,9 @@ function cardHTML(card) {
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}</div>`
-                 : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b> · pairs with <b>${d.combo || '—'}</b></div>`) +
+                 : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b>` +
+                   (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
+                   ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
     // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
     (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : ''}">` +

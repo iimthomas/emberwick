@@ -728,6 +728,9 @@ button.stage.locked .stage-shape { font-style: italic; }
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
 
+.rg-blade { color: #f0a86a; }   /* heavy, slow, expensive — it belongs in ① */
+.rg-tool  { color: #9fd6e8; }   /* light, fast, cheap — it belongs in ② */
+
 /* 🗡️ THE SPARE ROW — cards drawn past the four slots. Deliberately set apart from the row
    rather than squeezed into it: these are not seated, and a card that looks seated but is not is
    worse than one that is plainly waiting. */
