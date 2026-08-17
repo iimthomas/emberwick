@@ -802,70 +802,68 @@ const MAGE = {
 };
 
 // ============================================================
-// 🗡️ THE ROGUE — BUILDERS, FINISHERS AND MOMENTUM (redesigned 2026-08-12).
+// ============================================================
+// 🗡️ THE ROGUE — ENERGY, THE PAIR, AND MOMENTUM (third design, 2026-08-12).
 //
-// ⚠️ THIS IS THE SECOND DESIGN, AND THE FIRST ONE'S EPITAPH IS WORTH KEEPING. It was a CHAIN:
-// your strike had to follow the card you struck with LAST turn. Thomas killed it on two counts:
-//   1. *"the chain only works when you have the same pair combo back and forth, eventually you
-//      can't and the chain stops right?"* — a pair is only FOUR physical cards and the Strike is
-//      spent every turn, so the chain consumed the very thing that sustained it. Measured average
-//      length 1.35: the class's signature mechanic was switched off seven turns in ten.
-//   2. *"i imagine the combo would happen in the same turn."*
-// 🔑 THE LESSON: A CROSS-TURN CONDITION IS A CROSS-TURN COST. Checking last turn is cheap to
-// build and expensive to play, because the player cannot see it and cannot plan around it. The
-// condition now sits ON THE TABLE — both cards in one hand — and only the PAYOFF is deferred.
-// That keeps the rogue a sequence class while making it legible.
+// ⚠️ TWO DESIGNS WERE THROWN AWAY BEFORE THIS ONE AND BOTH FAILURES ARE WORTH KEEPING:
+//   v1 THE CHAIN — your Strike had to follow the card you struck with LAST turn. A pair is only
+//      four physical cards and the Strike is spent every turn, so the chain consumed the thing that
+//      sustained it. Measured average length 1.35: off seven turns in ten.
+//      🔑 A CROSS-TURN CONDITION IS A CROSS-TURN COST — you cannot see it or plan around it.
+//   v2 BUILDERS / FINISHERS — legible, but the turn was a mode switch rather than a decision, and
+//      Thomas simply did not enjoy it. 🔑 A MECHANIC CAN BE PERFECTLY CLEAR AND STILL BE FLAT.
 //
-// THE MODEL IS WoW'S, NOT HEARTHSTONE'S: builders accumulate, a finisher spends and scales.
-// ⚠️ WoW's own known flaw is that the answer is always "build to 5" — a solved loop. Two things
-// break it here:
-//   • A finisher lands as many HITS as the Momentum it spends. 🛡️ Armour is paid per hit, so a
-//     5-point finisher into armour is the worst turn available; 🧱 Guard swallows hits whole, so it
-//     demands a big one. **The right number is set by what you are looking at, never by a full meter.**
-//   • Momentum DECAYS, so 5 is rarely even reachable.
+// WHAT SURVIVED BOTH: the eight names, the four pairs, 🧱 GUARD, hits-divide-and-Armour-is-paid-
+// per-hit, and the class seam. Everything else here is new.
 //
-// 🔑 AND THE DECAY IS THE WHOLE MINIGAME (Thomas: *"i want like a minigame of trying to keep up
-// the momentum tokens from round to round"*). Free accumulation is a savings account and a savings
-// account is not a decision — the same reason the 🔥 Emberwake token expires after one turn.
-//   builder alone ............ +1, decay −1  →  tread water
-//   builder + its PAIR in ② .. +2, decay −1  →  climb
-//   ...and FEED a card to ③ .. +3, decay −1  →  climb fast, and you are a card down
-//   bad hand .................  0, decay −1  →  slide
-// Treading water is free. Climbing costs something. Standing still is not on the menu.
+// THE TURN ASKS FOUR THINGS, and every one of them is answered by a number printed on a card:
+//   ① STRIKE   costs ⚡. Paid in full it deals its ✦ damage; short, it deals its plain ⚔️.
+//   ② COMBO    your Initiative — and its PAIR cuts the cost by 1 AND earns +1 ● Momentum.
+//   ③ ENERGY   burn a card to pay; it provides its own ⚡.
+//   ④ ARSENAL  the card you keep. Identical in every class, as always.
+//
+// 🔑 SLOT ② IS THE SQUEEZE, AND IT IS THE MAGE'S TENSION REACHED BY ANOTHER ROAD: the card you
+// want there for the PAIR is competing with the card you want there for SPEED. The mage's Catalyst
+// has exactly that problem via elements; the rogue's has it via names, and the pair pays twice.
+//
+// ⚠️ THE CARD'S SECOND NUMBER IS BACK, WITH A ROGUE MEANING. ✦ was the mage's attuned value and
+// this class cannot attune — but the COLUMN is reused rather than deleted, which is the right way
+// round: a rogue card carries five numbers, exactly the density of a mage card, and nothing on it
+// belongs to a mechanic it does not have.
 // ============================================================
 const MOMENTUM_CAP = 5;
-const MOMENTUM_DMG = 3;          // damage a finisher gains per point it spends
 const MOMENTUM_DECAY = 1;
+const MOMENTUM_INIT = 2;         // 💨 per point spent
+const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it never answers
 
-// 🔑 THREE STATS AND ONE WORD. No attuned value — that was the mage's, and a card carrying a
-// number its own class can never read is how `enhEl` became dead data sitting in 68 rows.
-// Row shape is the engine's: [value, (unused), init, (unused), armor, (unused), costToNext].
+// 🔑 ⚡ IS ONE NUMBER DOING TWO JOBS: what a card COSTS as your Strike, and what it PAYS when
+// burned for energy. That is the whole resource tension in a single column — your best cards are
+// also your best fuel, so a big turn is bought with something you wanted to play.
 const ROGUE_SPEC = [
-  // pair          name               type        pairs with          spike    base [val, init, armor]
-  { pair: 'RUSH',    name: 'Viper Strike',    type: 'builder',  combo: 'Second Fang',     spike: 'init',  base: [7, 7, 1] },
-  { pair: 'RUSH',    name: 'Second Fang',     type: 'finisher', combo: 'Viper Strike',    spike: 'init',  base: [6, 5, 1] },
-  { pair: 'OPENING', name: 'Venom Needle',    type: 'builder',  combo: 'Lethal Dose',     spike: 'value', base: [9, 4, 2] },
-  { pair: 'OPENING', name: 'Lethal Dose',     type: 'finisher', combo: 'Venom Needle',    spike: 'value', base: [8, 2, 1] },
-  { pair: 'HOLD',    name: 'Slow Poison',     type: 'builder',  combo: 'Sleight of Hand', spike: 'armor', base: [8, 3, 2] },
-  { pair: 'HOLD',    name: 'Sleight of Hand', type: 'builder',  combo: 'Slow Poison',     spike: 'init',  base: [6, 6, 1] },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   type: 'builder',  combo: 'Ghostblade',      spike: 'armor', base: [8, 3, 3] },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      type: 'finisher', combo: 'Shadow Double',   spike: 'value', base: [7, 3, 2] },
+  // pair          name               ⚡ pairs with          spike    base [val, init, armor]  ✦ paid bonus
+  { pair: 'RUSH',    name: 'Viper Strike',    energy: 1, combo: 'Second Fang',     spike: 'init',  base: [5, 7, 1], paid: 4 },
+  { pair: 'RUSH',    name: 'Second Fang',     energy: 2, combo: 'Viper Strike',    spike: 'init',  base: [6, 5, 1], paid: 5 },
+  { pair: 'OPENING', name: 'Venom Needle',    energy: 2, combo: 'Lethal Dose',     spike: 'value', base: [7, 4, 2], paid: 5 },
+  { pair: 'OPENING', name: 'Lethal Dose',     energy: 3, combo: 'Venom Needle',    spike: 'value', base: [8, 2, 1], paid: 7 },
+  { pair: 'HOLD',    name: 'Slow Poison',     energy: 2, combo: 'Sleight of Hand', spike: 'armor', base: [6, 3, 2], paid: 5 },
+  { pair: 'HOLD',    name: 'Sleight of Hand', energy: 1, combo: 'Slow Poison',     spike: 'init',  base: [5, 6, 1], paid: 4 },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   energy: 2, combo: 'Ghostblade',      spike: 'armor', base: [6, 3, 3], paid: 5 },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      energy: 3, combo: 'Shadow Double',   spike: 'value', base: [8, 3, 2], paid: 7 },
 ];
 const ROGUE_COST = [2, 3, 4, null];
-// generated from the spec, never hand-authored — the discipline the mage's tables were put back on
-// after 12 of 16 cards were found to have a flat attuned strike.
+// generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
+// can print `⚔️ 7 → ✦ 12` off the same row shape every other card in the game uses.
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
   const lv = [0, 1, 2, 3].map(L => {
     const st = s.base.map((v, i) => (i === idx[s.spike] ? v + 3 * L : (L === 0 ? v : Math.max(0, v - 1))));
-    return [st[0], null, st[1], null, st[2], null, ROGUE_COST[L]];
+    return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
   return { name: s.name, element: null, arch: null, pair: s.pair,
-           combo: s.combo, type: s.type, lv };
+           combo: s.combo, energy: s.energy, paid: s.paid, lv };
 });
 
-const isFinisher = c => !!(c && c.def.type === 'finisher');
-// ② THE COMBO SLOT PAIRS WITH THE STRIKE — the entire condition, visible on the table.
+// ② the pair sits in the COMBO slot — the whole condition, on the table, checkable at a glance.
 // 🗡️ Twin Blades lets the ARSENAL complete it instead, which is that slot's job for this class.
 function pairedNow() {
   const st = spellCard(); if (!st || !st.def.combo) return false;
@@ -873,45 +871,50 @@ function pairedNow() {
   if (hasCharm('twinblades')) seats.push(cardById(S.assign.Reserve));
   return seats.some(c => c && c.def.name === st.def.combo);
 }
-// ③ FEED — opt-in, and the price is the CARD: it is discarded for the region instead of sliding
-// back under the deck. ⚠️ Deliberately the same currency as the Spell being spent, so the cost
-// needs no new explanation — and it is what makes slot ③ a fork rather than a number.
-function canFeed() { return !!(CLASS.feeds && isAssignPhase() && cardById(S.assign.Boost)); }
-function toggleFeed() { if (!canFeed()) return; S.feedArmed = !S.feedArmed; render(); }
-function feedingNow() { return !!(CLASS.feeds && S.feedArmed && cardById(S.assign.Boost)); }
-
-// 🔑 ONE FUNCTION FOR THE WHOLE METER, so the line on screen and the damage in the reveal can
-// never disagree — the `computeAction` rule applied to a resource.
-function momentumMath() {
+// ⚠️ ONE FUNCTION FOR THE WHOLE TURN'S BOOKKEEPING, so the line on screen, the card face and the
+// damage in the reveal all read the same source — the `computeAction` rule, applied to a resource.
+function rogueMath() {
   const st = spellCard();
-  const fin = isFinisher(st);
-  const gain = (st && !fin ? 1 : 0) + (pairedNow() ? 1 : 0) + (feedingNow() ? 1 : 0);
+  if (!st) return null;
+  const paired = pairedNow();
+  const fuel = cardById(S.assign.Boost);
+  const cost = Math.max(0, (st.def.energy || 0) - (paired ? 1 : 0));
+  const paid = fuel ? (fuel.def.energy || 0) : 0;
+  const full = paid >= cost;
+  const gain = paired ? 1 : 0;
   const pool = Math.min(MOMENTUM_CAP, (S.momentum || 0) + gain);
-  const spent = fin ? pool : 0;
-  // decay does not apply on a finisher turn: it already emptied the meter.
-  // 🗡️ Second Nature holds a floor under the slide
-  const floor = hasCharm('secondnature') ? Math.min(2, pool) : 0;
-  const next = fin ? 0 : Math.max(floor, pool - MOMENTUM_DECAY);
-  return { fin, gain, pool, spent, next };
+  const spend = S.moTarget ? pool : 0;
+  const next = S.moTarget ? 0 : Math.max(0, pool - MOMENTUM_DECAY);
+  return { paired, cost, paid, full, fuel, gain, pool, spend, next, target: S.moTarget || null };
+}
+// ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
+// is "is this the turn to cash out", not "yes or no".
+function setMoTarget(t) {
+  if (!CLASS.momentum || !isAssignPhase()) return;
+  S.moTarget = (S.moTarget === t) ? null : t;
+  render();
 }
 
 const ROGUE = {
   id: 'rogue',
   mark: '🗡️',
   multi: null,
-  labels: { Spell: 'Strike', Element: 'Combo', Boost: 'Momentum', Reserve: 'Arsenal' },
+  labels: { Spell: 'Strike', Element: 'Combo', Boost: 'Energy', Reserve: 'Arsenal' },
   defs: ROGUE_DEFS,
   deck() { return shuffle(ROGUE_DEFS.concat(ROGUE_DEFS).map(newCard)); },   // 8 x 2
   emberwake: false,        // 🔥 that is the MAGE's slot ③
   pairs: false,            // ✦ no elements, so nothing ever attunes
-  feeds: true,             // 🗡️ slot ③: burn a card for a point of Momentum
+  boosts: false,           // ➕ no Surge stat either
+  energy: true,            // ⚡ the Strike costs, slot ③ pays
+  momentum: true,          // ● earned by pairing, spent on speed or cuts
   canPlace() { return true; },
   valid() { return !!spellCard(); },
-  // ⚠️ A FED CARD IS SPENT TOO, and this is the ONLY place that knows it — so the engine's
-  // cleanup discards it without ever having to learn what feeding is.
+  // ⚠️ THE FUEL CARD IS SPENT TOO, and this is the only place that knows it — so the engine's
+  // cleanup discards it without ever learning what energy is.
   spentIds() {
     const out = S.assign.Spell ? [S.assign.Spell] : [];
-    if (feedingNow() && S.assign.Boost) out.push(S.assign.Boost);
+    const m = rogueMath();
+    if (m && m.fuel && m.cost > 0) out.push(S.assign.Boost);
     return out;
   },
   compose() {
@@ -919,25 +922,29 @@ const ROGUE = {
     if (!strike) return null;
     const combo = cardById(S.assign.Element);
     const st = eff(strike);
-    const m = momentumMath();
-    // 🔑 A FINISHER'S DAMAGE AND ITS HIT COUNT BOTH COME FROM WHAT IT SPENT. That one join is
-    // what turns WoW's "scales with combo points" into this game's shape question.
-    // 🗡️ Lone Fang pays only from a COLD meter, so it fights every other rogue charm — the
-    // deliberate anti-synergy, the same job ✦ Cold Iron does for the mage.
+    const m = rogueMath();
+    // 🔑 PAID IN FULL BUYS THE BIG NUMBER. Short, you still swing — a card that cannot be played
+    // is the harshest thing a four-card hand can hold, so underpaying costs power, never the turn.
+    const dmg = (m.full ? st.attuned : st.value);
+    const spendInit = m.target === 'init' ? m.spend * MOMENTUM_INIT : 0;
+    // 🎯 hits are the 🧱 GUARD answer and the one thing the mage can never buy.
+    const hits = 1 + (m.target === 'hits' ? m.spend : 0);
     return {
-      value: Math.max(0, st.value + (m.fin ? MOMENTUM_DMG * m.spent : 0) + (duelFx().value || 0)
+      value: Math.max(0, dmg + (duelFx().value || 0)
         + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
       element: null,
-      init: combo ? eff(combo).init : 0,
+      init: (combo ? eff(combo).init : 0) + spendInit,
       boost: 0,
-      hits: m.fin ? Math.max(1, m.spent) : 1,
+      hits,
       attuned: false, attBonus: 0,
       banks: false, bank: 0, wake: 0, wakeTarget: null,
       vSpell: null, vElem: null,
       spell: strike, elem: combo, boostC: cardById(S.assign.Boost),
       attuner: null, loose: false,
-      rogue: { type: strike.def.type, pair: strike.def.pair, paired: pairedNow(),
-               fed: feedingNow(), gain: m.gain, spent: m.spent, next: m.next, fin: m.fin },
+      // 🌀 SLIP is stated as a REQUEST, not a verdict — computeAction owns the Initiative race, so
+      // it is the only place that knows the margin. The class only says "this class can slip".
+      rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired,
+               pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
     };
   },
 };
@@ -1910,7 +1917,7 @@ function loadGame() {
       candle: d.candle !== false,
       // 🗡️ absent on any save written before the rogue existed, which is correct — those are
       // mage runs and never read it. feedArmed is per-turn, so it is never restored.
-      momentum: d.momentum || 0, feedArmed: false,
+      momentum: d.momentum || 0, moTarget: null,   // the target is per-turn, never restored
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -2285,7 +2292,7 @@ function freshGame(stage) {
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ It DECAYS every turn (see momentumMath) — that is the minigame, not an accounting detail.
-    momentum: 0, feedArmed: false,
+    momentum: 0, moTarget: null,     // ● the pool, and where this turn spends it (null = hold)
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
@@ -2881,7 +2888,7 @@ function nextTurn() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
-  S.feedArmed = false;   // 🗡️ feeding is chosen per TURN, like the mage's bank
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -3133,6 +3140,13 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
+    // 🌀 SLIPPED (rogue) — beat its Initiative by SLIP_MARGIN and it never answers at all, even
+    // on a Narrow. 🔑 THIS IS WHY THE ROGUE'S METER IS NOT THE MAGE'S: winning the race is BINARY and
+    // stops paying the moment you win it (measured twice — the old Attack-or-Initiative fork read
+    // 13%, then 4% after doubling). A margin that buys you out of the COUNTER never plateaus,
+    // because every Narrow you would have bled on is a card you do not blunt — and in a game where
+    // the deck IS the health bar, that is real value with no ceiling.
+    const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
     const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rAb !== 'pierce') ? (e.shapeV || 0) : 0;
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
@@ -3184,7 +3198,8 @@ function computeAction(reserve) {
     // the only encounter in the game where a bigger blow is worse than a sufficient one.
     const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk
+    // 🌀 a slipped rogue is gone before it can swing back
+    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow' && !slipped) ? e.atk
       : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
@@ -3193,7 +3208,7 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { ...classPayload, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -3421,6 +3436,7 @@ function finishResolve() {
   // 🗡️ Ghostblade reading the resolved turn rather than recomputing from the arrangement.
   if (r.rogue) {
     S.momentum = r.rogue.next;
+    S.moTarget = null;
     // 🗡️ Dead Hand — read here rather than in compose() because THIS turn's outcome does not
     // exist until now. Same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
     if (hasCharm('deadhand') && r.outcome === 'Complete') S.momentum = Math.min(MOMENTUM_CAP, S.momentum + 1);
@@ -4783,12 +4799,12 @@ function pips(n, cap) {
 // the chip in the status bar: always visible, so the meter is a THING you have rather than a fact
 // you are told. Sits beside 🏃 the Standing for the same reason — both are run-level state.
 function momentumText() {
-  if (!CLASS.feeds || !S || S.momentum === undefined) return '';
-  const m = isAssignPhase() ? momentumMath() : null;
+  if (!CLASS.momentum || !S || S.momentum === undefined) return '';
+  const m = isAssignPhase() ? rogueMath() : null;
   const now = S.momentum || 0;
   let tail = '';
   if (m) {
-    if (m.fin) tail = ` <span class="mo-spend">→ spending all ${m.spent}</span>`;
+    if (m.target) tail = ` <span class="mo-spend">→ all ${m.spend} into ${m.target === 'init' ? '💨' : '🎯'}</span>`;
     else if (m.next > now) tail = ` <span class="good">→ ${m.next}</span>`;
     else if (m.next < now) tail = ` <span class="bad">→ ${m.next} (slipping)</span>`;
     else tail = ` <span class="dim">→ ${m.next} (holding)</span>`;
@@ -5325,27 +5341,28 @@ function zoneHint(zone) {
 // only thing this class's turn is about — and the arithmetic is stated, never implied.
 function rogueZoneHint(zone, isFight) {
   const st = spellCard();
-  const m = momentumMath();
+  const m = rogueMath();
   switch (zone) {
     case 'Spell': {
       if (!st) return isFight ? 'your Attack' : 'your Move';
-      if (st.def.type === 'finisher')
-        return m.spent
-          ? `FINISHER — spends all <b>${m.spent} ${PIP_ON}</b> to strike <b>${m.spent} times</b> for <b>+${MOMENTUM_DMG * m.spent}</b>`
-          : `FINISHER — you have <b>no ${PIP_ON}</b> to spend, so this is one ordinary hit`;
-      return `BUILDER — earns <b>+1 ${PIP_ON}</b> · spent, gone for the region`;
+      const e = eff(st);
+      return m.full
+        ? `PAID — strikes for its full <b>✦ ${e.attuned}</b> · spent, gone for the region`
+        : `costs <b>⚡ ${m.cost}</b>, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
     }
     case 'Element': {
-      if (!st) return 'Initiative — returns to your deck';
-      const here = cardById(S.assign.Element);
-      if (pairedNow()) return `PAIRED with your Strike — <b>+1 ${PIP_ON}</b> · and your Initiative`;
-      return `your Initiative — put <b>${st.def.combo}</b> here for <b>+1 ${PIP_ON}</b>`;
+      if (!st) return 'your Initiative — returns to your deck';
+      if (m.paired) return `PAIRED — cost −1 and <b>+1 ●</b> · and your Initiative`;
+      return `your Initiative — <b>${st.def.combo}</b> here cuts the cost and earns <b>+1 ●</b>`;
     }
     case 'Boost': {
-      const sc = cardById(S.assign.Boost);
-      if (!sc) return `put a card here to burn for <b>+1 ${PIP_ON}</b>`;
-      if (S.feedArmed) return `BURNING — <b>+1 ${PIP_ON}</b>, and this card is <b>gone for the region</b>`;
-      return `burn it for <b>+1 ${PIP_ON}</b>, or leave it and it returns to your deck`;
+      const fuel = cardById(S.assign.Boost);
+      if (!st) return 'burn a card here to pay for your Strike';
+      if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
+      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — burn a card here`;
+      return m.full
+        ? `BURNED for <b>⚡ ${m.paid}</b> — pays the <b>${m.cost}</b>, and this card is gone`
+        : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough, and this card is still gone`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
@@ -5365,24 +5382,20 @@ function rogueZoneHint(zone, isFight) {
 // 🔑 It reads off momentumMath(), the same function the damage does, so the number you are shown
 // and the number you get cannot drift.
 function momentumRowHTML() {
-  if (!CLASS.feeds || !isAssignPhase()) return '';
-  const m = momentumMath();
-  const st = spellCard();
-  const sc = cardById(S.assign.Boost);
-  // 🔑 LEAD WITH THE VERB, not the number. The meter itself lives in the status bar now, so this
-  // row's only job is to say what THIS turn does to it and offer the one button.
-  const head = !st ? `🗡️ Put a card under <b>STRIKE</b>.`
-    : m.fin
-      ? (m.spent
-          ? `🗡️ <b>Finishing</b> — spending all <b>${m.spent} ${PIP_ON}</b> for <b>${m.spent} hits</b>`
-          : `🗡️ <b>Finishing with nothing</b> — no ${PIP_ON} banked, so this is one ordinary hit`)
-      : `🗡️ <b>Building</b> — ${S.momentum || 0} ${PIP_ON} ${m.gain ? `+ ${m.gain}` : ''} − 1 (slip) = <b>${m.next} ${PIP_ON}</b> next turn`;
-  const why = [];
-  if (!m.fin && st && st.def.combo) why.push(pairedNow() ? `✓ paired` : `pair with ${st.def.combo}`);
+  if (!CLASS.momentum || !isAssignPhase()) return '';
+  const m = rogueMath();
+  if (!m) return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
+  // 🔑 THE BUTTONS SAY WHAT THEY BUY, not what they are called. "💨 +6 Initiative" is a decision;
+  // "spend on initiative" is a menu.
+  const btn = (t, label) => `<button class="wake-btn${m.target === t ? ' on' : ''}" onclick="setMoTarget('${t}')">${label}</button>`;
+  const head = m.target
+    ? `🗡️ Spending all <b>${m.spend} ●</b>`
+    : `🗡️ <b>${S.momentum || 0} ●</b>${m.gain ? ` +${m.gain}` : ''} − 1 (slip) = <b>${m.next} ●</b> next turn`;
   return `<div class="wake-row bank-row"><span class="wake-lab">${head}</span> ` +
-    (sc && !m.fin ? `<button class="wake-btn${S.feedArmed ? ' on' : ''}" onclick="toggleFeed()">` +
-      (S.feedArmed ? `burning ${displayName(sc)}` : `burn a card +1 ${PIP_ON}`) + `</button> ` : '') +
-    `<span class="wake-note">${why.join(' · ')}</span></div>`;
+    (m.pool > 0
+      ? btn('init', `💨 +${m.pool * MOMENTUM_INIT} Initiative`) + ' ' + btn('hits', `🎯 ${1 + m.pool} hits`)
+      : `<span class="wake-note">pair up to earn ●</span>`) + ' ' +
+    `<span class="wake-note">${m.target ? 'tap again to hold it instead' : (m.pool > 0 ? 'or hold, and lose 1 to the slip' : '')}</span></div>`;
 }
 
 function bankRowHTML() {
@@ -5399,7 +5412,13 @@ function bankRowHTML() {
 }
 
 // a one-word mark of the card's fate, shown on the card itself during the action phase
-function fateOf(zone) {
+// ⚠️ ASK THE CLASS WHAT IT IS ABOUT TO EAT (2026-08-17). This read the ZONE alone, so a rogue's
+// ⚡ Energy card — which is burned to pay for the Strike — sat there promising "↻ returns" right
+// up until it was destroyed. 🔑 Never state a rule about an object without marking the object,
+// and never let the object state the WRONG rule about itself.
+function fateOf(zone, id) {
+  if (id != null && CLASS.spentIds && CLASS.spentIds().includes(id) && zone !== 'Spell')
+    return { cls: 'fate-spent', text: '🔥 burned' };
   if (zone === 'Spell') return { cls: 'fate-spent', text: '⊘ spent' };
   if (zone === 'Reserve') return { cls: 'fate-kept', text: '✋ kept' };
   if (zone) return { cls: 'fate-return', text: '↻ returns' };
@@ -5559,6 +5578,11 @@ function cardHTML(card) {
     }
   }
 
+  // 🗡️ is THIS card's ✦ live right now? Only meaningful while it is the Strike.
+  const paidLive = !CLASS.pairs && zoneOf(card.id) === 'Spell' && (() => { const m = rogueMath(); return !!(m && m.full); })();
+  // ⚠️ DECLARED ABOVE ITS USE, DELIBERATELY. It was below, and `vals` reads it — a temporal dead
+  // zone that threw on every card render. Exactly the POTION_CAP bug: a `const` used earlier in the
+  // file than it is declared is not a warning, it is a blank screen.
   // Attack/Move centerpiece: always two rows, consistent across all cards.
   // Each stat is TAGGED so CSS can quiet whatever this encounter/slot doesn't use — the
   // numbers never leave (legible math), they just stop shouting all at once.
@@ -5573,15 +5597,13 @@ function cardHTML(card) {
   const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
     (CLASS.pairs
       ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
-      : (d.type ? `<span class="v-type v-type-${d.type}">${d.type === 'finisher'
-            ? `spends all ${PIP_ON}`
-            : `+1 ${PIP_ON}`}</span>` : '')) +
+      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">✦${v.attuned}</span>` : '')) +
     `</div>`;
 
   const slot = zoneOf(card.id);
   const verb = verbOf(card);
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
-  const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
+  const fate = (isAssignPhase() && slot) ? fateOf(slot, card.id) : null;
   // ⚖️🐌 name the barred card outright — "your heaviest" is not something you can read off a row
   const barred = isAssignPhase() && S.hardship
     ? (placementBan(card.id, 'Spell') ? '⚖️ too heavy for the SPELL'
@@ -5606,7 +5628,7 @@ function cardHTML(card) {
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}</div>`
-                 : `<div class="el-identity pair-identity">🗡️ pairs with <b>${d.combo || '—'}</b></div>`) +
+                 : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b> · pairs with <b>${d.combo || '—'}</b></div>`) +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
     // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
     // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
@@ -5675,7 +5697,7 @@ function startLastMile() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
-  S.feedArmed = false;   // 🗡️ feeding is chosen per TURN, like the mage's bank
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -5819,7 +5841,7 @@ function startDuelBeat() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
-  S.feedArmed = false;   // 🗡️ feeding is chosen per TURN, like the mage's bank
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
