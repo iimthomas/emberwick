@@ -3058,7 +3058,16 @@ function computeAction(reserve) {
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
     const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) && rAb !== 'unhalved' &&
                    foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
-    let value = Math.max(0, withBoost - armorCut);
+    // 🗡️ MULTI-HIT — and the rule is that hits do NOT add damage, they DIVIDE it, with 🛡️ Armour
+    // paid on EVERY one. That is the entire reason a long chain is a liability against Armour and
+    // (once 🧱 GUARD exists) an asset against a breakable pool.
+    // ⚠️ `hits` WAS INERT UNTIL 2026-08-12 — computed by the class, passed through computeAction,
+    // printed in the reveal, and never once touching a number. The rogue's central mechanic was
+    // decoration, which is why teaching the bot to chain moved the win rate by zero.
+    // 🔑 A FIELD THE ENGINE CARRIES BUT NEVER READS IS NOT A MECHANIC, IT IS A COMMENT.
+    // Mage behaviour is byte-identical: hits === 1 takes the original path.
+    const perHit = hits > 1 ? Math.floor(withBoost / hits) : withBoost;
+    let value = hits > 1 ? hits * Math.max(0, perHit - armorCut) : Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;

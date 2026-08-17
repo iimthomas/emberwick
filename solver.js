@@ -1,4 +1,32 @@
 'use strict';
+
+/* 🗡️ THE CHAIN WEIGHT — SHARED BY BOTH SCORERS, AND THAT IS THE POINT.
+   ------------------------------------------------------------------------------------------------
+   ⚠️ THIS FILE CONTAINS TWO INDEPENDENT SCORERS: the analyser's `fightScore`/`journeyScore`, and
+   RUNSIM's own `scoreOf`. Putting a scoring term in one of them is how the last THREE bugs in this
+   instrument happened — the bot ignoring placement bans (patched twice, because `chooseBest` holds
+   a second copy of the arrangement search), and the bot aiming at a cut Emberwake target from a
+   stale local enum. The note left after the second said: *if a third is ever needed, EXTRACT IT.*
+   This is the third. So it lives up here, once, above both.
+
+   WHY IT EXISTS: the bot scores ONE encounter. The rogue's entire source of power pays off NEXT
+   turn — the chain sets both hits and Initiative — so a one-encounter scorer values every chain at
+   zero and plays the rogue as a worse mage. Before this, it continued a chain on 17% of turns, by
+   pure accident, which makes every rogue number taken that way noise.
+
+   🔑 IT IS A POLICY, NOT A FACT. A bot policy can invert what you measure (the stir-band sweep read
+   backwards for exactly this reason), so: one named constant, sitting BELOW outcome and damage in
+   the lexicographic order — a chain is never worth losing an encounter for — and any number
+   produced with it must be reported alongside the same number at CHAIN_WEIGHT = 0.
+   ============================================================================================== */
+let CHAIN_WEIGHT = 1;
+function setChainWeight(w) { CHAIN_WEIGHT = w; }
+// what the arrangement LEAVES BEHIND: a live link is worth more the deeper it already is.
+function chainValue(r) {
+  if (!CHAIN_WEIGHT || !r || !r.rogue) return 0;
+  return CHAIN_WEIGHT * (r.rogue.linked ? r.rogue.chain : 0);
+}
+
 /* ============================================================
    EMBERWICK solver bot — a TUNING INSTRUMENT, not a game feature.
    Runs in the same global scope as game.js, so it scores plays through
@@ -14,32 +42,51 @@
    ============================================================ */
 
 const SOLVER = (() => {
-  const NDEF = CARD_DEFS.length;               // 17
+  // ⚠️ THE CLASS'S OWN TABLE, not CARD_DEFS. This only feeds the per-hand analyser (RUNSIM deals
+  // real decks), but a second stale copy of "what a card is" is exactly the bug that let the bot
+  // ignore placement bans and keep aiming at a cut Emberwake target. One source, always.
+  const DEFS = () => CLASS.defs || CARD_DEFS;
+  const NDEF = () => DEFS().length;
   const OUTCOME_RANK = { Complete: 2, Narrow: 1, Loss: 0 };
 
   // ---- build a hand of distinct card defs at a given level ----
   function mkCard(defIndex, level) {
-    const c = newCard(CARD_DEFS[defIndex]);
+    const c = newCard(DEFS()[defIndex]);
     c.level = Math.min(level, MAX_LEVEL);
     return c;
   }
   function randomHand(level) {
     const idx = [];
     while (idx.length < HAND_SIZE) {
-      const r = Math.floor(Math.random() * NDEF);
+      const r = Math.floor(Math.random() * NDEF());
       if (!idx.includes(r)) idx.push(r);
     }
     return idx.map(i => mkCard(i, level));
   }
 
-  // ---- score a computeAction result: [outcomeRank, -damage, -loseReserve, value] ----
+  // 🗡️ TEACHING THE BOT TO VALUE A CHAIN (2026-08-12) — and this is a POLICY, not a fact.
+  //
+  // ⚠️ THE PROBLEM IT SOLVES IS FATAL WITHOUT IT. This bot scores ONE encounter. The rogue's whole
+  // source of power pays off NEXT turn (the chain sets hits and Initiative), so a one-encounter
+  // scorer values every chain at exactly zero and plays the rogue as a worse mage. Measured before
+  // this existed: it continued a chain on 17% of turns, entirely by accident. Every rogue number
+  // taken that way is noise, which is why this had to come before any tuning.
+  //
+  // 🔑 BUT A BOT POLICY CAN INVERT WHAT YOU MEASURE (the 2026-08-05 stir-band lesson: a sweep read
+  // backwards purely because of how the bot picked). So the weight is ONE named constant, it sits
+  // BELOW outcome and damage in the lexicographic order — a chain is never worth losing an
+  // encounter for — and every number produced with it must be reported alongside CHAIN_WEIGHT = 0.
+  // (CHAIN_WEIGHT and chainValue live at the TOP of this file — see the note there. There are two
+  // scorers in here and putting it in one of them is how the last three of these bugs happened.)
+
+  // ---- score a computeAction result: [outcomeRank, -damage, -loseReserve, chain, value] ----
   function fightScore(r) {
     const dmg = (r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + (r.stormDmg || 0);
-    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, r.value];
+    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, chainValue(r), r.value];
   }
   function journeyScore(r) {
     const pen = (r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0);
-    return [OUTCOME_RANK[r.outcome], -pen, r.nightCaught ? -1 : 0, r.value];
+    return [OUTCOME_RANK[r.outcome], -pen, r.nightCaught ? -1 : 0, chainValue(r), r.value];
   }
   function better(a, b) { // is score a strictly better than b?
     for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; }
@@ -275,9 +322,10 @@ function SOLVER_pct(n, d) { return d ? Math.round(n / d * 100) : 0; }
 // ============================================================
 const RUNSIM = (() => {
   const OUT = { Complete: 2, Narrow: 1, Loss: 0 };
+  // 🗡️ chainValue() is shared with the analyser's scorer — see the note at the top of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), r.value]
-    : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0)), r.value];
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value]
+    : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0)), chainValue(r), r.value];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
@@ -574,7 +622,7 @@ const RUNSIM = (() => {
     finally { window.render = _r; window.saveGame = _s; try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
-  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better };
+  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setChainWeight };
 })();
 
 function runSimulator() {
