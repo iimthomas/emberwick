@@ -369,7 +369,7 @@ const RUNSIM = (() => {
     return best ? best.sc : [-1, 0, 0];
   }
 
-  function chooseBest() {
+  function chooseBestOnce() {
     // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
     // blind spot it has about the Spell being spent. Banking rates from RUNSIM are therefore
@@ -421,6 +421,34 @@ const RUNSIM = (() => {
       }
     }
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; }
+    return best ? best.sc : null;
+  }
+
+  // 🗡️ THE ROGUE'S MOMENTUM POLICY (2026-08-17).
+  //
+  // ⚠️ WITHOUT THIS THE METER IS INERT AND EVERY ROGUE NUMBER IS A LIE. setMoTarget() is a UI
+  // call, so chooseBest never made it: measured over 70 runs the bot HELD momentum on 100% of turns
+  // and spent 💨 0% / 🎯 0%. That is the THIRD time this instrument has produced a confident
+  // number about something it structurally could not do — after the Emberwake bank and the
+  // placement bans. 🔑 BEFORE QUOTING HOW OFTEN THE BOT DOES A THING, CHECK THAT IT CAN.
+  //
+  // ⚠️ It wraps chooseBestOnce, NOT pickArrangement — those are two different searches and the
+  // first draft of this wrapped the one autoRun never calls. The whole search runs once per target,
+  // because the target changes Initiative and therefore changes which arrangement is best at all;
+  // scoring targets against a fixed arrangement would quietly under-rate 💨.
+  //
+  // ⚠️ STILL A POLICY. The bot spends greedily for THIS encounter and can never price holding a
+  // pool for a better one, exactly as it cannot price the Emberwake bank. Hold rates from RUNSIM
+  // are meaningless; only a human can judge when to save.
+  function chooseBest() {
+    if (!CLASS.momentum) { chooseBestOnce(); return; }
+    let best = null;
+    for (const t of [null, 'init', 'hits']) {
+      S.moTarget = t;
+      const sc = chooseBestOnce();
+      if (sc && (!best || better(sc, best.sc))) best = { sc, t, assign: { ...S.assign }, bt: S.boostTarget };
+    }
+    if (best) { S.moTarget = best.t; S.assign = best.assign; S.boostTarget = best.bt; }
   }
 
   // ---- duel play evaluation: computeAction gives the raw strike (dragon armor []),

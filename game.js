@@ -243,7 +243,7 @@ const REGIONS = [
   // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 1,     xp: 6 },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6 },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
@@ -253,7 +253,7 @@ const REGIONS = [
   ]},
   // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
   { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 2,    xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 2,    xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6 },
@@ -304,7 +304,7 @@ const ROAD_STORMREACH = [
   { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
     { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
     { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
@@ -327,7 +327,7 @@ const ROAD_STORMREACH = [
   { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
     { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
     { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
@@ -359,7 +359,7 @@ const ROAD_FELLGRIND = [
   ]},
   { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 2, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
     { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
@@ -378,7 +378,7 @@ const ROAD_FELLGRIND = [
     { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
   ]},
   { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
-    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
     { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
@@ -403,7 +403,7 @@ const ROAD_FATHOM = [
     { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
     { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
@@ -422,7 +422,7 @@ const ROAD_FATHOM = [
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
     { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7 },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 3, xp: 7 },
     { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
