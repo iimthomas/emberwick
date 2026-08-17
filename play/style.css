@@ -12,11 +12,17 @@ body {
 }
 
 header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
-#newrun-btn {
+#report-btn, #newrun-btn, #menu-btn {
   margin: 0; padding: 5px 11px; font-size: 12px; align-self: center;
   background: #262b34; border: 1px solid #4a4a4a; color: #b9b4a5;
 }
-#newrun-btn:hover { background: #3a4150; color: #e6e2d8; }
+#report-btn:hover, #newrun-btn:hover, #menu-btn:hover { background: #3a4150; color: #e6e2d8; }
+#report-btn { margin-left: auto; }      /* the group sits together at the right */
+#turn-indicator + #report-btn { margin-left: 0; }
+/* 🏠 nothing to leave and nothing to restart when you are already on the shell */
+body.shell #newrun-btn, body.shell #menu-btn { display: none; }
+/* 📋 the report stays reachable EVERYWHERE — a bug you cannot report from is the
+   one that never gets fixed, and the menu is where a crashed run lands you. */
 h1 { font-size: 22px; letter-spacing: 3px; font-weight: 600; color: #e9c26a; text-shadow: 0 0 14px rgba(233,178,74,0.25); }
 h1 .mark { filter: drop-shadow(0 0 6px rgba(255,180,74,0.6)); }
 h1 .sub { font-size: 12px; color: #8a8577; letter-spacing: 0; font-weight: normal; }
@@ -330,7 +336,18 @@ label.radio { margin-right: 14px; cursor: pointer; }
    plane. Anchoring both to bottom:0 made them look like they stood on the same line. */
 /* the mage is WIDER and SHORTER than the first pass — that hat is enormous, and cropping at the
    waist (as in the Maya mock) frees the whole top-left of the frame for the fight panel. */
-.mage { position: absolute; left: 1%; bottom: -2%; width: 30%; height: 64%; fill: #070605; z-index: 2; }
+/* 🎭 width is the binding constraint on her size (a 2:3 plate in this box fits by width),
+   so 30% -> 34% is what actually makes her read as "large in the near foreground". */
+/* 🎭 She stands on the VISIBLE floor, not the scene's own bottom edge - `--stage-floor` is
+   the height of the UI covering the scene, and `--mage-drop` is how far below it she sits so the
+   cards cross her at the waist. Both are measured per render by stageFloor(), because neither
+   can be a percentage: `bottom: N%` resolves against HEIGHT, while her drawn size tracks the
+   scene's WIDTH. */
+.mage {
+  position: absolute; left: 1%; width: 38%; height: 96%;
+  bottom: calc(var(--stage-floor, 0px) - var(--mage-drop, 34px));
+  fill: #070605; z-index: 2;
+}
 .foe { position: absolute; z-index: 1; }
 /* the foe fills the top-right properly now — it was reading as a distant detail rather than the
    thing you are fighting. Depth still comes from it sitting HIGHER, not from it being small. */
@@ -562,7 +579,8 @@ body.shell #scene { display: none; }
 .grade-badge { float: right; min-width: 34px; text-align: center; margin-left: 8px;
   padding: 1px 7px; border-radius: 7px; font-size: 13px; font-weight: bold;
   background: #1c1810; border: 1px solid #4a4436; color: #cfc9ba; }
-.grade-badge.none { color: #55514a; border-style: dashed; font-weight: normal; }
+/* `.grade-badge.none` deleted 2026-08-12 with the placeholder it styled — an ungraded stage now
+   draws no badge at all. A cut display goes in the same commit as the thing it displayed. */
 .grade-badge .gb-score { display: block; font-size: 9.5px; font-weight: normal; opacity: .7; }
 .grade-badge.g-S { border-color: #e8c67a; color: #ffe6a3; box-shadow: 0 0 12px rgba(232,198,122,.28); }
 .grade-badge.g-A { border-color: #8fcf9a; color: #b6e6bd; }
@@ -706,6 +724,10 @@ button.stage.locked .stage-shape { font-style: italic; }
 .wake-btn { padding: 3px 9px; font-size: 12.5px; border-radius: 999px; }
 .wake-btn.on { background: rgba(232,145,60,.32); border-color: #e8913c; color: #ffe6b0; }
 
+/* 🔥 ARM THE BANK — same row treatment as the aim, so arming and aiming read as one mechanic.
+   Dimmer border while unarmed: it is an option every turn, not an alert. */
+.bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
+
 
 /* ❌ the Prism's styles were deleted with the rule, 2026-08-05 — a cut rule loses its display in
    the same change, or a later session finds selectors for a mechanic that no longer exists. */
@@ -817,14 +839,31 @@ button.stage.locked .stage-shape { font-style: italic; }
 .lesson-row button { flex: none; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
 .lesson-btns { display: flex; gap: 5px; flex: none; }
 
-/* 🎓 the pointer — a ring around whatever the lesson is describing. Show, don't tell. */
-.lesson-point { position: relative; z-index: 4;
-  outline: 2px solid rgba(127,200,230,.9); outline-offset: 3px; border-radius: 8px;
-  animation: lesson-pulse 1.6s ease-in-out infinite; }
+/* 🎓 the pointer — a ring around whatever the lesson is describing. Show, don't tell.
+   ⚠️ LOUDER 2026-08-12: the old version was a 2px outline and a pulse that faded to nothing, which
+   on a phone, on a dark busy UI, read as "some element has focus" rather than "LOOK HERE". Now a
+   heavy ring, a solid halo, and a pulse that stays visible at both ends of its cycle. */
+.lesson-point { position: relative; z-index: 6;
+  outline: 3px solid #8fd6f5; outline-offset: 4px; border-radius: 9px;
+  animation: lesson-pulse 1.5s ease-in-out infinite; }
 @keyframes lesson-pulse {
-  0%,100% { box-shadow: 0 0 0 0 rgba(127,200,230,.45); }
-  50%     { box-shadow: 0 0 0 7px rgba(127,200,230,0); } }
-@media (prefers-reduced-motion: reduce) { .lesson-point { animation: none; } }
+  0%,100% { box-shadow: 0 0 0 3px rgba(143,214,245,.30), 0 0 16px 3px rgba(143,214,245,.35); }
+  50%     { box-shadow: 0 0 0 10px rgba(143,214,245,.10), 0 0 26px 8px rgba(143,214,245,.60); } }
+
+/* The one-shot "look here" flash, replayed only when the TARGET changes (see pointAtLesson).
+   ⚠️ NO `transform: scale()` HERE, deliberately. Several lessons point at whole panels
+   (#slots-panel, #controls-panel, #status-bar); scaling one of those overflows the stage and
+   would reintroduce the horizontal scroll the layout works hard to avoid. A colour flash is
+   just as loud and cannot change anyone's size. */
+.lesson-point-in { animation: lesson-pulse 1.5s ease-in-out infinite, lesson-flash .5s ease-out 2; }
+@keyframes lesson-flash {
+  0%   { outline-color: #ffffff; outline-width: 4px; }
+  100% { outline-color: #8fd6f5; outline-width: 3px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* keep the RING — it is the information. Only the movement goes. */
+  .lesson-point, .lesson-point-in { animation: none;
+    box-shadow: 0 0 0 4px rgba(143,214,245,.28), 0 0 20px 5px rgba(143,214,245,.45); } }
 
 
 /* 📖 the opening brief — paged, and you go through all of it before the first card is dealt */
@@ -864,6 +903,77 @@ button.stage.locked .stage-shape { font-style: italic; }
 .menu-stamp { margin-top: 16px; text-align: center; font-size: .72rem; letter-spacing: .07em;
   text-transform: uppercase; color: #6b6152; }
 .menu-stamp b { color: #c9a227; }
+
+/* 📋 the fallback box, for when the clipboard says no */
+#report-box { position: fixed; inset: 0; z-index: 90; background: rgba(10,10,12,.82);
+  display: flex; align-items: center; justify-content: center; padding: 20px; }
+#report-box .rb-inner { background: #1f232b; border: 1px solid #4a4a4a; border-radius: 8px;
+  padding: 16px; width: min(560px, 100%); display: flex; flex-direction: column; gap: 10px; }
+#report-box p { margin: 0; color: #b9b4a5; font-size: .86rem; }
+#report-box textarea { width: 100%; height: 42vh; background: #14171c; color: #d8d3c6;
+  border: 1px solid #3a3f48; border-radius: 5px; padding: 8px; font: 12px/1.45 ui-monospace, monospace;
+  resize: vertical; }
+
+/* 📖 the tutorial's handoff to stage 1 */
+.handoff { background: #1d2129; border: 1px solid #3a3f48; border-left: 3px solid #c9a227;
+  border-radius: 6px; padding: 12px 14px; margin: 10px 0; }
+.handoff p { margin: 0 0 8px; line-height: 1.5; }
+.handoff p:last-child { margin-bottom: 0; }
+
+/* 🖼️ FOE ART. The picture sits over the placeholder silhouette and only shows once it has
+   actually loaded (`.has-art`), so an undrawn creature simply keeps its silhouette. */
+.foe-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; opacity: 0; transition: opacity .5s ease;
+  /* 🗝️ THE MASK IS GONE — the PNG carries real alpha now (art/keyalpha.ps1), so there is no
+     rectangle to hide. The feather was a workaround for a plate that still had its background;
+     keeping it would now eat the creature's own silhouette at the edges of the frame. */
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .55));
+}
+.foe.has-art .foe-img { opacity: 1; }
+.foe.has-art > svg { opacity: 0; }   /* the silhouette steps aside, but stays for the anim hooks */
+
+/* 🗺️ THE PLACE. Sits behind every other scene layer, dimmed hard because the UI reads
+   directly on top of it. `cover` because the scene's aspect ratio changes with the window and a
+   backdrop must never letterbox. */
+/* ⚠️ NO load-gated fade here, unlike the foe and the mage. Those start at opacity 0 and are
+   revealed by a class their onload adds; on the backdrop that combination computed 0 forever
+   even though an identical probe element in the same parent computed correctly. It was also
+   pointless: `onerror` already removes a missing file, so there is nothing to hide while
+   waiting. One declaration, no state, no failure mode. */
+.place-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  /* 🔑 DIM IN THE GAME, NOT IN THE ART. The first backdrop was PROMPTED dark for legibility
+     and then dimmed again here - two darkenings compounding into mud, and an asset that could
+     never be made brighter without regenerating it. The painting is now made luminous and this
+     layer is the only place it gets knocked back, so the balance is one number to tune. */
+  opacity: .62; z-index: 0;
+}
+/* 🌑 THE SCRIM. Legibility is not uniform: the UI does not sit evenly on the scene, it
+   crowds the BOTTOM and the LEFT (card row, mage, encounter panel) while the upper right is
+   open sky. So darken where the text is instead of darkening the whole picture. */
+#scene .place-scrim {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(to top, rgba(12,10,8,.92) 0%, rgba(12,10,8,.55) 22%, transparent 55%),
+    linear-gradient(to right, rgba(12,10,8,.72) 0%, transparent 42%);
+}
+
+/* 🎭 the mage, same deal. She is anchored bottom-left and the card row covers her legs by
+   design, so the art is composed with everything that matters in its upper half. */
+.mage-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  /* 🎭 BOTTOM-anchored: she belongs in the near foreground, standing on the floor of the
+     scene with her legs running down behind the card row. Top-anchoring floated her in the
+     middle of the frame with dead space underneath, which threw away the depth the whole
+     layout is built on. Her boots being hidden is the intended reading, not a loss. */
+  object-fit: contain; object-position: bottom left;
+  opacity: 0; transition: opacity .5s ease;
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, .6));
+}
+.mage.has-art .mage-img { opacity: 1; }
+.mage.has-art > svg { opacity: 0; }
 
 /* ---------- responsive overrides (keep at END of file so they win the cascade) ---------- */
 

@@ -12,6 +12,7 @@ const MAX_LEVEL = 4;
 let ATTUNE_BONUS = 1;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 const HAND_SIZE = 4;
+const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so it must stay ABOVE it
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
 // not plan when you would reach the dragon. 4 regions x 5 = a 20-turn run you can hold in your
@@ -104,9 +105,37 @@ const HARDSHIPS = {
   // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
   // mage that means no attuning, for a rogue it would mean no chain.
   'Dead Air':     'Your cards find no accord — nothing attunes this encounter.',
+  // 🌪️ STAGE 2's OWN TWO (2026-08-05). A land should press on the thing its dragon presses on,
+  // so Skyrender's country attacks SPEED from both ends — one takes your fast card away from the
+  // race, the other makes the race a condition on your class rule.
+  //
+  // 🔃 Vertigo is the INVERSE of Mire, and that is the point: Mire bars your fastest card from
+  // the Catalyst, Vertigo nails it INTO the Spell. Same card, opposite instruction, and both are
+  // stated in engine terms (`init`), so a rogue meets them unchanged.
+  'Vertigo':      'The ground falls away — your <b>fastest</b> card must be your <b>Spell</b>.',
+  // ⚡ Squall puts a SECOND condition on the Catalyst, which is the one card already serving two
+  // masters. ⚠️ We measured in July that a permanent second condition produces search, not
+  // sacrifice — with 12 arrangements you can usually satisfy both. A HARDSHIP is where that
+  // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
+  // problem you solve rather than a tax you route around forever.
+  'Squall':       'The air will not hold — your cards find accord <b>only if you win Initiative</b>.',
+  // ⏳ STAGE 3's TWO. Cragmourn's demand is *waste nothing*, so its land takes away the slack
+  // you did not know you were relying on.
+  // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
+  // just pays nothing, so no slot is sealed and no choice is removed (sealed slots shipped once and
+  // were killed the same day).
+  'Rationed':     'Nothing is spare here — your <b>Surge adds nothing</b> this encounter.',
+  // ⚖️ Exacting is the mountain's own logic: half-measures are nothing. It is the harshest
+  // hardship in the game and it is deliberately confined to late Fellgrind regions.
+  'Exacting':     'It gives no half credit — a <b>Narrow counts as a Loss</b>.',
+  // 🌊 STAGE 4's. The Arsenal is the one slot that is identical in every class, and this is the
+  // only rule that takes the carry itself — the exam's way of saying *nothing you save is safe*.
+  'Riptide':      'The current takes what you held — your <b>Arsenal is spent</b>, not kept.',
 };
-const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air'];
-const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air'];
+const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
+// ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
+// road it would either never fire or always fire. A hardship that cannot be answered is weather.
+const JOURNEY_HARDSHIPS = ['Night Travel', 'Storm', 'Dead Weight', 'Dead Air', 'Vertigo', 'Rationed', 'Exacting', 'Riptide'];
 
 // 🔑 the placement bans are ENGINE rules, not class rules — they read `value` and `init`, which
 // every class has. A class's own canPlace() is consulted separately, so the two never collide.
@@ -122,6 +151,8 @@ function fastestId() {
 function placementBan(id, zone) {
   if (S.hardship === 'Dead Weight' && zone === 'Spell' && id === heaviestId()) return '⚖️ Dead Weight — your heaviest card cannot be your Spell';
   if (S.hardship === 'Mire' && zone === 'Element' && id === fastestId()) return '🐌 Mire — your fastest card cannot be your Catalyst';
+  // 🌀 Vertigo pins the fastest card INTO the Spell, so it is barred from everywhere else
+  if (S.hardship === 'Vertigo' && zone !== 'Spell' && id === fastestId()) return '🌀 Vertigo — your fastest card must be your Spell';
   return null;
 }
 function slotLegal(id, zone) { return !placementBan(id, zone) && CLASS.canPlace(id, zone); }
@@ -130,11 +161,29 @@ const ABILITIES = {
   'Freeze': 'If it deals you Early Damage, you discard your Arsenal in Cleanup.',
   'Poison': 'If it damages you, +1 damage to your next drawn hand (+2 if both Early and Combat).',
   'Ranged': 'It shoots from range — you take Early Damage even when you strike first. Speed cannot save you here.',
+  // 🌬️ WINDSHEAR turns Initiative from a COIN into a GRADIENT. Everywhere else in the game the
+  // race is binary — you win or you lose — so a Catalyst one point short costs exactly as much as
+  // one six points short, and "fast enough" is the only question. Against this, losing NARROWLY is
+  // cheap and losing BADLY is ruinous, which makes the second-fastest card a real answer.
+  'Windshear': 'Lose Initiative and its Early Damage grows by how far you were outpaced (up to +3).',
+  // 💢 BACKLASH is the answer to the most-solved thing in the game. Sharpening drives
+  // "the Spell is simply your biggest card" from 83% toward 94%, because overkill has never cost
+  // anything — there has been no reason in twenty turns to hit for exactly enough. Against this,
+  // every point past its HP comes back at you. 🔑 It INVERTS Armour: Armour says *bigger*,
+  // Backlash says *exact*, and a hand that answers one is wrong for the other.
+  'Backlash': 'Strike it harder than it can take and the excess rebounds on you (up to 3).',
 };
 
 const PERILS = {
   'Steep':       "The journey's MP is increased by your Arsenal's Boost.",
   'Treacherous': 'Fail to attain Complete Victory → suffer 1 damage after the Time Penalty.',
+  // 🏔️ UPDRAFT is the mirror of Steep, and the first peril that PAYS. A road hazard that can
+  // only ever cost you makes the peril line something to dread and skim past; one that rewards the
+  // stat the land is about makes you read it. It also gives the Catalyst's Initiative a job on a
+  // JOURNEY, where the race is otherwise only about Nightfall.
+  'Updraft':     "The wind is with you — the journey's MP is reduced by your Catalyst's Initiative.",
+  // ⏳ the road that does not forgive: falling short costs twice
+  'Toll':        'Fail to Complete and the <b>Time Penalty is doubled</b>.',
 };
 
 // ---------- regions (SOURCE-GRAMMAR RECUT 2026-07-01, from Thomas's transcription) ----------
@@ -213,6 +262,186 @@ const REGIONS = [
   ]},
 ];
 
+
+// ============================================================
+// 🗺️ THE ROADS (2026-08-05) — one land per dragon
+// ============================================================
+// Thomas: *"i don't want the same exact runs for stages 2-4, it should be completely different with
+// new monsters, new events, new journeys as well… they got different hardships to deal with."*
+// Until now every stage walked the SAME four regions and only the dragon at the end changed, so
+// stages 2–4 were one road with a harder ending — and the whole difficulty curve lived in the
+// last four beats of a twenty-turn run.
+//
+// 🔑 THE ORGANISING RULE, AND IT IS WHAT STOPS THIS BEING A RESKIN: **a land presses on the same
+// thing its dragon presses on.** The mage can answer exactly two creature shapes, so new monsters
+// alone would be stage 1's roster with new names. What makes a road genuinely a different problem
+// is that its creatures, its hardships and its perils all lean the same way — so the road is the
+// dragon's demand met in small, twenty times, before you meet it full size.
+//   🛡️ stage 1  Cindermaw   — ARMOUR, hit big     → a land of things that shrug off small blows
+//   🌀 stage 2  Skyrender   — EVASION, hit first  → a land that punishes being slow
+//   ⏳ stage 3  Cragmourn   — RELENTLESS, waste nothing → a land that takes away your slack
+//   🛡️🌀 stage 4  Fathomdread — both, big AND first   → the exam: all three lands at once
+//
+// ⚠️ A road is CONTENT, and content is CLASS-BLIND. Every stat here is `hp`/`init`/`atk`/`mp`,
+// which every class has; nothing on a road may name an element, a pair or a chain.
+const ROAD_STORMREACH = [
+  // 🍃 Windward Steps — no hardships: the same teaching grace stage 1 opens with. High, open,
+  // and mercifully empty; what it teaches is that up here things are FASTER than you.
+  { name: 'Windward Steps', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
+    { type: 'fight',   name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4 },
+    { type: 'fight',   name: 'Rill Otter',   hp: 10, init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 4 },
+    { type: 'fight',   name: 'Scarp Ram',    hp: 14, init: 2, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'journey', name: 'Kestrel Stair',   mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Whistling Gap',   mp: 9,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 2 },
+    { type: 'journey', name: 'Sunlit Terrace',  mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Cloudmere Path',  mp: 10, timePenalty: 1, element: 'Stone',     nightfall: 4, xp: 3 },
+  ]},
+  // 🦅 The Shrike Downs — hunting country. Everything here reaches you first, and 🌀 Vertigo
+  // arrives to take the one card that could have answered that.
+  { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
+    { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Gorsewind Run',    mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Cairn Ladder',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 3, peril: 'Steep' },
+  ]},
+  // ⚡ Thunderhead Reach — the storm itself. ⚡ Squall lives here: your cards hold together only
+  // if you were fast enough, which is Skyrender's whole demand rehearsed one encounter at a time.
+  { name: 'Thunderhead Reach', hardshipChance: 0.5, hardships: ['Squall', 'Storm', 'Night Travel', 'Vertigo'], encounters: [
+    { type: 'fight',   name: 'Levinbeast',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Anvil Toad',      hp: 18, init: 2, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Fulgurite Wolf',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Skylash Serpent', hp: 13, init: 4, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'journey', name: 'Thunder Stair',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Static Flats',   mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Rainshadow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Long Gale',  mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
+  ]},
+  // 🐉 The Riven Sky — under its wings. Everything is faster than you and the ground is gone.
+  { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
+    { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Cloudbreak Run',  mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Wingshadow Pass', mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 4 },
+  ]},
+];
+
+// 🗺️ stage → road. ⚠️ A stage with no road of its own FALLS BACK to stage 1's rather than
+// crashing or shipping an empty region — stages 3 and 4 are not written yet, and a missing road
+// must degrade to "the old run" instead of to a dead end.
+
+// ⏳ THE FELLGRIND (stage 3) — Cragmourn's country. Its demand is **waste nothing**: the breath
+// grows every beat, so a long duel is one you have already lost. The road rehearses that by taking
+// away slack — ⏳ Rationed pays nothing for your Surge, ⚖️ Exacting gives no half credit, 💢
+// Backlash makes overkill rebound, ⏳ Toll doubles the price of falling short.
+// 🔑 Backlash is the load-bearing one: it is the first thing in the game that makes the BIGGEST
+// card the wrong card, which is the single most-solved decision we have measured.
+const ROAD_FELLGRIND = [
+  { name: 'The Sloughs', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Sump Toad',     hp: 10, init: 3, atk: 2, atkEl: 'Water', xp: 4 },
+    { type: 'fight',   name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'fight',   name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash' },
+    { type: 'fight',   name: 'Fen Ox',        hp: 16, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 6 },
+    { type: 'journey', name: 'The Slow Ford',   mp: 12, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 4 },
+    { type: 'journey', name: 'Turfcutter Way',  mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Reedlight Path',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'The Long Bank',   mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
+  ]},
+  { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
+    { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
+    { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
+    { type: 'journey', name: 'Ashfall Steps',   mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Cold Furrow',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 3 },
+    { type: 'journey', name: 'The Iron Cut',    mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Steep' },
+  ]},
+  { name: 'The Unquiet Deep', hardshipChance: 0.5, hardships: ['Rationed', 'Dead Air', 'Night Travel', 'Dead Weight'], encounters: [
+    { type: 'fight',   name: 'Deepdelver',     hp: 18, init: 3, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Cavern Shrike',  hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
+    { type: 'fight',   name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash' },
+    { type: 'fight',   name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Winding Cut', mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5 },
+    { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+  ]},
+  { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
+    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
+    { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
+    { type: 'journey', name: 'The Grinding Pass', mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Shoulderfall',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'The Last Furrow',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5 },
+    { type: 'journey', name: 'Thunderfoot Road',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Treacherous' },
+  ]},
+];
+
+// 🌊 THE SUNLESS FATHOM (stage 4) — Fathomdread's country, and the exam. Its demand is **big
+// AND first**, which four cards cannot give at once.
+// 🔑 THE EXAM IS NOT A NEW RULE, IT IS THE OTHER THREE ARRIVING TOGETHER. Its hardship pool
+// draws from all three lands, and its creatures are the first in the game to carry BOTH shapes —
+// 🛡️ Armour wants the attuned blow, 🌀 Evasion wants the fast Catalyst, and one card cannot be
+// both. That is Fathomdread's whole question, asked twenty times before you meet it.
+// ⚠️ DOUBLE-SHAPED CREATURES ARE KEPT SMALL AND SOFT. A creature that is big, armoured, evasive
+// AND hits hard is not an exam question, it is a wall — the Stormreach already taught us that a
+// shape and a stat enforcing the same thing multiply.
+const ROAD_FATHOM = [
+  { name: 'The Tidewrack', hardshipChance: 0, hardships: [], encounters: [
+    { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'The Ebb Path',    mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 4 },
+  ]},
+  { name: 'Drowned Kell', hardshipChance: 0.35, hardships: ['Riptide', 'Vertigo', 'Rationed', 'Night Travel'], encounters: [
+    { type: 'fight',   name: 'Kell Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 6 },
+    { type: 'fight',   name: 'Silt Crawler',   hp: 17, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Drowned Piper',  hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'fight',   name: 'Anchorback',     hp: 16, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Kell Stair',  mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Bell Causeway',   mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Weedlight Reach', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'The Undertow',    mp: 15, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+  ]},
+  { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
+    { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7 },
+    { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Sounding',    mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5 },
+  ]},
+  { name: "Fathomdread's Trench", hardshipChance: 0.6, hardships: ['Riptide', 'Exacting', 'Squall', 'Vertigo', 'Dead Weight', 'Rationed'], encounters: [
+    { type: 'fight',   name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear' },
+    { type: 'fight',   name: 'Pressureback',   hp: 19, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7, ability: 'Backlash' },
+    { type: 'fight',   name: 'The Pale Herald',hp: 14, init: 5, atk: 5, atkEl: 'Fire',  shapes: ['armour', 'evasion'], shapeV: 1, xp: 7, ability: 'Freeze' },
+    { type: 'journey', name: 'The Trench Road', mp: 14, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 6, peril: 'Toll' },
+    { type: 'journey', name: 'Deadlight Deep',  mp: 14, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Long Descent',mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Stormfathom',     mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 7, xp: 6, peril: 'Updraft' },
+  ]},
+];
+
+const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH, 3: ROAD_FELLGRIND, 4: ROAD_FATHOM };
+function roadFor(stage) { return ROADS[stage] || REGIONS; }
+
 const ROLES = ['Spell', 'Element', 'Boost'];
 const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
 // ============================================================
@@ -275,8 +504,8 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // measured 13%, then 4% after doubling, because Initiative's payoff is CAPPED and Attack's is not.
 //
 // THE RULE: if your SURGE shares your CATALYST's element, its boost does not fire this turn - it
-// BANKS as a token worth half the boost, rounded up. At the start of your next turn you aim that
-// token at ⚔️ attack, 💨 initiative or 🛡️ armour.
+// BANKS as a token worth the WHOLE boost (it was half until 2026-08-12; see bankValueOf). At the
+// start of your next turn you aim that token at ⚔️ attack, 💨 initiative or 🛡️ armour.
 //
 // 🔑 WHY THIS IS THE GOOD VERSION: you bank BLIND but you spend INFORMED - next turn you can see
 // the encounter before choosing where the power lands. And the element pair becomes a currency you
@@ -312,12 +541,68 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // turns - one hand IS one creature - so that is the argument to watch for.)
 // ============================================================
 
+// 🔥 BANKING IS A CHOICE, NOT A COINCIDENCE (2026-08-12). It used to fire when your Surge shared
+// your Catalyst's element — and that gate is what killed the mechanic, for a reason worth keeping:
+//
+// 🔑 THE TRIGGER WAS RANDOM BUT THE REASON IS SITUATIONAL, AND THEY NEVER LINED UP.
+// You want to bank when THIS turn is already decided — measured at 33.7% of turns, where removing
+// the boost entirely changes nothing (15.4% stuck on Narrow · 9.4% lost anyway · 8.9% already won).
+// That is a property of the ENCOUNTER. You were ALLOWED to bank when the deal handed you two
+// same-element cards — a property of the SHUFFLE, ~54% of hands. Independent events. So the option
+// appeared when you did not want it and was missing when you did, and it read as a curiosity rather
+// than a tool. Thomas: "i feel like i have to choose to do it."
+//
+// ⚠️ AND AN ELEMENT-GATED RULE CAN NEVER LEAVE THE MAGE. Pairing is the one thing the CLASS owns;
+// a rogue has no elements, so an element-gated bank sits in the engine's slot ③ wired to a class
+// rule and could never be inherited. As a plain choice it is an ENGINE rule and all eight planned
+// classes get it free — the "+1 class = xN content" trade, on a rule-changer that should always
+// have been generic.
+//
+// What makes it HARD is already built: 🕯️ the candle. Lit, you can see the next encounter's HP,
+// Initiative and shape, so banking is informed. Out, it is a bet that next turn's problem is bigger
+// than this one's. An existing system does the work instead of a new rule.
 function banksNow() {
-  const surge = cardById(S.assign.Boost), elem = cardById(S.assign.Element);
-  return !!(surge && elem && elOf(surge) === elOf(elem));
+  return !!(S.bankArmed && cardById(S.assign.Boost));
 }
-function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost / 2) : 0; }
-const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative', armor: '🛡️ armour' };
+// ⚠️ ARMED PER TURN, CLEARED WITH THE TURN. Anything that outlived its turn would be a charm.
+function toggleBank() {
+  if (!isAssignPhase() || !cardById(S.assign.Boost)) return;
+  S.bankArmed = !S.bankArmed;
+  render();
+}
+// 🔥 THE BANK IS THE FULL BOOST (2026-08-12, was ceil(boost/2)). At half, banking paid you back
+// 50% for 100% — a 2:1 loss you could only justify if AIMING the token were worth 2×, and the
+// measured aim went to ⚔️ attack 100% of the time, i.e. at exactly what the unbanked boost was
+// already doing. Worth ~1×. So it was a tax wearing a fork's clothes, taken on 0.8% of turns.
+// ⚠️ AND THE ELEMENT GATE WAS NOT THE CAUSE: an arrangement that banks AND still attunes exists
+// in 53.6% of hands (combinatorics over all 1820 four-card hands). It was never unavailable —
+// it was never worth taking. At full value it is a pure tempo trade: move this boost to next
+// turn, and pick its target. Correct on the ~30% of turns the Surge already changes nothing.
+function bankValueOf(surge) { return surge ? eff(surge).boost : 0; }
+// ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
+// you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
+// hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
+// way for something to happen appears, every line that explains the FIRST way is now a lie.
+// One helper, asked by all four.
+function bankCostPhrase(surge) {
+  const v = verbOf(surge);
+  return (v && v.slot === 'Boost' && v.name === 'Motherlode')
+    ? '✦ Motherlode — and it still feeds this turn'
+    : 'so it feeds nothing now';
+}
+// 🔥 TWO TARGETS, NOT THREE (2026-08-12). 🛡️ armour was cut: measured over 3,357 turns at a FULL
+// -value token it was chosen 2.3% of the time, and it is the one target 🕯️ the candle cannot
+// inform — it prints the next encounter's HP, Initiative and shape, none of which argue for soaking.
+// ⚔️/💨 map exactly onto the two defence shapes, so the aim is now "hit harder, or get there first".
+//
+// 🔑 AND THE REASON 💨 LOOKED DEAD WAS A STALE COMMENT, NOT A DEAD OPTION. The old note here said
+// the Initiative gap was "a chasm and a token cannot bridge a chasm" (short by 5-9, not 1-3). It
+// asked for a floor under init as a separate change — INIT_FLOOR and creature init -2 SHIPPED, and
+// nobody came back to correct the note. Measured now: average deficit 3.0, median 3, and a
+// full-boost token (avg 5.9) closes it 84.6% of the time. 💨 reads low only because you lose the
+// race on just 16.4% of fights — and the bot aims at the creature in front of it, which is exactly
+// the case a human does NOT have: seeing on the candle that the next one is fast and banking for it.
+const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
 function wakeReady() { return S.wake > 0 && isAssignPhase(); }
 function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
@@ -369,8 +654,16 @@ function nextEncounter() {
   return S.encounterQueue && S.encounterQueue.length ? S.encounterQueue[0] : null;
 }
 
+// ⚡ SQUALL — accord only at speed. Stated class-blind (the ENGINE asks "did you win Initiative",
+// the CLASS decides what accord means), so a rogue's chain would be gated the same way.
+function squallBlocks() {
+  if (S.hardship !== 'Squall' || !S.encounter || S.encounter.type !== 'fight') return false;
+  const el = cardById(S.assign.Element);
+  return !el || eff(el).init < S.encounter.init;
+}
 function attunedNow() {
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
+  if (squallBlocks()) return false;              // ⚡ Squall — too slow to hold together
   if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
   const sp = spellCard(); if (!sp) return false;
   const el = cardById(S.assign.Element);
@@ -455,13 +748,16 @@ const MAGE = {
     const vSpell = verbOf(spell), vElem = verbOf(elem);
     // 🔥 a banked Surge gives NOTHING this turn - that is the price of aiming it next turn
     const banks = banksNow();
-    // ✦ Motherlode banks the FULL boost · Backdraft doubles what it banks
+    // ✦ Motherlode pays the bank's PRICE for you · Backdraft doubles what it banks
     const vB = verbOf(boostC);
     let bank = banks ? bankValueOf(boostC) : 0;
     if (banks && vB && vB.slot === 'Boost') {
-      if (vB.name === 'Motherlode') bank = eff(boostC).boost;
       if (vB.name === 'Backdraft') bank *= 2;
     }
+    // ✦ MOTHERLODE (rewritten 2026-08-12). Its old job — "keeps the FULL boost, not half" — became
+    // a no-op the moment the bank went to full value. A verb must name what the rule COSTS you, so
+    // it now buys off the one price banking still charges: the boost fires this turn as well.
+    const lode = banks && vB && vB.slot === 'Boost' && vB.name === 'Motherlode';
     const w = S.wake || 0, wt = S.wakeTarget;
     return {
       value: Math.max(0, mageStrike(spell, attuned, elem, boostC) + (wt === 'atk' ? w : 0)
@@ -470,7 +766,7 @@ const MAGE = {
       element: spell.def.element,
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
-      boost: banks ? 0 : (boostC ? eff(boostC).boost : 0),
+      boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: 1,
       attuned, attBonus: st.attuned - st.value,
       banks, bank, wake: w, wakeTarget: wt,
@@ -522,7 +818,7 @@ const VERBS = {
   Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Banking from here DOUBLES the Emberwake.' },
   Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake banked from here lasts a second turn.' },
   Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Banking from here also gives +3 Initiative this turn.' },
-  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here keeps the FULL boost, not half.' },
+  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
   Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
   Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
@@ -654,21 +950,35 @@ const TUTORIAL = {
       body: 'There is a dragon at the end of the road, and you are what stands between it and everyone behind you.<br><br>' +
             'You carry <b>sixteen cards</b> — the whole of your craft. You will hold <b>four at a time</b>, ' +
             'and every turn you decide what those four are for.' },
+    // ⚠️ REWRITTEN 2026-08-12 (Thomas: *"doesn't explain what it does. we gotta explain what things
+    // do exactly"*). The old page said "fall short and you lose time" and "the dark catches you" —
+    // both name a consequence without defining it, which is the one thing a brief exists to do.
+    // 🔑 THE BAR: every stat must say what it SUBTRACTS FROM WHAT. If a sentence could be true of
+    // three different rules, it is flavour, not a brief.
     { title: 'A turn is an arrangement',
       body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
-            '<b>SPELL</b> is your action. It is <b>spent</b> afterwards, gone for the rest of the region.<br>' +
-            '<b>CATALYST</b> decides who strikes first — and if it shares your Spell\'s element, the Spell <b>attunes</b> and hits far harder.<br>' +
-            '<b>SURGE</b> adds its power now, or <b>banks</b> it for next turn.<br>' +
-            '<b>ARSENAL</b> is the one card you keep.' },
-    { title: 'Two kinds of encounter',
-      body: '⚔️ A <b>FIGHT</b> asks for damage. Beat its <b>HP</b> outright to <b>Complete</b> it; reach half for a <b>Narrow</b>, and it hits you back. ' +
-            'Each creature defends with a <b>shape</b> — 🛡️ <b>Armour</b> shaves a flat amount off any blow, so it wants one big hit; ' +
-            '🌀 <b>Evasion</b> halves you unless you strike first.<br><br>' +
-            '👣 A <b>JOURNEY</b> asks for distance. Beat its <b>MP</b> to arrive; fall short and you lose time. ' +
-            'It also has a <b>🌙 Nightfall</b> — if your Catalyst is too slow, the dark catches you.<br><br>' +
-            'Same four cards, two completely different questions.' },
+            '<b>SPELL</b> — its number is what you deal. Afterwards it is <b>spent</b>: into the discard, and you will not see it again until the region ends.<br>' +
+            '<b>CATALYST</b> — its <b>💨 Initiative</b> races the enemy\'s. And if it shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger <b>✦</b> number on its face instead.<br>' +
+            '<b>SURGE</b> — its <b>➕</b> is added to your Spell. Or <b>bank</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br>' +
+            '<b>ARSENAL</b> — the one card you <b>keep</b> into the next hand. Your Catalyst and Surge slide back under your deck.' },
+    { title: '⚔️ A fight asks for damage',
+      body: 'Your <b>Spell</b> (plus your Surge) is your blow, measured against its <b>❤️ HP</b>:<br><br>' +
+            '• <b>Complete</b> — you meet or beat its HP. It never touches you.<br>' +
+            '• <b>Narrow</b> — you reach <b>half</b> its HP. You still get past it, but it <b>hits back for its ⚔️</b>.<br>' +
+            '• <b>Loss</b> — below half. It hits back and you gain nothing. <i>You still move on</i> — an encounter is never the end of your run.<br><br>' +
+            '<b>💨 And the race is separate.</b> If your Catalyst is slower than its 💨, it <b>bites first for its ⚔️</b> — even if your blow then kills it. Speed is not damage; it is whether you get hurt on the way in.<br><br>' +
+            'Each creature also defends with a <b>shape</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
+    { title: '👣 A journey asks for distance',
+      body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
+            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. You do not bleed; you lose the cards you were about to draw. <i>(Only if your deck is already empty does it become damage.)</i><br><br>' +
+            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number the dark catches you: the card in your <b>ARSENAL</b> is discarded, and your 🕯️ candle goes out.<br><br>' +
+            'So a fight punishes you in <b>blood</b> and a journey punishes you in <b>cards and time</b>.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it — each drops a level, and a card at Lv1 <b>leaves your deck for good</b>.<br><br>' +
+      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it.<br><br>' +
+            '• Each card you blunt <b>drops one level</b> and soaks its printed <b>🛡️ armour</b>.<br>' +
+            '• A card showing <b>🛡️ —</b> cannot soak at all.<br>' +
+            '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
+            '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
             'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
             'You will lose runs. That is the game working — you learn the shapes, unlock more, and come back.' },
   ],
@@ -692,7 +1002,9 @@ const TUTORIAL = {
             'Reach the <b>half</b> and it is a <b>Narrow</b> — you win through, but it still hits you back.' },
     { id: 'f-init', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '💨 <b>Init</b> is the number your <b>Catalyst</b> has to beat. Beat it and you strike first; fail and it gets a hit in before you swing.' },
+      // ⚠️ initLost is `e.init > init`, so a TIE WINS. "Has to beat" was wrong by one.
+      text: '💨 <b>Init</b> is what your <b>Catalyst</b> must <b>match or beat</b> — a tie goes to you. ' +
+            'Win and it never touches you on the way in; lose and it <b>bites first for its ⚔️</b>, even if your blow then kills it.' },
     { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
       text: '⚔️ <b>Atk</b> is what it does to you — once if it strikes first, and again if you fail to Complete. ' +
@@ -721,24 +1033,71 @@ const TUTORIAL = {
     { id: 'spent', when: () => S.turn === 1 && isAssignPhase(),
       point: '.in-Spell',
       text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
+    { id: 'arsenal', when: () => S.turn === 1 && isAssignPhase(),
+      point: '.in-Reserve',
+      text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
+            'It is the only slot that works the same way for every class, so it is the one anchor that never moves.' },
+    // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
+    // decides whether banking is informed or a bet, and nothing had ever named it.
+    { id: 'candle', when: () => isAssignPhase() && S.candle && !!nextEncounter(),
+      point: '.candle',
+      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its shape. ' +
+            'Plan two encounters, not one.' },
+    { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
+      point: '.candle',
+      text: '🕯️ It went out. Only a <b>Complete</b> keeps it lit — a Narrow or a loss snuffs it, and you travel blind until you come through one cleanly. ' +
+            '<b>That is what a Narrow really costs you.</b>' },
     { id: 'couldattune', when: () => isAssignPhase() && !attunedNow() && handHasPair(),
       point: () => { const id = pairPartnerId(); return id ? '.in-' + (zoneOf(id) || 'Spell') : null; },
       text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
       text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
-    { id: 'bank', when: () => isAssignPhase() && banksNow(),
+    // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
+    // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
+    { id: 'bank', when: () => isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> matches your Catalyst, so it will <b>bank</b> instead of firing — nothing now, but next turn you aim it at attack, initiative or armour.' },
+      text: 'Your <b>SURGE</b> can fire now — or <b>bank</b> instead: nothing this turn, but next turn you aim its full power at your <b>strike</b> or your <b>speed</b>. ' +
+            'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
+    // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
+    // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
+    { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
+      point: '.wake-row:not(.bank-row)',
+      text: '🔥 You are holding an <b>Emberwake</b>. Aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
+            '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
       text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
       text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
+    // ⚠️ STALE UNTIL 2026-08-12 — this said only "coins buy levels", which described the Wheel from
+    // before sharpening was merged onto it. The screen now does BOTH, and the budget split between
+    // them is the actual decision, so a lesson naming one half taught the wrong thing.
     { id: 'wheel', when: () => S.phase === 'wheel',
       point: '#controls-panel',
-      text: 'Coins buy levels. A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else.' },
+      text: '🎰 <b>The Wheel.</b> One screen, one purse: <b>sharpen</b> your own cards, or <b>buy</b> what is on the shelf. ' +
+            'A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else. ' +
+            '<b>Deciding between the two IS the shop</b>, so spend knowing you cannot have both.' },
+    { id: 'charm', when: () => S.phase === 'wheel' && S.wheel && (S.wheel.offers || []).some(o => o && o.kind === 'charm'),
+      point: '#controls-panel',
+      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b> rather than a number — so it can make a different arrangement correct. ' +
+            'Everything you are carrying is shown in the bar at the top, always.' },
+    { id: 'potion', when: () => (S.potions || []).length > 0,
+      point: '.kit-row',
+      text: '🧪 A <b>potion</b> is one use, spent on a turn <b>you</b> choose, and it lasts that turn only. You can carry ' + POTION_CAP + '. ' +
+            'It buys you a single turn where the arrangement you wanted is legal — so hold it for the turn that needs it.' },
+    // ⚠️ CURSES ARE A DIFFERENT LESSON FROM CHARMS. They arrive without being bought, and the whole
+    // point of `carried()` is that a run-long penalty must be on screen every turn — so the lesson's
+    // job is to send you to the status bar, not to explain the individual curse.
+    { id: 'curse', when: () => (S.charms || []).some(id => { const c = charmById(id); return c && c.curse; }),
+      point: '#status-bar',
+      text: '⚠️ You picked up a <b>curse</b> — a charm that costs you instead of paying you. It sits in the same bar as your boons, ' +
+            'because a penalty you cannot see is one you cannot play around.' },
+    { id: 'event', when: () => S.phase === 'event',
+      point: '#controls-panel',
+      text: '📖 The road throws things at you between encounters. Read the options — some cost coins or a card, and one is usually just <b>walk on</b>. ' +
+            'An option you cannot afford says so instead of hiding.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
       text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
@@ -746,6 +1105,14 @@ const TUTORIAL = {
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
       text: 'All four elements, so <b>nothing can pair</b> — no Spell will attune this turn. Some hands simply cannot. Play the best plain line you have, and keep your best card for a hand that can.' },
+    // ⚠️ WRITTEN WRONG ONCE (2026-08-12) — the first draft described the press-your-luck "stir band"
+    // approach, which was CUT and replaced by this ordinary journey. It was copied out of CLAUDE.md,
+    // which still documented the cut version. The lesson must describe LAST_MILE, not the history.
+    { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
+      point: '#encounter-panel',
+      text: '⚔️ <b>The Last Mile</b> — one journey between you and the lair, and it <b>costs you nothing</b>: no Nightfall, no Time Penalty, no hardship, nothing kept. ' +
+            'Everything is reshuffled for the duel afterwards, so this is the one turn in the game where you should <b>empty the tank</b>. ' +
+            'Arrive cleanly and the ' + '<b>dragon starts wounded</b>; scrape in and it starts a little wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
       text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
@@ -775,7 +1142,11 @@ function nextLesson() {
 function learned(id) { S.taught = [...(S.taught || []), id]; render(); }
 
 // 🔑 ONE ACCESSOR, so the tutorial is a dataset rather than a branch
-function RUN() { return S && S.tutorial ? TUTORIAL.regions : REGIONS; }
+// 🗺️ the road you are actually walking — the tutorial's, or your stage's
+function RUN() {
+  if (S && S.tutorial) return TUTORIAL.regions;
+  return roadFor(S && S.dragon ? S.dragon.stage : 1);
+}
 
 // ============================================================
 // 🐉 DRAGON ATTACKS (2026-07-29, Thomas). The duel is the ONLY multi-beat fight in the game —
@@ -893,9 +1264,14 @@ function recordGrade(stage, g, won) {
   } catch (e) {}
 }
 // the one-line summary of the whole board — what is left to do, not what is done
+// ⚠️ THE TUTORIAL IS NOT ON THE WALL (fixed 2026-08-05). It used to be counted here, so the
+// Stages line read "0/5 graded" for four stages — a board whose total does not match the number
+// of things on it. The tutorial carries its own badge on its own menu button now, which is the
+// whole reason it stopped belonging in this total. 🔑 When something moves to a new screen,
+// find every count that still includes it.
 function wallSummary() {
   const all = bestGrades();
-  const stages = [0, ...DRAGONS.map(d => d.stage)];
+  const stages = DRAGONS.map(d => d.stage);
   const got = stages.filter(n => all[String(n)]).length;
   const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
   return { graded: got, total: stages.length, perfect: s_ };
@@ -946,10 +1322,21 @@ const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 // the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
 // briefing tells you what the dragon demands, and the whole run is your preparation for it.
 // how a creature defends, in one phrase — this is the question the encounter is asking you
+// 🛡️🌀 A CREATURE MAY CARRY TWO SHAPES (2026-08-10, for stage 4). Fathomdread's demand is
+// *big AND first*, which is exactly what four cards cannot give at once — so its land is full of
+// small things that ask the same question. 🔑 The exam is not a new rule, it is two old rules
+// arriving together, which is the cheapest hard content in the game.
+// ⚠️ `shape` (one) stays legal everywhere; `shapes` (many) is the superset. Everything reads
+// this helper so no site can be left behind.
+const shapesOf = e => (e && e.shapes) || (e && e.shape ? [e.shape] : []);
+// ⚠️ named foeHas, not hasShape — hasShape() already exists for the DRAGON and takes one
+// argument. Two same-named helpers with different arities is a crash waiting for a rename.
+const foeHas = (e, k) => shapesOf(e).includes(k);
 function shapeText(e) {
-  if (e.shape === 'armour') return `🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`;
-  if (e.shape === 'evasion') return `🌀 <b>Evasion</b> — halves your hit unless you strike first`;
-  return '— unguarded';
+  const bits = [];
+  if (foeHas(e, 'armour')) bits.push(`🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`);
+  if (foeHas(e, 'evasion')) bits.push(`🌀 <b>Evasion</b> — halves your hit unless you strike first`);
+  return bits.join(' + ') || '— unguarded';
 }
 
 // ============================================================
@@ -1363,7 +1750,7 @@ function devJump() {
   devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
   S.candle = !!d.candle;
   if (d.charm && charmById(d.charm)) S.charms.push(d.charm);
-  S.region = REGIONS.length;
+  S.region = RUN().length;
   S.turn = 20;                    // so the log and the grade read like a real arrival
   S.encounterQueue = [];
   S.coins = 0;
@@ -1371,10 +1758,33 @@ function devJump() {
   beginFinalBattle();
 }
 
+// 📖 what the tutorial hands you on to — stage 1, named, with its one demand
+function tutorialHandoffHTML() {
+  const d = dragonForStage(1);
+  if (!d) return `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`;
+  return `<div class="handoff">` +
+    `<p>That was the shallow end. Everything past here is the same four slots and the same sixteen ` +
+    `cards — what changes is <b>what stands in front of you</b>.</p>` +
+    // ❌ and no shape here either — the briefing on turn 1 is moments away and it is the
+    // designed place to learn what you are walking into.
+    `<p><b>${d.name}</b> ${elIcon(d.element)} waits at the end of the first road. ` +
+    `You will be told what it is the moment you set out.</p>` +
+    `</div>` +
+    `<button class="primary" onclick="startStage(1)">⚔️ Set out for the ${d.name} — Stage 1</button>` +
+    `<button onclick="showStages()">🗺️ Stages</button>`;
+}
+
 // 🏆 the badge on a stage button — your best, and what is still above it
 function gradeBadge(stage) {
   const g = bestGrades()[String(stage)];
-  if (!g) return `<span class="grade-badge none" title="not yet graded">—</span>`;
+  // ⚠️ NOTHING, not a placeholder (2026-08-12). An ungraded stage used to draw a dashed pill with
+  // an em-dash in it — and because `.grade-badge.none` inherited the FILLED dark background from
+  // the base class, it read as a small black BUTTON rather than an empty slot. Thomas, in play:
+  // *"why does the stages and tutorial button have a black button with a dash in it?"*
+  // 🔑 A PLACEHOLDER THAT HAS TO BE EXPLAINED IS WORSE THAN AN ABSENCE. Its only explanation was a
+  // `title` tooltip, which does not exist on the phone this is played on. The grade now simply
+  // appears when it is earned, which nobody has to be taught.
+  if (!g) return '';
   return `<span class="grade-badge g-${g.letter}" title="best: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
     `${g.letter}<span class="gb-score">${g.total}</span></span>`;
 }
@@ -1519,7 +1929,8 @@ function freshGame(stage) {
     hand: [],
     discard: [],
     trashed: [],
-    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(REGIONS[0].encounters),
+    // ⚠️ S does not exist yet, so RUN() cannot be asked — resolve the road from the picked dragon
+    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(roadFor(pick.stage)[0].encounters),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
     setout: null,       // 🏕️ the three class charms offered before turn 1
 
@@ -1573,6 +1984,9 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
+    // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
+    bankArmed: false,
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
@@ -1595,14 +2009,110 @@ function freshGame(stage) {
   render();
 }
 
-// always-available restart (header button) — guarded so a run isn't wiped by a mis-tap
+// ============================================================
+// 📋 THE REPORT (2026-08-05) — the playtest's only instrument
+// ============================================================
+// A friend who hits a bug can only tell you *"it broke on the dragon"*, and neither of us can act
+// on that. Everything needed to reproduce it — the stage, the turn, the phase, what the deck had
+// become, what the log just said — is sitting right there in their browser and has no way out.
+//
+// 🔑 THIS IS THE SAME PRINCIPLE AS THE GRADE AND THE STANDING: state the TERMS. A playtester
+// is an instrument, and an instrument that cannot export a reading is a rumour.
+//
+// ⚠️ It is deliberately a COPY, not a send. No endpoint, no account, no network — the game
+// stays a static page you can open from a file, and the tester chooses what to paste and where.
+function reportText() {
+  const L = [];
+  const p = (k, v) => L.push(k + ': ' + v);
+  p('build', BUILD + ' (' + CHANNEL + ')');
+  p('url', (() => { try { return location.href; } catch (e) { return '?'; } })());
+  p('screen', (() => { try { return innerWidth + 'x' + innerHeight; } catch (e) { return '?'; } })());
+  p('agent', (() => { try { return navigator.userAgent; } catch (e) { return '?'; } })());
+  if (!S || isShell()) { p('state', 'no run (' + ((S && S.phase) || 'boot') + ')'); return L.join('\n'); }
+  p('stage', (S.tutorial ? '0 (tutorial)' : (S.dragon ? S.dragon.stage + ' — ' + S.dragon.name : '?')));
+  p('where', S.finalMode ? ('the lair · ' + (S.finalPhase || 'duel')) : ('region ' + S.region + ' · turn ' + S.turn));
+  p('phase', S.phase + (S.encounter ? ' · ' + S.encounter.type + ' · ' + S.encounter.name : ''));
+  if (S.finalMode && S.dragonState) p('dragon', S.dragonState.hp + ' hp · breath ' + (S.dragonState.breath || '?'));
+  p('deck', S.deck.length + ' deck / ' + S.hand.length + ' hand / ' + S.discard.length + ' discard · ' +
+      deckLevels() + ' levels' + (S.dragon && S.dragon.par ? ' vs par ' + S.dragon.par : '') +
+      ' · lost ' + S.trashed.length);
+  p('hand', S.hand.map(c => displayName(c) + ' Lv' + c.level + ' [' + (zoneOf(c.id) || '—') + ']').join(' | ') || 'none');
+  p('carried', (carried() || []).map(x => x.name).join(', ') || 'nothing');
+  p('potions', (S.potions || []).map(id => (potionById(id) || {}).name || id).join(', ') || 'none');
+  p('coins', S.coins + (S.contract ? ' · contract: ' + S.contract.id : ''));
+  p('results', 'C' + S.results.Complete + ' N' + S.results.Narrow + ' L' + S.results.Loss +
+      ' · candle ' + (S.candle ? 'lit' : 'out'));
+  // the last few turns of log, stripped of markup — the single most useful part of the whole report
+  const strip = t => String(t).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '');
+  L.push('');
+  L.push('--- log (most recent last) ---');
+  (S.logEntries || []).slice(0, 4).reverse().forEach(e => {
+    L.push('[' + strip(e.header) + ']');
+    e.lines.forEach(l => L.push('  ' + strip(l.text)));
+  });
+  return L.join('\n');
+}
+
+// ⚠️ THE CLIPBOARD CAN REFUSE and it refuses most often on exactly the devices a playtester
+// uses — an insecure origin, an iOS gesture that did not count, a browser that never had the API.
+// A copy button that silently fails is worse than none, so a refusal falls back to showing the
+// text in a box the tester can select by hand. Never leave them with nothing.
+function copyReport() {
+  const txt = reportText();
+  const done = ok => {
+    const b = $('report-btn'); if (!b) return;
+    b.textContent = ok ? '✓ Copied' : '📋 Select it';
+    setTimeout(() => { b.textContent = '📋 Report'; }, 2200);
+    if (!ok) showReportBox(txt);
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(() => done(true), () => done(false));
+      return;
+    }
+  } catch (e) {}
+  done(false);
+}
+function showReportBox(txt) {
+  let box = $('report-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'report-box';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = `<div class="rb-inner"><p>Copy this and send it along with what you were doing:</p>` +
+    `<textarea readonly></textarea>` +
+    `<button onclick="document.getElementById('report-box').remove()">Close</button></div>`;
+  const ta = box.querySelector('textarea');
+  ta.value = txt; ta.focus(); ta.select();
+}
+
+// 🏠 THE WAY OUT (2026-08-05). The header used to hold one button, ⟳ New Run, which quietly
+// did neither thing: it dumped you on the menu and abandoned the run. Two buttons now, and each
+// does exactly what it says.
+//
+// 🔑 LEAVING IS NOT LOSING. The run auto-saves at every stable phase, so the menu is a DOOR,
+// not a discard — ▶ Continue is waiting on the other side. That is why this one does not ask for
+// a confirmation: there is nothing to confirm.
+function toMenu() {
+  showMenu();   // the last auto-save stands; ▶ Continue picks it back up
+}
+
+// ⟳ NEW RUN = the same stage, from the top. Thomas: *"new run should just restart you whatever
+// stage you are in."* The old behaviour sent you to the menu to re-pick the stage you were
+// already playing, which is three taps to express "again". A stage is a PROBLEM you are trying
+// to solve; wanting another go at the same one is the normal case, not the exception.
+// ⚠️ This one DOES discard the run (freshGame wipes the save), so it asks first.
 function newGame() {
-  if (confirm('Leave this run? It will be lost.')) showMenu();
+  if (!S || isShell()) { showMenu(); return; }
+  const st = S.tutorial ? 0 : (S.dragon && S.dragon.stage) || 1;
+  const what = st === 0 ? 'the tutorial' : `stage ${st} — ${S.dragon.name}`;
+  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st);
 }
 
 function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
-  expireContract();   // 📜 the bound is what makes it a bet
+  // 📜 a contract CROSSES the region break now — its own encounter window is the bound
   S.regionTurn = 0;
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
@@ -1724,7 +2234,9 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // reported "charms and potions are really good too, getting completes easy". The clean win still
 // pays more than a scrape, which was the point — it just stopped being an income firehose.
 const COMPLETE_BONUS = 2;
-const POTION_CAP = 3;
+// POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
+// it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
+// dead zone and threw at load. ⚠️ A `const` read by TUTORIAL's text must live ABOVE TUTORIAL.
 
 // ============================================================
 // 📜 QUEST CONTRACTS (2026-08-05, Thomas — from *GuildRun*: *"you could buy some items that
@@ -1738,28 +2250,58 @@ const POTION_CAP = 3;
 //
 // 🔑 IT COSTS NO NEW RULES. Every contract reads engine state the engine already tracks —
 // outcomes, Initiative, attunement, damage taken. No verb on a card, no exception to the turn.
-// ⚠️ ONE AT A TIME, AND IT EXPIRES AT THE REGION BREAK. That bound is what makes it a GAMBLE
-// against your own play rather than a slow-burning bonus you always take.
-// ⚠️ Declarative on purpose (`track` + `need`), so the whole table ports as data and only
-// `contractTick()` is behaviour — see the port-ready rule in CLAUDE.md.
+// ⚠️ ONE AT A TIME, AND IT CARRIES ITS OWN CLOCK (rewritten 2026-08-10, Thomas: *"not liking
+// the complete 2 journeys or fights or whatever for THIS region, i think it should carry over"*).
+//
+// It used to expire at the REGION BREAK, which made the same contract a different bet depending on
+// when the wheel happened to offer it — and the region boundary is a bookkeeping line, not
+// something the player is thinking about. Now every contract states a **window in encounters** and
+// that window crosses region breaks untouched.
+//
+// 🔑 THE WINDOW STAYS, AND THIS IS WHY: a goal with no deadline cannot be FAILED, only delayed,
+// so it stops being a gamble and becomes a slow bonus you always take. The bound is what makes it
+// a bet against your own play. What changed is that the bound is now the contract's own, stated on
+// the offer, and identical whenever you buy it.
+// ⚠️ EVERY WINDOW CARRIES SLACK over its `need` — measured 2026-08-05: at `need === turnsLeft`
+// the keep rate was 23%, a coin-flip dressed as a goal.
+// ⚠️ NOTHING ASKS FOR FEWER THAN 3 (Thomas: *"2 is maybe too low"*). Two of anything happens by
+// accident across six encounters; three is a thing you steered toward.
+// ⚠️ Declarative on purpose (`track` + `need` + `window`), so the whole table ports as data and
+// only `contractTick()` is behaviour — see the port-ready rule in CLAUDE.md.
 const CONTRACTS = [
-  { id: 'ledger',  name: 'The Clean Ledger', cost: 7, reward: 22, need: 3, track: 'complete',
-    text: '⚔️ <b>Complete 3</b> encounters this region' },
-  { id: 'swift',   name: 'Swift Passage',    cost: 6, reward: 18, need: 4, track: 'initiative',
-    text: '💨 <b>Win Initiative 4</b> times this region' },
-  { id: 'woven',   name: 'The Woven Road',   cost: 6, reward: 18, need: 4, track: 'attune',
-    text: '✦ <b>Attune 4</b> times this region' },
-  { id: 'untouched', name: 'Untouched',      cost: 8, reward: 26, need: 3, track: 'unhurt',
+  { id: 'ledger',  name: 'The Clean Ledger', cost: 7, reward: 22, need: 3, window: 6, track: 'complete',
+    text: '⚔️ <b>Complete 3</b> encounters' },
+  { id: 'swift',   name: 'Swift Passage',    cost: 6, reward: 18, need: 4, window: 7, track: 'initiative',
+    text: '💨 <b>Win Initiative 4</b> times' },
+  { id: 'woven',   name: 'The Woven Road',   cost: 6, reward: 18, need: 4, window: 7, track: 'attune',
+    text: '✦ <b>Attune 4</b> times' },
+  { id: 'untouched', name: 'Untouched',      cost: 8, reward: 26, need: 3, window: 6, track: 'unhurt',
     text: '🛡️ Finish <b>3</b> encounters <b>taking no damage</b>' },
-  { id: 'longwalk', name: 'The Long Walk',   cost: 5, reward: 16, need: 2, track: 'journey',
-    text: '👣 <b>Complete 2 journeys</b> this region' },
+  // 👣 the widest window in the table: only about half of all encounters are journeys, so a
+  // 6-encounter window would ask for three of roughly three chances — the 23% trap again.
+  { id: 'longwalk', name: 'The Long Walk',   cost: 6, reward: 20, need: 3, window: 9, track: 'journey',
+    text: '👣 <b>Complete 3 journeys</b>' },
+  // 🗺️ ONE QUEST PER LAND, tiered like the charms (2026-08-10, Thomas: *"each stage should
+  // have some new quests and maybe potions to buy as well to help"*).
+  // 🔑 Each names the thing ITS land is about, so a quest is a second reason to play the road
+  // the way the road already wants — and a stage's whole shop leans the same direction as its
+  // dragon. ⚠️ Every track still reads state the engine already records; no new bookkeeping.
+  { id: 'fleet',   name: 'The Fleet Ledger', tier: 2, cost: 8, reward: 26, need: 3, window: 7, track: 'cleanfast',
+    text: '💨 <b>Complete 3</b> encounters <b>having won Initiative</b>' },
+  { id: 'thrift',  name: 'Nothing Spared',   tier: 3, cost: 8, reward: 30, need: 3, window: 8, track: 'thrift',
+    text: '⚖️ <b>Complete 3</b> encounters with <b>2 or less to spare</b>' },
+  { id: 'deep',    name: 'The Deep Ledger',  tier: 4, cost: 10, reward: 38, need: 3, window: 9, track: 'flawless',
+    text: '🌊 <b>Complete 3</b> encounters <b>fast and untouched</b>' },
 ];
+const contractWindow = c => c.window || 6;
 const contractById = id => CONTRACTS.find(c => c.id === id) || null;
 function activeContract() { return S.contract ? contractById(S.contract.id) : null; }
 
 // 📜 one place reads the turn and moves the counter. Everything else is data.
 function contractTick(r) {
   const c = activeContract(); if (!c || !r) return;
+  // ⏳ the clock runs on ENCOUNTERS, not regions, so a region break is invisible to it
+  S.contract.left = (S.contract.left == null ? contractWindow(c) : S.contract.left) - 1;
   const hurt = (r.early || 0) + (r.combatDmg || 0) + (r.timePenalty || 0) + (r.treacherousDmg || 0);
   let hit = false;
   if (c.track === 'complete')   hit = r.outcome === 'Complete';
@@ -1767,15 +2309,19 @@ function contractTick(r) {
   if (c.track === 'attune')     hit = !!r.enhUsed;
   if (c.track === 'unhurt')     hit = hurt === 0 && r.outcome !== 'Loss';
   if (c.track === 'journey')    hit = r.type === 'journey' && r.outcome === 'Complete';
-  if (!hit) return;
-  S.contract.n++;
+  // 🗺️ the three land quests — still nothing but fields the turn already produced
+  if (c.track === 'cleanfast')  hit = r.outcome === 'Complete' && !r.initLost;
+  if (c.track === 'thrift')     hit = r.outcome === 'Complete' && r.target != null && (r.value - r.target) <= 2;
+  if (c.track === 'flawless')   hit = r.outcome === 'Complete' && !r.initLost && hurt === 0;
+  if (hit) S.contract.n++;
   if (S.contract.n >= c.need) {
     S.coins += c.reward;
     log(`📜 <b>${c.name}</b> — kept. 🪙 +${c.reward} (you now hold ${S.coins}).`, 'good result');
     S.contract = null;
-  } else {
-    log(`📜 ${c.name}: ${S.contract.n} of ${c.need}.`);
+    return;
   }
+  if (S.contract.left <= 0) { expireContract(); return; }
+  if (hit) log(`📜 ${c.name}: ${S.contract.n} of ${c.need} · ${S.contract.left} encounters left.`);
 }
 function expireContract() {
   const c = activeContract(); if (!c) return;
@@ -1831,6 +2377,19 @@ const POTIONS = [
     text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
+  // ---- 🗺️ ONE POTION PER LAND (2026-08-10). Each is the single-turn answer to the thing its
+  // road keeps asking, which is what makes a stage's shelf feel like it belongs to that stage.
+  // ⚠️ Same gate as always: a potion may only name something PRINTED ON THE CARD or on the foe.
+  // ⚠️ And they are CONSUMED, which is why they do not break *lateral power, not vertical* —
+  // a potion buys ONE turn where the arrangement you wanted is legal.
+  { id: 'skyglass',  name: 'Skyglass',   tier: 2, cost: 5, rarity: 'uncommon',
+    text: '🌀 Your blow <b>cannot be halved</b> this turn' },
+  { id: 'stillwater', name: 'Stillwater', tier: 3, cost: 6, rarity: 'uncommon',
+    text: '🛡️ Nothing <b>strikes back</b> at you this turn' },
+  { id: 'hardtack',  name: 'Hardtack',   tier: 3, cost: 2, rarity: 'common',
+    text: '⏳ Any <b>Time Penalty is 1 less</b> this turn' },
+  { id: 'deepcurrent', name: 'Deepcurrent', tier: 4, cost: 9, rarity: 'rare',
+    text: '💨 You <b>win Initiative</b> this turn, whatever it is' },
   { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
     text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
 ];
@@ -1858,7 +2417,9 @@ function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.
 function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
-const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()));
+// 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
+const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()) &&
+                                             (!p.tier || p.tier <= stageTier()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
 
@@ -1904,6 +2465,10 @@ function applyPotion(p, card) {
   if (p.id === 'nightglass'){ fx.noNight = true; log(`🧪 ${p.name} — 🌙 the dark cannot catch you this journey.`, 'good'); }
   if (p.id === 'breath')   { fx.unspent = true; log(`🧪 ${p.name} — ✦ your Spell survives this casting.`, 'good'); }
   if (p.id === 'quench')   { fx.noShape = true; log(`🧪 ${p.name} — 🛡️ its guard means nothing this turn.`, 'good'); }
+  if (p.id === 'skyglass') { fx.noEvade = true; log(`🧪 ${p.name} — 🌀 it cannot slip your blow this turn.`, 'good'); }
+  if (p.id === 'stillwater'){ fx.noCounter = true; log(`🧪 ${p.name} — 🛡️ nothing strikes back this turn.`, 'good'); }
+  if (p.id === 'hardtack') { fx.tpCut += 1; log(`🧪 ${p.name} — ⏳ any Time Penalty is 1 lighter.`, 'good'); }
+  if (p.id === 'deepcurrent'){ fx.winInit = true; log(`🧪 ${p.name} — 💨 you move first, whatever it is.`, 'good'); }
   if (p.id === 'solvent')  { fx.holdCatalyst = true; log(`🧪 ${p.name} — ✦ your Catalyst stays in hand.`, 'good'); }
   if (p.id === 'gravewax') { log(`🧪 ${p.name} — ` + evRecoverCard('last'), 'good'); }
   if (p.id === 'salve')    { card.level++; log(`🧪 ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
@@ -2012,7 +2577,8 @@ function nextTurn() {
   S.damage = 0;
   S.damageEl = null;
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2221,7 +2787,8 @@ function computeAction(reserve) {
   const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
-  const boostEff = h === 'Night Travel' ? Math.max(0, boostRaw - elemInit) : boostRaw;
+  const boostEff = h === 'Rationed' ? 0                                   // ⏳ nothing is spare
+    : h === 'Night Travel' ? Math.max(0, boostRaw - elemInit) : boostRaw;
   const nightCut = boostRaw - boostEff;
 
   if (e.type === 'fight') {
@@ -2230,10 +2797,13 @@ function computeAction(reserve) {
     const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
-    const initLost = vE === 'Outpace' ? false : e.init > init;
+    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
+    // 🌬️ Windshear — the MARGIN matters, not just the verdict. Capped so a very slow hand is
+    // punished hard but never arbitrarily; the cap is what keeps it a problem instead of a wall.
+    if (ability === 'Windshear' && initLost) early += Math.min(3, Math.max(0, e.init - init));
     if (h === 'Ambush') early *= 2;
     if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
@@ -2249,8 +2819,10 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
-    const armorCut = (!quenched && e.shape === 'armour' && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
-    const evaded = !quenched && e.shape === 'evasion' && vS !== 'Landslide' && (e.init > evInit);
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
+    // 🧪 Skyglass — the blow simply cannot be halved
+    const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
+                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
     let value = Math.max(0, withBoost - armorCut);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
@@ -2261,18 +2833,24 @@ function computeAction(reserve) {
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
-    const outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+    let outcome = value >= e.hp ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+    if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
+    // 💢 Backlash — the excess comes back. Note it fires on a CLEAN KILL, which is the point:
+    // the only encounter in the game where a bigger blow is worse than a sufficient one.
+    const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk : 0;
+    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk
+      : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
     // the dodge only costs the Arsenal when it actually cancels the ranged hit (you won initiative)
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
+    if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
-             combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, hardship: h };
+             combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
   const wrongType = false;
   const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
@@ -2290,19 +2868,25 @@ function computeAction(reserve) {
   // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
   const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
-  const mpEff = e.mp + steepAdd;
+  // 🏔️ Updraft — speed shortens the road (never below 1 MP: a journey you cannot fail is not one)
+  const updraftCut = peril === 'Updraft' ? elemInit : 0;
+  const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
   const half = Math.ceil(mpEff / 2);
-  const outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
-  const timePenalty = outcome !== 'Complete' ? e.timePenalty : 0;
+  let outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
+  if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
+  // ⏳ Toll — the road that does not forgive. 🧪 Hardtack takes a point back off any penalty.
+  let timePenalty = outcome !== 'Complete' ? e.timePenalty * (peril === 'Toll' ? 2 : 1) : 0;
+  if (timePenalty && S.potionFx && S.potionFx.tpCut) timePenalty = Math.max(0, timePenalty - S.potionFx.tpCut);
   const stormDmg = h === 'Storm' ? timePenalty : 0;
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
-  const loseReserve = nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
+  const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
+    : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
-           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, treacherousDmg,
+           pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
@@ -2336,7 +2920,7 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
     else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
@@ -2360,7 +2944,7 @@ function resolve() {
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, so it feeds nothing now: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
     else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
@@ -2537,12 +3121,8 @@ function finishResolve() {
       log(`Deck is empty — remaining Time Penalty ${overflow} becomes damage`, 'bad');
     }
   }
-  // 🛡️ an Emberwake aimed at armour simply takes the hit for you
-  if (S.wakeTarget === 'armor' && S.wake > 0 && damage > 0) {
-    const stop = Math.min(damage, S.wake);
-    damage -= stop;
-    log(`🔥 Emberwake holds — ${stop} damage turned aside`, 'good');
-  }
+  // ❌ the 🛡️ armour aim was CUT 2026-08-12 (chosen 2.3% of the time, and the one target the
+  // candle cannot inform) — its absorption branch goes with it, in the same commit as the rule.
   S.damage = damage;
   if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
@@ -2670,21 +3250,21 @@ function rollOffer(rich) {
     for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
     const p = rand(bag);
     return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
-  // 📜 a contract only appears when you have none — never at camp (which sits on the region
-  // break, where a fresh one would expire before you could keep it), and ⚠️ NEVER WHEN THERE IS
-  // NO LONGER TIME TO KEEP IT. Measured before this gate: the bot bought 9.4 contracts a run and
-  // kept 0.76, burning ~50 coins on promises the region ended before it could meet. That is the
-  // picker rule again — an offer you cannot act on is a trap, not a gamble.
-  const turnsLeft = Math.max(0, REGION_ENCOUNTERS - (S.regionTurn || 0));
-  // ⚠️ AND IT NEEDS SLACK, NOT JUST ROOM. `need === turnsLeft` means a perfect run or nothing,
-  // which is a coin-flip dressed as a goal; measured that way the keep rate sat near 23%. Demanding
-  // one spare encounter turns it into a bet you can actually plan around.
-  if (!S.contract && !rich && turnsLeft >= 3 && rnd() < 0.28) {
-    const fits = CONTRACTS.filter(x => x.need < turnsLeft);
+  // 📜 a contract only appears when you have none. ⚠️ IT NO LONGER NEEDS THE REGION-TIME GATE
+  // — a contract carries its OWN window now and crosses region breaks, so "will it fit before the
+  // region ends" is not a question any more. What replaced the gate is the check below: there must
+  // be enough RUN left to keep it. An offer you cannot act on is a trap, not a gamble, and that
+  // stays true whether the wall is the region or the lair.
+  const runLeft = Math.max(0, (RUN().length - (S.region || 1)) * REGION_ENCOUNTERS +
+                             (REGION_ENCOUNTERS - (S.regionTurn || 0)));
+  if (!S.contract && !rich && rnd() < 0.28) {
+    // 🗺️ a land's own quest only appears from that stage on — same simulated unlock as charms
+    const fits = CONTRACTS.filter(x => (!x.tier || x.tier <= stageTier()) &&
+                                       Math.min(contractWindow(x), runLeft) > x.need);
     if (!fits.length) return mkCharmOrPotion();
     const c = rand(fits);
     return { kind: 'contract', id: c.id, name: c.name, text: c.text +
-      `<div class="wo-delta">🪙 pays <b>${c.reward}</b> · <b>${turnsLeft}</b> encounter${turnsLeft === 1 ? '' : 's'} left this region</div>`,
+      `<div class="wo-delta">🪙 pays <b>${c.reward}</b> · within <b>${contractWindow(c)}</b> encounters · carries across regions</div>`,
       rarity: 'uncommon', cost: c.cost };
   }
   return mkCharmOrPotion();
@@ -2745,21 +3325,28 @@ function startUpgrade() {
   // Opening the shop first makes the money a CHOICE: this charm, or three levels?
   startWheel(false);
 }
-// called by the Wheel when you are done shopping — what is left goes to the forge
-function startSharpen() {
-  S.upgradePick = null;
-  S.phase = 'upgrade';
-  render();
-}
+// 🛒 ONE SHOP (2026-08-10, Thomas: *"lets make it be the upgrading at the same time too, so i
+// can spend all my money at once and see all my options at once"*).
+//
+// The Wheel and the forge were two screens in a row, and that split the purse into two blind
+// halves: you priced a charm without knowing what a level would cost, then priced levels with
+// whatever survived. 🔑 A BUDGET DECISION YOU CANNOT SEE BOTH SIDES OF IS NOT A DECISION — it
+// is two guesses. Ordering them (shop first, 2026-08-05) fixed which half got starved; putting
+// them on ONE screen removes the starving.
+//
+// ⚠️ The `'upgrade'` phase is kept, unentered, so a save written mid-forge by an older build
+// still loads. It is dead code the day save version 5 stops mattering.
+function startSharpen() { doneUpgrades(); }
+const canSharpenNow = () => S.phase === 'upgrade' || S.phase === 'wheel';
 
 // 🔼 tap a card to see what it BECOMES; tap again to buy it
 function pickUpgrade(id) {
-  if (S.phase !== 'upgrade') return;
+  if (!canSharpenNow()) return;
   S.upgradePick = (S.upgradePick === id) ? null : id;
   render();
 }
 function buyUpgrade(id) {
-  if (S.phase !== 'upgrade') return;
+  if (!canSharpenNow()) return;
   const card = cardById(id); if (!card || !upgradable(card)) return;
   const cost = eff(card).cost;
   S.coins -= cost;
@@ -2790,8 +3377,8 @@ function wheelBuy(i) {
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
   } else if (o.kind === 'contract') {
     const c = contractById(o.id);
-    S.contract = { id: o.id, n: 0 };
-    log(`📜 You take on <b>${c.name}</b> — ${c.text} (−${o.cost} coins). Keep it and it pays 🪙 ${c.reward}.`, 'good result');
+    S.contract = { id: o.id, n: 0, left: contractWindow(c) };
+    log(`📜 You take on <b>${c.name}</b> — ${c.text} within <b>${contractWindow(c)} encounters</b> (−${o.cost} coins). Keep it and it pays 🪙 ${c.reward}.`, 'good result');
   } else if (o.kind === 'potion') {
     S.potions.push(o.id);
     log(`🧪 ${o.name} goes in your kit — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -2804,8 +3391,9 @@ function wheelBuy(i) {
 function wheelDone() {
   const camp = S.wheel && S.wheel.rich;
   S.wheel = null;
+  S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
-  startSharpen();
+  doneUpgrades();   // 🛒 sharpening happened right here; there is no second screen
 }
 
 // kept as an alias so the solver/older callers still work — coins now simply roll over
@@ -3512,29 +4100,170 @@ function sceneVars(e, isFight) {
          ` --gx:${p.gx}%; --gy:${p.gy}%; --night:${night.toFixed(3)};`;
 }
 
+// 🖼️ ART BY NAME (2026-08-10) — a foe wears its own picture the moment the file exists.
+//
+// 🔑 THE WHOLE POINT IS THAT NOTHING BREAKS WHILE THE FOLDER IS EMPTY. There are 69 creatures
+// and they arrive one at a time over days; a build that needs all of them, or that shows a broken
+// image icon for the 68 that have not been drawn yet, would make the art a blocking dependency.
+// So: the silhouette renders as it always did, an <img> is laid over it, and the picture only
+// takes over `onload`. A miss removes itself and you never see that it tried.
+//
+// 🗝️ REAL ALPHA (2026-08-10). The plates are drawn on flat #000000 and `art/keyalpha.ps1`
+// keys that to true transparency, so a creature is a genuine cutout rather than a dark rectangle
+// feathered into a dark scene. ⚠️ IT FLOOD-FILLS FROM THE BORDER, IT DOES NOT THRESHOLD BRIGHTNESS
+// — these creatures are deliberately dark, so "anything black becomes transparent" would dissolve
+// the armour and leave floating ember veins. Only black CONNECTED to the edge is background.
+//
+// ⚠️ These are PLACEHOLDERS, and the standing rule still holds — we are not building
+// presentation. What makes this the exception is that a PNG is an ASSET, not a system: it ports to
+// Godot unchanged, the same way the numbers in Balance_Log transfer. `#foe-slot` was always
+// specified as the animation slot; this is that slot doing its job a little early.
+const artSlug = n => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// 🎭 THE MAGE. Same mechanism as a foe, its own folder, because she is not content - she is
+// the CLASS, and a rogue will drop `art/hero/rogue.png` beside her without touching this code.
+// ⚠️ Her art obeys the layout rule from July: hat, face and casting arm must live in the UPPER
+// HALF of the plate, because the scene is full-bleed BEHIND the UI and the card row occludes
+// everything below roughly 40% of her height.
+// 🚶 SHE HAS TWO POSES, AND THE SCENE PICKS ONE. A fighting stance is wrong on an empty road:
+// a journey is travel, not a duel, and the mage throwing a fireball at a hillside says the scene
+// does not know what is happening in it. `cast` for anything with a foe, `walk` for the road.
+// ⚠️ Poses are per CLASS, so a rogue needs rogue-cast.png and rogue-walk.png and no code.
+function heroPose() {
+  if (S.finalMode) return 'cast';
+  return (S.encounter && S.encounter.type === 'journey') ? 'walk' : 'cast';
+}
+function heroArt() {
+  return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}-${heroPose()}.png?v=${BUILD}" ` +
+    `onload="this.parentNode.classList.add('has-art'); stageFloor();" onerror="this.remove()">`;
+}
+// 🗺️ A PLACE, NOT A THING (2026-08-10). A creature is an object IN the scene; a journey IS
+// the scene. So a journey's art is a BACKDROP behind everything rather than a cutout in a slot -
+// which also fixes the emptiest screen in the game, since a journey has no foe to look at and
+// draws nothing but a road-glow today.
+//
+// ⚠️ NO KEYING, and it must stay DARK. The UI floats directly on the scene, so a bright or busy
+// backdrop costs legibility on every phase - the art is generated dusk-lit, dimmed further in CSS,
+// and the existing vignette sits on top of it.
+function placeArt(name) {
+  if (!name) return '';
+  return `<img class="place-img" alt="" src="art/places/${artSlug(name)}.jpg?v=${BUILD}" ` +
+    // ⚠️ the scrim must die WITH the image. Left behind on its own it would darken the plain
+    // gradient scene of every place that has no painting yet, i.e. almost all of them.
+    `onerror="var s=this.nextElementSibling; if(s&&s.className==='place-scrim')s.remove(); this.remove();">` +
+    `<div class="place-scrim"></div>`;
+}
+function foeArt(name) {
+  if (!name) return '';
+  // ⚠️ THE ART URL MUST CARRY THE BUILD. Everything else here is versioned - style.css,
+  // game.js, and index.html revalidates - but an image filename never changes, so a browser that
+  // cached cindermaw.png once will serve that copy forever. Re-keying the alpha and re-deploying
+  // looked exactly like the key had failed, because the old picture kept arriving. Third time this
+  // project has lost time to a cache: HTML, then the PWA, now assets.
+  return `<img class="foe-img" alt="" src="art/foes/${artSlug(name)}.png?v=${BUILD}" ` +
+    `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">`;
+}
+
 function renderScene() {
   const el = $('scene');
   if (!el) return;
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') {
-    el.innerHTML = ''; el.hidden = true; return;
+    el.innerHTML = ''; el.hidden = true; el.dataset.sceneKey = ''; return;
   }
   el.hidden = false;
   const e = S.encounter;
   const duel = S.finalMode && S.finalPhase === 'duel';
   const isFight = duel || (e && e.type === 'fight');
   let foe;
-  if (duel) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}</div>`;
-  else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}</div>`;
+  // 🐉 THE DRAGON IS ON SCREEN FOR THE WHOLE FINALE, not just the duel beats (2026-08-10).
+  // The Last Mile is a JOURNEY, so it used to draw the empty road - while the enemy panel showed
+  // "Cindermaw 52/52" and the log said the lair was in sight. Three parts of the UI describing the
+  // same moment, one of them saying nothing is there.
+  // 🔑 The scene must agree with the panel. You are at the lair mouth; the thing is right there.
+  if (S.finalMode) foe = `<div class="foe foe-dragon" id="foe-slot" data-anim="dragon">${ART.dragon}${foeArt(S.dragon.name)}</div>`;
+  else if (isFight) foe = `<div class="foe foe-beast" id="foe-slot" data-anim="creature">${ART.beast}${foeArt(e.name)}</div>`;
   else foe = `<div class="foe foe-road" id="foe-slot" data-anim="none"></div>`; // journeys: the road ahead
-  el.className = isFight ? 'is-fight' : 'is-journey';
-  el.setAttribute('style', sceneVars(e, isFight));
+  // 🔁 REBUILD ONLY WHEN THE SCENE ACTUALLY CHANGED (2026-08-12).
+  //
+  // 🐛 THE BUG, reported in play: "in the tutorial, everytime i click next, it flashes the images".
+  // `render()` runs on EVERY interaction — dismissing a lesson, swapping two cards, arming the
+  // bank — and this function rebuilt `innerHTML` each time. That destroys the <img> elements and
+  // creates new ones, so `.has-art` is gone until `onload` fires again and the opacity fade
+  // replays from zero. The art was re-decoding several times a turn and strobing every time.
+  //
+  // 🔑 A FADE-IN THAT IS KEYED TO ELEMENT CREATION BECOMES A FLICKER THE MOMENT ANYTHING
+  // RE-RENDERS. Either the element must survive the render, or the transition must not exist.
+  // Keeping the element is the right half: the picture is the same picture.
+  //
+  // The key covers everything that can change what is DRAWN — never anything that merely changes
+  // as you play a turn, or we are back to rebuilding constantly.
+  // ✅ Bonus fix: `fx()` puts transient classes on #scene (e.g. fx-dark on Nightfall) and the
+  // `el.className =` below used to wipe them on any render inside the animation's window.
+  const cls = isFight ? 'is-fight' : 'is-journey';
+  const style = sceneVars(e, isFight);
+  const key = [cls, style, S.finalMode ? 1 : 0, S.finalPhase || '',
+               S.dragon && S.dragon.name, e && e.name, e && e.type, heroPose()].join('|');
+  if (el.dataset.sceneKey === key) { stageFloor(); return; }   // layout can still shift under it
+  el.dataset.sceneKey = key;
+  el.className = cls;
+  el.setAttribute('style', style);
   el.innerHTML =
+    // 🗺️ WHAT PLACE ARE WE IN?
+    //   JOURNEY  its own painting - a journey IS a place, and travelling is what you are doing
+    //   FINALE   the dragon's lair - the one fight that has earned a stage
+    //   FIGHT    nothing. The dark.
+    //
+    // ⚠️ CREATURE FIGHTS GET NO BACKDROP, and that is a considered reversal (2026-08-11). Region
+    // paintings were built and tried, and they read WORSE: a creature is a cutout dropped onto a
+    // photographic-depth painting, so the composite fights itself - two different spaces claiming
+    // to be one. Against the plain dark the creature is simply the thing you are facing.
+    // 🔑 A place is for TRAVELLING THROUGH or ARRIVING AT. A fight is not somewhere, it is
+    // something. The dragons keep their lairs because arriving at one is the whole point of a run.
+    // ⚠️ The four region paintings are KEPT on disk, unused, rather than deleted - this is a
+    // feel judgement and feel judgements get revisited.
+    placeArt(S.finalMode ? S.dragon.name + ' lair'
+      : (e && e.type === 'journey') ? e.name
+      : null) +
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
-    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}</div>` +
-    `<div class="scene-name">${duel ? S.dragon.name : e ? e.name : ''}</div>` +
+    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
+    `<div class="scene-name">${S.finalMode ? S.dragon.name : e ? e.name : ''}</div>` +
     `<div class="scene-vig"></div>`;
+  stageFloor();
 }
+
+// 📏 WHERE THE VISIBLE STAGE ACTUALLY ENDS (2026-08-10).
+//
+// The scene is full-bleed BEHIND the UI, so the bottom of `#scene` and the bottom of what you can
+// SEE are different lines - separated by the height of the card row. That gap is a few hundred
+// pixels and it changes with every viewport, so no percentage in the stylesheet can express it:
+// bottom-anchoring the mage to the scene buried her face behind the cards on a tall window, and
+// top-anchoring left her floating in mid-air with dead space underneath on a short one.
+//
+// 🔑 So measure it once per render and hand CSS the number. The mage then stands on the
+// VISIBLE floor at every size, with her legs running down behind the cards where they belong.
+// ⚠️ Layout only - nothing here feeds the rules, and it is the first thing Godot replaces.
+// 🎭 WHERE THE CARD ROW CUTS HER. Thomas: *"cut her at the waist"* - she should loom in the
+// near foreground with the cards crossing her mid-body, not stand whole on a shelf.
+// ⚠️ This CANNOT be a CSS percentage. `bottom: N%` resolves against the container's HEIGHT, but
+// how far she must drop depends on how TALL SHE IS DRAWN - and a 2:3 plate in her box fits by
+// WIDTH, so her drawn height tracks the scene's width. The two are unrelated. Measure instead.
+const MAGE_CUT = 0.55;   // fraction of the plate left ABOVE the cards (0.55 ~ her waist)
+function stageFloor() {
+  const sc = $('scene'), cards = $('slots-panel');
+  if (!sc || !cards) return;
+  const s = sc.getBoundingClientRect(), c = cards.getBoundingClientRect();
+  const hidden = Math.max(0, Math.round(s.bottom - c.top));
+  sc.style.setProperty('--stage-floor', hidden + 'px');
+
+  const box = $('mage-slot'), img = box && box.querySelector('.mage-img');
+  if (!img || !img.naturalWidth) return;
+  const b = box.getBoundingClientRect();
+  // replicate object-fit: contain to find how tall she is actually painted
+  const scale = Math.min(b.width / img.naturalWidth, b.height / img.naturalHeight);
+  const drawn = img.naturalHeight * scale;
+  sc.style.setProperty('--mage-drop', Math.round((1 - MAGE_CUT) * drawn) + 'px');
+}
+try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !isShell()) stageFloor(); }); } catch (e) {}
 
 // 🏠 THE SHELL — screens that exist OUTSIDE a run and must not assume one.
 // ⚠️ The stages screen only ever worked because boot used to call freshGame() first, so `S`
@@ -3573,13 +4302,33 @@ function render() {
 // 🎓 SHOW, DON'T TELL. The lesson puts a ring around the thing it describes — the slot row, the
 // card that would attune, the enemy panel. This is the interactive half: you read a sentence and
 // the screen tells you where to look.
+// ⚠️ MADE LOUDER 2026-08-12 (Thomas: *"can we make it more obvious somehow?"*). The ring was a
+// 2px outline with a faint pulse, and it had two separate problems:
+//   1. it was quiet against a busy dark UI, and
+//   2. 🔑 ON A PHONE THE THING BEING POINTED AT IS OFTEN NOT ON SCREEN AT ALL. The layout stacks
+//      — enemy panel, then cards, then controls — so a lesson in the controls can ring a stat chip
+//      a thousand pixels above it. **No amount of brightness fixes a highlight you cannot see**,
+//      which is why the scroll matters more than the styling did.
+// The ring itself is now a heavy double ring + glow (see .lesson-point), and it re-plays its
+// attention animation whenever the TARGET changes — `lessonPointed` is what stops it restarting
+// on every unrelated render, which is the same flicker class as the scene rebuild.
+let lessonPointed = null;
 function pointAtLesson() {
-  document.querySelectorAll('.lesson-point').forEach(el => el.classList.remove('lesson-point'));
-  const L = nextLesson(); if (!L || !L.point) return;
+  document.querySelectorAll('.lesson-point').forEach(el => el.classList.remove('lesson-point', 'lesson-point-in'));
+  const L = nextLesson();
+  if (!L || !L.point) { lessonPointed = null; return; }
   let sel = L.point; if (typeof sel === 'function') { try { sel = sel(); } catch (e) { sel = null; } }
-  if (!sel) return;
+  if (!sel) { lessonPointed = null; return; }
   const el = document.querySelector(sel);
-  if (el) el.classList.add('lesson-point');
+  if (!el) { lessonPointed = null; return; }
+  el.classList.add('lesson-point');
+  const key = L.id + '|' + sel;
+  if (lessonPointed === key) return;      // same target as last render — don't restart anything
+  lessonPointed = key;
+  el.classList.add('lesson-point-in');    // the one-shot "look here" pop
+  // bring it into view, centred, but never fight a scroll the player is already making
+  try { if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); }
+  catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
 }
 
 // 🔑 EVERYTHING CURRENTLY MODIFYING YOUR MATHS, NAMED AND SIGNED (2026-07-29). Curses were
@@ -3600,7 +4349,7 @@ function carried() {
   // rule says must be on screen every turn, with its PROGRESS, not just its name
   const ct = activeContract();
   if (ct) out.push({ curse: false, name: ct.name,
-    text: `📜 ${S.contract.n}/${ct.need} · pays 🪙 ${ct.reward}` });
+    text: `📜 ${S.contract.n}/${ct.need} · ${S.contract.left != null ? S.contract.left + ' left · ' : ''}pays 🪙 ${ct.reward}` });
   return out;
 }
 const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
@@ -3802,6 +4551,7 @@ function renderControls() {
       lessonRow +
       potionRow +
       wakeRow +
+      bankRowHTML() +
       boostRow +
       resolveBtn +
       divertBtn +
@@ -3871,11 +4621,26 @@ function renderControls() {
     if (!S.wheel) S.wheel = { offers: spinWheel(false), rich: false, bought: [] };  // e.g. restored from a save
     const w = S.wheel;
     const canReroll = S.coins >= REROLL_COST;
+    // 🔼 the forge half of the same purse — stated here so both prices are on one screen
+    const canUp = S.hand.filter(cc => upgradable(cc));
+    const cheapUp = S.hand.filter(cc => cc.level < MAX_LEVEL && !S.downgraded.has(cc.id))
+      .map(cc => eff(cc).cost).filter(x => x != null).sort((a, b) => a - b)[0];
+    const sharpenLine = canUp.length
+      ? `🔼 <b>${canUp.length}</b> of your cards can be sharpened now — tap one below to see exactly what it becomes.`
+      : cheapUp != null ? `🔼 Sharpening the cheapest card below needs <b>🪙 ${cheapUp}</b>.`
+      : `🔼 Nothing in hand can be sharpened.`;
     const offers = w.offers.map((o, i) => {
       const afford = o.cost <= S.coins && o.kind !== 'none';
       const cls = `wheel-offer r-${o.rarity}${o.bought ? ' bought' : ''}`;
       return `<div class="${cls}">` +
-        `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity : o.kind === 'repair' ? 'MEND' : o.kind === 'none' ? '—' : 'UPGRADE'}` +
+        // 🏷️ every kind names ITSELF. Potions and contracts both fell through to the word
+        // "UPGRADE" — left over from when the Wheel sold card levels — so the shop labelled three
+        // different things with the name of a fourth that is no longer sold here.
+        `<div class="wo-rar">${o.kind === 'charm' ? 'CHARM · ' + o.rarity
+          : o.kind === 'potion' ? 'POTION · ' + o.rarity
+          : o.kind === 'contract' ? '📜 QUEST'
+          : o.kind === 'repair' ? 'MEND'
+          : o.kind === 'none' ? '—' : String(o.kind).toUpperCase()}` +
         `</div>` +
         `<div class="wo-name">${o.name}</div><div class="wo-text">${o.text}</div>` +
         (o.bought ? `<div class="wo-taken">taken</div>`
@@ -3884,8 +4649,10 @@ function renderControls() {
         `</div>`;
     }).join('');
     c.innerHTML =
-      `<div class="phase-label">${w.rich ? '🔥 CAMP — THE LONG WHEEL' : '🎰 THE WHEEL'}</div>` +
-      `<div class="hint">You hold <b style="color:#c9b458">🪙 ${S.coins}</b> — and coins keep. Buy what's worth it, re-spin for something better, or bank it all for a bigger pull later.</div>` +
+      `<div class="phase-label">${w.rich ? '🔥 CAMP — THE LONG WHEEL' : '🎰 THE WHEEL'} — 🪙 ${S.coins}</div>` +
+      `<div class="hint">You hold <b style="color:#c9b458">🪙 ${S.coins}</b> — and coins keep. ` +
+      `Buy from the wheel, <b>sharpen your own cards below</b>, or bank it for a bigger pull later.` +
+      (sharpenLine ? `<br>${sharpenLine}` : '') + `</div>` +
       `<div class="wheel-row">${offers}</div>` +
       `<button onclick="wheelReroll()" ${canReroll ? '' : 'disabled'}>🎲 Re-spin — 🪙 ${REROLL_COST}${canReroll ? '' : ' (short)'}</button>` +
       `<button class="primary" onclick="wheelDone()">${w.rich ? 'Break camp' : 'Move on'}</button>` +
@@ -4037,7 +4804,17 @@ function renderControls() {
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
           `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? gradeBadge(d.stage) : ''}` +
-          `<span class="stage-shape">${open ? dragonShapeText(d) + ' · <b>' + d.teaches + '</b>' : 'locked — clear stage ' + (d.stage - 1) + ' to open'}</span>` +
+          // ❌ THE PICKER DOES NOT SPOIL THE DRAGON (2026-08-05, Thomas: *"lets remove what the
+          // boss does, don't think we really need to show that off"*). It used to print the SHAPE
+          // and the demand on every stage button.
+          // 🔑 The turn-1 BRIEFING is where that belongs, and it is a designed moment: the run is
+          // *soft-directional* because you learn the problem the instant it starts and then spend
+          // twenty turns preparing for it. Printing the same facts on the menu spends the reveal
+          // before the run exists, and turns choosing a stage into reading a stat block.
+          // What the button says instead is about YOU — what you have done here, not what it does.
+          `<span class="stage-shape">${!open ? 'locked — clear stage ' + (d.stage - 1) + ' to open'
+            : done ? 'felled — go again for a better grade'
+            : 'not yet felled'}</span>` +
           `</button>`;
       }).join('') +
       `<button class="dev-open" onclick="showMenu()">← Menu</button>`;
@@ -4052,7 +4829,13 @@ function renderControls() {
       `<table><tr><th>Card</th><th>Level</th></tr>` +
       survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
       `</table></div>` +
-      `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`;
+      // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either
+      // becomes a player or closes the tab, and it used to end on the same generic stage picker a
+      // returning player gets. A picker is a question; what someone who has just been taught needs
+      // is the NEXT THING, named. So the tutorial's victory screen points at stage 1 by name, with
+      // the one demand it makes — the same briefing language the run itself uses.
+      (S.tutorial ? tutorialHandoffHTML()
+        : `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`);
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -4111,14 +4894,33 @@ function zoneHint(zone) {
       // ✦ Second Flame gives the Surge a second job — name it here or the slot lies about itself
       if (hasCharm('secondflame') && sc && spellCard() && attunerCard() === sc)
         return `✦ ATTUNES the Spell · +power now`;
-      if (sc && el && elOf(sc) === elOf(el))
-        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, nothing now`;
-      if (el) return `+power now — or match ${elOf(el)} to BANK it`;
+      if (sc && S.bankArmed)
+        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, ${bankCostPhrase(sc)}`;
+      if (sc) return `+power now — or 🔥 bank it for next turn`;
       return '+power — returns to your deck';
     }
     case 'Reserve': return 'kept in hand for next turn';
   }
 }
+// 🔥 ARM THE BANK. It sits in the controls with the Emberwake's AIM row rather than on the Surge
+// card, so the whole mechanic reads in one place: arm it here, aim it here next turn.
+// ⚠️ It was drafted into the Surge slot's head first (the "decision belongs on the object" rule)
+// and pulled back out: `.slot-head` is a FIXED 46px on purpose — a taller head staggers the whole
+// four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
+// states what will happen to that card, which is the part that must live on the object.
+function bankRowHTML() {
+  if (!isAssignPhase()) return '';
+  const sc = cardById(S.assign.Boost);
+  if (!sc) return '';
+  const v = bankValueOf(sc);
+  const on = !!S.bankArmed;
+  return `<div class="wake-row bank-row"><span class="wake-lab">🔥 Your <b>Surge</b> — ` +
+    (on ? `<b>banking +${v}</b> for next turn` : `+${v} power now`) + `</span>` +
+    `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleBank()">` +
+    (on ? 'spend it now instead' : `bank it for next turn`) + `</button>` +
+    `<span class="wake-note">${on ? 'nothing this turn' : 'worth it when this turn is already decided'}</span></div>`;
+}
+
 // a one-word mark of the card's fate, shown on the card itself during the action phase
 function fateOf(zone) {
   if (zone === 'Spell') return { cls: 'fate-spent', text: '⊘ spent' };
@@ -4185,7 +4987,7 @@ function cardHTML(card) {
   // 🔑 So we render THE SAME CARD RENDERER against a card one level higher. A hand-written preview
   // could drift from the real thing; this one cannot, by construction - it is the real thing.
   const real = card;
-  const previewing = S.phase === 'upgrade' && S.upgradePick === card.id && card.level < MAX_LEVEL;
+  const previewing = canSharpenNow() && S.upgradePick === card.id && card.level < MAX_LEVEL;
   if (previewing) card = { ...card, level: card.level + 1 };
   const v = eff(card);
   const d = card.def;
@@ -4250,7 +5052,7 @@ function cardHTML(card) {
     action = eventCanPick(opt, card)
       ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
       : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
-  } else if (S.phase === 'upgrade') {
+  } else if (canSharpenNow()) {
     // ⚠️ every number here reads off `real`, never the previewed copy — the cost of the NEXT
     // level is not the cost printed by the level you are looking at.
     if (real.level >= MAX_LEVEL) {
@@ -4366,7 +5168,8 @@ function startLastMile() {
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -4508,7 +5311,8 @@ function startDuelBeat() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
-  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} }; S.potionPick = null;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
@@ -4570,7 +5374,7 @@ function resolveDuel() {
   const b1 = [];
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst: +${r.bank} Emberwake for next beat`, 'good'));
+  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next beat`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
   if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));

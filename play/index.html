@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- 🔁 THE ENTRY HTML MUST NEVER BE CACHED. Every asset here is versioned with ?v=N,
+     but this file cannot version itself - so a cached copy quietly serves an OLD ?v= and
+     the browser runs yesterday's game while the server holds today's. That has cost this
+     project two debugging sessions (a "missing" economy change, then missing art).
+     Revalidating ONLY this file is cheap: it is 1KB, and everything it pulls stays cached. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="Emberwick — a candlelit puzzle-strategy roguelite card game.">
 <title>Emberwick</title>
@@ -13,13 +20,15 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=176">
+<link rel="stylesheet" href="style.css?v=220">
 </head>
 <body>
 <header>
   <h1><span class="mark">🕯️</span> Emberwick</h1>
   <div id="turn-indicator"></div>
-  <button id="newrun-btn" onclick="newGame()" title="Start a new run">⟳ New Run</button>
+  <button id="report-btn" onclick="copyReport()" title="Copy what the game is doing right now, to paste into a bug report">📋 Report</button>
+  <button id="menu-btn" onclick="toMenu()" title="Back to the main menu — your run is saved">🏠 Menu</button>
+  <button id="newrun-btn" onclick="newGame()" title="Start this stage again from the beginning">⟳ New Run</button>
 </header>
 
 <div id="status-bar"></div>
@@ -39,6 +48,6 @@
   </div>
 </main>
 
-<script src="game.js?v=176"></script>
+<script src="game.js?v=220"></script>
 </body>
 </html>

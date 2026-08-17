@@ -34,9 +34,25 @@ $files = @(
   'icon-512.png'
 )
 
+# The art, which is NOT a flat file list.
+# ⚠️ ADDED 2026-08-12, and it was missing for two builds. Art paths are RELATIVE
+# (`art/foes/<slug>.png`), so from /play/ they resolve to /emberwick/play/art/...
+# -- and `foeArt()` removes an image that fails to load, silently and by design.
+# A drop without this folder is not a broken drop, it is a drop where every
+# creature quietly has no picture and nothing anywhere says so.
+# 🔑 The same trap as the tutorial's missing art: a COPY LIST written before the
+# thing existed. When you add a new kind of asset, find every list that enumerates
+# what ships.
+# Dev tools inside art/ (keyalpha.ps1, sizeplace.ps1) are deliberately excluded.
+$artDirs = @('foes', 'places', 'hero')
+
 foreach ($f in $files) {
   $p = Join-Path $root $f
   if (-not (Test-Path $p)) { throw "MISSING: $f -- refusing to cut a partial drop." }
+}
+foreach ($d in $artDirs) {
+  $p = Join-Path $root "art\$d"
+  if (-not (Test-Path $p)) { throw "MISSING: art\$d -- refusing to cut a partial drop." }
 }
 
 if (-not (Test-Path $dest)) { New-Item -ItemType Directory $dest | Out-Null }
@@ -47,8 +63,17 @@ $html  = Get-Content (Join-Path $root 'index.html') -Raw
 $build = if ($html -match 'game\.js\?v=(\d+)') { $Matches[1] } else { '?' }
 
 # Clear the folder first, so a file deleted upstream does not survive in the drop.
+# ⚠️ -Recurse as well now: the art folder has to go too, or a creature whose plate was
+# regenerated or renamed upstream keeps its old picture in the frozen copy forever.
 Get-ChildItem $dest -File | Remove-Item -Force
+if (Test-Path (Join-Path $dest 'art')) { Remove-Item (Join-Path $dest 'art') -Recurse -Force }
 foreach ($f in $files) { Copy-Item (Join-Path $root $f) (Join-Path $dest $f) -Force }
+
+New-Item -ItemType Directory (Join-Path $dest 'art') -Force | Out-Null
+foreach ($d in $artDirs) {
+  Copy-Item (Join-Path $root "art\$d") (Join-Path $dest 'art') -Recurse -Force
+}
+$artCount = (Get-ChildItem (Join-Path $dest 'art') -Recurse -File).Count
 
 # A note in the folder, so nobody edits the frozen copy by mistake.
 @"
@@ -66,7 +91,7 @@ cut-playtest.ps1 runs. Change the real files in prototype/ and cut a new drop.
 Write-Host ""
 Write-Host "  Playtest drop cut: build $build" -ForegroundColor Green
 Write-Host "  -> $dest"
-Write-Host "  $($files.Count) files. Dev tools excluded."
+Write-Host "  $($files.Count) files + $artCount art assets. Dev tools excluded."
 Write-Host ""
 Write-Host "  Now:  git add -A ; git commit -m `"Playtest drop: build $build`" ; git push"
 Write-Host ""
