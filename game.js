@@ -911,14 +911,15 @@ const ROGUE = {
   momentum: true,          // ● earned by pairing, spent on speed or cuts
   canPlace() { return true; },
   valid() { return !!spellCard(); },
-  // ⚠️ THE FUEL CARD IS SPENT TOO, and this is the only place that knows it — so the engine's
-  // cleanup discards it without ever learning what energy is.
-  spentIds() {
-    const out = S.assign.Spell ? [S.assign.Spell] : [];
-    const m = rogueMath();
-    if (m && m.fuel && m.cost > 0) out.push(S.assign.Boost);
-    return out;
-  },
+  // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
+  // wasn't thinking the fuel would leave the deck"*). The fuel card slides back UNDER the deck like
+  // the Combo card — only the STRIKE is discarded, exactly as the mage's Spell is.
+  // 🔑 THE ASYMMETRY THIS KILLS WAS REAL AND UNMEASURED: burning to the discard made the rogue
+  // spend TWO cards a turn against the mage's one — 8 cards a region against 4, out of the same
+  // 16-card deck — and in a game where the deck IS the health bar that is an enormous hidden tax.
+  // The cost of ③ is now what it should be: that card does nothing else this turn, and you will
+  // not see it again for a while.
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
   compose() {
     const strike = spellCard();
     if (!strike) return null;
@@ -5377,12 +5378,12 @@ function rogueZoneHint(zone, isFight) {
     }
     case 'Boost': {
       const fuel = cardById(S.assign.Boost);
-      if (!st) return 'burn a card here to pay for your Strike';
+      if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
-      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — burn a card here`;
+      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to spend`;
       return m.full
-        ? `BURNED for <b>⚡ ${m.paid}</b> — pays the <b>${m.cost}</b>, and this card is gone`
-        : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough, and this card is still gone`;
+        ? `spends <b>⚡ ${m.paid}</b> — pays the <b>${m.cost}</b> · returns to your deck`
+        : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
