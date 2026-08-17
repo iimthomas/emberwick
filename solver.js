@@ -17,14 +17,17 @@
    🔑 IT IS A POLICY, NOT A FACT. A bot policy can invert what you measure (the stir-band sweep read
    backwards for exactly this reason), so: one named constant, sitting BELOW outcome and damage in
    the lexicographic order — a chain is never worth losing an encounter for — and any number
-   produced with it must be reported alongside the same number at CHAIN_WEIGHT = 0.
+   produced with it must be reported alongside the same number at MOMENTUM_WEIGHT = 0.
    ============================================================================================== */
-let CHAIN_WEIGHT = 1;
-function setChainWeight(w) { CHAIN_WEIGHT = w; }
+let MOMENTUM_WEIGHT = 1;
+function setMomentumWeight(w) { MOMENTUM_WEIGHT = w; }
 // what the arrangement LEAVES BEHIND: a live link is worth more the deeper it already is.
+// ⚠️ REWRITTEN WITH THE CLASS: this used to score a live CHAIN LINK. It now scores where the
+// METER LANDS, which is the thing a one-encounter scorer is blind to — a builder turn looks like a
+// weak turn to it, because the payoff is two turns away.
 function chainValue(r) {
-  if (!CHAIN_WEIGHT || !r || !r.rogue) return 0;
-  return CHAIN_WEIGHT * (r.rogue.linked ? r.rogue.chain : 0);
+  if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
+  return MOMENTUM_WEIGHT * (r.rogue.next || 0);
 }
 
 /* ============================================================
@@ -75,8 +78,8 @@ const SOLVER = (() => {
   // 🔑 BUT A BOT POLICY CAN INVERT WHAT YOU MEASURE (the 2026-08-05 stir-band lesson: a sweep read
   // backwards purely because of how the bot picked). So the weight is ONE named constant, it sits
   // BELOW outcome and damage in the lexicographic order — a chain is never worth losing an
-  // encounter for — and every number produced with it must be reported alongside CHAIN_WEIGHT = 0.
-  // (CHAIN_WEIGHT and chainValue live at the TOP of this file — see the note there. There are two
+  // encounter for — and every number produced with it must be reported alongside MOMENTUM_WEIGHT = 0.
+  // (MOMENTUM_WEIGHT and chainValue live at the TOP of this file — see the note there. There are two
   // scorers in here and putting it in one of them is how the last three of these bugs happened.)
 
   // ---- score a computeAction result: [outcomeRank, -damage, -loseReserve, chain, value] ----
@@ -622,7 +625,7 @@ const RUNSIM = (() => {
     finally { window.render = _r; window.saveGame = _s; try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
-  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setChainWeight };
+  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight };
 })();
 
 function runSimulator() {
