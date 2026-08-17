@@ -11,6 +11,8 @@ const MAX_LEVEL = 4;
 // ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
 let ATTUNE_BONUS = 1;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
+// 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
+const GUARD_CUT = 0.5;
 const HAND_SIZE = 4;
 const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so it must stay ABOVE it
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
@@ -1383,7 +1385,7 @@ function dragonDemand(d) {
   const bits = [];
   if (d.shapes.includes('armour')) bits.push(`it shaves <b>${d.shapeV}</b> off every blow`);
   if (d.shapes.includes('evasion')) bits.push(`it <b>halves</b> any blow it saw coming`);
-  if (d.shapes.includes('guard')) bits.push(`its plates <b>swallow your first ${d.shapeV} hit${d.shapeV === 1 ? '' : 's'} whole</b>`);
+  if (d.shapes.includes('guard')) bits.push(`its plates <b>halve your first ${d.shapeV} hit${d.shapeV === 1 ? '' : 's'}</b>`);
   if (d.shapes.includes('relentless')) bits.push(`its breath <b>grows +${RELENTLESS_STEP} every beat</b>`);
   return bits.join(' · ');
 }
@@ -1567,7 +1569,7 @@ function shapeText(e) {
   if (foeHas(e, 'evasion')) bits.push(`🌀 <b>Evasion</b> — halves your hit unless you strike first`);
   // 🧱 states the demand in HITS, because that is the unit it charges in — "absorbs 2 damage" would
   // be a lie about a pool that counts blows, and a shape you misread is a shape you cannot answer.
-  if (foeHas(e, 'guard')) bits.push(`🧱 <b>Guard ${e.shapeV}</b> — swallows your first ${e.shapeV} hit${e.shapeV === 1 ? '' : 's'} whole; needs MANY`);
+  if (foeHas(e, 'guard')) bits.push(`🧱 <b>Guard ${e.shapeV}</b> — halves your first ${e.shapeV} hit${e.shapeV === 1 ? '' : 's'}, so it wants MANY`);
   return bits.join(' + ') || '— unguarded';
 }
 
@@ -3174,7 +3176,7 @@ function computeAction(reserve) {
     // 🧱 Deep Cut shaves a hit off the pool · 🗡️ Whetstone sharpens every hit
     const guardPool = (!quenched && foeHas(e, 'guard'))
       ? Math.max(0, (e.shapeV || 0) - (hasCharm('deepcut') ? 1 : 0)) : 0;
-    const landed = Math.max(0, hits - guardPool);
+    const guarded = Math.min(hits, guardPool);
     const whet = hasCharm('whetstone') ? 1 : 0;
     // ⚠️ ONE PATH, NOT TWO. The single-hit case used to bypass perHit entirely, which meant
     // 🗡️ Whetstone ("every hit strikes +1") did nothing at all on a one-hit turn — a charm that
@@ -3182,7 +3184,25 @@ function computeAction(reserve) {
     // 🔑 A SPECIAL CASE FOR THE COMMON PATH IS A PLACE FOR A RULE TO GO MISSING.
     // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
     const perHit = (hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
-    let value = (guardPool ? landed : hits) * Math.max(0, perHit - armorCut);
+    // 🧱 GUARD REDUCES, IT DOES NOT NULLIFY (softened 2026-08-17, Thomas: *"that doesn't sound
+    // fun if a mage literally can't do anything about guard"* / *"i don't want to have to force
+    // people to play a different class"*).
+    //
+    // ⚠️ IT SHIPPED AS A CLIFF: the first N hits were swallowed WHOLE, so a mage — who lands
+    // exactly one hit, always — dealt literally ZERO to Guard 1. I built that and then defended it
+    // as a feature, when this file's own note had already called it *"unanswerable, not hard"*.
+    //
+    // 🔑 THE RULE THIS EARNS: **EVERY CLASS MUST BE ABLE TO BEAT EVERY STAGE. Classes differ in
+    // how HARD, never in WHETHER.** A shape one class cannot engage with is not difficulty, it is a
+    // paywall made of mechanics — and it makes the wall worse too: "S-graded the Guard stage as the
+    // mage" is a badge, "the mage cannot enter" is a locked door.
+    //
+    // So the first N hits are HALVED. The mage is disadvantaged and never excluded; the rogue is
+    // still plainly the right tool, which is all the differentiation ever needed to be.
+    // ✅ It also dissolves a sharp edge I could not justify: a Lv4 rogue card lands one hit, so
+    // under the old rule a fully sharpened rogue ALSO dealt zero to a pool.
+    const per = Math.max(0, perHit - armorCut);
+    let value = (hits - guarded) * per + guarded * Math.floor(per * GUARD_CUT);
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
