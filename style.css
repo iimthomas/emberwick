@@ -728,6 +728,14 @@ button.stage.locked .stage-shape { font-style: italic; }
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
 
+/* 🗡️ THE SPARE ROW — cards drawn past the four slots. Deliberately set apart from the row
+   rather than squeezed into it: these are not seated, and a card that looks seated but is not is
+   worse than one that is plainly waiting. */
+.spare-row { margin: 6px 0 0; padding: 6px 8px; border-radius: 9px;
+  border: 1px dashed rgba(232,145,60,.45); background: rgba(232,145,60,.06); }
+.spare-lab { font-size: 11px; color: #f0a86a; margin-bottom: 4px; }
+.spare-row .pile { display: flex; gap: 6px; }
+
 /* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them. */
 .mo-chip { white-space: nowrap; }
 .pip-on  { color: #f0a86a; letter-spacing: 1px; }

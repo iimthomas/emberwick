@@ -1924,7 +1924,7 @@ function saveGame() {
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
-      cls: CLASS.id, momentum: S.momentum,
+      cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1960,7 +1960,7 @@ function loadGame() {
       candle: d.candle !== false,
       // 🗡️ absent on any save written before the rogue existed, which is correct — those are
       // mage runs and never read it. feedArmed is per-turn, so it is never restored.
-      momentum: d.momentum || 0, moTarget: null,   // the target is per-turn, never restored
+      momentum: d.momentum || 0, moTarget: null, drawExtra: d.drawExtra || 0,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -2336,6 +2336,7 @@ function freshGame(stage) {
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ It DECAYS every turn (see momentumMath) — that is the minigame, not an accounting detail.
     momentum: 0, moTarget: null,     // ● the pool, and where this turn spends it (null = hold)
+    drawExtra: 0,                    // 🗡️ cards a combo verb owes you next turn
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
@@ -2351,6 +2352,12 @@ function freshGame(stage) {
     logEntries: [], // [{header, lines:[{text, cls}]}], newest first
   };
   draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   nextTurn();
   // the Dragon is fully revealed from turn 1 — the run's reference frame
   // 🐉 THE BRIEFING. The dragon is known from turn 1 — and now that it is a STAGE rather than a
@@ -2475,6 +2482,12 @@ function nextRegion() {
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
   S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   nextTurn();
 }
 
@@ -2919,6 +2932,17 @@ function nextTurn() {
     const drawn = S.hand.length - before;
     if (drawn > 0) log(`You draw back up to ${S.hand.length} card${S.hand.length === 1 ? '' : 's'} (+${drawn}).`);
   }
+  // 🗡️ THE EXTRA CARDS A COMBO VERB OWES YOU. ⚠️ This has to sit HERE, in nextTurn, and not
+  // beside the other draw(HAND_SIZE) calls — nextTurn tops up with `draw(HAND_SIZE - before)` and
+  // is the only draw site an ordinary turn ever reaches, so patching the three literal
+  // `draw(HAND_SIZE)` calls (freshGame, nextRegion, the finale) left the verb silently inert.
+  // 🔑 GREPPING FOR A CALL SHAPE IS NOT THE SAME AS FINDING THE CODE PATH.
+  if (S.drawExtra && S.deck.length) {
+    const n = Math.min(S.drawExtra, S.deck.length);
+    draw(n);
+    log(`🗡️ Your combo draws you ${n} extra card${n === 1 ? '' : 's'} — what you leave unseated slides under your deck.`, 'good');
+  }
+  S.drawExtra = 0;
   drawEncounter();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.divertsUsed = 0;
@@ -3499,6 +3523,11 @@ function finishResolve() {
   if (r.rogue) {
     S.momentum = r.rogue.next;
     S.moTarget = null;
+    // 🗡️ Viper Strike / Sleight of Hand — the extra cards arrive with NEXT turn's hand.
+    // ⚠️ THE DRAW CANNOT HAPPEN NOW: the verb only fires because you committed this arrangement,
+    // and this turn's four cards are already spoken for. Drawing into a hand that has finished
+    // being played is where the card would have nowhere to sit.
+    S.drawExtra = r.rogue.verb === 'cycle2' ? 2 : (r.rogue.verb === 'draw' ? 1 : 0);
     // 🗡️ Dead Hand — read here rather than in compose() because THIS turn's outcome does not
     // exist until now. Same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
     if (hasCharm('deadhand') && r.outcome === 'Complete') S.momentum = Math.min(MOMENTUM_CAP, S.momentum + 1);
@@ -5505,7 +5534,23 @@ function renderSlots() {
       (cards.length ? `<div class="pile">${cards.map(cardHTML).join('')}</div>`
                     : `<div class="slot-empty">— empty —</div>`) +
       `</div>`;
-  }).join('');
+  }).join('') + spareRowHTML();
+}
+
+// 🗡️ THE SPARE. With five cards and four slots, one card has no seat — and
+// `normalizeAssign` promises every card is "always slotted and visible", which it cannot keep.
+// ⚠️ AN INVISIBLE CARD IS A CARD YOU CANNOT CHOOSE, so the extra is shown here instead, and
+// tapping it swaps it into the row through the same path every other card uses.
+// 🔑 IT SLIDES UNDER THE DECK AT CLEANUP FOR FREE — `returning` already sweeps everything that
+// is not kept or held, so the spare needed no new rule at all.
+function spareRowHTML() {
+  if (!isAssignPhase()) return '';
+  const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
+  const spare = S.hand.filter(c => !seated.has(c.id));
+  if (!spare.length) return '';
+  return `<div class="spare-row"><div class="spare-lab">🗡️ drawn — tap to swap one in; ` +
+    `${spare.length > 1 ? 'the rest slide' : 'the other slides'} under your deck</div>` +
+    `<div class="pile">${spare.map(cardHTML).join('')}</div></div>`;
 }
 
 // Per-card visual identity (2026-07-06): each card wears its own arcane SIGIL — a mage's mark,
@@ -5744,6 +5789,12 @@ function beginFinalBattle() {
   S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
   S.hand = []; S.discard = [];
   draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   S.hardship = null;
   S.downgraded = new Set();
   S.damage = 0; S.poison = 0; S.loseReserve = null; S.afterSoak = 'upgrade';
