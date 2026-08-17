@@ -916,6 +916,27 @@ function comboCard() {
   return seats.find(c => c && c.def.name === st.def.combo) || null;
 }
 function comboVerb() { const c = comboCard(); return c ? c.def.verb : null; }
+
+// 🗡️ THE PAIR MARK. Eight unique sigils told you which card this was — which you already knew
+// from its name. One glyph per PAIR tells you the thing you actually need: these two go together,
+// visible without reading either name.
+const PAIR_SIGIL = { RUSH: '⟡', OPENING: '◈', HOLD: '≈', PAYOFF: '⧉' };
+
+// 🔑 POINT AT THE ANSWER INSTEAD OF LABELLING THE CATEGORY. Whatever sits in ① STRIKE, the card
+// that would complete it lights up wherever it is in your hand — the same move fuse-highlighting
+// made for the mage.
+// ⚠️ Deliberately NOT colour-coded pairs. The mage's colours earn their complexity: an element
+// says what a card seeks, what enemy armour checks, and what it fuels — one colour, four meanings.
+// A rogue pair means exactly one thing, so wrapping it in a second four-colour language (on the same
+// card frames, in the same game, meaning something different) would teach a system to answer a
+// yes/no question. A glow is an ANSWER; a colour is a category you have to interpret.
+function pairMateId() {
+  const st = spellCard();
+  if (!st || !st.def.combo) return null;
+  if (comboCard()) return null;                       // already paired — nothing to point at
+  const m = S.hand.find(c => c.id !== st.id && c.def.name === st.def.combo);
+  return m ? m.id : null;
+}
 // ⚠️ ONE FUNCTION FOR THE WHOLE TURN'S BOOKKEEPING, so the line on screen, the card face and the
 // damage in the reveal all read the same source — the `computeAction` rule, applied to a resource.
 function rogueMath() {
@@ -5734,13 +5755,16 @@ function cardHTML(card) {
       : placementBan(card.id, 'Element') ? '🐌 too fast for the CATALYST' : null)
     : null;
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
-  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') + (previewing ? ' card-preview' : '');
+  const isMate = pairMateId() === card.id;
+  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') +
+    (previewing ? ' card-preview' : '') + (isMate ? ' pair-mate' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
   // sigil watermark + seek-element accent glow (wild gets its own prismatic aura via .card-el-wild)
-  const sigil = SIGIL[d.name] || '✦';
+  // 🗡️ a rogue card wears its PAIR's mark; a mage card keeps its own.
+  const sigil = (!CLASS.pairs && d.pair && PAIR_SIGIL[d.pair]) || SIGIL[d.name] || '✦';
   const accent = d.wild ? null : (ACCENT[enhElOf(card)] || '#cfc9ba');
   const sigilStyle = accent ? `--accent:${accent};` : '';
   // while fuse is armed, highlight the valid partners you can tap
@@ -5757,8 +5781,8 @@ function cardHTML(card) {
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
     // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
-    (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : ''}">` +
-      `<b>🗡️ Combo</b><span>${ROGUE_VERBS[d.verb]}</span></div>` : '') +
+    (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : (isMate ? ' verb-offer' : '')}">` +
+      `<b>🗡️ ${isMate ? 'Move me to COMBO' : 'Combo'}</b><span>${ROGUE_VERBS[d.verb]}</span></div>` : '') +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
     // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
     // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
