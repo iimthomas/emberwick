@@ -728,6 +728,14 @@ button.stage.locked .stage-shape { font-style: italic; }
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
 
+/* 🎭 CLASS PICKER on the stages screen. Two wide buttons, each stating what the class IS rather
+   than naming it — "the rogue" means nothing before you have played one. */
+.class-row { display: flex; gap: 8px; margin: 0 0 10px; }
+.class-pick { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 11px; text-align: left; border-radius: 9px; }
+.class-pick .class-line { font-size: 11px; opacity: .72; font-weight: normal; }
+.class-pick.on { background: rgba(127,200,230,.16); border-color: #7fb0c4; color: #eaf6fb; }
+
 
 /* ❌ the Prism's styles were deleted with the rule, 2026-08-05 — a cut rule loses its display in
    the same change, or a later session finds selectors for a mechanic that no longer exists. */

@@ -1473,6 +1473,30 @@ function wallSummary() {
   const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
   return { graded: got, total: stages.length, perfect: s_ };
 }
+// ============================================================
+// 🗡️ CHOOSING A CLASS (2026-08-12). The rogue opens once you have felled stage 1.
+//
+// ⚠️ THE "unlock by runs PLAYED, never dragons felled" NOTE DOES NOT APPLY HERE. That rule is
+// about CHARM TIERS, which are power — gating power on winning punishes exactly the players who
+// need it. A class is lateral CONTENT, and the ladder itself already gates on dragons felled
+// (clearing a stage opens the next), so this is the existing pattern rather than a new one.
+//
+// 🔑 AND STAGE 1 IS THE RIGHT GATE FOR A TEACHING REASON, not just a pacing one. Cindermaw is
+// 🛡️ Armour — "hit big" — and the rogue is the class that structurally CANNOT hit big. Handing
+// you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
+// ============================================================
+const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
+function classUnlocked(id) { return id === 'mage' || stagesCleared() >= 1; }
+function pickedClassId() {
+  try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
+  catch (e) { return 'mage'; }
+}
+function pickClass(id) {
+  if (!CLASSES[id] || !classUnlocked(id)) return;
+  try { localStorage.setItem(CLASS_KEY, id); } catch (e) {}
+  render();
+}
+
 function stagesCleared() {
   try { return Math.max(0, Math.min(DRAGONS.length, +localStorage.getItem(LADDER_KEY) || 0)); }
   catch (e) { return 0; }
@@ -2068,6 +2092,11 @@ function showStages() {
   render();
 }
 function startStage(n) {
+  // ⚠️ THE CLASS MUST BE SET BEFORE freshGame — it is freshGame that deals the deck, and the deck
+  // is the class's (16 unique for the mage, 8 x 2 for the rogue).
+  // 🎓 Stage 0 is MAGE by construction: its authored deck order names mage cards, and the tutorial
+  // teaches the engine through the class you start with.
+  setClass(n === 0 ? MAGE : (CLASSES[pickedClassId()] || MAGE));
   freshGame(n);
   // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
   // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
@@ -5087,6 +5116,23 @@ function renderControls() {
         return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} stages graded` +
           (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') +
           `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
+      // 🗡️ WHO ARE YOU TAKING? Sits ABOVE the stages because it changes what every one of them
+      // means — the same dragon is a different problem to a different class, which is the whole
+      // economy: +1 class = xN content. Hidden entirely until it is earned, rather than shown
+      // greyed-out: a locked door you cannot read is a tease, and the Collection already states
+      // what is not built. Once open it is two buttons, and the game says what each one IS.
+      (() => {
+        if (!classUnlocked('rogue')) return '';
+        const picked = pickedClassId();
+        const row = (id, name, line) =>
+          `<button class="class-pick${picked === id ? ' on' : ''}" onclick="pickClass('${id}')">` +
+          `<b>${name}</b><span class="class-line">${line}</span></button>`;
+        return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
+          `<div class="class-row">` +
+          row('mage', '✦ The Mage', 'elements agree — one big blow') +
+          row('rogue', '🗡️ The Rogue', 'strikes chain — many small ones') +
+          `</div>`;
+      })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
 
       DRAGONS.map(d => {
