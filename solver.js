@@ -21,13 +21,20 @@
    ============================================================================================== */
 let MOMENTUM_WEIGHT = 1;
 function setMomentumWeight(w) { MOMENTUM_WEIGHT = w; }
-// what the arrangement LEAVES BEHIND: a live link is worth more the deeper it already is.
-// ⚠️ REWRITTEN WITH THE CLASS: this used to score a live CHAIN LINK. It now scores where the
-// METER LANDS, which is the thing a one-encounter scorer is blind to — a builder turn looks like a
-// weak turn to it, because the payoff is two turns away.
+// what the arrangement LEAVES BEHIND.
+// ⚠️ REWRITTEN TWICE WITH THE CLASS. It scored a live CHAIN LINK, then where the METER LANDED, and
+// now whether the STREAK SURVIVES — because momentum is no longer a pool that a turn adds to, it is
+// a run of turns that cost you nothing, and it breaks the moment one does.
+// 🔑 THIS IS EXACTLY THE THING A ONE-ENCOUNTER SCORER IS BLIND TO. The streak pays NEXT turn, in
+// cheaper ⚡, so protecting a 4-pip streak reads as pure cost to a bot that stops thinking at the
+// end of this encounter — the same blind spot as the Emberwake bank, ✦ Unspent and 🃏 Reversed.
+// ⚠️ Which is why it is weighted by how DEEP the streak already is: that is the only way to make
+// the instrument prefer keeping a long one, and it is a POLICY, not a fact about the game.
 function chainValue(r) {
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
-  return MOMENTUM_WEIGHT * (r.rogue.next || 0);
+  const touched = (r.combatDmg || 0) + (r.early || 0) + (r.timePenalty || 0) > 0;
+  const now = r.rogue.streak || 0;
+  return touched ? 0 : MOMENTUM_WEIGHT * Math.min(MOMENTUM_CAP, now + 1);
 }
 
 /* ============================================================
@@ -424,32 +431,22 @@ const RUNSIM = (() => {
     return best ? best.sc : null;
   }
 
-  // 🗡️ THE ROGUE'S MOMENTUM POLICY (2026-08-17).
+  // 🗡️ THE ROGUE'S MOMENTUM POLICY (rewritten 2026-08-17 with the streak).
   //
-  // ⚠️ WITHOUT THIS THE METER IS INERT AND EVERY ROGUE NUMBER IS A LIE. setMoTarget() is a UI
-  // call, so chooseBest never made it: measured over 70 runs the bot HELD momentum on 100% of turns
-  // and spent 💨 0% / 🎯 0%. That is the THIRD time this instrument has produced a confident
-  // number about something it structurally could not do — after the Emberwake bank and the
-  // placement bans. 🔑 BEFORE QUOTING HOW OFTEN THE BOT DOES A THING, CHECK THAT IT CAN.
+  // ⚠️ THE TARGET LOOP IS GONE BECAUSE THE SPEND IS GONE. It used to run the whole search once per
+  // spend target (null / 💨 / 🎯) because the target changed Initiative and therefore changed which
+  // arrangement was best at all. Momentum is not spent any more — it is a passive ⚡ discount that
+  // `rogueMath()` already reads off S.momentum — so a single search is correct again.
   //
-  // ⚠️ It wraps chooseBestOnce, NOT pickArrangement — those are two different searches and the
-  // first draft of this wrapped the one autoRun never calls. The whole search runs once per target,
-  // because the target changes Initiative and therefore changes which arrangement is best at all;
-  // scoring targets against a fixed arrangement would quietly under-rate 💨.
+  // ⚠️ KEEP THE HISTORY, because the lesson outlived the code: setMoTarget() was a UI call, so the
+  // bot could never spend, and it reported HELD on 100% of turns for a week. That was the THIRD
+  // confident number this instrument produced about something it structurally could not do, after
+  // the Emberwake bank and the placement bans.
+  // 🔑 BEFORE QUOTING HOW OFTEN THE BOT DOES A THING, CHECK THAT IT CAN.
   //
-  // ⚠️ STILL A POLICY. The bot spends greedily for THIS encounter and can never price holding a
-  // pool for a better one, exactly as it cannot price the Emberwake bank. Hold rates from RUNSIM
-  // are meaningless; only a human can judge when to save.
-  function chooseBest() {
-    if (!CLASS.momentum) { chooseBestOnce(); return; }
-    let best = null;
-    for (const t of [null, 'init', 'hits']) {
-      S.moTarget = t;
-      const sc = chooseBestOnce();
-      if (sc && (!best || better(sc, best.sc))) best = { sc, t, assign: { ...S.assign }, bt: S.boostTarget };
-    }
-    if (best) { S.moTarget = best.t; S.assign = best.assign; S.boostTarget = best.bt; }
-  }
+  // ⚠️ And the discount reaches the search for free ONLY because it lives in rogueMath() rather
+  // than in a UI handler — the same reason `slotLegal` had to move before the bans could be seen.
+  function chooseBest() { chooseBestOnce(); }
 
   // ---- duel play evaluation: computeAction gives the raw strike (dragon armor []),
   // so we simulate resolveDuel's shield/HP math here WITHOUT mutating dragonState ----

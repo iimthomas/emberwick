@@ -831,7 +831,7 @@ const MAGE = {
 //
 // THE TURN ASKS FOUR THINGS, and every one of them is answered by a number printed on a card:
 //   ① STRIKE   costs ⚡. Paid in full it deals its ✦ damage; short, it deals its plain ⚔️.
-//   ② COMBO    your Initiative — and its PAIR cuts the cost by 1 AND earns +1 ● Momentum.
+//   ② COMBO    your Initiative — and its PAIR fires that card's VERB.
 //   ③ ENERGY   burn a card to pay; it provides its own ⚡.
 //   ④ ARSENAL  the card you keep. Identical in every class, as always.
 //
@@ -844,9 +844,27 @@ const MAGE = {
 // round: a rogue card carries five numbers, exactly the density of a mage card, and nothing on it
 // belongs to a mechanic it does not have.
 // ============================================================
+// ● MOMENTUM IS AN UNTOUCHED STREAK (rebuilt 2026-08-17, third design and the first one that is
+// not a currency). Thomas: *"i do want to keep these momentum tokens, but i want it feel good
+// getting it, and be fun trying to keep up the momentum."*
+//
+// 🔑 THE MISTAKE IN THE FIRST TWO DESIGNS WAS BUILDING A WALLET AND ASKING WHAT IT BUYS. He never
+// once said *spend* — he said *keep up*. If the fun is in maintaining it then the decision lives on
+// every turn in between, not at the cash-out, so it must not be a currency at all.
+//
+// ⚠️ AND THE OLD ONE FAILED TWICE OVER, both faults already named elsewhere in this file:
+//   GETTING it felt like nothing — a pip was CHANGE FROM A PURCHASE (surplus ⚡ you overpaid),
+//     an accounting remainder rather than an event.
+//   SPENDING it was impossible — the two targets were 💨 Initiative, which she already wins on
+//     99–100% of turns (`outpace`'s fault: it reprints a freebie), and 🎯 hits, which is correct
+//     only against 🧱 Guard and Guard is on no creature (measured dead in every real encounter).
+//   Result: earned 0.88 a turn, spent 0.13. 🔑 THE METER WAS NEVER BROKEN. THE SHOP WAS EMPTY.
+//   ⚠️ I read that as "players don't engage with meters" for three designs running.
+//
+// 🔑 DECAY WAS THE OTHER HALF OF THE PROBLEM: losing 1 a turn is EROSION, not pressure. Nothing you
+// did caused it, so there was nothing to try at. A streak is fun because BREAKING it is an event
+// and the event is your fault.
 const MOMENTUM_CAP = 5;
-const MOMENTUM_DECAY = 1;
-const MOMENTUM_INIT = 2;         // 💨 per point spent
 const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
 const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It used to mean NOTHING.
 
@@ -915,15 +933,24 @@ const ROGUE_SPEC = [
   // what buys you parity, which is the whole point of the ⚡ layer.
   // ⚠️ Tools also came UP (3-4 → 5), narrowing the blade:tool gap from ~3x to ~2x, so striking
   // with a tool stays viable — four verbs measured 0% because you never did.
+  // ⚡ THE COST LADDER (2026-08-17). Thomas asked for a ⚡5 ceiling; measured, putting THREE cards
+  // at ⚡4–5 cost the class ~15 points of run win (52% mage vs 34% rogue at n=240, reproduced) and
+  // left stage 3 at 5–8%, which breaks the rule that every class must be able to beat every stage.
+  // 🔑 THE FAULT DOES NOT SHOW UP IN "PAID IN FULL", WHICH BARELY MOVED (92% → 89%). Slot ③ takes
+  // a whole CARD, so a ⚡5 Strike is paid by burning ANOTHER BLADE as fuel — she still pays, she
+  // just spends her best card to do it. *A cost measured only by whether it was met will read as
+  // free right up until you ask what met it.*
+  // ✅ So the ceiling stays, on exactly ONE card: 🗡️ Ghostblade, the payoff half of the PAYOFF
+  // pair. ⚡5 is now aspirational rather than routine — the card you are keeping the streak up FOR.
   // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
   { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'draw' },
   { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [5, 2, 1], paid: 5, verb: 'fangs'   },
   { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [6, 8, 2], paid: 3, verb: 'pierce' },
-  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [6, 2, 0], paid: 5, verb: 'lethal'  },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [6, 2, 0], paid: 5, verb: 'lethal'  },
   { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'cycle2' },
-  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [5, 2, 3], paid: 5, verb: 'nocounter' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [5, 2, 3], paid: 5, verb: 'nocounter' },
   { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [6, 8, 3], paid: 3, verb: 'surge' },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [6, 2, 1], paid: 5, verb: 'unspent' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [6, 2, 1], paid: 5, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
@@ -981,32 +1008,32 @@ function rogueMath() {
   const paired = !!verb;
   const fuel = cardById(S.assign.Boost);
   // ⚠️ NO MORE PAIR DISCOUNT — the pair pays in a VERB now, not in arithmetic.
-  const cost = st.def.energy || 0;
+  // ● THE STREAK IS THE DISCOUNT. Each pip takes 1 off what your Strike costs, so momentum does not
+  // make you hit harder — it makes more ARRANGEMENTS LEGAL. That keeps it inside *lateral power,
+  // not vertical*: a five-turn streak does not inflate a number, it lets you swing the ⚡5 card you
+  // have been holding. 🔑 And it reads right — the longer you are in rhythm, the more you can pull
+  // off. At a full streak every card in the deck costs nothing, which is the payoff for five clean
+  // turns and is meant to feel like getting away with something.
+  const rawCost = st.def.energy || 0;
+  const cost = Math.max(0, rawCost - (S.momentum || 0));
   const paid = fuel ? (fuel.def.energy || 0) : 0;
   const full = paid >= cost;
-  // 🔑 MOMENTUM IS THE SURPLUS OF WHAT YOU SPEND. It used to come only from pairing, which is
-  // gated on slot ② — and ② is also your Initiative, so speed won and pairing measured at 17%.
-  // A meter fed by the one slot you always need for something else can never fill.
-  // Now it drips from a decision you are already making (which card to spend), and pairing feeds it
-  // only indirectly: 🗡️ Shadow Double's verb is the burst.
-  const gain = Math.max(0, paid - cost) + (verb === 'surge' ? 2 : 0);
-  const pool = Math.min(MOMENTUM_CAP, (S.momentum || 0) + gain);
-  const spend = S.moTarget ? pool : 0;
-  const next = S.moTarget ? 0 : Math.max(0, pool - MOMENTUM_DECAY);
   // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
   // ~9 you gave up by not striking with the blade. They scale off DIFFERENT things on purpose:
   //   Second Fang — the strike's own ⚔️, so it grows as you sharpen that card.
   //   Lethal Dose — what you feed slot ③, so it makes the fuel choice matter beyond "does it cover".
+  // ⚠️ `lethal` is +1 per ⚡ now, not +2 — costs run to 5, and +2 on a ⚡5 fuel was +10 on a tool.
   const bonus = verb === 'fangs'  ? eff(st).value
-              : verb === 'lethal' ? 2 * paid
+              : verb === 'lethal' ? paid
               : 0;
-  return { paired, verb, cost, paid, full, fuel, gain, bonus, pool, spend, next, target: S.moTarget || null };
+  return { paired, verb, rawCost, cost, paid, full, fuel, bonus,
+           saved: rawCost - cost, streak: S.momentum || 0 };
 }
 // ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
 // is "is this the turn to cash out", not "yes or no".
+// ⚠️ DEAD, kept only so an older save's stored target cannot throw. Momentum is not spent any more.
 function setMoTarget(t) {
-  if (!CLASS.momentum || !isAssignPhase()) return;
-  S.moTarget = (S.moTarget === t) ? null : t;
+  return;
   render();
 }
 
@@ -1021,7 +1048,7 @@ const ROGUE = {
   pairs: false,            // ✦ no elements, so nothing ever attunes
   boosts: false,           // ➕ no Surge stat either
   energy: true,            // ⚡ the Strike costs, slot ③ pays
-  momentum: true,          // ● earned by pairing, spent on speed or cuts
+  momentum: true,          // ● the untouched streak — earned by taking nothing, lost by taking anything
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
@@ -1046,14 +1073,14 @@ const ROGUE = {
     // 🔑 PAID IN FULL BUYS THE BIG NUMBER. Short, you still swing — a card that cannot be played
     // is the harshest thing a four-card hand can hold, so underpaying costs power, never the turn.
     const dmg = (m.full ? st.attuned : st.value);
-    const spendInit = m.target === 'init' ? m.spend * MOMENTUM_INIT : 0;
-    // 🎯 hits are the 🧱 GUARD answer and the one thing the mage can never buy.
-    const hits = 1 + (m.target === 'hits' ? m.spend : 0);
+    // 🎯 hits: the 🧱 GUARD answer, and now reachable ONLY through 🎯-granting effects rather than
+    // by spending ● — the momentum spend that used to buy it was dead in every real encounter.
+    const hits = 1;
     return {
       value: Math.max(0, dmg + (duelFx().value || 0)
         + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
       element: null,
-      init: (combo ? eff(combo).init : 0) + spendInit,
+      init: combo ? eff(combo).init : 0,
       boost: 0,
       hits,
       attuned: false, attBonus: 0,
@@ -1066,7 +1093,7 @@ const ROGUE = {
       rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
                // ⚠️ `gain` was missing here until 2026-08-17, so nothing outside rogueMath() could
                // see momentum EARNED — including the instrument, which read NaN and said so.
-               gain: m.gain, bonus: m.bonus, pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
+               bonus: m.bonus, rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true },
     };
   },
 };
@@ -1804,8 +1831,11 @@ const RULE_CHARMS = [
   // 🔑 THE DELIBERATE ANTI-SYNERGY, and the rogue's Cold Iron: the one charm that makes a BROKEN
   // chain something you wanted. Without it every rogue charm pulls the same way, and a class whose
   // charms all agree has no build to discover.
+  // ⚠️ its text still said "while your chain is 1" long after the chain was deleted; the CODE always
+  // read momentum === 0. Under a streak that means *just broken*, so it now pays you for the wreck —
+  // deliberate anti-synergy with every other rogue charm, the way ✦ Cold Iron is for the mage.
   { id: 'lonefang', tier: 1, name: 'Lone Fang',      rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
-    text: '🗡️ While your chain is <b>1</b>, your strike gains <b>+4</b>' },
+    text: '🗡️ While your Momentum is <b>0</b>, your strike gains <b>+4</b>' },
   { id: 'twinblades', tier: 2, name: 'Twin Blades',  rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
     text: '🗡️ Your <b>Arsenal</b> always counts as the previous card' },
   { id: 'deepcut', tier: 3, name: 'Deep Cut',        rarity: 'rare', cost: 13, rule: true, cls: 'rogue',
@@ -1813,12 +1843,12 @@ const RULE_CHARMS = [
   // ⚠️ REWRITTEN WITH THE CLASS (2026-08-12). Both of these named the CHAIN, which no longer
   // exists — a charm whose subject has been deleted is worse than a missing charm, because it still
   // takes a slot in the offer and still reads as a rule.
-  // 🔑 A FLOOR, NOT AN OFF SWITCH: "Momentum never decays" would delete the minigame outright.
+  // 🔑 A FLOOR, NOT AN OFF SWITCH: "Momentum never breaks" would delete the minigame outright.
   // A charm may bend the class's question, never answer it.
   { id: 'secondnature', tier: 4, name: 'Second Nature', rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
-    text: '🗡️ Your Momentum never <b>decays below 2</b>' },
+    text: '🗡️ When your Momentum breaks it falls to <b>2</b>, not 0' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
-    text: '🗡️ <b>Complete</b> an encounter and gain <b>+1 Momentum</b>' },
+    text: '🗡️ <b>Complete</b> an encounter and Momentum rises by <b>2</b>' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
     text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
     why: 'attuning stops costing you tempo' },
@@ -2413,8 +2443,9 @@ function freshGame(stage) {
     wake: 0, wakeTarget: null, wakePending: 0,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
-    // ⚠️ It DECAYS every turn (see momentumMath) — that is the minigame, not an accounting detail.
-    momentum: 0, moTarget: null,     // ● the pool, and where this turn spends it (null = hold)
+    // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
+    // 0 the moment one does — that reset is the minigame, and it is always your own fault.
+    momentum: 0, moTarget: null,     // ● the streak (moTarget is dead, kept for old saves)
     drawExtra: 0,                    // 🗡️ cards a combo verb owes you next turn
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
@@ -3631,16 +3662,11 @@ function finishResolve() {
   // so the number the player was shown before Resolve is the number they get. Same discipline as
   // 🗡️ Ghostblade reading the resolved turn rather than recomputing from the arrangement.
   if (r.rogue) {
-    S.momentum = r.rogue.next;
-    S.moTarget = null;
     // 🗡️ Viper Strike / Sleight of Hand — the extra cards arrive with NEXT turn's hand.
     // ⚠️ THE DRAW CANNOT HAPPEN NOW: the verb only fires because you committed this arrangement,
     // and this turn's four cards are already spoken for. Drawing into a hand that has finished
     // being played is where the card would have nowhere to sit.
     S.drawExtra = r.rogue.verb === 'cycle2' ? 2 : (r.rogue.verb === 'draw' ? 1 : 0);
-    // 🗡️ Dead Hand — read here rather than in compose() because THIS turn's outcome does not
-    // exist until now. Same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
-    if (hasCharm('deadhand') && r.outcome === 'Complete') S.momentum = Math.min(MOMENTUM_CAP, S.momentum + 1);
   }
   // a Gray Pilgrim / Mirror Fen blessing covers a limited number of journeys — spend a charge
   if (r.type === 'journey' && (S.paceBless || 0) > 0) S.paceBless--;
@@ -3696,6 +3722,28 @@ function finishResolve() {
   }
   // ❌ the 🛡️ armour aim was CUT 2026-08-12 (chosen 2.3% of the time, and the one target the
   // candle cannot inform) — its absorption branch goes with it, in the same commit as the rule.
+  // ● THE STREAK, SETTLED HERE AND NOWHERE ELSE — because "untouched" is not knowable until every
+  // source of damage has been totalled. ⚠️ It must sit BELOW the Time Penalty block: that burns
+  // cards straight off the deck without ever passing through `damage`, and a turn that cost you
+  // cards is a turn that touched you whatever the variable is called.
+  // 🔑 ONE DEFINITION, THE SAME ONE THE HEALTH BAR USES: did this turn cost you cards?
+  if (r.rogue) {
+    const touched = damage > 0 || r.timePenalty > 0;
+    const before = S.momentum || 0;
+    if (touched) {
+      // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
+      S.momentum = hasCharm('secondnature') ? Math.min(before, 2) : 0;
+      if (before > 0) log(`● Momentum broken — ${before} → ${S.momentum}`, 'bad');
+    } else {
+      // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
+      // Read here, not in compose(), because THIS turn's outcome does not exist until now — the
+      // same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
+      const step = 1 + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
+                     + (r.rogue.verb === 'surge' ? 2 : 0);
+      S.momentum = Math.min(MOMENTUM_CAP, before + step);
+      if (S.momentum > before) log(`● Untouched — Momentum ${before} → ${S.momentum}`, 'good');
+    }
+  }
   S.damage = damage;
   if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
@@ -5003,14 +5051,12 @@ function momentumText() {
   if (!CLASS.momentum || !S || S.momentum === undefined) return '';
   const m = isAssignPhase() ? rogueMath() : null;
   const now = S.momentum || 0;
-  let tail = '';
-  if (m) {
-    if (m.target) tail = ` <span class="mo-spend">→ all ${m.spend} into ${m.target === 'init' ? '💨' : '🎯'}</span>`;
-    else if (m.next > now) tail = ` <span class="good">→ ${m.next}</span>`;
-    else if (m.next < now) tail = ` <span class="bad">→ ${m.next} (slipping)</span>`;
-    else tail = ` <span class="dim">→ ${m.next} (holding)</span>`;
-  }
-  return `<span class="mo-chip" title="Momentum. Builders earn it, finishers spend it, and it slips by 1 every turn.">` +
+  // 🧾 ANY PERSISTENT MODIFIER MUST BE ON SCREEN EVERY TURN, and it must show the TERMS rather than
+  // a verdict — so the chip states what the streak is worth right now, not merely how long it is.
+  const tail = now > 0
+    ? ` <span class="good">−${now} ⚡</span>`
+    : ` <span class="dim">no discount</span>`;
+  return `<span class="mo-chip" title="Momentum — turns in a row that cost you no cards. Every pip takes 1 off what your Strike costs. Take any damage and it breaks.">` +
     `🗡️ ${pips(now, MOMENTUM_CAP)} <b>${now}</b>${tail}</span>`;
 }
 
@@ -5547,9 +5593,10 @@ function rogueZoneHint(zone, isFight) {
     case 'Spell': {
       if (!st) return isFight ? 'your Attack' : 'your Move';
       const e = eff(st);
+      const disc = m.saved ? ` <span class="good">(⚡${m.rawCost} − ${m.saved} ●)</span>` : '';
       return m.full
-        ? `PAID — strikes for its full <b>✦ ${e.attuned}</b> · spent, gone for the region`
-        : `costs <b>⚡ ${m.cost}</b>, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
+        ? `PAID — strikes for its full <b>✦ ${e.attuned}</b>${disc} · spent, gone for the region`
+        : `costs <b>⚡ ${m.cost}</b>${disc}, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
     }
     case 'Element': {
       if (!st) return 'your Initiative — returns to your deck';
@@ -5562,10 +5609,9 @@ function rogueZoneHint(zone, isFight) {
       if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
       if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to spend`;
-      const over = Math.max(0, m.paid - m.cost);
+      // ⚠️ overpaying earns NOTHING now — ● comes from surviving a turn, not from spare change.
       return m.full
-        ? `spends <b>⚡ ${m.paid}</b> for a cost of <b>${m.cost}</b>` +
-          (over ? ` — <b>+${over} ●</b> from the surplus` : '') + ` · returns to your deck`
+        ? `spends <b>⚡ ${m.paid}</b> for a cost of <b>${m.cost}</b> · returns to your deck`
         : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
@@ -5581,25 +5627,29 @@ function rogueZoneHint(zone, isFight) {
 // four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
 // states what will happen to that card, which is the part that must live on the object.
 // 🗡️ THE MOMENTUM ROW — the minigame, on screen.
-// ⚠️ THE DECAY MUST BE STATED BEFORE YOU COMMIT or it is a trap rather than a puzzle. Same
-// treatment as the 🏃 Standing chip: show the TERMS and let the player do the arithmetic.
-// 🔑 It reads off momentumMath(), the same function the damage does, so the number you are shown
-// and the number you get cannot drift.
+// ⚠️ WHAT BREAKS THE STREAK MUST BE STATED BEFORE YOU COMMIT or it is a trap rather than a puzzle.
+// Same treatment as the 🏃 Standing chip: show the TERMS and let the player do the arithmetic.
+// 🔑 It reads off rogueMath(), the same function the damage does, so the number you are shown and
+// the number you get cannot drift.
 function momentumRowHTML() {
   if (!CLASS.momentum || !isAssignPhase()) return '';
   const m = rogueMath();
   if (!m) return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
-  // 🔑 THE BUTTONS SAY WHAT THEY BUY, not what they are called. "💨 +6 Initiative" is a decision;
+  // 🔑 NO BUTTONS ANY MORE. Momentum is not spent — it is KEPT, so the only thing to show is what
+  // it is doing for you and what will take it away. (The old row offered "💨 +N Initiative" and
   // "spend on initiative" is a menu.
-  const btn = (t, label) => `<button class="wake-btn${m.target === t ? ' on' : ''}" onclick="setMoTarget('${t}')">${label}</button>`;
-  const head = m.target
-    ? `🗡️ Spending all <b>${m.spend} ●</b>`
-    : `🗡️ <b>${S.momentum || 0} ●</b>${m.gain ? ` +${m.gain}` : ''} − 1 (slip) = <b>${m.next} ●</b> next turn`;
+  // "🎯 N hits" — both were dead: she already wins 99–100% of races, and hits only answer 🧱 Guard,
+  // which is on no creature. The meter was never the problem; the shop was empty.)
+  const now = S.momentum || 0;
+  const head = now > 0
+    ? `🗡️ <b>${now} ●</b> — your Strike costs <b>${m.saved} less ⚡</b>` +
+      (m.cost === 0 ? ` <span class="good">(free)</span>` : ` <span class="dim">(⚡${m.rawCost} → ${m.cost})</span>`)
+    : `🗡️ <b>0 ●</b> — no discount`;
+  const risk = now > 0
+    ? `take any damage this turn and it breaks${hasCharm('secondnature') ? ' back to 2' : ' to 0'}`
+    : `come through a turn untouched to start a streak`;
   return `<div class="wake-row bank-row"><span class="wake-lab">${head}</span> ` +
-    (m.pool > 0
-      ? btn('init', `💨 +${m.pool * MOMENTUM_INIT} Initiative`) + ' ' + btn('hits', `🎯 ${1 + m.pool} hits`)
-      : `<span class="wake-note">pair up to earn ●</span>`) + ' ' +
-    `<span class="wake-note">${m.target ? 'tap again to hold it instead' : (m.pool > 0 ? 'or hold, and lose 1 to the slip' : '')}</span></div>`;
+    `<span class="wake-note">${risk}</span></div>`;
 }
 
 function bankRowHTML() {
