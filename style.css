@@ -764,6 +764,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 
 /* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them. */
 .mo-chip { white-space: nowrap; }
+/* ⚡ cost and ◇ pitch sit side by side on a rogue card, because as it levels they move in
+   OPPOSITE directions - showing one without the other hides the whole trade. */
+.rg-pitch { margin-left: 6px; color: #9fd18a; }
 .pip-on  { color: #f0a86a; letter-spacing: 1px; }
 .pip-off { color: #4a4436; letter-spacing: 1px; }
 .mo-spend { color: #ffd9a0; font-weight: bold; }

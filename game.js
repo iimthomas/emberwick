@@ -865,7 +865,29 @@ const MAGE = {
 // did caused it, so there was nothing to try at. A streak is fun because BREAKING it is an event
 // and the event is your fault.
 const MOMENTUM_CAP = 5;
-const MOMENTUM_DISCOUNT_CAP = 2;   // ⚡ the most a full streak can ever take off
+// ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
+// *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
+// work in flesh and blood, blue cards are weaker but they give more pitch."*
+//
+// 🔑 BEFORE THIS, `energy` WAS ONE NUMBER DOING TWO JOBS — the cost to strike with a card AND
+// what it paid as fuel — and it did not vary by level at all. So LEVELLING A CARD HAD NO DOWNSIDE:
+// it struck harder and fuelled exactly as well as before. That is the one thing
+// [[Levelling_As_Sharpening]] says must never be true: *a level makes a card MORE ITSELF, spike up
+// and weakness DOWN.*
+//
+// Now they are separate. COST is identity and never moves (a heavy blade is always heavy). PITCH
+// falls as the card sharpens, so your best strike is your worst fuel.
+// 🔑 AND IT DELIVERS A DESIGN GOAL THE VAULT ALREADY WANTED FOR FREE: an all-Lv4 deck becomes
+// literally unplayable, because nothing left in it can pay for anything.
+// ⚠️ Tools pitch one better than blades at the same level — the fuel/strike split is the roles
+// restated in the resource, not a second axis to learn.
+const PITCH_BASE = { tool: 6, blade: 5 };
+function pitchOf(card) {
+  if (!card || !card.def) return 0;
+  const base = PITCH_BASE[card.def.role] || 5;
+  return Math.max(0, base - (card.level || 1));
+}
+const MOMENTUM_DISCOUNT_CAP = 2;   // ⚠️ DEAD: momentum no longer touches cost. Kept so old saves load.
 const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
 const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It used to mean NOTHING.
 
@@ -1008,7 +1030,11 @@ const ROGUE_COST = [2, 3, 4, null];
 // charms and the LEVEL of the cards that help players get through."* Weak at Lv1 (⚔️4-5, under the
 // mage's 5-11 turn) and genuinely strong at Lv4 (⚔️19-20 / ✦23-24, against the mage's 20-29).
 // A weak baseline is only half the rule; if the curve does not repay it, the run has nothing to give.
-const SPIKE_STEP = { value: 5, init: 1, armor: 1 };
+// ⚠️ value steps 4, down from 5, because ● MOMENTUM IS DAMAGE NOW and has to be paid for
+// somewhere. Thomas: *"it should probably just add to attack instead. and we should probaby lower
+// attack across the board because of it."* The streak runs 0-5 and averages ~1.3, so the card
+// table gives back roughly what the meter now supplies.
+const SPIKE_STEP = { value: 4, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
   const step = SPIKE_STEP[s.spike];
@@ -1069,9 +1095,14 @@ function rogueMath() {
   // have been holding. 🔑 And it reads right — the longer you are in rhythm, the more you can pull
   // off. At a full streak every card in the deck costs nothing, which is the payoff for five clean
   // turns and is meant to feel like getting away with something.
-  // ⚠️ THE DISCOUNT IS HALVED AND CAPPED (2026-08-17). It used to be 1-for-1 with the streak, so
-  // a full streak made every card FREE. Thomas: *"minus cost on cards, i don't even have to think
-  // or weigh options or anything."*
+  // ⚠️ MOMENTUM NO LONGER TOUCHES COST (2026-08-18). Thomas: *"i feel like momentum takes the
+  // fork away, if every card is nearly free, slot 3 is not doing anything for us. it should
+  // probably just add to attack instead."*
+  // 🔑 He is right and the capped version was worse than either extreme: capped at 2, the meter
+  // hit its ceiling on its SECOND pip, so pips 3-5 did literally nothing while still being drawn
+  // on screen. A resource that stops paying but keeps counting is a lie told every turn.
+  // It adds to the STRIKE now, which cannot dissolve slot ③ — what you feed still has to cover
+  // the cost on its own.
   // 🔑 AND THE FAULT IS BIGGER THAN THE NUMBER: ⚡ WAS THE CLASS'S ONE REAL CONSTRAINT, AND
   // MOMENTUM WAS PAYING IT OFF. A reward that removes the constraint it rewards you within does not
   // make the game easier, it DELETES THE DECISION — slot ③ stopped being a choice about which card
@@ -1087,20 +1118,22 @@ function rogueMath() {
   // 🔑 THE CAP IS WHAT STOPS THE BYPASS; THE RATE WAS NEVER THE PROBLEM. Capping at 2 keeps
   // slot ③ a real question (a ⚡5 blade never drops below ⚡3) without taxing the one place her
   // streak is hardest to hold.
-  const discount = Math.min(MOMENTUM_DISCOUNT_CAP, S.momentum || 0);
-  const cost = Math.max(0, rawCost - discount);
-  const paid = fuel ? (fuel.def.energy || 0) : 0;
+  const cost = rawCost;
+  const paid = pitchOf(fuel);
   const full = paid >= cost;
   // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
   // ~9 you gave up by not striking with the blade. They scale off DIFFERENT things on purpose:
   //   Second Fang — the strike's own ⚔️, so it grows as you sharpen that card.
   //   Lethal Dose — what you feed slot ③, so it makes the fuel choice matter beyond "does it cover".
   // ⚠️ `lethal` is +1 per ⚡ now, not +2 — costs run to 5, and +2 on a ⚡5 fuel was +10 on a tool.
-  const bonus = verb === 'fangs'  ? eff(st).value
-              : verb === 'lethal' ? paid
-              : 0;
-  return { paired, verb, rawCost, cost, paid, full, fuel, bonus,
-           saved: rawCost - cost, streak: S.momentum || 0 };
+  // ● the streak is damage now — one point a pip, the whole meter live all the way to 5
+  const verbBonus = verb === 'fangs'  ? eff(st).value
+                  : verb === 'lethal' ? paid
+                  : 0;
+  const streakDmg = S.momentum || 0;
+  const bonus = verbBonus + streakDmg;
+  return { paired, verb, rawCost, cost, paid, full, fuel, bonus, verbBonus, streakDmg,
+           saved: 0, streak: S.momentum || 0 };
 }
 // ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
 // is "is this the turn to cash out", not "yes or no".
@@ -5688,7 +5721,7 @@ function rogueZoneHint(zone, isFight) {
     case 'Spell': {
       if (!st) return isFight ? 'your Attack' : 'your Move';
       const e = eff(st);
-      const disc = m.saved ? ` <span class="good">(⚡${m.rawCost} − ${m.saved} ●)</span>` : '';
+      const disc = m.streakDmg ? ` <span class="good">(+${m.streakDmg} from ●)</span>` : '';
       return m.full
         ? `PAID — strikes for its full <b>✦ ${e.attuned}</b>${disc} · spent, gone for the region`
         : `costs <b>⚡ ${m.cost}</b>${disc}, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
@@ -5703,11 +5736,13 @@ function rogueZoneHint(zone, isFight) {
       const fuel = cardById(S.assign.Boost);
       if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
-      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to spend`;
-      // ⚠️ overpaying earns NOTHING now — ● comes from surviving a turn, not from spare change.
+      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to feed it`;
+      // ⚠️ NAME THE LEVEL, because the level IS the rule now. A card pitches LESS as it sharpens,
+      // and a player not told that reads a low fuel number as a bad card rather than a sharp one.
+      const lvNote = ` <span class="dim">(Lv${fuel.level} · pitches less as it sharpens)</span>`;
       return m.full
-        ? `spends <b>⚡ ${m.paid}</b> for a cost of <b>${m.cost}</b> · returns to your deck`
-        : `only <b>⚡ ${m.paid}</b> of <b>${m.cost}</b> — not enough · returns to your deck`;
+        ? `feeds <b>◇ ${m.paid}</b> against a cost of <b>⚡ ${m.cost}</b>${lvNote} · returns to your deck`
+        : `only <b>◇ ${m.paid}</b> of <b>⚡ ${m.cost}</b> — not enough${lvNote} · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
@@ -5740,11 +5775,10 @@ function momentumRowHTML() {
   // broken, and a row reading only "no discount" while a charm quietly adds 4 is the Mirror Fen bug
   // again — a modifier doing real work with nothing on screen to account for it.
   const head = now > 0
-    ? `🗡️ <b>${now} ●</b> — your Strike costs <b>${m.saved} less ⚡</b>` +
-      (m.cost === 0 ? ` <span class="good">(free)</span>` : ` <span class="dim">(⚡${m.rawCost} → ${m.cost})</span>`)
+    ? `🗡️ <b>${now} ●</b> — your Strike hits for <b>+${now}</b>`
     : (hasCharm('lonefang')
-        ? `🗡️ <b>0 ●</b> — no discount, but <b>Lone Fang</b> gives your strike <b>+4</b>`
-        : `🗡️ <b>0 ●</b> — no discount`);
+        ? `🗡️ <b>0 ●</b> — nothing yet, but <b>Lone Fang</b> gives your strike <b>+4</b>`
+        : `🗡️ <b>0 ●</b> — no bonus yet`);
   const risk = now > 0
     ? `take any damage this turn and it breaks${hasCharm('secondnature') ? ' back to 2' : ' to 0'}`
     : `come through a turn untouched to start a streak`;
@@ -6005,7 +6039,8 @@ function cardHTML(card) {
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}` +
                      (d.hits > 1 ? `<span class="fork-tag">⚡ ${d.hits} hits</span>` : '') + `</div>`
-                 : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b>` +
+                 : `<div class="el-identity pair-identity"><b class="rg-energy" title="what it COSTS to strike with">⚡${d.energy}</b>` +
+                     `<b class="rg-pitch" title="what it GIVES when you feed it - falls as the card levels">◇${pitchOf(card)}</b>` +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
