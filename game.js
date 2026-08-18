@@ -67,7 +67,18 @@ const CARD_DEFS = [
     lv: [[2,null,2,4,3,null,2], [2,null,1,7,2,null,3], [2,null,0,10,1,null,4], [2,null,0,13,1,null,null]] },
   { name: 'Rimeguard', element: 'Water', arch: 'WARD',
     lv: [[2,null,2,3,4,null,2], [2,null,1,2,7,null,3], [3,null,0,1,10,null,4], [4,null,0,1,13,null,null]] },
-  { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE',
+  // ⚡ THE ONE MAGE CARD THAT FORKS (2026-08-17, Thomas: *"doesn't feel fair for mage to not have
+  // ANY if this is a shape we want to add. maybe its a lightning spell"*). Right, and it is the same
+  // argument that softened 🧱 Guard: a shape a class cannot engage with AT ALL is not difficulty.
+  // ⚠️ THIS IS NOT THE PILE BY THE BACK DOOR, and the difference is the whole reason it is allowed.
+  // The banned thing was ACCUMULATING hits by pouring cards into the Spell — a mechanic. This is a
+  // PRINTED PROPERTY of one card in sixteen, like its armour or its initiative. You cannot build
+  // toward it, stack it, or choose it; you draw it.
+  // 🔑 AND IT COSTS WHAT IT SHOULD: hits divide the blow and 🛡️ Armour is paid on every one, so
+  // Sparkstrike is the mage's worst card into armour and her only real answer to a pool. A shaped
+  // card, not a better one — which is also the first time an ELEMENT means something in combat
+  // beyond its temperament.
+  { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE', hits: 2,
     lv: [[4,null,4,2,1,null,2], [6,null,3,1,1,null,3], [8,null,2,1,1,null,4], [10,null,2,1,1,null,null]] },
   { name: 'Quickfire', element: 'Lightning', arch: 'SPARK',
     lv: [[3,null,7,3,1,null,2], [2,null,10,2,1,null,3], [2,null,13,1,1,null,4], [2,null,16,1,1,null,null]] },
@@ -253,7 +264,7 @@ const REGIONS = [
   ]},
   // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
   { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 2,    xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6 },
@@ -359,7 +370,7 @@ const ROAD_FELLGRIND = [
   ]},
   { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 2, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
     { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
@@ -403,7 +414,7 @@ const ROAD_FATHOM = [
     { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
     { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
@@ -422,7 +433,7 @@ const ROAD_FATHOM = [
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
     { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
@@ -792,7 +803,7 @@ const MAGE = {
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
       boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
-      hits: 1,
+      hits: spell.def.hits || 1,   // ⚡ a forking card prints its own
       attuned, attBonus: st.attuned - st.value,
       banks, bank, wake: w, wakeTarget: wt,
       vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
@@ -5781,7 +5792,8 @@ function cardHTML(card) {
            `` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
-    (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}</div>`
+    (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}` +
+                     (d.hits > 1 ? `<span class="fork-tag">⚡ ${d.hits} hits</span>` : '') + `</div>`
                  : `<div class="el-identity pair-identity"><b class="rg-energy">⚡${d.energy}</b>` +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +

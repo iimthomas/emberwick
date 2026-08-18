@@ -736,6 +736,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 .card-verb.verb-offer b { color: #d6f0fa; }
 @media (prefers-reduced-motion: reduce) { .card.pair-mate { box-shadow: 0 0 0 4px rgba(159,214,232,.3); } }
 
+/* ⚡ a card that forks. Marked on its face because the hit COUNT is what the shapes read. */
+.fork-tag { margin-left: 6px; font-size: 10.5px; color: #b9d8ea; }
+
 .rg-blade { color: #f0a86a; }   /* heavy, slow, expensive — it belongs in ① */
 .rg-tool  { color: #9fd6e8; }   /* light, fast, cheap — it belongs in ② */
 
