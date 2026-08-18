@@ -847,7 +847,8 @@ const MAGE = {
 const MOMENTUM_CAP = 5;
 const MOMENTUM_DECAY = 1;
 const MOMENTUM_INIT = 2;         // 💨 per point spent
-const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it never answers
+const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
+const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It used to mean NOTHING.
 
 // 🔑 ⚡ IS ONE NUMBER DOING TWO JOBS: what a card COSTS as your Strike, and what it PAYS when
 // burned for energy. That is the whole resource tension in a single column — your best cards are
@@ -891,15 +892,25 @@ const ROGUE_VERBS = {
 // ⚠️ A TOOL'S VERB IS WHAT FIRES WHEN YOU SWING THE BLADE, so the tools carry the verbs you want
 // on a big turn (pierce, draw, +●) and the blades carry the ones you want when you cannot swing.
 const ROGUE_SPEC = [
-  // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦   verb
-  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 9, 1], paid: 4, verb: 'draw' },
-  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [9, 2, 1], paid: 6, verb: 'outpace' },
-  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [5, 8, 2], paid: 4, verb: 'pierce' },
-  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [10, 2, 0], paid: 7, verb: 'freepaid' },
-  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 9, 1], paid: 4, verb: 'cycle2' },
-  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [9, 2, 3], paid: 6, verb: 'nocounter' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [5, 8, 3], paid: 4, verb: 'surge' },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [10, 2, 1], paid: 7, verb: 'unspent' },
+  // ⚠️ RESCALED 2026-08-17. Thomas, two encounters in: *"the rogue's numbers just seem way too
+  // high, at lvl 2 cards"* — and the sim agreed at 81% Complete against the mage's 48%.
+  // 🔑 THE MISTAKE WAS OVER-PAYING FOR A MISSING SLOT. The rogue has no ➕ Surge, so I lifted her
+  // Strike to compensate — and lifted it to the mage's WHOLE TURN. Measured at Lv2 the mage lands
+  // 12-17 (⚔️ 5-7 plus ➕ 5-7); a rogue blade was landing 12-13 UNPAID and 15-16 paid, then also
+  // taking a verb and 🌀 Slipped on top.
+  // The scale now: a PAID blade ≈ a mage turn (14-15), an UNPAID one is a bad turn (9-10). Paying is
+  // what buys you parity, which is the whole point of the ⚡ layer.
+  // ⚠️ Tools also came UP (3-4 → 5), narrowing the blade:tool gap from ~3x to ~2x, so striking
+  // with a tool stays viable — four verbs measured 0% because you never did.
+  // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [6, 9, 1], paid: 4, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [6, 2, 1], paid: 5, verb: 'outpace' },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [6, 8, 2], paid: 4, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [7, 2, 0], paid: 5, verb: 'freepaid' },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [6, 9, 1], paid: 4, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [6, 2, 3], paid: 5, verb: 'nocounter' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [6, 8, 3], paid: 4, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [7, 2, 1], paid: 5, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
@@ -1033,7 +1044,9 @@ const ROGUE = {
       // 🌀 SLIP is stated as a REQUEST, not a verdict — computeAction owns the Initiative race, so
       // it is the only place that knows the margin. The class only says "this class can slip".
       rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
-               pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
+               // ⚠️ `gain` was missing here until 2026-08-17, so nothing outside rogueMath() could
+               // see momentum EARNED — including the instrument, which read NaN and said so.
+               gain: m.gain, pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
     };
   },
 };
@@ -2562,7 +2575,13 @@ function eff(card) {
     // stays dead. One rule: +(level + 1). It SHARPENS, so the higher a card is levelled the more
     // it depends on being properly fuelled - a Lv4 Emberfall is enormous attuned and merely large
     // raw, which is the same "more itself" curve every other stat follows.
-    attuned: adj(v) + card.level + ATTUNE_BONUS,
+    // 🐛 ...EXCEPT WHEN THE CLASS AUTHORS IT (found 2026-08-17). The rogue's ✦ is what you get
+    // for PAYING a card's ⚡ cost in full, and `ROGUE_SPEC.paid` sets it per card — a cheap tool
+    // pays back a little, an expensive blade a lot. That whole column was being overwritten here by
+    // the mage's derived rule, so every rogue card paid back a flat +(level+1) and `paid` was DEAD
+    // DATA. 🔑 THE SAME SHAPE AS `hits`: a field the class authors and the engine quietly
+    // ignores looks exactly like a tuned mechanic right up until you check the number.
+    attuned: d.paid != null ? adj(v) + d.paid : adj(v) + card.level + ATTUNE_BONUS,
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
     // 💨 THE INITIATIVE FLOOR (2026-07-29). Sharpening drove every non-SPARK card's init to 0-1,
     // so only 4 of the 16 cards could ever contest a race and the deck's MEDIAN init FELL as you
@@ -3253,12 +3272,23 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
-    // 🌀 SLIPPED (rogue) — beat its Initiative by SLIP_MARGIN and it never answers at all, even
-    // on a Narrow. 🔑 THIS IS WHY THE ROGUE'S METER IS NOT THE MAGE'S: winning the race is BINARY and
-    // stops paying the moment you win it (measured twice — the old Attack-or-Initiative fork read
-    // 13%, then 4% after doubling). A margin that buys you out of the COUNTER never plateaus,
-    // because every Narrow you would have bled on is a card you do not blunt — and in a game where
-    // the deck IS the health bar, that is real value with no ceiling.
+    // 🌀 SLIPPED (rogue) — beat its Initiative by SLIP_MARGIN and its answer comes in HALF.
+    // 🔑 THIS IS WHY THE ROGUE'S METER IS NOT THE MAGE'S: winning the race is BINARY and stops
+    // paying the moment you win it (measured twice — the old Attack-or-Initiative fork read 13%,
+    // then 4% after doubling). A margin that keeps paying past the win line never plateaus.
+    //
+    // ⚠️ IT SHIPPED AS A FULL CANCEL AND THAT WAS A PILLAR BUG (fixed 2026-08-17). Measured against
+    // the mage over 80 runs: mage countered on 32% of turns for 1.14 cards a turn, rogue countered on
+    // — 1% — for 0.04. A 28× reduction. 🔑 THE COUNTER IS THE GAME'S ONLY DAMAGE SOURCE, so a
+    // rule that deletes it doesn't make a class evasive, it EXCUSES THE CLASS FROM DECK-AS-HEALTH.
+    // She never spent her deck, so she never ran out, and 18 of her 18-point lead over the mage was
+    // sitting right here — not in her damage, which measured at parity.
+    // 🔑 THE FIX IS THE ONE ALREADY MADE FOR 🧱 GUARD THE SAME WEEK: HALVE, NEVER SWALLOW. A shape
+    // that reduces to zero is not a hard problem, it is an absent one — in Guard's case it locked the
+    // mage out, here it lets the rogue out. Same cliff, both directions.
+    // ⚠️ AND THE FULL CANCEL STILL EXISTS — it is 🗡️ Slow Poison's verb. Slipping is now the
+    // cheap, common, partial version; the verb is the rare, chosen, total one. That is the shape a
+    // verb should have, and it is why `nocounter` measured 0%: it was reprinting a freebie.
     const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
     const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce') ? (e.shapeV || 0) : 0;
@@ -3329,10 +3359,11 @@ function computeAction(reserve) {
     // the only encounter in the game where a bigger blow is worse than a sufficient one.
     const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
-    // 🌀 a slipped rogue is gone before it can swing back
-    // 🗡️ Slow Poison in ② — it simply does not answer
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow' && !slipped && rVerb !== 'nocounter') ? e.atk
-      : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
+    // 🗡️ Slow Poison in ② — it simply does not answer. The one FULL cancel the rogue owns.
+    const answers = outcome !== 'Complete' && vS !== 'Undertow' && rVerb !== 'nocounter'
+                    && !(S.potionFx && S.potionFx.noCounter);
+    // 🌀 a slipping rogue takes the blow at an angle — halved, never skipped
+    const combatDmg = answers ? (slipped ? Math.floor(e.atk * SLIP_CUT) : e.atk) : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
