@@ -869,9 +869,22 @@ const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It u
 // A verb that restates the stat is a verb that never changes a decision.
 const ROGUE_VERBS = {
   draw:      'you <b>draw a card</b>',
-  outpace:   'you <b>win Initiative</b> automatically',
+  // 🗡️ THE BLADE-SIDE VERBS ARE THE BIG ONES, and they have to be (re-dealt 2026-08-17).
+  // A verb fires when its card sits in ②, which means STRIKING WITH ITS PARTNER. So a verb printed
+  // on a TOOL fires when you strike with the blade — free upside, and those four measured 2–13%.
+  // A verb printed on a BLADE fires when you strike with the TOOL, which costs ~9 damage, so it
+  // must be worth about a blade or it is never correct. All four measured 0–1%.
+  // 🔑 AND TWO OF THEM WERE NOT MERELY SMALL, THEY REPRINTED SOMETHING FREE:
+  //   `outpace`  'win Initiative automatically' — she already wins 99–100% of races.
+  //   `freepaid` 'deals its ✦ even unpaid'      — it only ever fires on a TOOL strike, and tools
+  //              cost ⚡1–2 while any fuel is ⚡2–3, so the cost was already covered.
+  // Same fault 🌀 Slipped had. *A verb that restates something you already get for free is not a
+  // weak verb, it is an absent one.* Both replaced with verbs that pay about a blade.
+  // ⚠️ worded as ADDED DAMAGE, never "strikes again" — 🎯 hits is a real mechanic that DIVIDES
+  // the blow, so "again" would promise the wrong thing against 🛡️ Armour and 🧱 Guard.
+  fangs:     'your strike gains <b>+its own ⚔️</b>',
+  lethal:    'your strike gains <b>+2 damage per ⚡</b> you feed it',
   pierce:    'your strike <b>ignores 🛡️ Armour</b>',
-  freepaid:  'your strike deals its <b>✦</b> even unpaid',
   nocounter: 'it <b>does not counter</b> you',
   cycle2:    'you <b>draw two cards</b>',
   surge:     '<b>+2 ●</b> Momentum',
@@ -903,14 +916,14 @@ const ROGUE_SPEC = [
   // ⚠️ Tools also came UP (3-4 → 5), narrowing the blade:tool gap from ~3x to ~2x, so striking
   // with a tool stays viable — four verbs measured 0% because you never did.
   // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
-  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [6, 9, 1], paid: 4, verb: 'draw' },
-  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [6, 2, 1], paid: 5, verb: 'outpace' },
-  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [6, 8, 2], paid: 4, verb: 'pierce' },
-  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [7, 2, 0], paid: 5, verb: 'freepaid' },
-  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [6, 9, 1], paid: 4, verb: 'cycle2' },
-  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [6, 2, 3], paid: 5, verb: 'nocounter' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [6, 8, 3], paid: 4, verb: 'surge' },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [7, 2, 1], paid: 5, verb: 'unspent' },
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [5, 2, 1], paid: 5, verb: 'fangs'   },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [6, 8, 2], paid: 3, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 3, combo: 'Venom Needle',    spike: 'value', base: [6, 2, 0], paid: 5, verb: 'lethal'  },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 2, combo: 'Sleight of Hand', spike: 'value', base: [5, 2, 3], paid: 5, verb: 'nocounter' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [6, 8, 3], paid: 3, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 3, combo: 'Shadow Double',   spike: 'value', base: [6, 2, 1], paid: 5, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
@@ -970,7 +983,7 @@ function rogueMath() {
   // ⚠️ NO MORE PAIR DISCOUNT — the pair pays in a VERB now, not in arithmetic.
   const cost = st.def.energy || 0;
   const paid = fuel ? (fuel.def.energy || 0) : 0;
-  const full = paid >= cost || verb === 'freepaid';     // 🗡️ Lethal Dose pays for you
+  const full = paid >= cost;
   // 🔑 MOMENTUM IS THE SURPLUS OF WHAT YOU SPEND. It used to come only from pairing, which is
   // gated on slot ② — and ② is also your Initiative, so speed won and pairing measured at 17%.
   // A meter fed by the one slot you always need for something else can never fill.
@@ -980,7 +993,14 @@ function rogueMath() {
   const pool = Math.min(MOMENTUM_CAP, (S.momentum || 0) + gain);
   const spend = S.moTarget ? pool : 0;
   const next = S.moTarget ? 0 : Math.max(0, pool - MOMENTUM_DECAY);
-  return { paired, verb, cost, paid, full, fuel, gain, pool, spend, next, target: S.moTarget || null };
+  // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
+  // ~9 you gave up by not striking with the blade. They scale off DIFFERENT things on purpose:
+  //   Second Fang — the strike's own ⚔️, so it grows as you sharpen that card.
+  //   Lethal Dose — what you feed slot ③, so it makes the fuel choice matter beyond "does it cover".
+  const bonus = verb === 'fangs'  ? eff(st).value
+              : verb === 'lethal' ? 2 * paid
+              : 0;
+  return { paired, verb, cost, paid, full, fuel, gain, bonus, pool, spend, next, target: S.moTarget || null };
 }
 // ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
 // is "is this the turn to cash out", not "yes or no".
@@ -1046,7 +1066,7 @@ const ROGUE = {
       rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
                // ⚠️ `gain` was missing here until 2026-08-17, so nothing outside rogueMath() could
                // see momentum EARNED — including the instrument, which read NaN and said so.
-               gain: m.gain, pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
+               gain: m.gain, bonus: m.bonus, pool: m.pool, spend: m.spend, next: m.next, target: m.target, slips: true },
     };
   },
 };
@@ -3228,7 +3248,7 @@ function computeAction(reserve) {
   // hands it straight back to the class. One line, so a third class needs no change here.
   const classPayload = a.rogue ? { rogue: a.rogue } : null;
   // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
-  // 🔑 Deliberately NOT a second system: outpace/pierce/unhalved answer the same three questions
+  // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
   // rather than a parallel set. A class adds an ANSWER, never a new question.
   const rVerb = a.rogue ? a.rogue.verb : null;
@@ -3250,7 +3270,7 @@ function computeAction(reserve) {
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
     // 🗡️ Viper Strike arrives before they are ready — same answer as ✦ Outpace, different class
-    const initLost = (vE === 'Outpace' || rVerb === 'outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
+    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -3260,7 +3280,10 @@ function computeAction(reserve) {
     if (h === 'Ambush') early *= 2;
     if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
-    const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
+    // 🗡️ the blade-side verb lands BEFORE the shape does, so 🛡️ Armour is still paid on the total
+    // and 🌀 Evasion still halves it. A verb makes the blow bigger; it does not exempt the blow.
+    const base = pileVal + (S.potionFx ? S.potionFx.value : 0)     // 🧪 Emberdraught
+                 + (a.rogue ? (a.rogue.bonus || 0) : 0);
     const withBoost = base + boostEff;
     // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
     // an elemental attack - a rule no non-elemental class could ever join - but a SHAPE, stated
@@ -3376,7 +3399,11 @@ function computeAction(reserve) {
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
   const wrongType = false;
-  const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
+  // ONE VALUE PER CARD, so a blade-side verb reads as PROGRESS here exactly as it reads as damage
+  // in a fight. ⚠️ Anything added to `base` in the fight branch must be added here too, or a rule
+  // silently applies to half the game — the branches are parallel and neither one warns you.
+  const base = pileVal + (S.potionFx ? S.potionFx.value : 0)     // 🧪 Emberdraught
+               + (a.rogue ? (a.rogue.bonus || 0) : 0);
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
