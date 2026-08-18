@@ -5290,6 +5290,43 @@ function renderControls() {
     const resolveBtn = duel
       ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
       : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>Resolve ${isFight ? 'Fight' : 'Journey'}</button>`;
+    // 👁️ WHAT YOU ARE FACING, RESTATED AT THE BUTTON (2026-08-18).
+    // Thomas: *"the encounter info also seems small in the top left. since my gaze is always at my
+    // hand, and the resolve button is near my hand. thats where im looking at, and i don't see the
+    // encounter info. and sometimes i click resolve journey without even seeing the encounter
+    // info."*
+    // 🔑 MEASURED, AND IT IS A LAYOUT FAULT RATHER THAN CARELESSNESS: the encounter panel
+    // centres at (156,221) in 11px type, the Resolve button at (543,388), the hand at (509,673).
+    // The information and the decision sit 422px apart in opposite corners, so you cannot read the
+    // terms while looking at the control you are about to press.
+    // 🔑 THE RULE: PUT THE TERMS WHERE THE DECISION IS - a restatement beside the button, not a
+    // bigger panel on the far side of the screen.
+    // ⚠️ TERMS ONLY, NEVER THE OUTCOME. Live preview was removed deliberately and stays removed:
+    // this says what the encounter DEMANDS, never what your arrangement would do about it.
+    const facing = (() => {
+      // ⚠️ `e` is NOT in scope here - renderControls has no local encounter, and the `const e`
+      // a few lines up belongs to renderEncounter. Read S.encounter directly.
+      const e = S.encounter;
+      if (S.finalMode || !e) return '';
+      const chip = (t, cls) => `<span class="fc ${cls || ''}">${t}</span>`;
+      const bits = [];
+      if (e.type === 'journey') {
+        bits.push(chip(`👣 MP <b>${e.mp}</b> <span class="dim">(half ${Math.ceil(e.mp / 2)})</span>`, 'need'));
+        if (e.nightfall) bits.push(chip(`🌑 Nightfall <b>${e.nightfall}</b>`, 'bad'));
+        if (e.timePenalty) bits.push(chip(`⏳ Time <b>${e.timePenalty}</b>`, 'bad'));
+        if (e.peril) bits.push(chip(`⛰️ ${e.peril}`, 'bad'));
+      } else {
+        bits.push(chip(`❤️ <b>${e.hp}</b> <span class="dim">(half ${Math.ceil(e.hp / 2)})</span>`, 'need'));
+        bits.push(chip(`💨 <b>${e.init}</b>`));
+        bits.push(chip(`⚔️ <b>${e.atk}</b>`, 'bad'));
+        if (shapesOf(e).length) bits.push(chip(shapeText(e), 'shape'));
+        if (e.ability) bits.push(chip(`☠️ ${e.ability}`, 'bad'));
+      }
+      if (S.hardship) bits.push(chip(`⚠️ ${S.hardship}`, 'bad'));
+      // the chips already carry the icons - repeating one in the label just doubles it
+      return `<div class="facing-bar"><span class="facing-lab">${e.name}</span>${bits.join('')}</div>`;
+    })();
+
     // Divert only makes sense before the first blow is struck
     const divertBtn = S.finalMode ? '' :
       `<button onclick="beginDivert()" ${canDivert() ? '' : 'disabled'} title="Burn the top deck card + 1 hand card to swap this encounter for one of a different type">` +
@@ -5338,6 +5375,7 @@ function renderControls() {
       bankRowHTML() +
       momentumRowHTML() +
       boostRow +
+      facing +
       resolveBtn +
       divertBtn +
       howto;
