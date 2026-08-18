@@ -5641,10 +5641,15 @@ function momentumRowHTML() {
   // "🎯 N hits" — both were dead: she already wins 99–100% of races, and hits only answer 🧱 Guard,
   // which is on no creature. The meter was never the problem; the shop was empty.)
   const now = S.momentum || 0;
+  // 🧾 ⚠️ AT ZERO, SAY WHAT IS STILL HAPPENING. 🗡️ Lone Fang pays +4 precisely while the streak is
+  // broken, and a row reading only "no discount" while a charm quietly adds 4 is the Mirror Fen bug
+  // again — a modifier doing real work with nothing on screen to account for it.
   const head = now > 0
     ? `🗡️ <b>${now} ●</b> — your Strike costs <b>${m.saved} less ⚡</b>` +
       (m.cost === 0 ? ` <span class="good">(free)</span>` : ` <span class="dim">(⚡${m.rawCost} → ${m.cost})</span>`)
-    : `🗡️ <b>0 ●</b> — no discount`;
+    : (hasCharm('lonefang')
+        ? `🗡️ <b>0 ●</b> — no discount, but <b>Lone Fang</b> gives your strike <b>+4</b>`
+        : `🗡️ <b>0 ●</b> — no discount`);
   const risk = now > 0
     ? `take any damage this turn and it breaks${hasCharm('secondnature') ? ' back to 2' : ' to 0'}`
     : `come through a turn untouched to start a streak`;
