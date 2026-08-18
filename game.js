@@ -953,13 +953,13 @@ const ROGUE_SPEC = [
   // still sheds the same 13 levels a run, because every hit costs her more cards.
   // 🔑 So 💨 Initiative may sit a *little* above the mage's — that is what the thin armour buys.
   // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
-  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 7, 1], paid: 3, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'draw' },
   { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [4, 2, 1], paid: 4, verb: 'fangs'   },
-  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [4, 6, 2], paid: 3, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [4, 5, 2], paid: 3, verb: 'pierce' },
   { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [5, 2, 0], paid: 4, verb: 'lethal'  },
-  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 7, 1], paid: 3, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'cycle2' },
   { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [4, 2, 3], paid: 4, verb: 'nocounter' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 6, 3], paid: 3, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 5, 3], paid: 3, verb: 'surge' },
   { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [5, 2, 1], paid: 4, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
@@ -991,7 +991,24 @@ const ROGUE_COST = [2, 3, 4, null];
 // to come up, or the run has nothing to give you. Dropping the base alone took her to 5% run win:
 // weak at Lv1 AND weak at Lv4 is not a tradeoff, it is just weak.
 // Lv1 ⚔️4-5 (below the mage's 5-11 turn) climbing to Lv4 ⚔️16-17 / ✦20-21.
-const SPIKE_STEP = { value: 4, init: 3, armor: 1 };
+// ⚠️ 💨 STEPS 1. Thomas, looking at a Lv2 card sitting on 💨 10: *"lvl 2 cards having
+// initiative at 10 is also crazy, why are we doing this?"* There is no good reason, and the
+// principle is the keeper:
+// 🔑 INITIATIVE IS A THRESHOLD STAT, NOT AN ACCUMULATING ONE. You win the race or you do not.
+// Once you are faster than the thing you are racing, MORE SPEED BUYS NOTHING - so scaling it is
+// pure inflation, and it inflates against creatures that never scale at all (💨 1-6, fixed).
+// Measured at +3 a level: 76% of her races were won by 3 or more, i.e. decided before she looked
+// at her hand, average margin +5.1. The mage sits at 48% / +2.6 and her race still reads as a race.
+// ⚠️ Kept at 1 rather than 0 so a tool still SHARPENS - but the number now stays legible for
+// the whole run instead of running away from the board it is compared against.
+// ⚠️ value steps 5. Flattening 💨 to 1 was right for legibility and took her run win to 6%,
+// because her duel was being held up ENTIRELY by out-racing the dragon - nothing else she owns
+// scales to 50-68 HP over 3-4 beats. Taking that away means the damage has to arrive instead.
+// 🔑 This is Thomas's rule applied to BOTH ends: *"baseline of the hero should be weak, its the
+// charms and the LEVEL of the cards that help players get through."* Weak at Lv1 (⚔️4-5, under the
+// mage's 5-11 turn) and genuinely strong at Lv4 (⚔️19-20 / ✦23-24, against the mage's 20-29).
+// A weak baseline is only half the rule; if the curve does not repay it, the run has nothing to give.
+const SPIKE_STEP = { value: 5, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
   const step = SPIKE_STEP[s.spike];
