@@ -1811,6 +1811,25 @@ const CHARMS = [
     text: '🪨 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
   { id: 'swiftwick', tier: 2,   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
     text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
+  // 🔑 THE RUN LAYER OWES YOU INITIATIVE, NOT THE CARD TABLE (Thomas, 2026-08-17): *"right now we
+  // don't have something that helps initiative, that would come from potions or charms, and
+  // definitely lvling up cards."* Audited on the spot: exactly ONE positive Initiative charm
+  // existed in 32 (Swiftwick, +1, tier 2), against three potions - so the only place speed could
+  // come from was the printed number, which is precisely why that number had inflated to 18.
+  // ⚠️ AND THE SHAPES HAD NO ANSWERS AT ALL: zero charms named 🌀 Evasion, zero named
+  // 🛡️ Armour, one named 🧱 Guard. The three defence shapes ARE the combat design, and the
+  // run layer could not engage with two of them.
+  { id: 'quickwick', tier: 1,   name: 'Quickwick',        rarity: 'uncommon', cost: 9,
+    text: '💨 +2 Initiative every turn',             mods: { init: 2 } },
+  // 🌀 the first answer to Evasion in the game. Lateral by construction: it adds no damage, it
+  // narrows WHEN the shape applies - so a slightly slower card becomes a legal choice, which is a
+  // different arrangement rather than a bigger number.
+  { id: 'windreader', tier: 2,  name: 'Windreader',       rarity: 'rare', cost: 12, rule: true,
+    text: '🌀 <b>Evasion</b> only halves you if it beats your Initiative by <b>3</b>' },
+  // 🛡️ and the first answer to Armour. ⚠️ Deliberately flat rather than a multiplier: Armour
+  // is subtracted per HIT, so a percentage would swing wildly between a mage (1 hit) and a rogue.
+  { id: 'ironsplit', tier: 2,   name: 'Ironsplitter',     rarity: 'uncommon', cost: 10, rule: true,
+    text: '🛡️ <b>Armour</b> takes <b>2 less</b> off every hit' },
   { id: 'lanternpace', tier: 2, name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
     text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
   { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
@@ -3418,10 +3437,13 @@ function computeAction(reserve) {
     // verb should have, and it is why `nocounter` measured 0%: it was reprinting a freebie.
     const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
-    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce') ? (e.shapeV || 0) : 0;
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce')
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0)) : 0;   // 🛡️ Ironsplitter
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
+    // 🌀 Windreader widens the margin Evasion needs, so a near-miss on the race still lands full
+    const evGrace = hasCharm('windreader') ? 2 : 0;
     const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
-                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
+                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit + evGrace);
     // 🗡️ MULTI-HIT — and the rule is that hits do NOT add damage, they DIVIDE it, with 🛡️ Armour
     // paid on EVERY one. That is the entire reason a long chain is a liability against Armour and
     // (once 🧱 GUARD exists) an asset against a breakable pool.
@@ -6105,9 +6127,15 @@ function duelArmour() {
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
   const quenched = !!(S.potionFx && S.potionFx.noShape);   // 🧪 Quenching Draught works on a dragon too
-  const armour = quenched ? 0 : duelArmour() + (duelFx().armour || 0);   // 🐉 Bank the Forge
+  const armour = quenched ? 0 : Math.max(0, duelArmour() + (duelFx().armour || 0) - (hasCharm('ironsplit') ? 2 : 0));   // 🐉 Bank the Forge · 🛡️ Ironsplitter
   // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
-  const evaded = !quenched && hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
+  // 🌀 Windreader applies at the lair too - a dragon is where Evasion actually decides runs.
+  // ⚠️ The duel only knows initLost (a boolean), so the margin is re-read from the same terms
+  // computeAction used, rather than inventing a second notion of "close".
+  const evMargin = (S.dragon && S.dragon.init != null) ? (S.dragon.init - (r.init || 0)) : 99;
+  const evaded = !quenched && hasShape('evasion') && r.initLost
+                 && !(hasCharm('windreader') && evMargin <= 2)
+                 && !(S.dragonState.boon.unseen > 0);
   let toHp = Math.max(0, r.value - armour);
   if (evaded) toHp = Math.floor(toHp / 2);
   return { toHp, armour, evaded };
