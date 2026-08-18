@@ -745,10 +745,22 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* 🗡️ THE SPARE ROW — cards drawn past the four slots. Deliberately set apart from the row
    rather than squeezed into it: these are not seated, and a card that looks seated but is not is
    worse than one that is plainly waiting. */
-.spare-row { margin: 6px 0 0; padding: 6px 8px; border-radius: 9px;
+/* ⚠️ IT MUST SPAN THE WHOLE ROW. #slots-panel is a 4-column grid, so without this the tray
+   becomes a FIFTH GRID ITEM and lands in one quarter-width column - measured at 126px of a 528px
+   panel, with the drawn cards crushed to 51px against a slot card's 140px. That is the "messes up
+   the UI pretty bad" Thomas hit the moment a draw verb fired.
+   🔑 A CARD YOU CANNOT READ IS A CARD YOU CANNOT CHOOSE, which is the same failure as the
+   invisible card this tray was built to fix - just wearing different clothes.
+   ⚠️ It stays LAST in the DOM on purpose: the immersive layout fans the row with
+   `#slots-panel .slot:nth-child(1..4)`, and putting the tray first would shift every one of those
+   onto the wrong slot. */
+.spare-row { grid-column: 1 / -1; margin: 8px 0 0; padding: 7px 9px; border-radius: 9px;
   border: 1px dashed rgba(232,145,60,.45); background: rgba(232,145,60,.06); }
-.spare-lab { font-size: 11px; color: #f0a86a; margin-bottom: 4px; }
-.spare-row .pile { display: flex; gap: 6px; }
+.spare-lab { font-size: 11px; color: #f0a86a; margin-bottom: 5px; }
+/* the drawn cards sit at slot width so they read as the same OBJECT as the cards in the row -
+   they are the same cards, and one tap moves them there. */
+.spare-row .pile { display: flex; gap: 8px; flex-wrap: wrap; }
+.spare-row .pile .card { flex: 0 1 150px; max-width: 170px; }
 
 /* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them. */
 .mo-chip { white-space: nowrap; }

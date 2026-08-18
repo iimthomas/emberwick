@@ -5769,8 +5769,11 @@ function spareRowHTML() {
   const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
   const spare = S.hand.filter(c => !seated.has(c.id));
   if (!spare.length) return '';
-  return `<div class="spare-row"><div class="spare-lab">🗡️ drawn — tap to swap one in; ` +
-    `${spare.length > 1 ? 'the rest slide' : 'the other slides'} under your deck</div>` +
+  // ⚠️ SAY THE ACTUAL GESTURE. It read "tap to swap one in", but this is the row's usual TWO-tap
+  // swap: the drawn card, then the card it replaces. A label that describes a gesture the player
+  // does not have is the picker rule again - offering something you cannot act on.
+  return `<div class="spare-row"><div class="spare-lab">🗡️ drawn — tap one, then tap the card ` +
+    `it replaces · ${spare.length > 1 ? 'the rest slide' : 'the other slides'} under your deck</div>` +
     `<div class="pile">${spare.map(cardHTML).join('')}</div></div>`;
 }
 
