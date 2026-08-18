@@ -865,6 +865,7 @@ const MAGE = {
 // did caused it, so there was nothing to try at. A streak is fun because BREAKING it is an event
 // and the event is your fault.
 const MOMENTUM_CAP = 5;
+const MOMENTUM_DISCOUNT_CAP = 2;   // ⚡ the most a full streak can ever take off
 const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
 const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It used to mean NOTHING.
 
@@ -942,23 +943,60 @@ const ROGUE_SPEC = [
   // free right up until you ask what met it.*
   // ✅ So the ceiling stays, on exactly ONE card: 🗡️ Ghostblade, the payoff half of the PAYOFF
   // pair. ⚡5 is now aspirational rather than routine — the card you are keeping the streak up FOR.
+  // 🔑 THE BASELINE IS DELIBERATELY WEAK (Thomas, 2026-08-17): *"baseline of the hero should be
+  // weak, its the charms and the level of the cards that help players get through the stuff."*
+  // Measured before this: a Lv1 rogue turn produced 6-12 against a Lv1 MAGE turn of 5-11 — she
+  // started where the mage arrived, so nothing the run gave you afterwards felt like it mattered.
+  // Blades now open at ⚔️4-5 and climb +3 a level; tools strike for ⚔️4 and are not meant to.
+  // ⚠️ HER TRADEOFF IS ARMOUR, AND IT IS ALREADY PRICED: mage cards soak avg 2.9 at Lv2 (WARD cards
+  // 5-8), rogue cards 0.9. She takes HALF the damage a mage does (0.70 a turn against 1.46) and
+  // still sheds the same 13 levels a run, because every hit costs her more cards.
+  // 🔑 So 💨 Initiative may sit a *little* above the mage's — that is what the thin armour buys.
   // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
-  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'draw' },
-  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [5, 2, 1], paid: 5, verb: 'fangs'   },
-  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [6, 8, 2], paid: 3, verb: 'pierce' },
-  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [6, 2, 0], paid: 5, verb: 'lethal'  },
-  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [6, 9, 1], paid: 3, verb: 'cycle2' },
-  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [5, 2, 3], paid: 5, verb: 'nocounter' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [6, 8, 3], paid: 3, verb: 'surge' },
-  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [6, 2, 1], paid: 5, verb: 'unspent' },
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 7, 1], paid: 3, verb: 'draw' },
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [4, 2, 1], paid: 4, verb: 'fangs'   },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [4, 6, 2], paid: 3, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [5, 2, 0], paid: 4, verb: 'lethal'  },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 7, 1], paid: 3, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [4, 2, 3], paid: 4, verb: 'nocounter' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 6, 3], paid: 3, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [5, 2, 1], paid: 4, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
 // can print `⚔️ 7 → ✦ 12` off the same row shape every other card in the game uses.
+// ⚠️ THE SPIKE STEP IS PER-STAT (2026-08-17). It used to be +3 a level for ANY spike, which was
+// right for ⚔️ damage and catastrophic for 💨 Initiative: a tool went 9 → 18, against creatures
+// that run 💨 1-6. Thomas, playing stage 1: *"theres a card with 17 initiative, like what... i just
+// put the highest one in slot 2."*
+// 🔑 A STAT THAT ALWAYS WINS IS NOT A STAT, IT IS A FORMALITY — and it took slot ② with it,
+// because pairing costs you the race only if there IS a race. Initiative now steps +1.
+// ⚠️ init steps 2, not 1 — and the reason is the gap between the two things Initiative races.
+// Road creatures sit at 💨 1-6; DRAGONS sit at 7-10. A flat +1 made her tools top out at 9, so she
+// lost the race on every beat of every duel and the stage win rates fell to 16/4/0/0.
+// 🔑 SO THE CURVE IS THE POINT: at Lv1 a tool (5-6) races CREATURES and often loses; by Lv4
+// (11-12) it contests DRAGONS. Levelling Initiative buys you "I can outrun the boss now" instead of
+// buying a number that was already unbeatable at Lv1.
+// ⚠️ THE BASE WAS THE BUG, NOT THE STEP — and cutting the step too cost 15 points of run win.
+// At base 8-9 a Lv1 tool already beat EVERY creature in the game (they run 💨 1-6), so Initiative
+// was decided before you looked at your hand. That is what made slot ② thoughtless.
+// But flattening the growth as well took her answer to 🌀 EVASION away, and Evasion halves your
+// hit unless you WIN the race — so stages 2 and 4, the Evasion stages, fell from 58%/42% to 27%/7%
+// while stages 1 and 3 barely moved. A textbook case of the measurement naming the mechanic.
+// 🔑 SO: START CONTESTED, BECOME DOMINANT ONLY THROUGH INVESTMENT. Base 5-6 races creatures at
+// Lv1 and loses often; Lv3-4 reaches 12-15 and contests dragons at 7-10. The big number is now the
+// REWARD for levelling rather than the state you start in.
+// ⚠️ value steps 4, not 3. A weak baseline is only half of Thomas's rule - *"its the charms and
+// the LEVEL of the cards that help players get through"* - so if the start comes down the CURVE has
+// to come up, or the run has nothing to give you. Dropping the base alone took her to 5% run win:
+// weak at Lv1 AND weak at Lv4 is not a tradeoff, it is just weak.
+// Lv1 ⚔️4-5 (below the mage's 5-11 turn) climbing to Lv4 ⚔️16-17 / ✦20-21.
+const SPIKE_STEP = { value: 4, init: 3, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
+  const step = SPIKE_STEP[s.spike];
   const lv = [0, 1, 2, 3].map(L => {
-    const st = s.base.map((v, i) => (i === idx[s.spike] ? v + 3 * L : (L === 0 ? v : Math.max(0, v - 1))));
+    const st = s.base.map((v, i) => (i === idx[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
     return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
   return { name: s.name, element: null, arch: null, pair: s.pair, role: s.role,
@@ -1014,8 +1052,26 @@ function rogueMath() {
   // have been holding. 🔑 And it reads right — the longer you are in rhythm, the more you can pull
   // off. At a full streak every card in the deck costs nothing, which is the payoff for five clean
   // turns and is meant to feel like getting away with something.
+  // ⚠️ THE DISCOUNT IS HALVED AND CAPPED (2026-08-17). It used to be 1-for-1 with the streak, so
+  // a full streak made every card FREE. Thomas: *"minus cost on cards, i don't even have to think
+  // or weigh options or anything."*
+  // 🔑 AND THE FAULT IS BIGGER THAN THE NUMBER: ⚡ WAS THE CLASS'S ONE REAL CONSTRAINT, AND
+  // MOMENTUM WAS PAYING IT OFF. A reward that removes the constraint it rewards you within does not
+  // make the game easier, it DELETES THE DECISION — slot ③ stopped being a choice about which card
+  // you can afford and became a formality. *Cheaper costs are not lateral power when the cost WAS
+  // the fork.* Worse, a streak is easiest to hold when you are already winning, so the discount
+  // arrived exactly when it was least needed.
+  // Now: 2 pips buy 1 ⚡, and it never exceeds MOMENTUM_DISCOUNT_CAP — a real help at a long
+  // streak, never a bypass.
   const rawCost = st.def.energy || 0;
-  const cost = Math.max(0, rawCost - (S.momentum || 0));
+  // ⚠️ min(cap, streak), NOT floor(streak/2). The halving version starved her exactly where she
+  // needed it: at the LAIR her streak averages 1.4-1.9 (the dragon hits every beat), so floor/2
+  // paid out ZERO there, her ⚡-paid rate fell 85-94% -> 70-75%, and the duel collapsed to 4/12/4/4.
+  // 🔑 THE CAP IS WHAT STOPS THE BYPASS; THE RATE WAS NEVER THE PROBLEM. Capping at 2 keeps
+  // slot ③ a real question (a ⚡5 blade never drops below ⚡3) without taxing the one place her
+  // streak is hardest to hold.
+  const discount = Math.min(MOMENTUM_DISCOUNT_CAP, S.momentum || 0);
+  const cost = Math.max(0, rawCost - discount);
   const paid = fuel ? (fuel.def.energy || 0) : 0;
   const full = paid >= cost;
   // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
