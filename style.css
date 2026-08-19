@@ -773,6 +773,10 @@ button.stage.locked .stage-shape { font-style: italic; }
    `title=` tooltips did not exist at all. */
 .nlab { font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .62;
   margin-left: 2px; font-weight: 400; }
+/* ⚠️ DIM, NOT HIDDEN. The slot the card sits in decides which of its two energy numbers is
+   being read - ① STRIKE reads ⚡ cost, ③ ENERGY reads ◇ fuel - so the other recedes. Same rule
+   the mage's two element facts already follow; deleting it would just move the confusion. */
+.num-dim { opacity: .34; font-weight: 400; }
 
 /* 👁️ THE FACING BAR - the encounter's demands, restated where the decision is.
    ⚠️ It sits directly above Resolve on purpose. The encounter panel is 422px away in the

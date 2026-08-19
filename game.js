@@ -6133,9 +6133,22 @@ function cardHTML(card) {
                  // ⚠️ The old version explained itself in `title=` attributes. This is played daily
                  // on a phone, WHERE TOOLTIPS DO NOT EXIST - so the explanation was invisible to the
                  // only player it had. Three characters of label beat any hover text.
-                 : `<div class="el-identity pair-identity">` +
-                     `<b class="rg-energy">⚡${d.energy}<span class="nlab">cost</span></b>` +
-                     `<b class="rg-pitch">◇${pitchOf(card)}<span class="nlab">fuel</span></b>` +
+                 // 🔑 DISCLOSURE BY POSITION - the rule this game already uses for the mage's two
+                 // element facts, applied to the rogue's two energy facts. Thomas: *"ah the energy
+                 // and pitch can't be 1 number?"* They cannot (the level tradeoff needs them moving
+                 // in opposite directions), but only ONE of them is ever being read:
+                 //   ① STRIKE  -> ⚡ cost is what matters. Dim the fuel.
+                 //   ③ ENERGY  -> ◇ fuel is what matters. Dim the cost.
+                 // ⚠️ DIMMED, NEVER DELETED - same as the element rule. The number is still there
+                 // when you go looking; it just stops competing for the glance.
+                 : (() => {
+                     const reads = slot === 'Boost' ? 'pitch' : slot === 'Spell' ? 'cost' : null;
+                     const cD = reads === 'pitch' ? ' num-dim' : '';
+                     const pD = reads === 'cost'  ? ' num-dim' : '';
+                     return `<div class="el-identity pair-identity">` +
+                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">cost</span></b>` +
+                       `<b class="rg-pitch${pD}">◇${pitchOf(card)}<span class="nlab">fuel</span></b>`;
+                   })() +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
