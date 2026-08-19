@@ -830,7 +830,7 @@ const MAGE = {
 // per-hit, and the class seam. Everything else here is new.
 //
 // THE TURN ASKS FOUR THINGS, and every one of them is answered by a number printed on a card:
-//   ① STRIKE   costs ⚡. Paid in full it deals its ✦ damage; short, it deals its plain ⚔️.
+//   ① STRIKE   costs ⚡. Paid in full it deals its ◆ damage; short, it deals its plain ⚔️.
 //   ② COMBO    your Initiative — and its PAIR fires that card's VERB.
 //   ③ ENERGY   burn a card to pay; it provides its own ⚡.
 //   ④ ARSENAL  the card you keep. Identical in every class, as always.
@@ -5742,7 +5742,7 @@ function rogueActionLines(r, spell, L, verb) {
   const out = [];
   const rg = r.rogue || {};
   const fed = rg.fuelName ? `fed ◇${rg.paid} of ${rg.fuelName}` : 'nothing fed';
-  if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ✦ ` +
+  if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ◆ ` +
     `${eff(spell).attuned} (${fed} against ⚡${rg.cost})`, 'good'));
   else out.push(L(`⚡ UNPAID — ${fed} against ⚡${rg.cost}, so ${spell.def.name} ` +
     `strikes for only ⚔️ ${eff(spell).value}`, 'bad'));
@@ -5804,7 +5804,7 @@ function rogueZoneHint(zone, isFight) {
       const e = eff(st);
       const disc = m.streakDmg ? ` <span class="good">(+${m.streakDmg} from ●)</span>` : '';
       return m.full
-        ? `PAID — strikes for its full <b>✦ ${e.attuned}</b>${disc} · spent, gone for the region`
+        ? `PAID — strikes for its full <b>◆ ${e.attuned}</b>${disc} · spent, gone for the region`
         : `costs <b>⚡ ${m.cost}</b>${disc}, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
     }
     case 'Element': {
@@ -6085,7 +6085,11 @@ function cardHTML(card) {
   const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
     (CLASS.pairs
       ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
-      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">✦${v.attuned}</span>` : '')) +
+      // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
+      // damage" - the same borrowed-vocabulary fault as the reveal printing "unattuned" at her.
+      // 🔑 ◇ is what a card GIVES as fuel, ◆ is what you get when the cost is PAID: same shape
+      // family, so it reads as the same economy. Filled = fulfilled. ✦ is the mage's again.
+      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">◆${v.attuned}</span>` : '')) +
     `</div>`;
 
   const slot = zoneOf(card.id);
@@ -6120,8 +6124,18 @@ function cardHTML(card) {
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
     (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}` +
                      (d.hits > 1 ? `<span class="fork-tag">⚡ ${d.hits} hits</span>` : '') + `</div>`
-                 : `<div class="el-identity pair-identity"><b class="rg-energy" title="what it COSTS to strike with">⚡${d.energy}</b>` +
-                     `<b class="rg-pitch" title="what it GIVES when you feed it - falls as the card levels">◇${pitchOf(card)}</b>` +
+                 // ⚠️ LABELLED, NOT JUST GLYPHED (2026-08-18). Thomas, reading a reveal:
+                 // *"how was second fang paid, it costs 3, viper strike has 2 energy to pay"* -
+                 // and he was reading the card exactly as it was written. ⚡2 is what Viper Strike
+                 // costs to STRIKE WITH; ◇4 is what it PAYS as fuel. Two bare numbers side by side
+                 // with no words, and 🔑 THE INTUITIVE READ IS THE WRONG ONE, because ⚡ is the
+                 // cost glyph everywhere else in the game, so it looks like the number that pays.
+                 // ⚠️ The old version explained itself in `title=` attributes. This is played daily
+                 // on a phone, WHERE TOOLTIPS DO NOT EXIST - so the explanation was invisible to the
+                 // only player it had. Three characters of label beat any hover text.
+                 : `<div class="el-identity pair-identity">` +
+                     `<b class="rg-energy">⚡${d.energy}<span class="nlab">cost</span></b>` +
+                     `<b class="rg-pitch">◇${pitchOf(card)}<span class="nlab">fuel</span></b>` +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
