@@ -1199,7 +1199,15 @@ const ROGUE = {
       rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
                // ⚠️ `gain` was missing here until 2026-08-17, so nothing outside rogueMath() could
                // see momentum EARNED — including the instrument, which read NaN and said so.
-               bonus: m.bonus, rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true },
+               // ⚠️ THE REVEAL CANNOT EXPLAIN A TERM THE PAYLOAD DOES NOT CARRY. `verbBonus`,
+               // `streakDmg` and the fuel's name were all missing, so the new rogue action lines
+               // would have silently printed "nothing fed" beside a PAID verdict and never once
+               // mentioned momentum. 🔑 THAT IS THE THIRD TIME TODAY a class-authored field was
+               // computed and not passed through - after `hits` and `gain`. When compose() gains a
+               // field, check the payload spread in the same edit.
+               bonus: m.bonus, verbBonus: m.verbBonus, streakDmg: m.streakDmg,
+               fuelName: m.fuel ? m.fuel.def.name : null,
+               rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true },
     };
   },
 };
@@ -3638,13 +3646,19 @@ function resolve() {
 
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
+    // 🗡️ a rogue turn is not an attunement - it gets its own lines, in its own vocabulary
+    if (r.rogue) rogueActionLines(r, spell, L, 'Atk').forEach(x => b1.push(x));
+    else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
     if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
-    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    // ⚠️ the Surge is a MAGE stat - the rogue's slot ③ pays ⚡ and adds no damage, so printing
+    // "Surge +0" reported a mechanic she does not have
+    else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
+    // 🗡️ Whetstone was invisible: it added +1 per hit and the log never said so
+    if (hasCharm('whetstone')) b1.push(L(`🗡️ Whetstone: +1 on every hit`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
     if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
     beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
@@ -3657,10 +3671,11 @@ function resolve() {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
+    if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
+    else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
-    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
@@ -5707,6 +5722,34 @@ function renderControls() {
 // one line, three places (fight / journey / duel). It names the card that ACTUALLY attuned, which
 // is the Catalyst normally, the Surge under ✦ Second Flame, and a non-matching Catalyst under
 // ✦ Loose Weave - where it says so, because a half bonus with no explanation reads as a bug.
+// 🗡️ THE ROGUE'S OWN ACTION LINES (2026-08-18). Found in play by Thomas, who screenshotted
+// a reveal reading *"Attack: 12 - unattuned (Viper Strike is null, not null)"* above a big
+// — 13 — and asked, reasonably: *"how did i do 13 dmg, why is it attuned, and what is viper
+// strike is null not null"*. Three separate faults in one panel:
+//   1. The whole beat was written in MAGE. `unattuned` interpolates ELEMENT names, and a rogue card
+//      has `element: null`, so it printed "is null, not null".
+//   2. `Surge: Viper Strike +0 → 12` - she has no ➕ Surge at all. Slot ③ is ENERGY and adds
+//      nothing; the line was pure noise reporting a mage stat she does not own.
+//   3. 🗡️ Whetstone silently added the missing +1. It appeared TWICE in 6,500 lines - its
+//      definition and the one place it is applied - and NOWHERE in the reveal.
+// 🔑 THE THIRD ONE IS THE REAL BUG: THE ARITHMETIC ON SCREEN DID NOT ADD UP TO THE NUMBER ON
+// SCREEN. *Legible math always* is the project's first pillar, and a hidden charm term breaks it
+// more completely than any wrong number would - a wrong number is a bug, an unexplained number is
+// a game you cannot learn.
+// ⚠️ The rule this earns: A CHARM THAT TOUCHES THE MATHS MUST APPEAR IN THE REVEAL. Same
+// discipline as the 🧾 status-bar chips - if it changes a term, it says so.
+function rogueActionLines(r, spell, L, verb) {
+  const out = [];
+  const rg = r.rogue || {};
+  const fed = rg.fuelName ? `fed ◇${rg.paid} of ${rg.fuelName}` : 'nothing fed';
+  if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ✦ ` +
+    `${eff(spell).attuned} (${fed} against ⚡${rg.cost})`, 'good'));
+  else out.push(L(`⚡ UNPAID — ${fed} against ⚡${rg.cost}, so ${spell.def.name} ` +
+    `strikes for only ⚔️ ${eff(spell).value}`, 'bad'));
+  if (rg.verbBonus) out.push(L(`🗡️ its combo adds +${rg.verbBonus}`, 'good'));
+  if (rg.streakDmg) out.push(L(`● Momentum ${rg.streakDmg} — +${rg.streakDmg} to the strike`, 'good'));
+  return out;
+}
 function attunedLineText(r, spell, verb) {
   const src = r.attuner;
   const nm = src ? src.def.name : 'your Catalyst';
@@ -6381,6 +6424,7 @@ function resolveDuel() {
 
   const b1 = [];
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
+  else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
   if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next beat`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
