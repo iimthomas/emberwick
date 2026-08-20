@@ -1081,6 +1081,84 @@ button.stage.locked .stage-shape { font-style: italic; }
    along the bottom, controls above them on the right. Because the scene and the UI
    share the same space instead of stacking, small screens gain the most.
    ============================================================ */
+/* ============================================================
+   🚪 THE MODAL LAYER (2026-08-18)
+   Thomas: *"i want it to feel more like a game UI. instead of this prototypey stuff. like we can
+   have big popup windows that pop up in the middle of the screen for the wheel or anything else."*
+
+   🔑 THIS IS STRUCTURE, NOT JUICE. Every phase used to render into #controls-panel - a strip
+   at the BOTTOM of the column, under the cards - so the Wheel, an event and the region summary all
+   appeared in the least-looked-at part of the screen. That is the same complaint as *"i click
+   resolve journey without even seeing the encounter info"*: the eye is on the hand, and everything
+   that mattered was rendering away from it.
+   ⚠️ No transitions, no easing, no staging - those stay Godot's job. A centred panel is layout,
+   and layout ports; a tween does not.
+
+   🔑 THE HAND STAYS LIT AND CLICKABLE ON PURPOSE. Event and soak pickers live ON the cards, and
+   *the slot row is the only place a card is ever drawn* - so #slots-panel is lifted ABOVE the
+   backdrop rather than dimmed behind it. That is also how card games stage a dialog: the decision
+   in the middle, your hand still readable at the bottom.
+   ============================================================ */
+#modal-layer { position: fixed; inset: 0; z-index: 40; display: none; }
+/* 🔑 THE PANEL NEVER COVERS THE HAND. It is flex-anchored to the TOP of the screen with a
+   height cap, so the slot row below stays lit and clickable. Found by measuring
+   `elementFromPoint` over the slot row and getting #modal-panel back - a centred dialog sat right
+   on top of the cards.
+   ⚠️ This is not a nicety. Event and soak pickers live ON the cards, and the FORK is a choice
+   you make BY READING YOUR HAND - *"which problem do I want, given what I am holding"*. A dialog
+   that hides the hand is a dialog about the thing it is covering. */
+/* ⚠️ THE LAYER MUST NOT CAPTURE CLICKS - only the panel does. #left-col turns out to ISOLATE,
+   so a z-index lift on #slots-panel can never escape it and the backdrop always won the hit test.
+   🔑 Lifting the hand ABOVE an overlay is the fragile fix; making the overlay INTANGIBLE is the
+   robust one - it cannot be defeated by a stacking context anywhere in the tree. */
+body.modal-open #modal-layer { display: flex; align-items: flex-start; justify-content: center;
+  padding: 5vh 12px 0; pointer-events: none; }
+#modal-panel { pointer-events: auto; }
+
+/* 🔑 THE DIM IS A GRADIENT THAT FADES OFF THE HAND. Flat dimming made the cards unreadable,
+   and the fork is a choice you make BY reading them. Strong behind the dialog, gone by the card
+   row - it reads as a spotlight rather than a curtain. */
+#modal-backdrop { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom,
+    rgba(8,7,6,.84) 0%, rgba(8,7,6,.78) 40%, rgba(8,7,6,.30) 64%, rgba(8,7,6,.06) 100%); }
+
+#modal-panel {
+  position: relative;
+  width: min(760px, calc(100vw - 24px));
+  max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
+  background: linear-gradient(#232019, #17150f);
+  border: 1px solid #574a39; border-radius: 16px;
+  box-shadow: 0 26px 70px rgba(0,0,0,.66), 0 0 0 1px rgba(255,220,160,.06) inset;
+  padding: 20px 22px 22px;
+}
+/* the panel owns its own phase label - bigger than the inline strip's, because it is a title now */
+#modal-panel .phase-label {
+  font-size: 1.02em; letter-spacing: .10em; margin: 0 0 10px;
+  color: #f0d9a8; border-bottom: 1px solid #453a2c; padding-bottom: 9px;
+}
+#modal-panel .hint { margin-bottom: 12px; }
+#modal-panel button { font-size: 1em; padding: 11px 14px; }
+
+/* ⚠️ NO z-index LIFT ON THE HAND - it was tried and it cannot work (see #modal-layer above).
+   The overlay is intangible instead, so the hand is reachable without touching stacking at all. */
+/* the empty strip must not hold space while its contents are in the modal */
+body.modal-open #controls-panel:empty { display: none; }
+
+/* 🛤️ THE FORK - two roads, side by side, each stating what it is before what it costs */
+.fork-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fork-branch {
+  display: flex; flex-direction: column; gap: 5px; text-align: left;
+  padding: 14px 15px; min-height: 116px;
+  background: linear-gradient(#2a2519, #1d1a13); border: 1px solid #5b4c38; border-radius: 12px;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.fork-branch:hover, .fork-branch:focus-visible { border-color: #d8b06a; background: linear-gradient(#332c1d, #221e15); }
+.fork-kind  { font-size: .74em; letter-spacing: .12em; color: #b9ab8c; }
+.fork-name  { font-size: 1.06em; font-weight: 600; color: #f2e2bd; }
+.fork-shape { font-size: .92em; }
+.fork-stats { font-size: .84em; color: #b9ad96; margin-top: auto; }
+.fork-extra { font-size: .8em; color: #e0a678; }
+
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }
@@ -1260,4 +1338,15 @@ button.stage.locked .stage-shape { font-style: italic; }
   .enc-stats span { font-size: 11px; padding: 1px 5px; }
   .dragon-hp { height: 20px; }
   .dragon-hp-label { line-height: 20px; font-size: 11.5px; }
+}
+
+/* 🛤️ THE FORK STACKS ON A PHONE. Side by side at 375px gives each road 141px, which wraps
+   the stat line to three lines - readable but cramped, and this is played on a phone daily.
+   ⚠️ MUST STAY AT THE END OF THE FILE with the other responsive rules (cascade-order bug,
+   documented in Prototype_V1.md). */
+@media (max-width: 560px) {
+  .fork-row { grid-template-columns: 1fr; gap: 9px; }
+  .fork-branch { min-height: 0; padding: 12px 13px; }
+  body.modal-open #modal-layer { padding-top: 3vh; }
+  #modal-panel { max-height: 52vh; padding: 15px 16px 17px; }
 }

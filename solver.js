@@ -567,6 +567,36 @@ const RUNSIM = (() => {
           if (up) buyUpgrade(up.id); else wheelDone();
         }
       }
+      // 🛤️ THE FORK. ⚠️ A NEW PHASE MUST BE TAUGHT HERE OR autoRun SILENTLY BREAKS - this
+      // loop `break`s on an unknown phase and the run reports garbage. It has happened with
+      // 'wheel', with 'setout', and it is the first thing to check when a run-level number looks
+      // impossible.
+      // Bot policy: take the branch it scores better by playing BOTH out against the current hand
+      // and comparing outcomes. ⚠️ That makes the bot a CEILING, not a player - it sees each road
+      // perfectly whether the candle is lit or not, where a human unlit reads only the shape. Any
+      // measured gain from the fork is therefore an OVER-estimate of what a person gets.
+      else if (p === 'fork') {
+        const f = S.fork || [];
+        if (!f.length) { takeFork(0); continue; }
+        // 🕯️ THE BOT MUST OBEY THE CANDLE. Its first version evaluated both roads perfectly
+        // whether the candle was lit or not - which is not the rule a human plays by, and it is the
+        // same class of error as the placement bans the bot could not see and the Emberwake it
+        // structurally could not bank.
+        // 🔑 BEFORE QUOTING WHAT AN OPTION IS WORTH, CHECK THE BOT IS ALLOWED TO SEE IT.
+        // Unlit, a player reads only the SHAPE, so the bot chooses at random - a deliberate FLOOR.
+        // Lit, it chooses the better road - the CEILING. Reality sits between them.
+        if (!S.candle) { takeFork(Math.floor(Math.random() * f.length)); continue; }
+        let best = 0, bestSc = null;
+        const saveAssign = { ...S.assign }, saveHardship = S.hardship, saveEnc = S.encounter;
+        for (let i = 0; i < f.length; i++) {
+          beginEncounter(f[i]);
+          const sc = chooseBestOnce();
+          if (sc && (!bestSc || better(sc, bestSc))) { bestSc = sc; best = i; }
+        }
+        S.encounter = saveEnc; S.hardship = saveHardship; S.assign = saveAssign;
+        if (HOOK.onFork) HOOK.onFork(m, f, best);
+        takeFork(best);
+      }
       else if (p === 'event') {
         if (!withEvents) { S.event = null; finishRegionCheck(); continue; }
         const ev = S.event;

@@ -20,7 +20,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=275">
+<link rel="stylesheet" href="style.css?v=280">
 </head>
 <body>
 <header>
@@ -48,6 +48,13 @@
   </div>
 </main>
 
-<script src="game.js?v=275"></script>
+<!-- 🚪 THE MODAL LAYER. Phases that are a DECISION render here instead of in the strip at the
+     bottom of the column. Empty and display:none until a modal phase opens it. -->
+<div id="modal-layer" aria-live="polite">
+  <div id="modal-backdrop"></div>
+  <div id="modal-panel"></div>
+</div>
+
+<script src="game.js?v=280"></script>
 </body>
 </html>

@@ -23,6 +23,10 @@ let ATTUNE_BONUS = 1;
 // made her blades strong enough UNPAID, which dulls the one rule the class is built on. The spike
 // and the payoff have to climb together or the payoff is a Lv1 mechanic you outgrow.
 let PAID_STEP = 2;
+// 🛤️ the fork can be switched off, so it can be A/B'd against the blind draw it replaced.
+// ⚠️ Keep it: the fork changes the RUN ECONOMY (free agency where there was only paid agency
+// via ↩️ Divert), so every number taken before it is measured against a different game.
+let FORK_ENABLED = true;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 // 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
 const GUARD_CUT = 0.5;
@@ -2260,6 +2264,7 @@ function saveGame() {
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
+      fork: S.fork ? S.fork.map(e => e.name) : null,
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
@@ -2293,7 +2298,13 @@ function loadGame() {
     const region = RUN()[d.region - 1];
     if (!region) return false;
     const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel'];
+    // ⚠️ PHASES THAT LEGITIMATELY HAVE NO ENCOUNTER. 🛤️ 'fork' had to be added the day it was
+    // built: during a fork no encounter has been chosen yet, so S.encounter is null, and this
+    // guard sent every mid-fork load down the `return false` path.
+    // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
+    // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
+    // **Any new phase that can exist without an encounter belongs in this list.**
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -2317,6 +2328,10 @@ function loadGame() {
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
       lastMileOutcome: d.lastMileOutcome || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
+      // ⚠️ re-resolved from the region by NAME, never stored as objects - a serialized copy
+      // would be a DIFFERENT object from the region's own def, and every identity check elsewhere
+      // (the queue, beginEncounter, the tutorial's fixed list) compares references.
+      fork: d.fork ? d.fork.map(n => region.encounters.find(e => e.name === n)).filter(Boolean) : null,
       pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
@@ -2664,6 +2679,7 @@ function freshGame(stage) {
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
+    fork: null,             // 🛤️ the two roads on offer this turn (null outside the fork phase)
     pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
     eventAt: 1,             // 🏕️ which encounter this region's event follows
     eventDone: false,       // 🏕️ has this region's event been spent
@@ -3249,6 +3265,50 @@ function log(text, cls = '') { S.logEntries[0].lines.push({ text, cls }); }
 // ============================================================
 // turn flow
 // ============================================================
+// 🛤️ THE FORK IN THE ROAD (2026-08-18) - spec in [[The_Fork_In_The_Road]].
+// Thomas: *"what if we did it like slay the spire with branching paths that you select where to
+// go… to give the player some agency and choice, instead of just being completely random."*
+//
+// ⚠️ IT IS A FORK, NOT A MAP, AND THAT IS A PILLAR DECISION. [[Game_Pillars]] is LOCKED on
+// *"all planning is soft & directional, never hard & calculated… hints/direction, NOT complete
+// optimizable data"* and *"full destination + FUZZY path"*. A whole region laid out in advance is
+// exactly the spreadsheet that forbids; two nodes at a time is direction without calculation.
+//
+// 🔑 THE POOL FITS EXACTLY, WHICH IS WHY THIS COSTS NO CONTENT: a region holds 8 encounters and
+// spends REGION_ENCOUNTERS (4). Offering 2 a turn consumes all 8 across the region - **you see
+// everything the region has and take half of it.**
+//
+// ⚠️ THE BRANCH NOT TAKEN IS DISCARDED, NOT RETURNED. Putting it back would let the same
+// creature be offered three turns running, and the *"i was seeing the same ones a lot"* report is
+// about exactly that feeling.
+function offerFork() {
+  const region = RUN()[S.region - 1];
+  const refill = () => S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  if (S.encounterQueue.length === 0) S.encounterQueue = refill();
+  const a = S.encounterQueue.shift();
+  if (S.encounterQueue.length === 0) S.encounterQueue = refill();
+  // ⚠️ prefer a branch of a DIFFERENT TYPE when the bag allows it. Two fights is a weaker
+  // question than a fight against a journey, and the bag is half and half by construction.
+  let bi = S.encounterQueue.findIndex(e => e.type !== a.type);
+  if (bi === -1) bi = 0;
+  const b = S.encounterQueue.splice(bi, 1)[0];
+  S.fork = [a, b].filter(Boolean);
+  return S.fork;
+}
+
+// 🛤️ the player picks a branch; the other is gone.
+function takeFork(i) {
+  if (S.phase !== 'fork' || !S.fork || !S.fork[i]) return;
+  const chosen = S.fork[i];
+  const other = S.fork[1 - i];
+  S.fork = null;
+  log(`🛤️ You take the road toward ${chosen.name}${other ? ` — ${other.name} is left behind` : ''}.`);
+  beginEncounter(chosen);
+  S.phase = 'assign';
+  logChallenge();
+  render();
+}
+
 function drawEncounter(avoidType) {
   const region = RUN()[S.region - 1];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
@@ -3259,8 +3319,19 @@ function drawEncounter(avoidType) {
     const diff = S.encounterQueue.findIndex(e => e.type !== avoidType);
     if (diff !== -1) idx = diff;
   }
-  S.encounter = S.encounterQueue.splice(idx, 1)[0];
+  const picked = S.encounterQueue.splice(idx, 1)[0];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  beginEncounter(picked);
+}
+
+// 🛤️ EVERYTHING THAT HAPPENS ONCE AN ENCOUNTER IS SETTLED - split out of drawEncounter so the
+// ↩️ Divert path, the ordinary draw and the FORK all run the identical setup.
+// ⚠️ The hardship is rolled HERE, i.e. AFTER the branch is chosen. Rolling it per-branch at offer
+// time would double the rolls and let a player shop for a hardship-free road, which turns a risk
+// into a filter - the *"a hardship must stay a risk, not become a tax"* rule, from the other side.
+function beginEncounter(e) {
+  const region = RUN()[S.region - 1];
+  S.encounter = e;
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
@@ -3369,7 +3440,23 @@ function nextTurn() {
     log(`🗡️ Your combo draws you ${n} extra card${n === 1 ? '' : 's'} — what you leave unseated slides under your deck.`, 'good');
   }
   S.drawExtra = 0;
-  drawEncounter();
+  // 🛤️ THE FORK replaces the blind draw. ⚠️ The tutorial keeps the old single draw: stage 0
+  // is deterministic by design, and a choice is the one thing a scripted lesson cannot script.
+  if (S.tutorial || !FORK_ENABLED) { drawEncounter(); }
+  else {
+    offerFork();
+    S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+    S.divertsUsed = 0; S.diverting = false; S.loseReserve = null;
+    S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
+    S.emberguardUsed = false;
+    S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+    S.bankArmed = false; S.moTarget = null;
+    S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+    S.phase = 'fork';
+    logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+    render();
+    return;
+  }
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.divertsUsed = 0;
   S.diverting = false;
@@ -5245,6 +5332,33 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev'];
 const isShell = () => SHELL_PHASES.includes(S && S.phase);
 
+// 🚪 WHICH PHASES TAKE THE MIDDLE OF THE SCREEN. A phase belongs here when it is a DECISION
+// you stop and make, rather than something you do to the cards in front of you.
+// ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
+// would be a dialog about the thing it was covering.
+const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary'];
+function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
+
+// 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
+// touched at all. It writes the phase body where it always did, and this RELOCATES that markup
+// into the centred panel. Every handler in this codebase is an inline `onclick` string, so moving
+// innerHTML carries the behaviour with it - nothing has to be re-bound.
+// ⚠️ Which means a new modal phase needs NO render code: add it to MODAL_PHASES and it moves.
+function applyModal() {
+  const panel = $('modal-panel'), ctrl = $('controls-panel');
+  if (!panel || !ctrl) return;
+  if (!isModalPhase()) {
+    if (document.body.classList.contains('modal-open')) {
+      document.body.classList.remove('modal-open');
+      panel.innerHTML = '';
+    }
+    return;
+  }
+  document.body.classList.add('modal-open');
+  panel.innerHTML = ctrl.innerHTML;
+  ctrl.innerHTML = '';
+}
+
 function render() {
   if (isShell()) {
     document.body.className = 'phase-' + S.phase + ' shell';
@@ -5254,6 +5368,7 @@ function render() {
     $('slots-panel').innerHTML = '';
     const sc = $('scene'); if (sc) sc.innerHTML = '';
     renderControls();
+    applyModal();    // 🚪 isShell() is false-y for modals, so this CLOSES one left open
     // ⚠️ the log belongs to a RUN. On the shell there may be no run at all, so show the last
     // one's entries if they exist and nothing if they don't — never assume the array is there.
     if (S.logEntries) renderLog(); else $('log').innerHTML = '';
@@ -5269,6 +5384,7 @@ function render() {
   renderControls();
   renderSlots();
   renderLog();
+  applyModal();      // 🚪 must run AFTER renderControls has written the phase body
   pointAtLesson();
 }
 
@@ -5495,8 +5611,42 @@ function renderEncounter() {
   }
 }
 
+// 🛤️ WHAT A BRANCH SHOWS. 🕯️ THE CANDLE DECIDES HOW MUCH YOU SEE - lit, you read what is IN
+// each road; out, you read only its SHAPE and choose on that.
+// 🔑 This is the candle's PROMOTION, not its replacement. Its old job (*"see the next
+// encounter"*) was measured to change the Spell only 7% of the time; deciding how much of a fork
+// you can read is worth far more, and it makes *keep the candle lit* a directional goal.
+// ⚠️ Even UNLIT a branch always states its shape, so the ✦ Arsenal always has something to aim
+// at - which is the whole reason the fork rescues that slot ([[The_Arsenal_Question]] §reopened).
+function forkBranchHTML(e, i) {
+  const lit = S.candle;
+  const isFight = e.type === 'fight';
+  const shape = shapeText(e);
+  const known = lit
+    ? (isFight ? `❤️ HP ${e.hp} · 💨 Init ${e.init} · ⚔️ Atk ${e.atk} · 🪙 ${e.xp}`
+               : `👣 MP ${e.mp} · 🌙 Nightfall ${e.nightfall} · ⏳ TP ${e.timePenalty} · 🪙 ${e.xp}`)
+    : `<span class="dim">by dark you can make out only its shape</span>`;
+  const extra = lit && (e.ability || e.peril)
+    ? `<div class="fork-extra">${e.ability ? `⚠️ ${e.ability}` : `⚠️ ${e.peril}`}</div>` : '';
+  return `<button class="fork-branch" onclick="takeFork(${i})">` +
+    `<span class="fork-kind">${isFight ? '⚔️ FIGHT' : '👣 JOURNEY'}</span>` +
+    `<span class="fork-name">${lit ? e.name : (isFight ? 'something in the way' : 'a road onward')}</span>` +
+    `<span class="fork-shape">${shape || '<span class="dim">unguarded</span>'}</span>` +
+    `<span class="fork-stats">${known}</span>${extra}</button>`;
+}
+
 function renderControls() {
   const c = $('controls-panel');
+  if (S.phase === 'fork') {
+    const f = S.fork || [];
+    c.innerHTML =
+      `<div class="phase-label">🛤️ THE ROAD FORKS</div>` +
+      `<div class="hint">Choose where to go. ${S.candle
+        ? 'Your candle is lit — you can see what waits down each road.'
+        : '<b>Your candle is out</b> — you can read only the shape of what waits.'}</div>` +
+      `<div class="fork-row">${f.map((e, i) => forkBranchHTML(e, i)).join('')}</div>`;
+    return;
+  }
   if (S.phase === 'assign' && S.diverting) {
     c.innerHTML =
       `<div class="phase-label">PHASE 1 — CHALLENGE · DIVERT</div>` +
