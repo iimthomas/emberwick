@@ -27,6 +27,12 @@ let PAID_STEP = 2;
 // ⚠️ Keep it: the fork changes the RUN ECONOMY (free agency where there was only paid agency
 // via ↩️ Divert), so every number taken before it is measured against a different game.
 let FORK_ENABLED = true;
+// 🛒 does the shop open after EVERY encounter, or only at a 🎰 node?
+// ⚠️ A/B toggle, because the answer is measurable and was being argued instead. Thomas:
+// *"i think the game is built on being able to upgrade after every encounter. but i wonder how
+// itll be if we have to go to a shop to do it... but that might take too long, and youll have
+// hoarded a bunch of coin possibly."*
+let WHEEL_PER_ENCOUNTER = true;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 // 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
 const GUARD_CUT = 0.5;
@@ -3323,7 +3329,18 @@ const MAP_WEIGHTS = [
   { type: 'event',  w: 20 },
   { type: 'hearth', w: 11 },   // 🕯️ rest: relight the candle
   { type: 'elite',  w: 12 },   // 🐉 a harder creature paying more coins
-  { type: 'wheel',  w: 14 },   // 🎰 the shop, now a DETOUR rather than a guarantee
+  // ❌ 🎰 THE WHEEL NODE IS CUT (2026-08-18, measured). It was built on a premise I never
+  // checked: that the shop fired at region breaks and the map would turn it into a choice. It does
+  // not - **the Wheel has always opened after EVERY encounter** - so the node handed you a screen
+  // you would have reached anyway after the next fight, and cost you a floor to do it.
+  // 🔑 A NODE THAT GIVES YOU SOMETHING YOU ALREADY GET IS A WASTED FLOOR.
+  // ⚠️ And the alternative was measured before it was argued. Making the shop node-ONLY:
+  //   shop opens 12.4 -> 1.9 · levels bought 7.5 -> 4.3 · **deck at the lair 35.5 -> 32.0, exactly
+  //   where it started** · 🪙 unspent at the lair 4 -> **28** · duel 61% -> 31%.
+  // 🔑 THE CONSTRAINT STOPS BEING COINS AND BECOMES SHOP ACCESS - you cannot spend money you
+  // cannot reach, so more income cannot fix it. Thomas called this before the measurement did:
+  // *"youll have hoarded a bunch of coin possibly."*
+  // (`takeMapNode` still handles type 'wheel' so saves made before this still load.)
 ];
 // ⚠️ THE WEIGHTS WERE TUNED AGAINST THE *BEST ROUTE*, NOT THE AVERAGE ONE, AND THAT IS THE WHOLE
 // POINT OF A MAP. Measured over 1200 maps at these weights: 🎰 3.2 on the map, **2.1 reachable by a
@@ -4697,7 +4714,20 @@ function startUpgrade() {
   // charms are bad - because SHARPENING RAN FIRST and had no budget. A level costs 3-4 and is
   // always affordable, so the purse was always empty by the time the shop opened.
   // Opening the shop first makes the money a CHOICE: this charm, or three levels?
+  // 🗺️ with the shop as a map NODE, the per-encounter opening is what makes that node worthless -
+  // it hands you a screen you would have reached anyway after the next fight.
+  if (!WHEEL_PER_ENCOUNTER && S.map && !S.finalMode) { finishTurn(); return; }
   startWheel(false);
+  // ⚠️ A SHOP WHERE NOTHING IS AFFORDABLE IS NOT A DECISION, IT IS A CONFIRM BUTTON. The shop
+  // opening after every encounter is what keeps the deck growing (measured above), but it is also
+  // ~12 screens a run - and [[Tempo_And_The_Watch]] is explicit that *a weightless decision is not
+  // a rest, it is homework*. When you can afford nothing on the shelf AND nothing in hand, walk on.
+  // ⚠️ never in the tutorial: stage 0 has a lesson that rings the Wheel, and a screen that
+  // skips itself is a screen the lesson can never fire on.
+  if (!S.tutorial && S.phase === 'wheel' && wheelIsEmptyHanded()) {
+    log(`🛒 Nothing here you can afford — you walk on.`);
+    wheelDone();
+  }
 }
 // 🛒 ONE SHOP (2026-08-10, Thomas: *"lets make it be the upgrading at the same time too, so i
 // can spend all my money at once and see all my options at once"*).
@@ -4761,6 +4791,17 @@ function wheelBuy(i) {
   o.bought = true;
   saveGame();
   render();
+}
+
+// ⚠️ "empty-handed" means BOTH halves of the screen are out of reach - the shelf and the forge.
+// Checking only one would skip a screen where the other still had something to offer.
+function wheelIsEmptyHanded() {
+  const offers = (S.wheel && S.wheel.offers) || [];
+  // ⚠️ `kind: 'none'` is an empty slot on the shelf, not a free item - counting it as buyable
+  // would keep the screen open on a shop with literally nothing in it.
+  const canBuy = offers.some(o => o && o.kind !== 'none' && !o.bought && o.cost != null && o.cost <= S.coins);
+  const canSharpen = S.hand.some(c => upgradable(c));
+  return !canBuy && !canSharpen;
 }
 
 function wheelDone() {
