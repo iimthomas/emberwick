@@ -2260,7 +2260,7 @@ function saveGame() {
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
-      pendingEvent: S.pendingEvent, event: S.event,
+      pendingEvent: S.pendingEvent, eventThisRegion: S.eventThisRegion, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
@@ -2316,7 +2316,7 @@ function loadGame() {
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
       lastMileOutcome: d.lastMileOutcome || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
-      pendingEvent: d.pendingEvent || false, event: d.event || null,
+      pendingEvent: d.pendingEvent || false, eventThisRegion: d.eventThisRegion || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
@@ -2663,6 +2663,7 @@ function freshGame(stage) {
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
     pendingEvent: false, // a Complete/Narrow journey owes an Event this turn
+    eventThisRegion: false, // 🏕️ one event per region - see the trigger in resolve()
     event: null,         // active event state { id, step, opt, targetId, wantElement, lines }
     // ---- cross-turn event effects (run layer) ----
     eventsSeen: [],        // ids of events already drawn this run (for `once` events)
@@ -2815,6 +2816,7 @@ function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
   // 📜 a contract CROSSES the region break now — its own encounter window is the bound
   S.regionTurn = 0;
+  S.eventThisRegion = false;   // 🏕️ a fresh region may offer one event
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.region++;
@@ -3950,7 +3952,25 @@ function finishResolve() {
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
 
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
-  else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
+  // 🏕️ ONE EVENT PER REGION, NOT ONE PER JOURNEY (2026-08-18). Thomas: *"not sure about
+  // doing the events after every journey, seems a bit too much."*
+  // Measured: journeys are 54% of encounters and 78% of them fired an event - 7.0 a run - so a
+  // journey turn ran resolve -> soak -> EVENT while a fight ran one screen.
+  // 🔑 THE EVENT HAD STOPPED BEING AN EVENT. Welded to a journey it is not a reward, it is a
+  // STEP - "journey" and "event" had quietly become one compound encounter type, and it was the
+  // majority one. A thing that happens 78% of the time is a phase, whatever it is called.
+  // 🔑 A CAP, NOT A ROLL. A 50% chance halves the count but can still deal two in a row and
+  // then a dry region, and it would add randomness to a run layer that is deliberately
+  // predictable (REGION_ENCOUNTERS is fixed for exactly this reason). One per region is
+  // deterministic, spaces them by construction, and gives a region a SHAPE: some encounters, one
+  // place you arrive, then the Wheel at the break.
+  // ⚠️ It also fixes a telegraph problem rather than making one - see [[Tempo_And_The_Watch]]:
+  // the run layer is meant to be the exhale, and it cannot be if every second encounter asks
+  // another question.
+  else if (r.type === 'journey' && r.outcome !== 'Loss' && !S.eventThisRegion) {
+    S.pendingEvent = true;
+    S.eventThisRegion = true;
+  }
   if (r.banks) S.wakePending = r.bank;
   // 🕯️ a clean win keeps your footing; anything less costs it — and the dark takes it regardless
   if (!S.finalMode) {
