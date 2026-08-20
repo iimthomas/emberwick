@@ -766,7 +766,10 @@ button.stage.locked .stage-shape { font-style: italic; }
 .mo-chip { white-space: nowrap; }
 /* ⚡ cost and ◇ pitch sit side by side on a rogue card, because as it levels they move in
    OPPOSITE directions - showing one without the other hides the whole trade. */
-.rg-pitch { margin-left: 6px; color: #9fd18a; }
+/* ⚠️ BOTH NUMBERS ARE ⚡ ENERGY - one resource, asked twice: what a card NEEDS to be struck
+   with, and what it GIVES when fed. They wear the same glyph on purpose. Colour and the tiny
+   verb carry the difference, and the slot dims whichever one is not being read. */
+.rg-pitch { margin-left: 10px; color: #9fd18a; }
 /* ⚠️ THE NUMBERS CARRY WORDS. ⚡cost and ◇fuel move in opposite directions as a card levels,
    and two bare numbers side by side had the intuitive reading backwards - ⚡ is the cost glyph
    everywhere else, so it looked like the one that pays. This is played on a phone, where the old

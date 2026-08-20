@@ -2579,6 +2579,7 @@ function freshGame(stage) {
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
     // 0 the moment one does — that reset is the minigame, and it is always your own fault.
     momentum: 0, moTarget: null,     // ● the streak (moTarget is dead, kept for old saves)
+    sharpenedVisit: [],              // 🔼 cards already sharpened on THIS visit - one level each
     drawExtra: 0,                    // 🗡️ cards a combo verb owes you next turn
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
@@ -3989,9 +3990,21 @@ const REROLL_COST = 3;
 function ownedCards() { return [...S.hand, ...S.deck, ...S.discard]; }
 function anyCardById(id) { return ownedCards().find(c => c.id === id) || null; }
 
+// 🔑 ONE LEVEL PER CARD PER VISIT (2026-08-18). Thomas: *"i usually upgrade a card straight
+// away to lvl 4, and it starts making the run feel easy. lvl 4 cards just have a lot of stats."*
+// Measured before this: the first Lv4 arrived on turn 5.9 of ~20, in 99% of runs, for BOTH classes.
+// ⚠️ THE FAULT WAS THAT NOTHING SPACED THE LEVELS OUT. Free choice replaced the Wheel's random
+// offers, and the note left at the time said the randomness had been *"a soft brake on always
+// sharpening your best card"* with nothing put back. With enough coins you could walk a single card
+// 1 -> 4 in one sitting, and [[Levelling_As_Sharpening]]'s whole premise - that a level is a
+// COMMITMENT, and knowing when to stop is the skill - never gets asked.
+// 🔑 A cap per VISIT is the smallest possible brake: it never takes the choice away (his rule
+// from the free-choice change), it only makes you come back. The cost curve is untouched.
+const sharpenedHere = id => !!(S.sharpenedVisit && S.sharpenedVisit.includes(id));
 function upgradable(card) {
   const cost = eff(card).cost;
-  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && cost != null && cost <= S.coins;
+  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && !sharpenedHere(card.id)
+    && cost != null && cost <= S.coins;
 }
 
 // build one offer; `rich` (camp) leans rarer
@@ -4115,12 +4128,13 @@ function buyUpgrade(id) {
   const cost = eff(card).cost;
   S.coins -= cost;
   card.level++;
+  (S.sharpenedVisit = S.sharpenedVisit || []).push(card.id);
   log(`🔼 ${card.def.name} sharpens to Lv${card.level} (−${cost} coins, ${S.coins} left).` +
       (card.level >= MAX_LEVEL && VERBS[card.def.name] ? ` ✦ It gains <b>${VERBS[card.def.name].name}</b>.` : ''), 'good result');
   S.upgradePick = null;
   render();
 }
-function doneUpgrades() { endTurn(); }
+function doneUpgrades() { S.sharpenedVisit = []; endTurn(); }
 
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
@@ -5741,7 +5755,7 @@ function renderControls() {
 function rogueActionLines(r, spell, L, verb) {
   const out = [];
   const rg = r.rogue || {};
-  const fed = rg.fuelName ? `fed ◇${rg.paid} of ${rg.fuelName}` : 'nothing fed';
+  const fed = rg.fuelName ? `${rg.fuelName} gave ⚡${rg.paid}` : 'nothing fed';
   if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ◆ ` +
     `${eff(spell).attuned} (${fed} against ⚡${rg.cost})`, 'good'));
   else out.push(L(`⚡ UNPAID — ${fed} against ⚡${rg.cost}, so ${spell.def.name} ` +
@@ -5817,13 +5831,14 @@ function rogueZoneHint(zone, isFight) {
       const fuel = cardById(S.assign.Boost);
       if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
-      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to feed it`;
+      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to give it`;
       // ⚠️ NAME THE LEVEL, because the level IS the rule now. A card pitches LESS as it sharpens,
       // and a player not told that reads a low fuel number as a bad card rather than a sharp one.
-      const lvNote = ` <span class="dim">(Lv${fuel.level} · pitches less as it sharpens)</span>`;
+      // ⚠️ "gives", not "pitches" - the player-facing word is ⚡ energy everywhere now
+      const lvNote = ` <span class="dim">(Lv${fuel.level} · gives less as it sharpens)</span>`;
       return m.full
-        ? `feeds <b>◇ ${m.paid}</b> against a cost of <b>⚡ ${m.cost}</b>${lvNote} · returns to your deck`
-        : `only <b>◇ ${m.paid}</b> of <b>⚡ ${m.cost}</b> — not enough${lvNote} · returns to your deck`;
+        ? `gives <b>⚡ ${m.paid}</b> — your Strike needs <b>${m.cost}</b>${lvNote} · returns to your deck`
+        : `gives only <b>⚡ ${m.paid}</b> — your Strike needs <b>${m.cost}</b>${lvNote} · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
@@ -6058,7 +6073,13 @@ function cardHTML(card) {
     } else {
       const cost = eff(real).cost;
       const ok = cost <= S.coins;
-      action = previewing
+      // ⚠️ A GATE MUST SAY WHY. One level per card per visit is invisible unless the card
+      // announces it - and a button that simply stops working reads as a bug, not a rule.
+      // Same discipline as the event pickers: ineligible stays VISIBLE and states its reason.
+      if (sharpenedHere(real.id)) {
+        action = `<div class="card-action"><button disabled>` +
+          `🔼 sharpened — one level per visit</button></div>`;
+      } else action = previewing
         ? `<div class="card-action"><button class="primary" onclick="buyUpgrade(${real.id})" ${ok ? '' : 'disabled'}>` +
           `Sharpen to Lv${real.level + 1} — 🪙 ${cost}${ok ? '' : ' (not enough)'}</button>` +
           `<button onclick="pickUpgrade(${real.id})">back</button></div>`
@@ -6087,8 +6108,8 @@ function cardHTML(card) {
       ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
       // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
       // damage" - the same borrowed-vocabulary fault as the reveal printing "unattuned" at her.
-      // 🔑 ◇ is what a card GIVES as fuel, ◆ is what you get when the cost is PAID: same shape
-      // family, so it reads as the same economy. Filled = fulfilled. ✦ is the mage's again.
+      // 🔑 ◆ is the DAMAGE you get once the energy is paid — a different kind of number from
+      // ⚡ itself, so it keeps its own mark. ✦ is the mage's again.
       : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">◆${v.attuned}</span>` : '')) +
     `</div>`;
 
@@ -6137,8 +6158,15 @@ function cardHTML(card) {
                  // element facts, applied to the rogue's two energy facts. Thomas: *"ah the energy
                  // and pitch can't be 1 number?"* They cannot (the level tradeoff needs them moving
                  // in opposite directions), but only ONE of them is ever being read:
-                 //   ① STRIKE  -> ⚡ cost is what matters. Dim the fuel.
-                 //   ③ ENERGY  -> ◇ fuel is what matters. Dim the cost.
+                 //   ① STRIKE  -> what it NEEDS is what matters. Dim the other.
+                 //   ③ ENERGY  -> what it GIVES is what matters. Dim the other.
+                 // ⚠️ ONE GLYPH, ONE WORD (2026-08-18). Thomas: *"maybe it should be called energy
+                 // instead of fuel, the slot is called energy anyways, would make it match."*
+                 // 🔑 AND IT GOES FURTHER THAN A RENAME: IT IS NOT TWO RESOURCES, IT IS ONE
+                 // RESOURCE ASKED TWICE. ⚡ energy is what a card NEEDS to be struck with and what it
+                 // GIVES when fed. Printing them as ⚡ and ◇ taught two symbols for one thing, which
+                 // is the same vocabulary sprawl that had the rogue reading the mage's ✦.
+                 // That is also the honest answer to "can't it be 1 number?" - it IS one number.
                  // ⚠️ DIMMED, NEVER DELETED - same as the element rule. The number is still there
                  // when you go looking; it just stops competing for the glance.
                  : (() => {
@@ -6146,8 +6174,8 @@ function cardHTML(card) {
                      const cD = reads === 'pitch' ? ' num-dim' : '';
                      const pD = reads === 'cost'  ? ' num-dim' : '';
                      return `<div class="el-identity pair-identity">` +
-                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">cost</span></b>` +
-                       `<b class="rg-pitch${pD}">◇${pitchOf(card)}<span class="nlab">fuel</span></b>`;
+                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">needs</span></b>` +
+                       `<b class="rg-pitch${pD}">⚡${pitchOf(card)}<span class="nlab">gives</span></b>`;
                    })() +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
