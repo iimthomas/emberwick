@@ -5357,6 +5357,36 @@ function applyModal() {
   document.body.classList.add('modal-open');
   panel.innerHTML = ctrl.innerHTML;
   ctrl.innerHTML = '';
+  sizeModal(panel);
+}
+
+// 📏 THE PANEL IS MEASURED, NOT GUESSED (2026-08-18, found in play).
+// Thomas: *"clicking something on the setting out page isn't doing anything."*
+// 🐛 It was the THIRD option. A fixed `max-height: 52vh` clipped it: the panel scrolled, nothing
+// on screen said so, and a tap on the half-visible option passed straight through to the card row
+// behind it - `elementFromPoint` on that button returned #slots-panel.
+// 🔑 A PANEL THAT SILENTLY CLIPS A BUTTON IS A BUTTON THAT DOES NOTHING. And it only appeared
+// with THREE offers; every test I ran had drawn two, which is why it shipped.
+// The cap is now the real constraint - *the distance to the top of the hand* - so the panel always
+// uses every pixel it may have, and says so when there is still more below.
+function sizeModal(panel) {
+  const layer = $('modal-layer'), slots = $('slots-panel');
+  if (!layer || !slots) return;
+  // ⚠️ measure from the PANEL's own top, not the layer's - the layer carries padding-top, so
+  // using its top overshot by exactly that padding and the panel overlapped the hand by 2px.
+  panel.style.maxHeight = '';
+  const top = panel.getBoundingClientRect().top;
+  const handTop = slots.getBoundingClientRect().top;
+  // ⚠️ the hand can sit ABOVE the layer's top on a stacked phone layout mid-scroll; never go
+  // negative, and never shrink below something readable.
+  const avail = Math.round(handTop - top - 14);
+  panel.style.maxHeight = Math.max(200, avail) + 'px';
+  // ⚠️ MEASURE WITH THE CUE OFF. The "▾ more below" cue is in flow, so it adds height - and a
+  // panel measured WITH it showing can be scrollable *because* of it. That is a self-fulfilling
+  // loop: the fork, with two branches and room to spare, was advertising more below itself.
+  // 🔑 An indicator that changes the thing it indicates has to be removed before you measure.
+  panel.classList.remove('is-scrollable');
+  panel.classList.toggle('is-scrollable', panel.scrollHeight > panel.clientHeight + 2);
 }
 
 function render() {

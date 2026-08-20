@@ -20,7 +20,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=280">
+<link rel="stylesheet" href="style.css?v=283">
 </head>
 <body>
 <header>
@@ -41,6 +41,14 @@
     </div>
     <section id="slots-panel"></section>
     <section id="controls-panel"></section>
+
+    <!-- 🚪 THE MODAL LAYER lives INSIDE #left-col so it covers the GAME and never the log.
+         Thomas: *"was hoping it wouldn't cover the log either and was just over the actual game
+         part."* #left-col is position:relative, so inset:0 scopes it exactly. -->
+    <div id="modal-layer" aria-live="polite">
+      <div id="modal-backdrop"></div>
+      <div id="modal-panel"></div>
+    </div>
   </div>
   <div id="right-col">
     <h2>Turn Log</h2>
@@ -48,13 +56,6 @@
   </div>
 </main>
 
-<!-- 🚪 THE MODAL LAYER. Phases that are a DECISION render here instead of in the strip at the
-     bottom of the column. Empty and display:none until a modal phase opens it. -->
-<div id="modal-layer" aria-live="polite">
-  <div id="modal-backdrop"></div>
-  <div id="modal-panel"></div>
-</div>
-
-<script src="game.js?v=280"></script>
+<script src="game.js?v=283"></script>
 </body>
 </html>

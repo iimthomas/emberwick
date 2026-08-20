@@ -1099,7 +1099,8 @@ button.stage.locked .stage-shape { font-style: italic; }
    backdrop rather than dimmed behind it. That is also how card games stage a dialog: the decision
    in the middle, your hand still readable at the bottom.
    ============================================================ */
-#modal-layer { position: fixed; inset: 0; z-index: 40; display: none; }
+/* ⚠️ ABSOLUTE, not fixed - it is scoped to #left-col so it covers the GAME and not the log. */
+#modal-layer { position: absolute; inset: 0; z-index: 40; display: none; }
 /* 🔑 THE PANEL NEVER COVERS THE HAND. It is flex-anchored to the TOP of the screen with a
    height cap, so the slot row below stays lit and clickable. Found by measuring
    `elementFromPoint` over the slot row and getting #modal-panel back - a centred dialog sat right
@@ -1125,7 +1126,11 @@ body.modal-open #modal-layer { display: flex; align-items: flex-start; justify-c
 #modal-panel {
   position: relative;
   width: min(760px, calc(100vw - 24px));
-  max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
+  /* ⚠️ max-height is set in JS by applyModal(), measured against where the HAND starts.
+     A fixed vh cap CLIPPED THE THIRD OPTION on the Setting Out screen: the panel scrolled, nothing
+     said so, and a tap on the half-visible option hit the card row behind it.
+     🔑 A PANEL THAT SILENTLY CLIPS A BUTTON IS A BUTTON THAT DOES NOTHING. */
+  overflow-y: auto; overscroll-behavior: contain;
   background: linear-gradient(#232019, #17150f);
   border: 1px solid #574a39; border-radius: 16px;
   box-shadow: 0 26px 70px rgba(0,0,0,.66), 0 0 0 1px rgba(255,220,160,.06) inset;
@@ -1158,6 +1163,16 @@ body.modal-open #controls-panel:empty { display: none; }
 .fork-shape { font-size: .92em; }
 .fork-stats { font-size: .84em; color: #b9ad96; margin-top: auto; }
 .fork-extra { font-size: .8em; color: #e0a678; }
+
+/* 🔑 SAY SO WHEN THERE IS MORE BELOW. The clipped-option bug was really an INFORMATION bug -
+   the panel scrolled and nothing on screen admitted it. */
+#modal-panel.is-scrollable { border-bottom-color: #d8b06a; }
+#modal-panel.is-scrollable::after {
+  content: '▾ more below'; position: sticky; bottom: -2px; display: block;
+  margin: 6px -22px -22px; padding: 5px 0 7px; text-align: center;
+  font-size: .76em; letter-spacing: .08em; color: #e8cd93;
+  background: linear-gradient(rgba(23,21,15,0), #17150f 55%);
+}
 
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -1347,6 +1362,9 @@ body.modal-open #controls-panel:empty { display: none; }
 @media (max-width: 560px) {
   .fork-row { grid-template-columns: 1fr; gap: 9px; }
   .fork-branch { min-height: 0; padding: 12px 13px; }
-  body.modal-open #modal-layer { padding-top: 3vh; }
-  #modal-panel { max-height: 52vh; padding: 15px 16px 17px; }
+  body.modal-open #modal-layer { padding-top: 2vh; }
+  /* ⚠️ NO max-height here - JS measures it. A vh cap clipped the third Setting Out option. */
+  #modal-panel { padding: 14px 15px 16px; }
+  .setout-offer { padding: 10px 12px; }
+  .setout-story { font-size: .88em; }
 }
