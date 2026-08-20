@@ -6114,14 +6114,26 @@ function renderControls() {
   }
   if (S.phase === 'hearth') {
     const forgeable = hearthForgeable();
+    // ⚠️ THE LAST HEARTH HAS NO ROAD AFTER IT, SO THE LIGHT HAS NOTHING TO SHOW. The top floor
+    // is always a hearth (StS's floor-15 rest), and the candle reveals the NEXT ENCOUNTER - after
+    // the top floor there is only the duel, and the dragon is fully revealed from turn 1 by design.
+    // 🔑 So the option is DISABLED AND SAYS WHY rather than quietly being a trap - the same rule
+    // as every other picker here. ⚠️ It is still a half-dead node: this makes the last hearth
+    // honest, it does not make it a decision. The real fix is a second option that means something
+    // on the eve of a duel (duel stamina and the dragon's opening HP are both already priced) -
+    // that is a design call, not a patch.
+    const lastHearth = !!(S.map && S.map.pos && S.map.pos.f >= MAP_FLOORS - 1);
     c.innerHTML =
       `<div class="phase-label">🕯️ A HEARTH</div>` +
       `<div class="event-flavor">Someone kept this fire and moved on. The coals are still warm — warm enough ` +
       `to take a wick from, or to work a blade in. Not both; they will be grey by morning.</div>` +
       `<div class="event-opts">` +
-      `<button onclick="hearthLight()">🕯️ <b>Take the light</b>` +
-        `<span class="opt-why">${S.candle ? 'your candle is already lit — this does nothing for you'
-          : 'see what waits at each step until it gutters'}</span></button>` +
+      `<button ${lastHearth ? 'disabled ' : ''}onclick="${lastHearth ? '' : 'hearthLight()'}">` +
+        `🕯️ <b>Take the light</b>` +
+        `<span class="opt-why">${lastHearth
+          ? 'there is no more road to read — only the dragon'
+          : (S.candle ? 'your candle is already lit — this does nothing for you'
+                      : 'see what waits at each step until it gutters')}</span></button>` +
       `<button ${forgeable.length ? '' : 'disabled '}onclick="${forgeable.length ? 'startHearthPick()' : ''}">` +
         `🔧 <b>Work the coals</b>` +
         `<span class="opt-why">${forgeable.length ? 'sharpen one card a level, free'
