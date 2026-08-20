@@ -6195,8 +6195,12 @@ function cardHTML(card) {
            `` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
-    (CLASS.pairs ? `<div class="el-identity">${elChip(shownEl)}` +
-                     (d.hits > 1 ? `<span class="fork-tag">⚡ ${d.hits} hits</span>` : '') + `</div>`
+    // ⚠️ THE MAGE'S ELEMENT CHIP IS GONE FROM THE TOP - the type line at the foot now carries
+    // it, and printing it twice is the "symbol soup" the element-disclosure rule exists to stop.
+    // 🔑 `elChip` had NO slot logic: it rendered what the card IS, unconditionally, so it was
+    // saying exactly what the foot says. And the card's TINT already encodes the element, which is
+    // why the vault's note says the dimmed half is never deleted - the colour keeps carrying it.
+    (CLASS.pairs ? (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : '')
                  // ⚠️ LABELLED, NOT JUST GLYPHED (2026-08-18). Thomas, reading a reveal:
                  // *"how was second fang paid, it costs 3, viper strike has 2 energy to pay"* -
                  // and he was reading the card exactly as it was written. ⚡2 is what Viper Strike
@@ -6233,7 +6237,9 @@ function cardHTML(card) {
                        `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">cost</span></b>` +
                        `<b class="rg-pitch${pD}">⚡${pitchOf(card)}<span class="nlab">energy</span></b>`;
                    })() +
-                   (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
+                   // ⚠️ the role moved to the TYPE LINE at the foot - it was appearing inline
+                   // here between the energy numbers and the pair, which is three different kinds
+                   // of fact in one run-on row.
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
     // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
     // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
@@ -6251,9 +6257,26 @@ function cardHTML(card) {
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
     (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
-    `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
-    `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
+    `<div class="card-row card-foot">` +
+      `<span class="card-type">${typeLine(d)}</span>` +
+      (enhLine ? `<span class="card-enh">${enhLine}</span>` : '') +
+      `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
     action + `</div>`;
+}
+
+// 🏷️ THE TYPE LINE (2026-08-18). Thomas: *"card classification should go like on the bottom
+// somewhere, kinda like how other tcg's do it... mage fire cards should say fire in that
+// classification slot. our rogue cards would say tool or blade in that slot i guess."*
+// 🔑 EVERY CLASS ALREADY HAS A CLASSIFICATION - it was just printed in a different place, in a
+// different shape, per class: the mage's element sat in a coloured chip at the top, the rogue's
+// role was jammed inline between her energy numbers and her pair. One fixed slot, bottom-left,
+// same position on every card in the game, is what makes a card scannable at a glance.
+// ⚠️ Deliberately NOT the archetype (FORCE/SPARK/FLOW/WARD). Those are an authoring tool and
+// [[Market_And_Retention]] already recorded the cost of surfacing them: five charms shipped for
+// months gating on a word printed nowhere on the card.
+function typeLine(d) {
+  if (CLASS.pairs) return d.wild ? 'WILD' : (d.element || '').toUpperCase();
+  return d.role ? d.role.toUpperCase() : '';
 }
 
 function renderLog() {

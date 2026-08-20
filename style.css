@@ -780,6 +780,15 @@ button.stage.locked .stage-shape { font-style: italic; }
    being read - ① STRIKE reads ⚡ cost, ③ ENERGY reads ◇ fuel - so the other recedes. Same rule
    the mage's two element facts already follow; deleting it would just move the confusion. */
 .num-dim { opacity: .34; font-weight: 400; }
+/* 🏷️ THE TYPE LINE - one fixed slot at the foot of every card, same position in every class.
+   The mage prints her element there, the rogue prints TOOL or BLADE. Both used to live somewhere
+   different and shaped differently, which is what stopped a card being scannable at a glance. */
+.card-type { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700;
+  color: #b9b4a5; opacity: .85; margin-right: auto; }
+.card-el-Fire .card-type      { color: #e08a5a; }
+.card-el-Water .card-type     { color: #7fb0c4; }
+.card-el-Lightning .card-type { color: #d8c470; }
+.card-el-Stone .card-type     { color: #a89a86; }
 
 /* 👁️ THE FACING BAR - the encounter's demands, restated where the decision is.
    ⚠️ It sits directly above Resolve on purpose. The encounter panel is 422px away in the
