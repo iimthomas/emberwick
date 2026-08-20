@@ -775,7 +775,12 @@ const MAGE = {
   mark: '✦',
   multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
-  defs: null,                           // set to CARD_DEFS below — the table is declared above it
+  // 🐛 WAS `null` WITH A COMMENT PROMISING IT WOULD BE SET "below" - and nothing ever set it
+  // (found 2026-08-18). CARD_DEFS is declared ~700 lines ABOVE this, so the deferral was never
+  // needed. ⚠️ `CLASS.defs` is read by SAVE and LOAD to serialise cards by index, so the mage
+  // was round-tripping through a null. 🔑 A COMMENT THAT DESCRIBES A FIXUP IS NOT THE FIXUP -
+  // I trusted this line's own note instead of checking, and it silently broke a charm filter.
+  defs: CARD_DEFS,
   deck() { return shuffle(CARD_DEFS.map(newCard)); },
   pairs: true,                          // ✦ elements agree → the Spell attunes. The mage's one rule.
   boosts: true,                         // ➕ the Surge adds a printed number — the rogue's does not
@@ -3052,6 +3057,18 @@ const POTIONS = [
 // they are lateral, not powerful, and they teach what a rule-charm even is.
 function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.dragon.stage) : 1; }
 function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
+// 🔑 AN ELEMENT GATE IS A CLASS GATE IN DISGUISE (2026-08-18). Thomas, at the Wheel:
+// *"i have a charm for fire cards but im playing rogue"* - and 🔥 Emberheart can never once fire
+// for her, because every rogue card has `element: null`. Four charms are like this
+// (Emberheart, Tideglass Bead, Storm Pin, Nightveil) and all four are marked GENERIC.
+// ⚠️ They were correctly generic when only one class existed. *"Generic" meant "not
+// class-specific", and an element gate did not look like a class gate until a class without
+// elements turned up.* [[Charm_Pools]] even reasoned that element gating was fine "because an
+// element is on the card's face" - true, and only true for the mage.
+// ⚠️ A dead offer is worse than a missing one: it takes a slot on a three-card shelf and it
+// costs a re-spin to clear.
+const classHasElements = () => (CLASS.defs || []).some(d => d && d.element);
+const charmFitsClass = c => !(c.mods && c.mods.el) || classHasElements();
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
@@ -4036,7 +4053,7 @@ function upgradable(card) {
 // than "three random things": the shop sells POWER, and sharpening your own deck is not shopping.
 function rollOffer(rich) {
   const held = S.charms || [];
-  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && charmUnlocked(c) && (rich ? true : c.rarity !== 'rare'));
+  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && charmUnlocked(c) && charmFitsClass(c) && (rich ? true : c.rarity !== 'rare'));
   const potPool = potionPool();
   const roomForPotion = (S.potions || []).length < POTION_CAP;
   const mkCharm = () => { const c = rand(charmPool);
@@ -4563,7 +4580,7 @@ const EVENTS = [
           if (rnd() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
       { label: 'Swear to tend it — take a CHARM, and a CURSE to carry with it', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && charmFitsClass(c) && !S.charms.includes(c.id));
           return [good.length ? evGrantCharm(rand(good).id) : 'The shrine has no gift left.', evTakeCurse()]; } },
       { label: 'Take the oil instead — 🪙 +6 coins, the shrine stays cold', need: 'none',
         apply: () => { S.coins += 6; return [`You pocket the oil — +6 coins (you now hold ${S.coins}).`]; } },
@@ -4596,7 +4613,7 @@ const EVENTS = [
     flavor: "A cartographer's mark scratched on a stone — someone buried something here, and warded it.",
     options: [
       { label: 'Dig it up — a charm lies buried, but the ward may cling to you', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && charmFitsClass(c) && !S.charms.includes(c.id));
           const lines = good.length ? [evGrantCharm(rand(good).id)] : evUpgradeRandom(2);
           if (rnd() < 0.4) lines.push(evTakeCurse());
           return lines; } },
@@ -4626,6 +4643,7 @@ const EVENTS = [
     flavor: "A slope of grey cinders where the mountain puts everything it has finished with. Somewhere in it is your handwriting.",
     options: [
       { label: 'Dig for the last thing you dropped — 🪙 −6, it returns at Lv1', need: 'none',
+        when: () => S.coins >= 6, whenNote: () => `you have only 🪙 ${S.coins} of 6`,
         apply: () => { if (S.coins < 6) return ['You have nothing to trade the ashfield, and it does not give on credit.'];
           S.coins -= 6; return [`You dig until your hands are black (−6 coins, ${S.coins} left).`, evRecoverCard('last')]; } },
       { label: 'Take back EVERYTHING you have lost — and a CURSE for the presumption', need: 'none',
@@ -4667,6 +4685,7 @@ const EVENTS = [
       { label: 'Cut through — a card you choose loses a level, but two others brighten', need: 'card', pick: c => c.level > 1, pickNote: 'already Lv1 — nothing to give up', 
         apply: ({ card }) => { const lines = ['You force the thorns — ' + evLevel(card, -1)]; lines.push('but win through to easier ground:', ...evUpgradeRandom(2, card.id)); return lines; } },
       { label: 'Pay the toll in coin — 🪙 −9 coins, pass untouched', need: 'none',
+        when: () => S.coins >= 9, whenNote: () => `you have only 🪙 ${S.coins} of 9`,
         apply: () => { if (S.coins < 9) return ['You cannot pay; the thorns let nothing through for free.'];
           S.coins -= 9; return [`You pay the bramble-keeper (−9 coins, ${S.coins} left) and pass untouched.`]; } },
       { label: 'Turn back, find another way — nothing lost, nothing gained', need: 'none', apply: () => ['You take the long way around, unscathed.'] },
@@ -5551,13 +5570,24 @@ function renderControls() {
       body = `<div class="hint"><b>${def.options[ev.opt].label}</b><br>Pick the card from your hand below — its stats are right there on it.</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
-      // an OPTION may gate itself with when(), the same way a whole event can
+      // ⚠️ AN UNAFFORDABLE OPTION IS DISABLED AND SAYS WHY - IT IS NOT HIDDEN (2026-08-18).
+      // Thomas, on the Toll of Thorns: *"i didn't have enough to pay, so i guess it didn't do
+      // anything? confused"* - and he was right to be. The option was offered at full strength, he
+      // spent his one event choice on it, and `apply()` checked the price only AFTER committing.
+      // 🔑 SAME BUG AS THE 2026-08-05 PICKER FIX, IN A DIFFERENT CURRENCY. That one made
+      // ineligible CARDS stay visible and say why; the coin cost never got the same treatment.
+      // ⚠️ And `when` HID the option, which is worse than disabling for a price you might soon
+      // afford: you learn neither that the option exists nor that you were short. Hiding is right
+      // for a whole EVENT (a pool filter); it is wrong for one option on a screen you are reading.
       body = `<div class="event-flavor">${def.flavor}</div>` +
-        `<div class="event-opts">` + def.options.map((o, i) =>
-          (!o.when || o.when())
-            ? (() => { const blocked = o.need === 'card' && !eventPickable(o).length;
-                return `<button onclick="eventChoose(${i})"${blocked ? ` disabled title="${S.hand.length ? 'no card in hand can take this' : 'no cards in hand'}"` : ''}>${o.label}</button>`; })()
-            : '').join('') + `</div>`;
+        `<div class="event-opts">` + def.options.map((o, i) => {
+          let why = null;
+          if (o.when && !o.when()) why = o.whenNote ? o.whenNote() : 'you cannot afford this';
+          else if (o.need === 'card' && !eventPickable(o).length)
+            why = S.hand.length ? 'no card in hand can take this' : 'no cards in hand';
+          return `<button onclick="eventChoose(${i})"${why ? ` disabled title="${why}"` : ''}>${o.label}` +
+            (why ? `<span class="opt-why">${why}</span>` : '') + `</button>`;
+        }).join('') + `</div>`;
     }
     c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
   } else if (S.phase === 'defeat') {
@@ -5777,7 +5807,7 @@ function renderControls() {
 function rogueActionLines(r, spell, L, verb) {
   const out = [];
   const rg = r.rogue || {};
-  const fed = rg.fuelName ? `${rg.fuelName} gave ⚡${rg.paid}` : 'nothing fed';
+  const fed = rg.fuelName ? `${rg.fuelName} paid ⚡${rg.paid}` : 'nothing paid';
   if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ◆ ` +
     `${eff(spell).attuned} (${fed} against ⚡${rg.cost})`, 'good'));
   else out.push(L(`⚡ UNPAID — ${fed} against ⚡${rg.cost}, so ${spell.def.name} ` +
@@ -5853,14 +5883,14 @@ function rogueZoneHint(zone, isFight) {
       const fuel = cardById(S.assign.Boost);
       if (!st) return 'a card here pays for your Strike';
       if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
-      if (!fuel) return `your Strike needs <b>⚡ ${m.cost}</b> — put a card here to give it`;
+      if (!fuel) return `your Strike costs <b>⚡ ${m.cost}</b> — put a card here to pay it`;
       // ⚠️ NAME THE LEVEL, because the level IS the rule now. A card pitches LESS as it sharpens,
       // and a player not told that reads a low fuel number as a bad card rather than a sharp one.
       // ⚠️ "gives", not "pitches" - the player-facing word is ⚡ energy everywhere now
-      const lvNote = ` <span class="dim">(Lv${fuel.level} · gives less as it sharpens)</span>`;
+      const lvNote = ` <span class="dim">(Lv${fuel.level} · less energy as it sharpens)</span>`;
       return m.full
-        ? `gives <b>⚡ ${m.paid}</b> — your Strike needs <b>${m.cost}</b>${lvNote} · returns to your deck`
-        : `gives only <b>⚡ ${m.paid}</b> — your Strike needs <b>${m.cost}</b>${lvNote} · returns to your deck`;
+        ? `<b>⚡ ${m.paid}</b> energy — your Strike costs <b>${m.cost}</b>${lvNote} · returns to your deck`
+        : `only <b>⚡ ${m.paid}</b> energy — your Strike costs <b>${m.cost}</b>${lvNote} · returns to your deck`;
     }
     case 'Reserve': return hasCharm('twinblades')
       ? 'kept — 🗡️ Twin Blades: it can pair too'
@@ -6180,8 +6210,12 @@ function cardHTML(card) {
                  // element facts, applied to the rogue's two energy facts. Thomas: *"ah the energy
                  // and pitch can't be 1 number?"* They cannot (the level tradeoff needs them moving
                  // in opposite directions), but only ONE of them is ever being read:
-                 //   ① STRIKE  -> what it NEEDS is what matters. Dim the other.
-                 //   ③ ENERGY  -> what it GIVES is what matters. Dim the other.
+                 //   ① STRIKE  -> its COST is what matters. Dim the other.
+                 //   ③ ENERGY  -> its ENERGY is what matters. Dim the other.
+                 // ⚠️ COST / ENERGY, not NEEDS / GIVES (2026-08-18). Thomas asked for "energy" to
+                 // match the slot name and I invented a verb pair instead - which read as two new
+                 // words to learn rather than one word already on the screen. The slot is ENERGY,
+                 // so the number it reads is ENERGY, and the other one is what the card COSTS.
                  // ⚠️ ONE GLYPH, ONE WORD (2026-08-18). Thomas: *"maybe it should be called energy
                  // instead of fuel, the slot is called energy anyways, would make it match."*
                  // 🔑 AND IT GOES FURTHER THAN A RENAME: IT IS NOT TWO RESOURCES, IT IS ONE
@@ -6196,8 +6230,8 @@ function cardHTML(card) {
                      const cD = reads === 'pitch' ? ' num-dim' : '';
                      const pD = reads === 'cost'  ? ' num-dim' : '';
                      return `<div class="el-identity pair-identity">` +
-                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">needs</span></b>` +
-                       `<b class="rg-pitch${pD}">⚡${pitchOf(card)}<span class="nlab">gives</span></b>`;
+                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">cost</span></b>` +
+                       `<b class="rg-pitch${pD}">⚡${pitchOf(card)}<span class="nlab">energy</span></b>`;
                    })() +
                    (d.role ? ` · <b class="rg-${d.role}">${d.role === 'blade' ? 'BLADE' : 'TOOL'}</b>` : '') +
                    ` · pairs with <b>${d.combo || '—'}</b></div>`) +
