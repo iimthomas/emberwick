@@ -2006,7 +2006,9 @@ const RULE_CHARMS = [
   // offer list is non-empty, which is exactly how the first charm-tiering silently deleted that
   // whole screen on stage 1. A pool filter without a pool is a missing feature, not a filter.
   { id: 'whetstone', tier: 1, name: 'Whetstone',     rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
-    text: '🗡️ Every hit strikes <b>+1</b> — so a long chain gains the most' },
+    // ⚠️ "so a long chain gains the most" was DOUBLY dead: the chain is gone, and the rogue's
+    // compose() returns hits: 1 always, so there is never more than one hit to multiply.
+    text: '🗡️ Your strike gains <b>+1</b>' },
   // 🔑 THE DELIBERATE ANTI-SYNERGY, and the rogue's Cold Iron: the one charm that makes a BROKEN
   // chain something you wanted. Without it every rogue charm pulls the same way, and a class whose
   // charms all agree has no build to discover.
@@ -2016,7 +2018,10 @@ const RULE_CHARMS = [
   { id: 'lonefang', tier: 1, name: 'Lone Fang',      rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
     text: '🗡️ While your Momentum is <b>0</b>, your strike gains <b>+4</b>' },
   { id: 'twinblades', tier: 2, name: 'Twin Blades',  rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
-    text: '🗡️ Your <b>Arsenal</b> always counts as the previous card' },
+    // ⚠️ WAS "counts as the previous card" - pure CHAIN language, and the chain was deleted two
+    // redesigns ago. The CODE was always fine: it lets the Arsenal complete a pair. Only the
+    // sentence was describing a mechanic that no longer exists.
+    text: '🗡️ Your <b>Arsenal</b> can complete a pair too — the combo fires from either slot' },
   { id: 'deepcut', tier: 3, name: 'Deep Cut',        rarity: 'rare', cost: 13, rule: true, cls: 'rogue',
     text: '🧱 <b>Guard</b> swallows one fewer hit' },
   // ⚠️ REWRITTEN WITH THE CLASS (2026-08-12). Both of these named the CHAIN, which no longer
@@ -2064,7 +2069,9 @@ function evGrantCharm(id) {
 // invisible and the whole event read as "nothing happened, and also you are worse off tomorrow".
 // A gamble whose faces silently annihilate each other is not a gamble, it is a non-event.
 function randomCurse() {
-  let pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
+  // ⚠️ CURSES GO THROUGH THE SAME GATE. 💧 Damp Wick (−2 Surge) was a free pass for any class
+  // without a Surge - the rogue simply could not be cursed by it.
+  let pool = CHARMS.filter(c => c.curse && charmFitsClass(c) && !(S.charms || []).includes(c.id));
   if (S.paceBless > 0) { const p = pool.filter(c => !(c.mods && c.mods.pace)); if (p.length) pool = p; }
   return pool.length ? rand(pool) : null;
 }
@@ -3097,9 +3104,15 @@ const classHasElements = () => (CLASS.defs || []).some(d => d && d.element);
 // existed and simply was not applied where charms are actually bought.
 // ⚠️ I touched this exact line an hour ago to add the ELEMENT gate and did not notice the class
 // gate missing beside it. Fixing one half of a check is how the other half stays broken.
+// ⚠️ THREE GATES. The third found two more dead entries after Thomas asked what Twin Blades
+// meant and the audit widened: ➕ Deep Tinderbox (+1 Surge) and the 💧 Damp Wick CURSE (−2 Surge)
+// both name a stat the rogue does not have. 🔑 THE CURSE IS THE WORSE OF THE TWO - a dead charm
+// wastes an offer, a dead CURSE is a free pass, and a run-layer penalty that skips one class is a
+// difficulty difference nobody chose.
 const charmFitsClass = c =>
   (!c.cls || c.cls === CLASS.id) &&                        // whose charm is it
-  (!(c.mods && c.mods.el) || classHasElements());          // and can this class use an element gate
+  (!(c.mods && c.mods.el) || classHasElements()) &&        // can this class use an element gate
+  (!(c.mods && c.mods.boost != null) || !!CLASS.boosts);   // does this class even have a ➕ Surge
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
