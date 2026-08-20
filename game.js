@@ -4947,14 +4947,29 @@ function finishTurn() {
 function backToMap() {
   const m = S.map;
   if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
+  // 🗺️ THE MAP IS THE CLOCK, SO ONLY THE TOP FLOOR ENDS THE ROAD.
+  // ⚠️ Running dry used to end a REGION, and the region break reshuffled your discard back in
+  // and carried on. Ported straight across it ended the whole RUN - a bad patch in band 2 would
+  // teleport you to the lair with eight floors unwalked, which is far harsher than the old rule
+  // and looks like a bug from the inside. Thomas spotted the shape of it: *"some regions could be
+  // short if you did bad."*
+  // 🔑 A CONDITION THAT USED TO END A CHAPTER MUST NOT BE PORTED AS ONE THAT ENDS THE BOOK.
+  // Going dry now does what a region break did: gather everything up and keep walking. The cost is
+  // already paid and permanent - the cards you LOST at Lv1 are gone, so the deck you reshuffle is
+  // thinner every time, which is the deck-as-health pressure doing its job without a cliff.
   const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
   const atTop = m.pos && m.pos.f >= MAP_FLOORS - 1;
-  if (atTop || dry) {
-    log(atTop ? `The road runs out. THE ${S.dragon.name.toUpperCase()} AWAITS.`
-              : `Too few cards left to go on — THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
+  if (atTop) {
+    log(`The road runs out. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
     S.phase = 'summary';
     render();
     return;
+  }
+  if (dry && S.discard.length) {
+    const pool = shuffle([...S.deck, ...S.discard]);
+    S.deck = pool; S.discard = [];
+    if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+    log(`You gather up what you have dropped and go on — ${S.deck.length + S.hand.length} cards left.`, 'bad');
   }
   S.phase = 'map';
   render();
