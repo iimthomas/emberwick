@@ -2600,10 +2600,17 @@ function pickSetout(id) {
   const c = charmById(id); if (!c) return;
   S.charms.push(id);
   S.setout = null;
-  S.phase = 'assign';
+  // 🛤️ HAND THE RUN BACK TO THE FORK, NOT TO A TURN THAT HAS NO ENCOUNTER (fixed 2026-08-18).
+  // 🐛 `freshGame` runs nextTurn, which now OPENS A FORK - phase 'fork', S.encounter still null.
+  // startStage then overwrote that phase with 'setout', orphaning the fork; picking a charm jumped
+  // straight to 'assign' with no road chosen, and renderControls threw on `S.encounter.type`.
+  // 🔑 THE CRASH PRESENTED AS *"clicking on the charm doesn't do anything"* - because render()
+  // does its modal bookkeeping LAST, the throw left the dialog open and the screen frozen mid-update.
+  // The charm was actually taken every time; nothing on screen ever said so.
+  S.phase = (S.fork && S.fork.length) ? 'fork' : 'assign';
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
   log(`🏕️ You set out carrying <b>${c.name}</b> — ${c.text}`, 'good');
-  logChallenge();
+  if (S.encounter) logChallenge();
   saveGame();
   render();
 }
@@ -5408,13 +5415,21 @@ function render() {
   saveGame();
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
   $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`) + ` · build ${BUILD}`;
+  try {
   renderStatus();
   renderScene();
   renderEncounter();
   renderControls();
   renderSlots();
   renderLog();
-  applyModal();      // 🚪 must run AFTER renderControls has written the phase body
+  } finally {
+    // 🔑 THE MODAL BOOKKEEPING RUNS EVEN IF A PANEL THREW. applyModal() used to be the LAST
+    // call in render(), so any exception above it left the dialog open over a half-updated screen -
+    // which is why a hard crash read as *"clicking does nothing"* instead of as a crash.
+    // ⚠️ The error is NOT swallowed; it still propagates. This only guarantees the UI ends in a
+    // consistent state on the way out.
+    applyModal();
+  }
   pointAtLesson();
 }
 
@@ -5682,6 +5697,14 @@ function renderControls() {
       `<div class="phase-label">PHASE 1 — CHALLENGE · DIVERT</div>` +
       `<div class="hint">Choose a hand card to discard. The top of the deck (<b>${S.deck[0].def.name}</b>) burns with it, and a new encounter — of a <b>different type</b> (${S.encounter.type === 'fight' ? 'a journey' : 'a fight'}, if one remains) — is revealed.</div>` +
       `<button onclick="cancelDivert()">Cancel — face ${S.encounter.name}</button>`;
+    return;
+  }
+  // ⚠️ A TURN WITHOUT AN ENCOUNTER IS A BUG, BUT IT MUST NOT BE A BLANK SCREEN. Reading
+  // `S.encounter.type` blind is what turned one sequencing slip into a frozen game.
+  if (S.phase === 'assign' && !S.encounter) {
+    c.innerHTML = `<div class="phase-label">⚠️ NO ENCOUNTER</div>` +
+      `<div class="hint">This turn has no encounter, which should not happen. ` +
+      `Use 📋 Report to copy the state, then ⟳ New Run.</div>`;
     return;
   }
   if (S.phase === 'assign') {
