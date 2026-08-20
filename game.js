@@ -3068,7 +3068,17 @@ function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
 // ⚠️ A dead offer is worse than a missing one: it takes a slot on a three-card shelf and it
 // costs a re-spin to clear.
 const classHasElements = () => (CLASS.defs || []).some(d => d && d.element);
-const charmFitsClass = c => !(c.mods && c.mods.el) || classHasElements();
+// ⚠️ TWO GATES, NOT ONE (2026-08-18). Thomas, at the Wheel as the rogue: *"mage charm while
+// playing rogue"* - ✦ Loose Weave, which is `cls: 'mage'` and rewrites how ATTUNING works, a rule
+// she does not have. 🔑 THE EXPLICIT GATE WAS THE ONE MISSING: three charm pools (the Wheel and
+// two event grants) filtered on tier, curse and rarity but never on `cls` at all. `classCharmPool()`
+// - used only by 🏕️ Setting Out - was the single place that ever checked it, so the rule
+// existed and simply was not applied where charms are actually bought.
+// ⚠️ I touched this exact line an hour ago to add the ELEMENT gate and did not notice the class
+// gate missing beside it. Fixing one half of a check is how the other half stays broken.
+const charmFitsClass = c =>
+  (!c.cls || c.cls === CLASS.id) &&                        // whose charm is it
+  (!(c.mods && c.mods.el) || classHasElements());          // and can this class use an element gate
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
