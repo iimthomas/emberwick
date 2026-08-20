@@ -624,8 +624,14 @@ const RUNSIM = (() => {
       // light. Same blind spot as the Emberwake bank and 🃏 Unspent.
       else if (p === 'hearth') {
         const forgeable = hearthForgeable();
-        if (!S.candle && S.map && S.map.pos && S.map.pos.f < MAP_FLOORS - 3) hearthLight();
+        const last = S.map && S.map.pos && S.map.pos.f >= MAP_FLOORS - 1;
+        const thin = (S.deck.length + S.hand.length + S.discard.length) < 12;
+        // 🧵 a lost card is worth ~8 points of duel win rate, so take it back before the lair or
+        // whenever the deck is getting thin; otherwise light the way, otherwise sharpen.
+        if (S.trashed.length && (last || thin)) hearthMend();
+        else if (!S.candle && !last && S.map && S.map.pos && S.map.pos.f < MAP_FLOORS - 3) hearthLight();
         else if (forgeable.length) startHearthPick();
+        else if (S.trashed.length) hearthMend();
         else hearthLight();
       }
       else if (p === 'hearthpick') {

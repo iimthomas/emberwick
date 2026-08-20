@@ -3583,6 +3583,24 @@ function hearthForge(id) {
 // with the candle, not with coins. A hearth that charged would just be a small Wheel, and the
 // question would collapse back into *do I have money*.
 function hearthForgeable() { return S.hand.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id)); }
+
+// 🧵 MEND — take back a card that damage took off you for good (Thomas, 2026-08-18).
+// 🔑 THIS IS THE HEAL THE HEARTH WAS MISSING, AND IT IS THE ONLY ONE DECK-AS-HEALTH ALLOWS. In
+// StS a campfire is *Rest or Smith* - rest restores HP. Our HP is the deck, so the honest analogue
+// is not un-softening a card, it is **getting a lost one back**. Until now damage was strictly
+// one-directional: cards left the run and never returned except through one paid event.
+// 🔑 AND IT IS WHAT MAKES THE LAST HEARTH A REAL DECISION. 🪙 1 card of duel stamina ≈ 8 points
+// of win rate (measured 2026-08-05), so on the eve of the duel *mend* and *sharpen* are two
+// genuinely different answers - stamina against power - which is exactly the bar four in-turn
+// forks have failed.
+// ⚠️ The last card lost, not a chosen one: `evRecoverCard('last')` is the existing precedent
+// (the Ashfield event) and it keeps the slot row as the only place a card is ever drawn.
+// ⚠️ FREE, like the forge. The price of every hearth option is the other two.
+function hearthMend() {
+  if (S.phase !== 'hearth' || !S.trashed.length) return;
+  log(`🧵 ${evRecoverCard('last')}`, 'good');
+  backToMap();
+}
 // ⚠️ THE PICKER IS ON THE CARD, like every other picker in the game - never a list of names.
 function startHearthPick() { if (S.phase === 'hearth' && hearthForgeable().length) { S.phase = 'hearthpick'; render(); } }
 function cancelHearthPick() { if (S.phase === 'hearthpick') { S.phase = 'hearth'; render(); } }
@@ -6138,6 +6156,11 @@ function renderControls() {
         `🔧 <b>Work the coals</b>` +
         `<span class="opt-why">${forgeable.length ? 'sharpen one card a level, free'
           : 'nothing in hand can be sharpened'}</span></button>` +
+      `<button ${S.trashed.length ? '' : 'disabled '}onclick="${S.trashed.length ? 'hearthMend()' : ''}">` +
+        `🧵 <b>Mend what you lost</b>` +
+        `<span class="opt-why">${S.trashed.length
+          ? `${displayName(S.trashed[S.trashed.length - 1])} comes back at Lv1 — ${S.trashed.length} lost so far`
+          : 'nothing of yours has been lost yet'}</span></button>` +
       `</div>`;
     return;
   }
