@@ -14,6 +14,26 @@ const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalys
 // 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
 const GUARD_CUT = 0.5;
 const HAND_SIZE = 4;
+// 🔼 THE COST OF A LEVEL, one ladder for every class (2026-08-18). Thomas: *"we sorta get into
+// this loop where we win, and we upgrade to lvl 4, so that makes us win more, and we get more
+// gold, and you kinda just keep winning."*
+//
+// 🔑 MEASURED FIRST, AND IT CHANGED THE FIX. A deck's TOTAL levels barely move across a run -
+// 32 -> 37 - because soaking eats almost exactly what sharpening buys. So the runaway is not
+// ACCUMULATION, it is CONCENTRATION: the same few levels funnelled into one dominant card. A
+// surcharge on a sharp deck would have fired almost never.
+// ⚠️ So the fix is the SHAPE of the ladder, not its height. It was a flat 2/3/4, which made the
+// last level - the one that creates the runaway - the cheapest thing in the game relative to what
+// it buys. Now 2/4/7: the first step is UNCHANGED so the shop stays reachable (the 2026-08-05 fix
+// that put the Wheel before the forge), and the climb to Lv4 costs 13 instead of 9.
+// ⚠️ Costs are hypersensitive - [[Balance_Log]] records 2/3/4 -> 4/7/10 taking stage 1 from 98%
+// to 49%. That change raised the FIRST step; this one deliberately does not.
+// 🔑 One constant for both classes: the mage's 16 level tables and ROGUE_COST both carried their
+// own copy of this ladder, which is 49 numbers to keep in step for a value that was always shared.
+// ⚠️ 2/3/7, not 2/4/7. Raising the MIDDLE step taxed all levelling and cost the mage 11 points
+// (51% -> 40%) - too blunt for a complaint that was specifically about Lv4. The first two steps are
+// now untouched and only the LAST one bites, which is the level he actually named.
+const LEVEL_COST = [2, 3, 7, null];
 const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so it must stay ABOVE it
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
@@ -984,7 +1004,7 @@ const ROGUE_SPEC = [
   { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 5, 3], paid: 3, verb: 'surge' },
   { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [5, 2, 1], paid: 4, verb: 'unspent' },
 ];
-const ROGUE_COST = [2, 3, 4, null];
+const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST for every class now
 // generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
 // can print `⚔️ 7 → ✦ 12` off the same row shape every other card in the game uses.
 // ⚠️ THE SPIKE STEP IS PER-STAT (2026-08-17). It used to be +3 a level for ANY spike, which was
@@ -2776,7 +2796,9 @@ function eff(card) {
     // slots). The floor keeps SPARK enormously faster (13 vs 3 at Lv4) — it stops the rest being
     // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
     init: Math.max(INIT_FLOOR, init + charmMod('init', d.element)),
-    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
+    // ⚠️ cost comes from LEVEL_COST, not the row - column 7 of every level table is now dead data
+    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am),
+    cost: LEVEL_COST[card.level - 1],
   };
 }
 
