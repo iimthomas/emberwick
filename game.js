@@ -931,7 +931,19 @@ const MOMENTUM_CAP = 5;
 // 🔑 And it lands on the right cards. A Lv4 blade now gives ZERO energy - sharpened, it is pure
 // payload and cannot fuel anything, exactly as a Lv4 Hammer is actively bad as a Catalyst.
 // [[Levelling_As_Sharpening]]: spike up, weakness DOWN.
-const PITCH_BASE = { tool: 5, blade: 4 };
+// ⚠️ ASYMMETRIC, AND THE TOOL SIDE IS A CEILING CONSTRAINT, NOT A TASTE (fixed same day).
+// Dropping BOTH to 5/4 made ⚡4 the most any card could ever give - and Ghostblade costs ⚡5, so
+// it became UNPAYABLE by any card in the deck at any level. Its ◆27 strike and its verb were
+// simply unreachable. Thomas felt the edge before the measurement found it: *"having a card be
+// lvl 1 to give 5 energy sounds a bit rough though."*
+// 🔑 THE RULE: WITH A SUBTRACTIVE PITCH FORMULA (base − level), A COST EQUAL TO THE GIVE
+// CEILING IS PAYABLE BY EXACTLY ONE CARD STATE IN THE DECK - THAT IS NOT A PRICE, IT IS A LOCKOUT.
+// Ghostblade sat at 25-30% paid even BEFORE the drop, because only a Lv1 tool could ever cover it.
+// A cost ceiling needs at least one level of headroom under the give ceiling to be a real price.
+// 🔑 The split is role-honest and does the work the flat drop was meant to do: TOOLS ARE THE
+// FUEL, so they stay able to pay at every level; BLADES ARE THE PAYLOAD, so a Lv4 blade gives ⚡0
+// and cannot fuel anything, exactly as a Lv4 Hammer is actively bad as a Catalyst.
+const PITCH_BASE = { tool: 6, blade: 4 };
 function pitchOf(card) {
   if (!card || !card.def) return 0;
   const base = PITCH_BASE[card.def.role] || 5;
