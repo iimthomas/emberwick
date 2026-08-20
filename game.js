@@ -33,6 +33,24 @@ let FORK_ENABLED = true;
 // itll be if we have to go to a shop to do it... but that might take too long, and youll have
 // hoarded a bunch of coin possibly."*
 let WHEEL_PER_ENCOUNTER = true;
+// ⚔️👣 BLOW AND DISTANCE (prototype, [[Blow_And_Distance]]).
+// 'spike'    = the old behaviour - a journey scores exactly like a fight, your Spell alone.
+// 'distance' = every card you COMMIT walks. The Spell leads (with your class's technique applied
+//              to it, as always) and the Catalyst and Surge add their own value behind it.
+//              ⚠️ The ✦ ARSENAL IS EXCLUDED - the card you keep is the progress you did not make.
+// ⚠️ This does NOT reopen ONE VALUE PER CARD. No second stat is printed anywhere; the same
+// single value is simply READ BY MORE CARDS on a journey than in a fight.
+let JOURNEY_MODE = 'distance';
+// ⚠️ MP is multiplied at runtime rather than hand-edited into REGIONS: those rows are
+// transcribed from the source tables and are not ours to rewrite for a prototype.
+// ⚠️ TUNED BY MEASUREMENT, AND MY FIRST GUESS WAS MILES OUT. I estimated ×2.4 on the reasoning
+// that "three cards contribute instead of one" - at which point the mage completed **4%** of
+// journeys. 🔑 THE STRIDE IS MUCH SMALLER THAN THE CARD COUNT SUGGESTS, BECAUSE THE CATALYST AND
+// SURGE ARE CHOSEN FOR SPEED AND BOOST, NOT FOR VALUE - they are usually the small cards.
+// Swept: ×1.3 mage journeys 71% · ×1.5 **55%** · ×1.7 39% · ×2.0 15% · ×2.4 4%.
+// ×1.5 holds the mage at her old journey rate (58%) and lifts the rogue's (82% → 92%), which is
+// the right way round: her road was never the problem, her duel was.
+let JOURNEY_MP_MULT = 1.5;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 // 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
 const GUARD_CUT = 0.5;
@@ -4210,7 +4228,16 @@ function computeAction(reserve) {
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
   // Pace and perils. Kept as a zeroed field so the log/solver result shapes do not change.
   const reserveBonus = 0;
-  const value = withBoost + reserveBonus;
+  // 👣 THE STRIDE - what the cards behind the Spell contribute on a journey.
+  // 🔑 A FIGHT IS A BLOW: one card lands, the others support it. A JOURNEY IS A DISTANCE: every
+  // card you commit covers ground. So the same 16 cards want a SPIKE for a fight and an EVEN hand
+  // for a journey, which is the one axis on which nothing else in the game pulls two ways.
+  // ⚠️ The class rule still applies to the Spell and nothing else - a journey must not be
+  // class-blind, or a mage and a rogue would play 54% of the game identically.
+  const strideCards = JOURNEY_MODE === 'distance'
+    ? [cardById(S.assign.Element), cardById(S.assign.Boost)].filter(Boolean) : [];
+  const stride = strideCards.reduce((t, c) => t + eff(c).value, 0);
+  const value = withBoost + reserveBonus + stride;
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
   const pace = elemInit + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
@@ -4224,7 +4251,9 @@ function computeAction(reserve) {
     ? (CLASS.boosts ? eff(reserve).boost : pitchOf(reserve)) : 0;
   // 🏔️ Updraft — speed shortens the road (never below 1 MP: a journey you cannot fail is not one)
   const updraftCut = peril === 'Updraft' ? elemInit : 0;
-  const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
+  // ⚠️ the road gets longer when more cards walk it, or a journey becomes free
+  const mpBase = JOURNEY_MODE === 'distance' ? Math.round(e.mp * JOURNEY_MP_MULT) : e.mp;
+  const mpEff = Math.max(1, mpBase + steepAdd - updraftCut);
   const half = Math.ceil(mpEff / 2);
   let outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
   if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
@@ -4239,6 +4268,9 @@ function computeAction(reserve) {
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
     : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
   return { ...classPayload, type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+           // ⚠️ WHEN compose() GAINS A FIELD, CHECK THE PAYLOAD IN THE SAME EDIT - three separate
+           // bugs this month came from a value being computed and then never reaching the reveal.
+           stride, strideNames: strideCards.map(c => c.def.name),
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
@@ -4308,6 +4340,7 @@ function resolve() {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
     // ⚠️ name the ARSENAL, not the mage's stat - the rogue's Arsenal contributes ⚡ energy
+    if (r.stride) b1.push(L(`👣 The road takes all of you — ${r.strideNames.join(' + ')} walk behind your Spell for +${r.stride}`, 'good'));
     if (r.steepAdd) b1.push(L(`Steep: MP raised by what your Arsenal would have given → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
