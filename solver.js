@@ -628,11 +628,18 @@ const RUNSIM = (() => {
         const thin = (S.deck.length + S.hand.length + S.discard.length) < 12;
         // 🧵 a lost card is worth ~8 points of duel win rate, so take it back before the lair or
         // whenever the deck is getting thin; otherwise light the way, otherwise sharpen.
-        if (S.trashed.length && (last || thin)) hearthMend();
+        if (S.trashed.length && (last || thin)) startMendPick();
         else if (!S.candle && !last && S.map && S.map.pos && S.map.pos.f < MAP_FLOORS - 3) hearthLight();
         else if (forgeable.length) startHearthPick();
-        else if (S.trashed.length) hearthMend();
+        else if (S.trashed.length) startMendPick();
         else hearthLight();
+      }
+      // 🧵 which lost card to take back: the biggest, as a blunt proxy for "the hole that hurts
+      // most". ⚠️ They all return at Lv1, so this is a choice about the CARD, not about levels.
+      else if (p === 'mendpick') {
+        const pool = S.trashed.slice();
+        if (!pool.length) { cancelMendPick(); }
+        else hearthMendPick(pool.sort((a2, b2) => bigness(b2) - bigness(a2))[0].id);
       }
       else if (p === 'hearthpick') {
         // sharpen the card that is furthest from its ceiling and biggest - a blunt but defensible proxy

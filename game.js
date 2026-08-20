@@ -2310,7 +2310,7 @@ function loadGame() {
     // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
     // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
     // **Any new phase that can exist without an encounter belongs in this list.**
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick'];
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -3596,9 +3596,26 @@ function hearthForgeable() { return S.hand.filter(c => c.level < MAX_LEVEL && !S
 // ⚠️ The last card lost, not a chosen one: `evRecoverCard('last')` is the existing precedent
 // (the Ashfield event) and it keeps the slot row as the only place a card is ever drawn.
 // ⚠️ FREE, like the forge. The price of every hearth option is the other two.
-function hearthMend() {
-  if (S.phase !== 'hearth' || !S.trashed.length) return;
-  log(`🧵 ${evRecoverCard('last')}`, 'good');
+// ⚠️ YOU PICK WHICH ONE, AND YOU SEE THEM (Thomas, 2026-08-18): *"a window should pop up with
+// all the cards you lost, and you get to pick 1."*
+// 🔑 THE PROJECT'S OWN RULE SAYS THE SAME THING - *never ask for a choice about an object without
+// showing the object; pickers belong ON the card.* Taking "the last one lost" was cheap of me: by
+// the lair you have usually lost two or three, they are rarely interchangeable, and the whole
+// decision is which hole in the deck hurts most.
+// ⚠️ These are the ONE set of cards not in your hand, so they render inside the window rather
+// than in the slot row - which leaves *the slot row is the only place a HAND card is drawn* intact.
+function startMendPick() { if (S.phase === 'hearth' && S.trashed.length) { S.phase = 'mendpick'; render(); } }
+function cancelMendPick() { if (S.phase === 'mendpick') { S.phase = 'hearth'; render(); } }
+function trashedById(id) { return S.trashed.find(c => c.id === id) || null; }
+
+function hearthMendPick(id) {
+  if (S.phase !== 'mendpick') return;
+  const i = S.trashed.findIndex(c => c.id === id);
+  if (i === -1) return;
+  const card = S.trashed.splice(i, 1)[0];
+  card.level = 1;
+  S.deck.push(card);
+  log(`🧵 <b>${displayName(card)}</b> is yours again — battered, back at Lv1, and now at the bottom of your deck.`, 'good');
   backToMap();
 }
 // ⚠️ THE PICKER IS ON THE CARD, like every other picker in the game - never a list of names.
@@ -5749,7 +5766,7 @@ const isShell = () => SHELL_PHASES.includes(S && S.phase);
 // you stop and make, rather than something you do to the cards in front of you.
 // ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
 // would be a dialog about the thing it was covering.
-const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick'];
+const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
 // 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
@@ -6156,12 +6173,21 @@ function renderControls() {
         `🔧 <b>Work the coals</b>` +
         `<span class="opt-why">${forgeable.length ? 'sharpen one card a level, free'
           : 'nothing in hand can be sharpened'}</span></button>` +
-      `<button ${S.trashed.length ? '' : 'disabled '}onclick="${S.trashed.length ? 'hearthMend()' : ''}">` +
+      `<button ${S.trashed.length ? '' : 'disabled '}onclick="${S.trashed.length ? 'startMendPick()' : ''}">` +
         `🧵 <b>Mend what you lost</b>` +
         `<span class="opt-why">${S.trashed.length
-          ? `${displayName(S.trashed[S.trashed.length - 1])} comes back at Lv1 — ${S.trashed.length} lost so far`
+          ? `choose one of the ${S.trashed.length} card${S.trashed.length === 1 ? '' : 's'} damage took — it returns at Lv1`
           : 'nothing of yours has been lost yet'}</span></button>` +
       `</div>`;
+    return;
+  }
+  if (S.phase === 'mendpick') {
+    c.innerHTML =
+      `<div class="phase-label">🧵 MEND WHAT YOU LOST</div>` +
+      `<div class="hint">Everything damage has taken from you this run. One comes back — at <b>Lv1</b>, ` +
+      `at the bottom of your deck.</div>` +
+      `<div class="mend-row">${S.trashed.map(t => cardHTML(t)).join('')}</div>` +
+      `<button onclick="cancelMendPick()">← back to the hearth</button>`;
     return;
   }
   if (S.phase === 'hearthpick') {
@@ -6963,6 +6989,9 @@ function cardHTML(card) {
     } else {
       action = `<div class="card-action muted">stays in hand</div>`;
     }
+  } else if (S.phase === 'mendpick') {
+    action = `<div class="card-action"><button class="primary" onclick="hearthMendPick(${card.id})">` +
+      `🧵 Take this one back</button></div>`;
   } else if (S.phase === 'hearthpick') {
     // 🔧 the hearth's forge. ⚠️ Same rule as every picker here: it lives ON the card, and a
     // card that cannot take it stays VISIBLE and says why.
