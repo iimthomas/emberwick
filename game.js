@@ -1068,6 +1068,17 @@ const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const step = SPIKE_STEP[s.spike];
   const lv = [0, 1, 2, 3].map(L => {
     const st = s.base.map((v, i) => (i === idx[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+    // 🛡️ ARMOUR FLOORS AT 1, NEVER 0 (2026-08-18). Thomas: *"feel like rogue cards shouldn't
+    // block 0, like what happens if i take damage and they all don't block?"*
+    // Measured: FIVE of her eight cards soaked nothing at Lv2, and 9% of her hands could soak
+    // nothing AT ALL - roughly one turn in eleven where any damage at all is an automatic
+    // knock-out (every card downgraded plus a deck burn). The mage's floor is 1 on every card at
+    // every level; hers had holes.
+    // 🔑 DECK-AS-HEALTH MEANS EVERY CARD IS A HIT POINT. A 0-armour card is not a weak card, it
+    // is a card that cannot take part in the health system at all - a hole in the health bar, not
+    // a thin one. Her tradeoff is meant to be THIN armour (1-4 against the mage's 1-8), and it
+    // still is.
+    st[idx.armor] = Math.max(1, st[idx.armor]);
     return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
   return { name: s.name, element: null, arch: null, pair: s.pair, role: s.role,
