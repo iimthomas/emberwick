@@ -129,7 +129,10 @@ const CARD_DEFS = [
 const HARDSHIPS = {
   'Ambush':       'Double the Early Damage you suffer this encounter.',
   'Hazards':      'Suffer 1 Time Penalty if you take Early Damage, and 1 more if you take Combat Damage.',
-  'Night Travel': "Your Boost is reduced by your Catalyst's Initiative (min 0).",
+  // ⚠️ ENGINE TERMS, NOT ONE CLASS'S STAT. "Your Boost" is a mage word, and a hardship that
+  // names it is a free ride for every class without a boost - which was literally true for the
+  // rogue until 2026-08-18.
+  'Night Travel': "What your third slot gives is reduced by your second slot's Initiative (min 0).",
   'Storm':        'Any Time Penalties this encounter also deal that much damage.',
   // ⚖️ aims straight at the most-solved part of the turn: the Spell is simply your biggest card 83%
   'Dead Weight':  'Your heaviest card cannot be your Spell.',
@@ -157,7 +160,7 @@ const HARDSHIPS = {
   // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
   // just pays nothing, so no slot is sealed and no choice is removed (sealed slots shipped once and
   // were killed the same day).
-  'Rationed':     'Nothing is spare here — your <b>Surge adds nothing</b> this encounter.',
+  'Rationed':     'Nothing is spare here — your <b>third slot gives nothing</b> this encounter.',
   // ⚖️ Exacting is the mountain's own logic: half-measures are nothing. It is the harshest
   // hardship in the game and it is deliberately confined to late Fellgrind regions.
   'Exacting':     'It gives no half credit — a <b>Narrow counts as a Loss</b>.',
@@ -208,7 +211,7 @@ const ABILITIES = {
 };
 
 const PERILS = {
-  'Steep':       "The journey's MP is increased by your Arsenal's Boost.",
+  'Steep':       "The journey's MP is increased by what your Arsenal would have given.",
   'Treacherous': 'Fail to attain Complete Victory → suffer 1 damage after the Time Penalty.',
   // 🏔️ UPDRAFT is the mirror of Steep, and the first peril that PAYS. A road hazard that can
   // only ever cost you makes the peril line something to dread and skim past; one that rewards the
@@ -1144,8 +1147,26 @@ function rogueMath() {
   // slot ③ a real question (a ⚡5 blade never drops below ⚡3) without taxing the one place her
   // streak is hardest to hold.
   const cost = rawCost;
-  const paid = pitchOf(fuel);
-  const full = paid >= cost;
+  // ⚠️ THE HARDSHIPS THAT NAMED A MAGE STAT DID NOTHING TO HER (2026-08-18). Thomas, on a
+  // journey: *"damn night travel doesn't work against rogue... i suppose we will need hazards and
+  // hardships and journies that affect classes."*
+  // 🔑 HE IS RIGHT ABOUT THE PROBLEM AND I THINK THE FIX IS THE OTHER WAY ROUND. The ENGINE owns
+  // hardships - [[Class_System]]'s seam says so - so a hardship must be stated in ENGINE terms and
+  // each CLASS reads what it means for its own maths. Class-SPECIFIC hardships would mean writing
+  // every one of them eight times; this way one hardship bites eight classes.
+  // The mapping is mechanical once you see it:
+  //   a hardship that names the mage's ➕ BOOST  -> the rogue reads her ⚡ ENERGY
+  //   a hardship that names ATTUNING              -> the rogue reads PAYING
+  // ⚠️ Four were free rides for her: Night Travel, Rationed, Dead Air and Squall, plus the
+  // ⛰️ Steep peril. Dead Air and Squall were gated inside attunedNow(), which returns early on
+  // `!CLASS.pairs`, so they never even reached her.
+  const h = S.hardship;
+  const comboCd = cardById(S.assign.Element);
+  let paid = pitchOf(fuel);
+  if (h === 'Rationed') paid = 0;                                   // ⏳ nothing is spare
+  else if (h === 'Night Travel') paid = Math.max(0, paid - (comboCd ? eff(comboCd).init : 0));
+  // 🔇 Dead Air / ⚡ Squall gate her combination rule the same way they gate the mage's
+  const full = (paid >= cost) && h !== 'Dead Air' && !squallBlocks();
   // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
   // ~9 you gave up by not striking with the blade. They scale off DIFFERENT things on purpose:
   //   Second Fang — the strike's own ⚔️, so it grows as you sharpen that card.
@@ -3634,7 +3655,10 @@ function computeAction(reserve) {
   const nightCaught = nightfall > pace && !(S.potionFx && S.potionFx.noNight);   // 🧪 Nightglass
   // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
-  const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
+  // ⛰️ Steep raises MP by what your ARSENAL would have given - the mage's ➕ boost, the
+  // rogue's ⚡ energy. Reading only `boost` made it a free peril for any class without one.
+  const steepAdd = peril === 'Steep' && reserve
+    ? (CLASS.boosts ? eff(reserve).boost : pitchOf(reserve)) : 0;
   // 🏔️ Updraft — speed shortens the road (never below 1 MP: a journey you cannot fail is not one)
   const updraftCut = peril === 'Updraft' ? elemInit : 0;
   const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
@@ -3720,7 +3744,8 @@ function resolve() {
   } else {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
+    // ⚠️ name the ARSENAL, not the mage's stat - the rogue's Arsenal contributes ⚡ energy
+    if (r.steepAdd) b1.push(L(`Steep: MP raised by what your Arsenal would have given → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
     if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
