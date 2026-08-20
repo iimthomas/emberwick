@@ -2260,7 +2260,8 @@ function saveGame() {
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
-      pendingEvent: S.pendingEvent, eventThisRegion: S.eventThisRegion, event: S.event,
+      pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
+      eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
       duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
@@ -2316,7 +2317,8 @@ function loadGame() {
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
       lastMileOutcome: d.lastMileOutcome || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
-      pendingEvent: d.pendingEvent || false, eventThisRegion: d.eventThisRegion || false, event: d.event || null,
+      pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
+      eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
@@ -2662,8 +2664,10 @@ function freshGame(stage) {
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
-    pendingEvent: false, // a Complete/Narrow journey owes an Event this turn
-    eventThisRegion: false, // 🏕️ one event per region - see the trigger in resolve()
+    pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
+    eventAt: 1,             // 🏕️ which encounter this region's event follows
+    eventDone: false,       // 🏕️ has this region's event been spent
+    eventTurnPending: false,// 🏕️ the NEXT turn is the event turn
     event: null,         // active event state { id, step, opt, targetId, wantElement, lines }
     // ---- cross-turn event effects (run layer) ----
     eventsSeen: [],        // ids of events already drawn this run (for `once` events)
@@ -2694,6 +2698,7 @@ function freshGame(stage) {
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
     logEntries: [], // [{header, lines:[{text, cls}]}], newest first
   };
+  scheduleRegionEvent();   // 🏕️ region 1 gets its event turn too - freshGame is a region start
   draw(HAND_SIZE);
   // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
   // the extra arrives now and is put back at cleanup rather than being a blind exchange.
@@ -2816,7 +2821,7 @@ function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
   // 📜 a contract CROSSES the region break now — its own encounter window is the bound
   S.regionTurn = 0;
-  S.eventThisRegion = false;   // 🏕️ a fresh region may offer one event
+  scheduleRegionEvent();       // 🏕️ one event turn, somewhere in this region
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.region++;
@@ -3300,8 +3305,48 @@ function logChallenge() {
   if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${HARDSHIPS[S.hardship]}`, 'bad');
 }
 
+// 🏕️ WHICH ENCOUNTER THIS REGION'S EVENT FOLLOWS. Rolled once per region rather than
+// per turn, so events are SPACED by construction instead of clustering - a cap on a per-turn roll
+// still permits two in a row and then a dry region, and the run layer is deliberately predictable.
+// ⚠️ Never slot 0: you should meet the road before the road offers you anything.
+// 🏕️ is THIS turn the region's event turn (as opposed to an event mid-encounter, which no
+// longer happens)? Read it rather than testing `S.phase === 'event'` in display code - the phase is
+// also what the tutorial and any future scripted event would use.
+function isEventTurn() { return S.phase === 'event' && !S.finalMode; }
+
+function scheduleRegionEvent() {
+  // ⚠️ NEVER THE LAST ENCOUNTER. finishTurn() arms the event turn and then finishRegionCheck()
+  // runs immediately - so an event scheduled after encounter REGION_ENCOUNTERS is armed and then
+  // stepped over by the region break, and nextRegion() clears the flag. Measured: it silently ate
+  // one region's event in four (3.1 event turns a run instead of 4.0).
+  // 🔑 A FLAG SET IN THE SAME BREATH AS THE CHECK THAT ENDS THE PHASE WILL LOSE THE RACE.
+  S.eventAt = 1 + Math.floor(rnd() * (REGION_ENCOUNTERS - 1));   // after encounter 1..N-1
+  S.eventDone = false;
+  S.eventTurnPending = false;
+}
+
+// 🏕️ THE EVENT TURN. No encounter is drawn, no cards are spent, no soak, no deck erosion -
+// it is the one beat in the run that asks a question without charging you for the answer.
+// 🔑 That is the whole point: [[Tempo_And_The_Watch]] says the run layer is meant to be the
+// exhale and cannot be while every second encounter stacks another screen on a combat resolution.
+function beginEventTurn() {
+  S.eventTurnPending = false;
+  S.eventDone = true;
+  // ⚠️ top the hand up FIRST - several events take a card, and the next real turn's top-up
+  // would otherwise be the only thing standing between you and a short hand.
+  if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.damage = 0; S.damageEl = null;
+  S.downgraded = new Set();
+  S.actionSetIds = []; S.reserveId = null;
+  logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+  startEvent();
+}
+
 function nextTurn() {
   S.turn++;
+  // 🏕️ an event takes the turn INSTEAD of an encounter - see beginEventTurn
+  if (S.eventTurnPending) { beginEventTurn(); return; }
   S.regionTurn = (S.regionTurn || 0) + 1;
   // Top the hand up before anything else. Cleanup draws you back to four, but EVENTS run after
   // it and several remove a card from your hand (the Gray Pilgrim takes one, the Toll of Thorns
@@ -3952,25 +3997,19 @@ function finishResolve() {
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
 
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
-  // 🏕️ ONE EVENT PER REGION, NOT ONE PER JOURNEY (2026-08-18). Thomas: *"not sure about
-  // doing the events after every journey, seems a bit too much."*
-  // Measured: journeys are 54% of encounters and 78% of them fired an event - 7.0 a run - so a
-  // journey turn ran resolve -> soak -> EVENT while a fight ran one screen.
-  // 🔑 THE EVENT HAD STOPPED BEING AN EVENT. Welded to a journey it is not a reward, it is a
-  // STEP - "journey" and "event" had quietly become one compound encounter type, and it was the
-  // majority one. A thing that happens 78% of the time is a phase, whatever it is called.
-  // 🔑 A CAP, NOT A ROLL. A 50% chance halves the count but can still deal two in a row and
-  // then a dry region, and it would add randomness to a run layer that is deliberately
-  // predictable (REGION_ENCOUNTERS is fixed for exactly this reason). One per region is
-  // deterministic, spaces them by construction, and gives a region a SHAPE: some encounters, one
-  // place you arrive, then the Wheel at the break.
-  // ⚠️ It also fixes a telegraph problem rather than making one - see [[Tempo_And_The_Watch]]:
-  // the run layer is meant to be the exhale, and it cannot be if every second encounter asks
-  // another question.
-  else if (r.type === 'journey' && r.outcome !== 'Loss' && !S.eventThisRegion) {
-    S.pendingEvent = true;
-    S.eventThisRegion = true;
-  }
+  // 🏕️ AN EVENT IS ITS OWN TURN, SCHEDULED BY THE REGION (2026-08-18, step 2).
+  // Thomas: *"lets do the encounter type change, i think thats how i envisioned it anyways."*
+  // 🔑 IT IS NO LONGER EARNED BY A JOURNEY AT ALL. An event used to be a RIDER: a journey
+  // resolved, and then a second screen appeared inside the same turn. That made a fight one screen
+  // and a journey three, and journeys are 54% of encounters - so the majority encounter type was a
+  // compound and the run had no beat that wasn't a question. Scheduling it per region instead
+  // makes both encounter types one screen each and gives the event a beat of its own.
+  // ⚠️ IT TAKES A TURN BUT NOT AN ENCOUNTER SLOT - `S.regionTurn` is NOT incremented on an
+  // event turn. That is deliberate and load-bearing: `REGION_ENCOUNTERS` is the accounting unit for
+  // the region clock, the `dry` check, dragon PAR, and 📜 quest-contract windows via `runLeft`.
+  // 🔑 Counting an event as an encounter would silently hand every contract a window a quarter
+  // of which cannot progress it - the *"never offer one without room to keep it"* trap, arriving
+  // through the back door. **An event costs you time, never cards, and never a card encounter.**
   if (r.banks) S.wakePending = r.bank;
   // 🕯️ a clean win keeps your footing; anything less costs it — and the dark takes it regardless
   if (!S.finalMode) {
@@ -4490,8 +4529,9 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
 function finishTurn() {
   // the finale runs its own beat sequencing (Approach beats → Duel), not region flow
   if (S.finalMode) { finaleAfterTurn(); return; }
-  // a completed/narrowed journey earns an EVENT (the place you arrive) before the turn ends
-  if (S.pendingEvent) { S.pendingEvent = false; startEvent(); return; }
+  // 🏕️ arm the event turn - it runs NEXT, as its own beat, rather than as a second
+  // screen bolted onto the encounter just resolved.
+  if (!S.eventDone && S.regionTurn >= S.eventAt) S.eventTurnPending = true;
   finishRegionCheck();
 }
 
@@ -5387,6 +5427,19 @@ function candleLine() {
 function renderEncounter() {
   const e = S.encounter;
   const panel = $('encounter-panel');
+  // 🏕️ ON AN EVENT TURN THERE IS NO ENCOUNTER. `S.encounter` still holds the LAST one, so
+  // the panel was presenting a live journey - MP, Nightfall, a Time Penalty - that you could not
+  // play and would never resolve. Found by looking at the screen, not by a test: every number on
+  // it was correct and every one of them was about a turn that had already happened.
+  // 🔑 A PANEL THAT DESCRIBES THE PREVIOUS TURN IS WORSE THAN AN EMPTY ONE.
+  // ⚠️ The SLOT ROW deliberately stays - event pickers live ON the cards, and it is the only
+  // place a card is ever drawn.
+  if (isEventTurn()) {
+    panel.innerHTML = `<div class="enc-title">✦ A PLACE ON THE ROAD</div>` +
+      `<div class="enc-sub">Region ${S.region} · no encounter this turn</div>` +
+      `<div class="hint">You spend no cards here. Your hand carries on to the next encounter.</div>`;
+    return;
+  }
   if (S.finalMode && S.phase !== 'defeat' && S.phase !== 'victory') {
     const ds = S.dragonState;
     const hpPct = ds ? Math.max(0, Math.round(100 * ds.hp / ds.maxHp)) : 100;
@@ -5703,7 +5756,11 @@ function renderControls() {
             (why ? `<span class="opt-why">${why}</span>` : '') + `</button>`;
         }).join('') + `</div>`;
     }
-    c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
+    // ⚠️ THE LINE USED TO SAY "as the journey ends" AND THE RULE MOVED OUT FROM UNDER IT
+    // (2026-08-18). Events are scheduled by the region now and follow a FIGHT about half the time.
+    // 🔑 When a trigger changes, every sentence that described the old one is now a lie -
+    // the fifth time this exact shape has bitten in one day.
+    c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">The road gives you a moment. Nothing here costs you a card.</div>` + body;
   } else if (S.phase === 'defeat') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     c.innerHTML =
