@@ -10,6 +10,19 @@ const START_LEVEL = 2;
 const MAX_LEVEL = 4;
 // ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
 let ATTUNE_BONUS = 1;
+// ⚡ how much PAYING is worth to the rogue: value + (paid + PAID_STEP × levels invested).
+// ⚠️ THE STEP EXISTS BECAUSE THE FLAT VERSION SHRANK. Thomas: *"i think attuned and unattuned
+// number gap needs to be a bit wider, feels like im pretty happy with unattuned damage, i need to
+// feel like attuning is more important."*
+// 🔑 THE GAP WAS FLAT WHILE EVERYTHING AROUND IT SCALED. Her blades spike +4 value a level, so
+// paying doubled a Lv1 blade (4→8) and added a quarter to a Lv4 one (16→20) - it got steadily
+// LESS important exactly as the run went on, and Lv4 arrives around turn 6. Measured flat: paying
+// supplied 20% of her damage on 75% of turns.
+// 🔑 AND IT WAS BACKWARDS FOR THE CLASS. Paying is the rogue's combination rule, and
+// [[Levelling_As_Sharpening]] says a level makes a card MORE ITSELF. A flat gap meant sharpening
+// made her blades strong enough UNPAID, which dulls the one rule the class is built on. The spike
+// and the payoff have to climb together or the payoff is a Lv1 mechanic you outgrow.
+let PAID_STEP = 2;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
 // 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
 const GUARD_CUT = 0.5;
@@ -909,7 +922,16 @@ const MOMENTUM_CAP = 5;
 // literally unplayable, because nothing left in it can pay for anything.
 // ⚠️ Tools pitch one better than blades at the same level — the fuel/strike split is the roles
 // restated in the resource, not a second axis to learn.
-const PITCH_BASE = { tool: 6, blade: 5 };
+// ⚡ WHAT A CARD GIVES WHEN FED: PITCH_BASE − its level. Dropped by 1 on 2026-08-18 as the
+// matched half of PAID_STEP. 🔑 A BIGGER PRIZE AND AN EASIER PRICE IS NOT A WIDER GAP, IT IS A
+// BIGGER NUMBER - measured, scaling the payoff ALONE took her duel from 71% to 88% and paying rose
+// to 81% of turns, so the mechanic got louder AND more automatic at once. Raising the prize while
+// tightening the price is what turns a formality into an event: paying fell 76% -> 64% of turns
+// while the turns it decided the OUTCOME rose 34% -> 44%, at an unchanged 69% Complete.
+// 🔑 And it lands on the right cards. A Lv4 blade now gives ZERO energy - sharpened, it is pure
+// payload and cannot fuel anything, exactly as a Lv4 Hammer is actively bad as a Catalyst.
+// [[Levelling_As_Sharpening]]: spike up, weakness DOWN.
+const PITCH_BASE = { tool: 5, blade: 4 };
 function pitchOf(card) {
   if (!card || !card.def) return 0;
   const base = PITCH_BASE[card.def.role] || 5;
@@ -2830,7 +2852,8 @@ function eff(card) {
     // the mage's derived rule, so every rogue card paid back a flat +(level+1) and `paid` was DEAD
     // DATA. 🔑 THE SAME SHAPE AS `hits`: a field the class authors and the engine quietly
     // ignores looks exactly like a tuned mechanic right up until you check the number.
-    attuned: d.paid != null ? adj(v) + d.paid : adj(v) + card.level + ATTUNE_BONUS,
+    attuned: d.paid != null ? adj(v) + d.paid + PAID_STEP * (card.level - 1)
+                            : adj(v) + card.level + ATTUNE_BONUS,
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
     // 💨 THE INITIATIVE FLOOR (2026-07-29). Sharpening drove every non-SPARK card's init to 0-1,
     // so only 4 of the 16 cards could ever contest a race and the deck's MEDIAN init FELL as you
