@@ -1174,6 +1174,25 @@ body.modal-open #controls-panel:empty { display: none; }
   background: linear-gradient(rgba(23,21,15,0), #17150f 55%);
 }
 
+/* 🗺️ THE MAP. Floors read from the top down because the dragon is up there.
+   ⚠️ Icons only - a node states its TYPE, never its contents. */
+.mp { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; }
+.mp-row { display: grid; grid-template-columns: 22px repeat(5, 1fr); align-items: center; gap: 4px; }
+.mp-row.mp-band { border-top: 1px dashed #4a3f30; padding-top: 4px; }
+.mp-f { font-size: .66em; color: #7d7160; text-align: right; padding-right: 2px; }
+.mp-gap { display: block; height: 30px; }
+.mp-node {
+  display: flex; align-items: center; justify-content: center;
+  height: 30px; border-radius: 8px; font-size: 15px; line-height: 1;
+  background: #1c1913; border: 1px solid #332c22; color: inherit; opacity: .38;
+}
+.mp-node.is-past { opacity: .72; border-color: #5b4c38; background: #2a2418; }
+.mp-node.is-here { opacity: 1; border-color: #e8cd93; background: #3a3020; box-shadow: 0 0 0 2px rgba(232,205,147,.25); }
+/* 🔑 only a REACHABLE node looks like a button - the rest of the map is information, not offers */
+button.mp-node.is-open { opacity: 1; cursor: pointer; border-color: #d8b06a; background: linear-gradient(#332c1d, #241f16); }
+button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background: #4a3d26; border-color: #f2d9a4; }
+.mp-legend { font-size: .72em; color: #9a8e79; text-align: center; margin-top: 2px; }
+
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }

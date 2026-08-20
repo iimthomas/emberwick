@@ -376,6 +376,37 @@ const RUNSIM = (() => {
     return best ? best.sc : [-1, 0, 0];
   }
 
+  // 🗺️ ROUTE VALUE. What a node is worth to a route, in the crude terms a bot can price.
+  // ⚠️ The bot still cannot price the FUTURE well (it scores one encounter at a time), so these
+  // are deliberately blunt: a shop is worth a lot, a hearth is worth a lot when the candle is out,
+  // an elite is worth its coins minus the risk of the deck it costs.
+  function nodeValue(n) {
+    if (n.type === 'wheel')  return S.coins >= 6 ? 9 : 4;
+    if (n.type === 'hearth') return S.candle ? 1 : 6;
+    if (n.type === 'elite')  return (S.hand.length + S.deck.length) > 9 ? 4 : 0;
+    if (n.type === 'event')  return 2;
+    return 2.2;                                   // a normal encounter still pays coins
+  }
+
+  // 🗺️ best route from each reachable node to the top, by dynamic programming up the floors.
+  // Returns the immediate step that begins the best route.
+  function mapRoute(m, opts) {
+    const F = m.floors, best = {};
+    for (let f = MAP_FLOORS - 1; f >= 0; f--) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        const n = F[f][c]; if (!n) continue;
+        let onward = 0;
+        for (const nc of n.next) {
+          const t = F[f + 1] && F[f + 1][nc];
+          if (t && best[t.f + ',' + t.c] > onward) onward = best[t.f + ',' + t.c];
+        }
+        best[f + ',' + c] = nodeValue(n) + onward;
+      }
+    }
+    return opts.slice().sort((a2, b2) =>
+      (best[b2.f + ',' + b2.c] || 0) - (best[a2.f + ',' + a2.c] || 0))[0];
+  }
+
   function chooseBestOnce() {
     // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
@@ -566,6 +597,42 @@ const RUNSIM = (() => {
           const up = S.hand.filter(cc => upgradable(cc)).sort((a, b) => eff(b).cost - eff(a).cost)[0];
           if (up) buyUpgrade(up.id); else wheelDone();
         }
+      }
+      // 🗺️ THE MAP. ⚠️ Same rule as every other phase: teach it or autoRun silently breaks.
+      // Bot policy: a greedy one-step preference over node TYPES, which is all a node advertises.
+      // ⚠️ IT IS A FLOOR, NOT A CEILING, AND THE GAP MATTERS MORE HERE THAN ANYWHERE ELSE. A map's
+      // whole value is ROUTING - looking 15 floors ahead and planning - and a one-step greedy bot
+      // cannot route at all. Measured separately: a player who routes for the Wheel reaches ~2.1 a
+      // run against a random walk's 0.9. **Whatever this bot scores, a human who plans scores more,
+      // so treat every map number as a LOWER bound.**
+      else if (p === 'map') {
+        const opts = mapChoices(S.map);
+        if (!opts.length) { backToMap(); continue; }
+        // 🔑 THE BOT ROUTES. Its first version picked the best NEXT node, which is not what a map
+        // asks - and it measured what a random walk gets (🎰 0.9 a run) rather than what a player
+        // who plans gets (2.1). Every map number taken with it was ~9 points too low.
+        // ⚠️ THE THIRD TIME TODAY: an instrument that cannot DO the thing cannot measure it.
+        // This walks the whole map with a DP, maximising the value of the route ahead, then takes
+        // the first step of the best route - recomputed every step, so it re-plans as it learns.
+        const best = mapRoute(S.map, opts);
+        if (HOOK.onMap) HOOK.onMap(m, opts, best);
+        takeMapNode(best.f, best.c);
+      }
+      // 🕯️ THE HEARTH FORK. Bot policy: take the LIGHT when the candle is out and the road
+      // ahead still matters, otherwise work the coals. ⚠️ It cannot price information well - the
+      // candle pays off a step later and this bot scores one encounter - so it will UNDER-take the
+      // light. Same blind spot as the Emberwake bank and 🃏 Unspent.
+      else if (p === 'hearth') {
+        const forgeable = hearthForgeable();
+        if (!S.candle && S.map && S.map.pos && S.map.pos.f < MAP_FLOORS - 3) hearthLight();
+        else if (forgeable.length) startHearthPick();
+        else hearthLight();
+      }
+      else if (p === 'hearthpick') {
+        // sharpen the card that is furthest from its ceiling and biggest - a blunt but defensible proxy
+        const pool = hearthForgeable();
+        if (!pool.length) { cancelHearthPick(); }
+        else hearthForge(pool.slice().sort((a2, b2) => bigness(b2) - bigness(a2))[0].id);
       }
       // 🛤️ THE FORK. ⚠️ A NEW PHASE MUST BE TAUGHT HERE OR autoRun SILENTLY BREAKS - this
       // loop `break`s on an unknown phase and the run reports garbage. It has happened with

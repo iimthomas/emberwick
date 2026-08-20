@@ -2304,7 +2304,7 @@ function loadGame() {
     // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
     // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
     // **Any new phase that can exist without an encounter belongs in this list.**
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork'];
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -2607,7 +2607,11 @@ function pickSetout(id) {
   // 🔑 THE CRASH PRESENTED AS *"clicking on the charm doesn't do anything"* - because render()
   // does its modal bookkeeping LAST, the throw left the dialog open and the screen frozen mid-update.
   // The charm was actually taken every time; nothing on screen ever said so.
-  S.phase = (S.fork && S.fork.length) ? 'fork' : 'assign';
+  // ⚠️ THE SAME BUG TWICE IN ONE DAY: this line has to name every way a run can begin. It
+  // was written for the fork, and when the map replaced the fork it silently dropped the player
+  // onto turn 1 with no road chosen. 🔑 A HANDOFF THAT ENUMERATES DESTINATIONS IS A LINE YOU MUST
+  // REVISIT EVERY TIME YOU ADD ONE.
+  S.phase = S.map ? 'map' : ((S.fork && S.fork.length) ? 'fork' : 'assign');
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
   log(`🏕️ You set out carrying <b>${c.name}</b> — ${c.text}`, 'good');
   if (S.encounter) logChallenge();
@@ -2686,7 +2690,8 @@ function freshGame(stage) {
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
-    fork: null,             // 🛤️ the two roads on offer this turn (null outside the fork phase)
+    fork: null,             // ⚠️ dead since the map replaced it; kept so older saves load
+    map: null,              // 🗺️ the run's map - floors, edges, and where you stand
     pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
     eventAt: 1,             // 🏕️ which encounter this region's event follows
     eventDone: false,       // 🏕️ has this region's event been spent
@@ -2721,7 +2726,10 @@ function freshGame(stage) {
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
     logEntries: [], // [{header, lines:[{text, cls}]}], newest first
   };
-  scheduleRegionEvent();   // 🏕️ region 1 gets its event turn too - freshGame is a region start
+  scheduleRegionEvent();   // 🏕️ legacy: kept for the tutorial, which does not use the map
+  // 🗺️ THE MAP IS THE RUN. ⚠️ Not for the tutorial - stage 0 is deterministic by design, and
+  // a route is the one thing a scripted lesson cannot script.
+  S.map = S.tutorial ? null : generateMap();
   draw(HAND_SIZE);
   // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
   // the extra arrives now and is put back at cleanup rather than being a blind exchange.
@@ -3267,11 +3275,301 @@ function elOf(card) {
 // logging
 // ============================================================
 function logHeader(text) { S.logEntries.unshift({ header: text, lines: [] }); }
-function log(text, cls = '') { S.logEntries[0].lines.push({ text, cls }); }
+// ⚠️ NEVER THROW. log() is called from dozens of places and used to assume a header already
+// existed - which was true only because nextTurn() always wrote one first. The map opens the run
+// on a screen that is not a turn, so the first log() of a run had no entry to write into and took
+// the whole boot down with it.
+// 🔑 A LOGGING HELPER THAT CAN CRASH THE CALLER IS WORSE THAN NO LOG.
+function log(text, cls = '') {
+  if (!S.logEntries) S.logEntries = [];
+  if (!S.logEntries[0]) S.logEntries.unshift({ header: '', lines: [] });
+  S.logEntries[0].lines.push({ text, cls });
+}
 
 // ============================================================
 // turn flow
 // ============================================================
+// ============================================================
+// 🗺️ THE MAP (2026-08-18) — Slay the Spire's run layer, adapted.
+// Thomas: *"not liking this forking thing, do we just have 2 choices every time? yeah i don't
+// like that. was thinking we literally just take slay the spires map run layer."*
+//
+// 🔑 THE FORK WAS THIN BECAUSE OF NODE VARIETY, NOT BRANCHING. Three node types, two of which
+// were "play a hand", makes every choice the same choice. StS's map is interesting because it has
+// SIX kinds of room - and three of ours already existed as systems that simply fired automatically
+// (the Wheel, the Forge, and the events). **Putting a guaranteed step on the map turns it into a
+// choice**, which is this morning's event lesson applied to the shop.
+//
+// ⚠️ AND A MAP IS PILLAR-LEGAL, WHICH I FIRST GOT WRONG. [[Game_Pillars]] bans *"complete
+// optimizable data"* - but StS shows node TYPES, never CONTENTS. You see *elite, then rest*; you
+// never see which elite. That is direction, not calculation. The 🕯️ candle still owns contents.
+//
+// The algorithm (wiki + sts_map_oracle): N paths walked upward through a grid, each step moving
+// to col-1/col/col+1, with a no-crossing rule and a unique-destination rule; then room types are
+// rolled by weight and re-rolled until every constraint holds.
+// ============================================================
+// ⚠️ `let`, not `const` - these are TUNING constants and the sweep sets them (same reason
+// ATTUNE_BONUS and FORK_ENABLED are let). A const here throws inside the headless harness.
+let MAP_FLOORS = 16;          // 4 region bands of 4 - the band decides which pool a node draws from
+let MAP_COLS   = 5;           // StS uses 6; we are on a phone and the map is a dialog
+let MAP_PATHS  = 6;           // paths walked upward. More paths = wider, more connected map
+let MAP_BAND   = 4;           // floors per region band
+
+// ⚠️ WEIGHTS, and they are OURS not StS's - we have no treasure room and two "normal" types.
+// 'normal' resolves to a fight or a journey from the band's own pool, so it keeps the 50/50 the
+// encounter bag already has.
+const MAP_WEIGHTS = [
+  { type: 'normal', w: 55 },
+  { type: 'event',  w: 20 },
+  { type: 'hearth', w: 11 },   // 🕯️ rest: relight the candle
+  { type: 'elite',  w: 12 },   // 🐉 a harder creature paying more coins
+  { type: 'wheel',  w: 14 },   // 🎰 the shop, now a DETOUR rather than a guarantee
+];
+// ⚠️ THE WEIGHTS WERE TUNED AGAINST THE *BEST ROUTE*, NOT THE AVERAGE ONE, AND THAT IS THE WHOLE
+// POINT OF A MAP. Measured over 1200 maps at these weights: 🎰 3.2 on the map, **2.1 reachable by a
+// player who routes for them, 0.9 by a random walk**; 🐉 2.6 on the map, 1.8 best route, 0.7 random.
+// 🔑 THAT GAP *IS* THE DECISION. A node type whose best route and random walk are the same
+// number is decoration - you would get it anyway. Tune map content by asking *what can someone who
+// WANTS this get*, never by the average.
+// ⚠️ Today the Wheel fires 4 times a run, guaranteed. Routing hard now gets ~2, ignoring it ~1,
+// so the coin economy is knowingly loosened-then-tightened and MUST be re-measured before it is
+// called balanced. 🔑 The Wheel keeps SHARPENING on the same screen - that was a considered call
+// (*a budget decision you cannot see both sides of is two guesses*) and the map does not reopen it.
+
+// ⚠️ Floors are 0-indexed here. Constraints mirror StS's, scaled to 16 floors from 15:
+//   • nothing but a normal encounter on floor 0        (StS: floor 1 is always an easy fight)
+//   • no elite / hearth / wheel below MAP_SPECIAL_FLOOR (StS: nothing special below floor 6)
+//   • the last floor is always a 🕯️ hearth              (StS: floor 15 is always a rest)
+//   • no hearth on the floor before that                (StS: no rest on floor 14)
+//   • elite / wheel / hearth are never CONSECUTIVE along an edge
+//   • a node with 2+ exits must have all destinations distinct
+let MAP_SPECIAL_FLOOR = 4;
+// 🐉 an elite is the band's own creature, harder and richer. Untuned on purpose - it is a new
+// reward channel and the whole coin economy is being re-measured anyway.
+const ELITE_HP = 1.5, ELITE_ATK = 2, ELITE_COIN = 2.2;
+
+// ⚠️ `kind` is fight-or-journey, decided AT GENERATION so the node can advertise it. Without it
+// every ordinary node drew ⚔️ and the icon was a lie on the half of them that turned out to be
+// journeys. 🔑 A map node's whole job is to state what it is; an icon that is right 50% of the
+// time is worse than no icon, because it is trusted.
+function mapNode(f, c) { return { f, c, type: 'normal', kind: 'fight', next: [], enc: null, done: false }; }
+
+function generateMap() {
+  const floors = [];
+  for (let f = 0; f < MAP_FLOORS; f++) floors.push(new Array(MAP_COLS).fill(null));
+  const nodeAt = (f, c) => floors[f][c] || (floors[f][c] = mapNode(f, c));
+
+  // —— 1. walk the paths upward
+  // ⚠️ the first two paths must START in different columns, or the map opens on a single node
+  // and the whole first floor is a non-choice. That is StS's rule and it is load-bearing.
+  const starts = [];
+  for (let p = 0; p < MAP_PATHS; p++) {
+    let c = Math.floor(rnd() * MAP_COLS);
+    if (p === 1) { let guard = 0; while (c === starts[0] && guard++ < 30) c = Math.floor(rnd() * MAP_COLS); }
+    starts.push(c);
+    nodeAt(0, c);
+    for (let f = 0; f < MAP_FLOORS - 1; f++) {
+      const from = nodeAt(f, c);
+      // candidate columns, clamped to the grid
+      let cand = [c - 1, c, c + 1].filter(x => x >= 0 && x < MAP_COLS);
+      // 🔑 NO CROSSING EDGES. If we step right, no node to our right may already run left
+      // past us (and vice versa) - two paths swapping columns would draw an X, which reads as a
+      // connection that is not there.
+      cand = cand.filter(x => {
+        if (x === c) return true;
+        const side = x > c ? c + 1 : c - 1;
+        const sideNode = floors[f][side];
+        return !(sideNode && sideNode.next.includes(c));
+      });
+      if (!cand.length) cand = [c];
+      const nc = cand[Math.floor(rnd() * cand.length)];
+      if (!from.next.includes(nc)) from.next.push(nc);   // unique destinations, by construction
+      nodeAt(f + 1, nc);
+      c = nc;
+    }
+  }
+
+  // —— 2. assign room types
+  const pick = () => {
+    const tot = MAP_WEIGHTS.reduce((t, x) => t + x.w, 0);
+    let r = rnd() * tot;
+    for (const x of MAP_WEIGHTS) { r -= x.w; if (r <= 0) return x.type; }
+    return 'normal';
+  };
+  const parentsOf = (f, c) => f === 0 ? []
+    : floors[f - 1].filter(n => n && n.next.includes(c));
+  const SPECIAL = ['elite', 'wheel', 'hearth'];
+
+  // ⚠️ ONE PREDICATE, USED BY BOTH THE ROLL AND THE FALLBACK. The first version checked the
+  // constraints inside the retry loop but then assigned whatever the LAST roll happened to be if
+  // all 40 tries failed - so ~1500 maps in 3000 shipped consecutive specials.
+  // 🔑 A RETRY LOOP WITHOUT A LEGAL FALLBACK IS NOT A CONSTRAINT, IT IS A PREFERENCE.
+  const legal = (t, f, c) => {
+    if (!SPECIAL.includes(t)) return true;
+    if (f < MAP_SPECIAL_FLOOR) return false;                       // nothing special early
+    if (t === 'hearth' && f === MAP_FLOORS - 2) return false;       // no rest right below the fixed rest
+    return !parentsOf(f, c).some(pn => SPECIAL.includes(pn.type));  // never consecutive
+  };
+  // ⚠️ the fixed top-floor rest is assigned FIRST, so the floor below can see it and the
+  // "never consecutive" test has something to test against. Assigning it last is what let a
+  // 🐉 elite sit directly beneath the guaranteed 🕯️ hearth.
+  floors[MAP_FLOORS - 1].forEach(n => { if (n) n.type = 'hearth'; });
+  floors[0].forEach(n => { if (n) n.type = 'normal'; });             // the road starts plainly
+
+  for (let f = 1; f < MAP_FLOORS - 1; f++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = floors[f][c]; if (!n) continue;
+      // ⚠️ a special on the floor below the fixed rest would be consecutive with it
+      const touchesTop = f === MAP_FLOORS - 2 && n.next.length > 0;
+      let t = 'normal';
+      for (let tries = 0; tries < 40; tries++) {
+        const r = pick();
+        if (legal(r, f, c) && !(touchesTop && SPECIAL.includes(r))) { t = r; break; }
+      }
+      n.type = t;
+    }
+  }
+  // fight or journey, for every node that resolves to an encounter
+  for (let f = 0; f < MAP_FLOORS; f++)
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = floors[f][c];
+      if (n) n.kind = rnd() < 0.5 ? 'fight' : 'journey';
+    }
+  return { floors, pos: null, taken: [] };
+}
+
+// 🗺️ which nodes you may move to right now: floor 0 if you have not started, else the
+// current node's `next` on the floor above.
+function mapChoices(m) {
+  if (!m) return [];
+  if (!m.pos) return m.floors[0].filter(Boolean);
+  const { f, c } = m.pos;
+  if (f >= MAP_FLOORS - 1) return [];
+  const here = m.floors[f][c];
+  return (here ? here.next : []).map(x => m.floors[f + 1][x]).filter(Boolean);
+}
+
+// 🗺️ the region band a floor belongs to (1-based), so encounter pools and hardship density
+// still come from the road's own regions.
+function bandOf(f) { return Math.min(4, Math.floor(f / MAP_BAND) + 1); }
+
+const MAP_LABEL = { normal: 'the road', elite: 'a dangerous thing', event: 'a place on the road',
+                    wheel: 'the wheel', hearth: 'a hearth' };
+// ⚠️ an ordinary or elite node shows WHICH KIND it is - a fight and a journey are different
+// problems and choosing between them is most of what the map is for.
+function mapIcon(n) {
+  if (n.type === 'event')  return '✦';
+  if (n.type === 'wheel')  return '🎰';
+  if (n.type === 'hearth') return '🕯️';
+  if (n.type === 'elite')  return n.kind === 'journey' ? '🐉' : '💀';
+  return n.kind === 'journey' ? '👣' : '⚔️';
+}
+function mapTitle(n) {
+  const kind = n.kind === 'journey' ? 'a journey' : 'a fight';
+  if (n.type === 'normal') return kind;
+  if (n.type === 'elite')  return 'a dangerous ' + (n.kind === 'journey' ? 'road' : 'thing') + ' — richer, harder';
+  return MAP_LABEL[n.type];
+}
+
+// 🗺️ STEP ONTO A NODE. Everything the old fork did, plus the node types the fork never had.
+// ⚠️ Crossing a BAND boundary is what a region break used to be: the deck reshuffles and the
+// pool changes. That happens here rather than in finishRegionCheck, because the map - not a
+// counter - is the run's clock now.
+function takeMapNode(f, c) {
+  const m = S.map;
+  if (!m || S.phase !== 'map') return;
+  if (!mapChoices(m).some(n => n.f === f && n.c === c)) return;   // must be reachable from where you stand
+  const node = m.floors[f][c];
+  const newBand = bandOf(f);
+  if (newBand !== S.region) { S.region = newBand; enterBand(); }
+  m.pos = { f, c };
+  m.taken.push(f + ',' + c);
+  node.done = true;
+  S.turn++;
+  logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+  // top the hand up on every node - several events and the hearth can thin it
+  if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.divertsUsed = 0; S.diverting = false; S.loseReserve = null;
+  S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
+  S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false; S.moTarget = null;
+  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+
+  if (node.type === 'normal' || node.type === 'elite') {
+    // ⚠️ avoidType is how you STEER the bag - avoiding the other kind picks the one the node
+    // promised. If the bag has run out of that kind you get the other, which is why the icon is a
+    // promise about the PROBLEM and not a contract about the creature.
+    drawEncounter(node.kind === 'fight' ? 'journey' : 'fight', node.type === 'elite');
+    S.phase = 'assign';
+    logChallenge();
+  } else if (node.type === 'event') {
+    S.phase = 'event';
+    startEvent();
+    return;
+  } else if (node.type === 'wheel') {
+    S.encounter = null;
+    startWheel();
+    return;
+  } else if (node.type === 'hearth') {
+    S.encounter = null;
+    S.phase = 'hearth';
+    log(`🕯️ A hearth. You stop, and the wick takes light again.`, 'good');
+  }
+  render();
+}
+
+// 🗺️ a band boundary is the old region break: reshuffle everything non-trashed, keep levels.
+function enterBand() {
+  const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
+  S.deck = pool; S.hand = []; S.discard = [];
+  S.encounterQueue = [];
+  S.emberShield = false;
+  draw(HAND_SIZE);
+  log(`— you cross into region ${S.region} —`, 'result');
+}
+
+// 🕯️ THE HEARTH IS A CHOICE, NOT A GIFT: take the LIGHT, or work the COALS.
+// ⚠️ The first version only relit the candle, which made it the one node with no question in it -
+// and it broke the economy besides. The 🔧 Forge lives on the Wheel screen, so putting the Wheel on
+// the map cut SHARPENING from 4 guaranteed stops a run to 1.3. Measured: the deck reached the lair
+// at **32.3-33.7 total levels against a start of 32 and a par of 36/44/48/52** - it was arriving
+// with essentially nothing bought.
+// 🔑 StS solved this years ago and the answer was in front of me: its campfire is *Rest OR
+// Smith*. One node, two goods, and you cannot have both.
+// 🔑 It also passes the slot-③ bar that four in-turn forks have failed: **two answers that are
+// each correct in a real situation** - the light when you are walking blind into a hard stretch,
+// the level when your deck is falling behind par.
+function hearthLight() {
+  if (S.phase !== 'hearth') return;
+  S.candle = true;
+  log(`🕯️ You take the light. The wick burns steady — you can see what lies ahead.`, 'good');
+  backToMap();
+}
+function hearthForge(id) {
+  // ⚠️ 'hearthpick', NOT 'hearth' - the picker moves the phase before this is ever called, so
+  // guarding on the wrong one made every call a silent no-op. The bot then hammered it **697 times
+  // a run**, spinning in the phase until the 800-step guard aborted the run: turns fell 15 → 10,
+  // the deck arrived 6 levels lighter and the mage duel read 0%.
+  // 🔑 A GATE NAMING THE WRONG PHASE DOES NOT ERROR, IT STALLS - and a stalled bot reports the
+  // stall as a BALANCE RESULT. This is the documented RUNSIM failure mode, reached from a new
+  // direction: not an untaught phase, but a taught phase whose action refused to fire.
+  if (S.phase !== 'hearthpick') return;
+  const card = cardById(id);
+  if (!card || card.level >= MAX_LEVEL || S.downgraded.has(card.id)) return;
+  card.level++;
+  log(`🔧 You work the coals — <b>${card.def.name}</b> sharpens to Lv${card.level}.`, 'good');
+  backToMap();
+}
+// ⚠️ the hearth sharpens for FREE and deliberately so: it is the half of the choice you pay for
+// with the candle, not with coins. A hearth that charged would just be a small Wheel, and the
+// question would collapse back into *do I have money*.
+function hearthForgeable() { return S.hand.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id)); }
+// ⚠️ THE PICKER IS ON THE CARD, like every other picker in the game - never a list of names.
+function startHearthPick() { if (S.phase === 'hearth' && hearthForgeable().length) { S.phase = 'hearthpick'; render(); } }
+function cancelHearthPick() { if (S.phase === 'hearthpick') { S.phase = 'hearth'; render(); } }
+
 // 🛤️ THE FORK IN THE ROAD (2026-08-18) - spec in [[The_Fork_In_The_Road]].
 // Thomas: *"what if we did it like slay the spire with branching paths that you select where to
 // go… to give the player some agency and choice, instead of just being completely random."*
@@ -3316,7 +3614,10 @@ function takeFork(i) {
   render();
 }
 
-function drawEncounter(avoidType) {
+// 🐉 `elite` scales the drawn creature rather than needing its own table - a harder version of
+// whatever the band offers, paying more. ⚠️ CONTENT IS CLASS-BLIND: hp/init/atk/mp and coins only,
+// never an element or a pair.
+function drawEncounter(avoidType, elite) {
   const region = RUN()[S.region - 1];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
   // normal turns take the next in the shuffled bag; Divert steers toward a DIFFERENT
@@ -3326,8 +3627,17 @@ function drawEncounter(avoidType) {
     const diff = S.encounterQueue.findIndex(e => e.type !== avoidType);
     if (diff !== -1) idx = diff;
   }
-  const picked = S.encounterQueue.splice(idx, 1)[0];
+  let picked = S.encounterQueue.splice(idx, 1)[0];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  if (elite && picked) {
+    picked = Object.assign({}, picked, {
+      name: `${picked.name}, grown bold`, elite: true,
+      hp: picked.hp != null ? Math.round(picked.hp * ELITE_HP) : picked.hp,
+      mp: picked.mp != null ? Math.round(picked.mp * ELITE_HP) : picked.mp,
+      atk: picked.atk != null ? picked.atk + ELITE_ATK : picked.atk,
+      xp: Math.round((picked.xp || 0) * ELITE_COIN),
+    });
+  }
   beginEncounter(picked);
 }
 
@@ -3447,8 +3757,9 @@ function nextTurn() {
     log(`🗡️ Your combo draws you ${n} extra card${n === 1 ? '' : 's'} — what you leave unseated slides under your deck.`, 'good');
   }
   S.drawExtra = 0;
-  // 🛤️ THE FORK replaces the blind draw. ⚠️ The tutorial keeps the old single draw: stage 0
-  // is deterministic by design, and a choice is the one thing a scripted lesson cannot script.
+  // 🗺️ ON THE MAP, takeMapNode() DOES ALL OF THIS - nextTurn is only reached by the tutorial
+  // and by legacy saves, which still walk a region counter and a blind draw.
+  if (S.map && !S.finalMode) { backToMap(); return; }
   if (S.tutorial || !FORK_ENABLED) { drawEncounter(); }
   else {
     offerFork();
@@ -4457,6 +4768,9 @@ function wheelDone() {
   S.wheel = null;
   S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
+  // 🗺️ on the map the Wheel is a NODE, so leaving it returns you to the road rather than
+  // ending a turn that never had an encounter.
+  if (S.map && !S.finalMode) { S.sharpenedVisit = []; backToMap(); return; }
   doneUpgrades();   // 🛒 sharpening happened right here; there is no second screen
 }
 
@@ -4623,10 +4937,27 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
 function finishTurn() {
   // the finale runs its own beat sequencing (Approach beats → Duel), not region flow
   if (S.finalMode) { finaleAfterTurn(); return; }
-  // 🏕️ arm the event turn - it runs NEXT, as its own beat, rather than as a second
-  // screen bolted onto the encounter just resolved.
-  if (!S.eventDone && S.regionTurn >= S.eventAt) S.eventTurnPending = true;
-  finishRegionCheck();
+  backToMap();
+}
+
+// 🗺️ EVERY NODE ENDS BY RETURNING TO THE MAP. ⚠️ The old `regionTurn >= REGION_ENCOUNTERS`
+// clock is gone - the map IS the clock now, and the run ends when you step off its top floor.
+// 🔑 The `dry` check survives, because running out of cards must still end the road: the deck is
+// the health bar, and a map with floors left does not change that.
+function backToMap() {
+  const m = S.map;
+  if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
+  const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
+  const atTop = m.pos && m.pos.f >= MAP_FLOORS - 1;
+  if (atTop || dry) {
+    log(atTop ? `The road runs out. THE ${S.dragon.name.toUpperCase()} AWAITS.`
+              : `Too few cards left to go on — THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
+    S.phase = 'summary';
+    render();
+    return;
+  }
+  S.phase = 'map';
+  render();
 }
 
 function finishRegionCheck() {
@@ -5032,7 +5363,8 @@ function resolveEvent(opt, card, el) {
   S.event.step = 'done';
   render();
 }
-function eventContinue() { S.event = null; finishRegionCheck(); }
+// 🗺️ an event is a NODE now, so it hands you back to the road.
+function eventContinue() { S.event = null; if (S.map && !S.finalMode) { backToMap(); return; } finishRegionCheck(); }
 
 // ============================================================
 // rendering
@@ -5343,7 +5675,7 @@ const isShell = () => SHELL_PHASES.includes(S && S.phase);
 // you stop and make, rather than something you do to the cards in front of you.
 // ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
 // would be a dialog about the thing it was covering.
-const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary'];
+const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
 // 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
@@ -5355,10 +5687,11 @@ function applyModal() {
   const panel = $('modal-panel'), ctrl = $('controls-panel');
   if (!panel || !ctrl) return;
   if (!isModalPhase()) {
-    if (document.body.classList.contains('modal-open')) {
-      document.body.classList.remove('modal-open');
-      panel.innerHTML = '';
-    }
+    // ⚠️ ALWAYS CLEAR, not only when the class was still set. Guarding the clear behind the
+    // class meant a second render left the old dialog's markup sitting in a hidden layer - invisible
+    // to a player, but it makes every DOM assertion read the PREVIOUS screen.
+    document.body.classList.remove('modal-open');
+    if (panel.innerHTML) panel.innerHTML = '';
     return;
   }
   document.body.classList.add('modal-open');
@@ -5680,8 +6013,73 @@ function forkBranchHTML(e, i) {
     `<span class="fork-stats">${known}</span>${extra}</button>`;
 }
 
+// 🗺️ THE MAP, DRAWN AS FLOORS FROM THE TOP DOWN - the dragon is up there, so the map reads
+// upward the way the run does. ⚠️ Node TYPES only, never contents: that is what keeps a map on the
+// legal side of *"hints and direction, not complete optimizable data"*, and it is why the 🕯️ candle
+// still matters - it tells you what is INSIDE the step you are about to take.
+function mapHTML() {
+  const m = S.map; if (!m) return '';
+  const reach = mapChoices(m).map(n => n.f + ',' + n.c);
+  const rows = [];
+  for (let f = MAP_FLOORS - 1; f >= 0; f--) {
+    const band = bandOf(f);
+    const cells = [];
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = m.floors[f][c];
+      if (!n) { cells.push('<span class="mp-gap"></span>'); continue; }
+      const key = f + ',' + c;
+      const here = m.pos && m.pos.f === f && m.pos.c === c;
+      const can = reach.includes(key);
+      const past = m.taken.includes(key);
+      const cls = 'mp-node' + (here ? ' is-here' : '') + (can ? ' is-open' : '') + (past ? ' is-past' : '');
+      cells.push(can
+        ? `<button class="${cls}" onclick="takeMapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
+        : `<span class="${cls}" title="${mapTitle(n)}">${mapIcon(n)}</span>`);
+    }
+    rows.push(`<div class="mp-row${f % MAP_BAND === 0 ? ' mp-band' : ''}">` +
+      `<span class="mp-f">${f === MAP_FLOORS - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
+  }
+  return `<div class="mp">${rows.join('')}</div>`;
+}
+
 function renderControls() {
   const c = $('controls-panel');
+  if (S.phase === 'map') {
+    const opts = mapChoices(S.map);
+    c.innerHTML =
+      `<div class="phase-label">🗺️ THE ROAD TO ${S.dragon.name.toUpperCase()}</div>` +
+      `<div class="hint">${S.map && S.map.pos ? 'Choose where to go next.' : 'Choose where to begin.'} ` +
+      (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
+                : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
+      `</div>` + mapHTML() +
+      `<div class="mp-legend">⚔️ fight · 👣 journey · 💀🐉 dangerous · ✦ a place · 🎰 the wheel · 🕯️ a hearth</div>` +
+      (opts.length ? '' : `<div class="hint">No road left — the lair is ahead.</div>`);
+    return;
+  }
+  if (S.phase === 'hearth') {
+    const forgeable = hearthForgeable();
+    c.innerHTML =
+      `<div class="phase-label">🕯️ A HEARTH</div>` +
+      `<div class="event-flavor">Someone kept this fire and moved on. The coals are still warm — warm enough ` +
+      `to take a wick from, or to work a blade in. Not both; they will be grey by morning.</div>` +
+      `<div class="event-opts">` +
+      `<button onclick="hearthLight()">🕯️ <b>Take the light</b>` +
+        `<span class="opt-why">${S.candle ? 'your candle is already lit — this does nothing for you'
+          : 'see what waits at each step until it gutters'}</span></button>` +
+      `<button ${forgeable.length ? '' : 'disabled '}onclick="${forgeable.length ? 'startHearthPick()' : ''}">` +
+        `🔧 <b>Work the coals</b>` +
+        `<span class="opt-why">${forgeable.length ? 'sharpen one card a level, free'
+          : 'nothing in hand can be sharpened'}</span></button>` +
+      `</div>`;
+    return;
+  }
+  if (S.phase === 'hearthpick') {
+    c.innerHTML =
+      `<div class="phase-label">🔧 WORK THE COALS</div>` +
+      `<div class="hint">Tap a card to sharpen it a level. ⚠️ The candle stays as it is.</div>` +
+      `<button onclick="cancelHearthPick()">← back to the hearth</button>`;
+    return;
+  }
   if (S.phase === 'fork') {
     const f = S.fork || [];
     c.innerHTML =
@@ -6474,6 +6872,14 @@ function cardHTML(card) {
     } else {
       action = `<div class="card-action muted">stays in hand</div>`;
     }
+  } else if (S.phase === 'hearthpick') {
+    // 🔧 the hearth's forge. ⚠️ Same rule as every picker here: it lives ON the card, and a
+    // card that cannot take it stays VISIBLE and says why.
+    const can = card.level < MAX_LEVEL && !wasDowngraded;
+    action = can
+      ? `<div class="card-action"><button class="primary" onclick="hearthForge(${card.id})">` +
+        `🔧 Sharpen → Lv${card.level + 1}</button></div>`
+      : `<div class="card-action muted">${card.level >= MAX_LEVEL ? 'already at Lv' + MAX_LEVEL : 'softened this turn'}</div>`;
   } else if (S.phase === 'soak') {
     if (!wasDowngraded) {
       const soak = soakValue(card);
