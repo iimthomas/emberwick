@@ -3454,7 +3454,8 @@ let MAP_STARTS = 3;             // 🗺️ roads leaving the gate, always this m
 // the elites, and have better rewards for going against an elite node"*).
 // ⚠️ At ×1.5 HP and +2 atk it was a slightly bigger creature - a detour with no dread in it.
 // The reward is the 💀 BOON below, so the danger has to justify a real prize.
-const ELITE_HP = 2.0, ELITE_ATK = 4, ELITE_COIN = 2.5;
+// ⚠️ `let` - tuning constants, and the sweep sets them (a const throws in the harness).
+let ELITE_HP = 2.0, ELITE_ATK = 4, ELITE_COIN = 2.5;
 // 🐉 one place that makes an elite, so the map's preview and the fight itself cannot disagree.
 function eliteVersion(e) {
   if (!e) return e;
