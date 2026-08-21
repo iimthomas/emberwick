@@ -860,6 +860,15 @@ const MAGE = {
   // give every class a gift; it spends the only room each class had.
   // So: flag it, and gate every consumer. A rogue's ③ is its own (extend the chain, or cycle).
   emberwake: true,
+  // 🎭 THE PASSIVE TRAIT (2026-08-18). Thomas: *"lets give them a passive trait, just so
+  // players can see what they do at a glance on the character select screen."*
+  // 🔑 A CLASS IS ITS SLOT-③ FORK, AND UNTIL NOW THE ONLY PLACE THAT WAS STATED WAS INSIDE A
+  // RUN. [[Class_System]] says a class is *what unlocks a card's big value*; the picker was
+  // describing flavour instead. The trait is that fork, named, on the screen where you choose.
+  // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
+  // cannot drift from the game as long as it is written from the code.
+  trait: { icon: '🔥', name: 'Emberwake',
+    text: 'Bank your Surge instead of spending it. Next turn it fires at its <b>full worth</b>, aimed at your <b>strike</b> or your <b>speed</b> — so a turn already won or lost is never wasted.' },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
@@ -1310,6 +1319,9 @@ const ROGUE = {
   boosts: false,           // ➕ no Surge stat either
   energy: true,            // ⚡ the Strike costs, slot ③ pays
   momentum: true,          // ● the untouched streak — earned by taking nothing, lost by taking anything
+  trait: { icon: '●', name: 'Momentum',
+    text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
+      '. Each pip adds <b>+1 to your Strike</b>. Take any damage and the whole streak breaks.' },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
@@ -7015,13 +7027,22 @@ function renderControls() {
       (() => {
         if (!classUnlocked('rogue')) return '';
         const picked = pickedClassId();
-        const row = (id, name, line) =>
-          `<button class="class-pick${picked === id ? ' on' : ''}" onclick="pickClass('${id}')">` +
-          `<b>${name}</b><span class="class-line">${line}</span></button>`;
+        // ⚠️ THE ROGUE'S OLD LINE WAS FALSE: *"strikes chain — many small ones"*. Her compose()
+        // returns `hits: 1` - she lands ONE blow exactly like the mage. That text is left over from
+        // when she was planned as a multi-hit class, and it promised the one thing she cannot do.
+        // 🔑 A CLASS DESCRIPTION IS A PROMISE ABOUT THE RULES; this one would have sold a player
+        // the answer to 🧱 Guard, which is precisely what she does not have.
+        const row = (id, name, line) => {
+          const cls = CLASSES[id], t = cls && cls.trait;
+          return `<button class="class-pick${picked === id ? ' on' : ''}" onclick="pickClass('${id}')">` +
+            `<b>${name}</b><span class="class-line">${line}</span>` +
+            (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> — ${t.text}</span>` : '') +
+            `</button>`;
+        };
         return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
           `<div class="class-row">` +
-          row('mage', '✦ The Mage', 'elements agree — one big blow') +
-          row('rogue', '🗡️ The Rogue', 'strikes chain — many small ones') +
+          row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
+          row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
           `</div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing

@@ -1205,6 +1205,11 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 .mend-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 .mend-row .card { width: calc(50% - 4px); min-width: 0; }
 
+/* 🎭 the class's signature fork, named on the screen where you choose */
+.class-trait { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid #453a2c;
+  font-size: .82em; line-height: 1.35; color: #c3b79f; }
+.class-trait b { color: #f0d9a8; }
+
 /* 🗺️ the one detail line, and the ring on the node it is describing */
 .mp-detail { min-height: 2.6em; font-size: .84em; color: #c9bda6; padding: 6px 8px; margin-top: 4px;
   border-left: 2px solid #6a5a41; background: rgba(0,0,0,.18); border-radius: 0 6px 6px 0; }
