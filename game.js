@@ -1097,7 +1097,14 @@ const ROGUE_SPEC = [
   // 🔑 So 💨 Initiative may sit a *little* above the mage's — that is what the thin armour buys.
   // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
   { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'draw' },
-  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [4, 2, 1], paid: 4, verb: 'fangs'   },
+  // 🎯 SECOND FANG STRIKES TWICE - the name was describing a mechanic the card did not have.
+  // ⚠️ MULTI-HIT IS LATERAL, NEVER MORE DAMAGE: the total is DIVIDED between the blows
+  // (`perHit = floor(value / hits)`), so two hits is the same damage delivered differently.
+  // 🔑 AND THAT IS WHAT MAKES IT A TRADE - 🧱 Guard eats the first N hits, so splitting means less
+  // of your damage is eaten; 🛡️ Armour subtracts PER HIT, so splitting means it comes off twice.
+  // **Better into a pool, worse into a wall.** The two shapes are opposites, and this is the first
+  // card in the game that has to choose between them.
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [4, 2, 1], paid: 4, verb: 'fangs', hits: 2 },
   { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [4, 5, 2], paid: 3, verb: 'pierce' },
   { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [5, 2, 0], paid: 4, verb: 'lethal'  },
   { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'cycle2' },
@@ -1189,7 +1196,7 @@ const ROGUE_DEFS = ROGUE_SPEC.map(s => {
     return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
   });
   return { name: s.name, element: null, arch: null, pair: s.pair, role: s.role,
-           combo: s.combo, energy: s.energy, paid: s.paid, verb: s.verb, lv };
+           combo: s.combo, energy: s.energy, paid: s.paid, verb: s.verb, hits: s.hits || 1, lv };
 });
 
 // ② the pair sits in the COMBO slot — the whole condition, on the table, checkable at a glance.
@@ -1346,9 +1353,15 @@ const ROGUE = {
     // 🔑 PAID IN FULL BUYS THE BIG NUMBER. Short, you still swing — a card that cannot be played
     // is the harshest thing a four-card hand can hold, so underpaying costs power, never the turn.
     const dmg = (m.full ? st.attuned : st.value);
-    // 🎯 hits: the 🧱 GUARD answer, and now reachable ONLY through 🎯-granting effects rather than
-    // by spending ● — the momentum spend that used to buy it was dead in every real encounter.
-    const hits = 1;
+    // 🎯 hits: the 🧱 GUARD ANSWER, AND IT IS HERS AGAIN (2026-08-18).
+    // ⚠️ This read `const hits = 1;` under a comment promising hits were *"reachable only through
+    // 🎯-granting effects"* - and no such effect existed anywhere. The rogue could never land more
+    // than one blow, while the MAGE quietly owned the only multi-hit card in the game
+    // (Sparkstrike ×2). 🔑 The class Guard was designed to EXCLUDE could engage with it; the class
+    // it was built FOR could not. Thomas found it on meeting his first Guard creature:
+    // *"how do i do multiple hits as rogue?"*
+    // 🔑 A COMMENT THAT DESCRIBES A SYSTEM IS NOT THE SYSTEM - same fault as `defs: null`.
+    const hits = strike.def.hits || 1;   // ⚠️ her card is `strike`, not `spell`
     return {
       value: Math.max(0, dmg + (duelFx().value || 0)
         + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
@@ -7493,14 +7506,22 @@ function cardHTML(card) {
   // commit removes its display" exists to prevent. The rogue was showing a second number for a
   // mechanic it does not have, which is worse than a missing number: it invites a wrong theory.
   // A rogue card instead prints the one word that decides its whole turn.
-  const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
+  // 🎯 A CARD THAT STRIKES TWICE HAS TO SAY SO. Sparkstrike has landed two blows since it was
+  // written and its face never mentioned it - a rule the card does not print, the same fault as the
+  // archetype-gated charms.
+  // ⚠️ Printed PER-HIT × COUNT, not total × count. The total is SPLIT, so "23×2" would promise
+  // 46; "11×2" is what actually lands - and it is the number that matters against 🛡️ Armour,
+  // because armour comes off each blow separately.
+  const nHits = d.hits || 1;
+  const per = n => nHits > 1 ? `${Math.floor(n / nHits)}<span class="v-x">×${nHits}</span>` : `${n}`;
+  const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
     (CLASS.pairs
-      ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span>`
+      ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${per(attV)}</span>`
       // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
       // damage" - the same borrowed-vocabulary fault as the reveal printing "unattuned" at her.
       // 🔑 ◆ is the DAMAGE you get once the energy is paid — a different kind of number from
       // ⚡ itself, so it keeps its own mark. ✦ is the mage's again.
-      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">◆${v.attuned}</span>` : '')) +
+      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">◆${per(v.attuned)}</span>` : '')) +
     `</div>`;
 
   const slot = zoneOf(card.id);

@@ -1205,6 +1205,9 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 .mend-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 .mend-row .card { width: calc(50% - 4px); min-width: 0; }
 
+/* 🎯 a card that strikes more than once says so, right on the number */
+.v-x { font-size: .78em; color: #e8cd93; margin-left: 1px; }
+
 /* 🎭 the class's signature fork, named on the screen where you choose */
 .class-trait { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid #453a2c;
   font-size: .82em; line-height: 1.35; color: #c3b79f; }
