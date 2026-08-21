@@ -2822,7 +2822,11 @@ function freshGame(stage) {
   // 🗺️ THE MAP IS THE RUN. ⚠️ Not for the tutorial - stage 0 is deterministic by design, and
   // a route is the one thing a scripted lesson cannot script.
   S.map = S.tutorial ? null : generateMap();
-  draw(HAND_SIZE);
+  // ⚠️ ON A MAP RUN THE FIRST HAND IS DEALT WHEN YOU SET OFF, NOT BEFORE. This is the exact case
+  // Thomas hit: *"i just started a new game, i see my whole hand, and i see all 3 encounters."*
+  // Turn 1 is the one route you take with NO Arsenal, so it is the purest version of the choice -
+  // you pick a road knowing only the road.
+  if (!S.map) draw(HAND_SIZE);
   // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
   // the extra arrives now and is put back at cleanup rather than being a blind exchange.
   // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
@@ -5036,9 +5040,18 @@ function wheelDone() {
   S.wheel = null;
   S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
-  // 🗺️ on the map the Wheel is a NODE, so leaving it returns you to the road rather than
-  // ending a turn that never had an encounter.
-  if (S.map && !S.finalMode) { S.sharpenedVisit = []; backToMap(); return; }
+  // 🐛 THIS BRANCH SKIPPED CLEANUP ENTIRELY AND SHIPPED FOR SIX BUILDS (fixed 2026-08-18).
+  // It read: `if (S.map) { backToMap(); return; }` - written when the Wheel was briefly a map NODE
+  // that ended a turn which never had an encounter. The node was cut the same day; the shortcut was
+  // not, and it bypassed doneUpgrades() -> endTurn(), which IS cleanup.
+  // ⚠️ CONSEQUENCE: on every map turn the Spell was never spent, the Catalyst and Surge never slid
+  // under the deck, and **THE HAND NEVER CHANGED BETWEEN ENCOUNTERS.** Measured after the fact:
+  // `endTurn` fired **0 times across 5 encounters**, and the deck lost one card in total - to a
+  // Time Penalty, not to play. Thomas found it from the outside: *"i see my whole hand"* - the hand
+  // was full because it was the SAME hand.
+  // 🔑 A SHORTCUT ADDED FOR A FEATURE MUST BE REMOVED WITH THAT FEATURE. Cutting the wheel node
+  // left a return path that quietly deleted the most important step in the turn.
+  // ⚠️ And every map measurement taken before this is suspect - they were played with a static hand.
   doneUpgrades();   // 🛒 sharpening happened right here; there is no second screen
 }
 
@@ -5180,13 +5193,27 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
   const down = returning.filter(c => !up.includes(c));
   if (up.length) S.deck.unshift(...up);
   if (down.length) S.deck.push(...down);
+  // 🗺️ THE HAND IS DEALT AFTER YOU CHOOSE THE ROAD, NOT BEFORE (2026-08-18).
+  // Thomas: *"i see my whole hand, and i see all 3 encounters and what they do. doesn't seem right
+  // that i have knowledge of my whole hand before picking an encounter."*
+  // 🔑 HE IS RIGHT AND IT WAS THE PILLAR AGAIN. Knowing your whole hand AND every road's contents
+  // makes routing a solved matching problem - *complete optimizable data*, the thing
+  // [[Game_Pillars]] forbids. Measured: **92% of map screens showed a full four-card hand.**
+  // ✅ AND IT IS THE BIGGEST JOB THE ✦ ARSENAL HAS EVER HAD. The card you carry is now the ONLY
+  // thing you know about yourself when you choose where to go - *what am I bringing into a decision
+  // I have not made yet*. [[The_Arsenal_Question]] records three failed attempts to make that slot
+  // matter from the inside; this makes it matter from the OUTSIDE, which is where forks have
+  // actually worked here.
+  // ⚠️ Only when a map is driving the run - the tutorial and the finale still deal at cleanup.
+  const holdDraw = !!S.map && !S.finalMode;
   const before = S.hand.length;
-  draw(HAND_SIZE - S.hand.length);
+  if (!holdDraw) draw(HAND_SIZE - S.hand.length);
   log(`Cleanup: ${spentCount} spent on the spell — gone. ` +
       (returning.length ? `${returning.map(c => displayName(c)).join(', ')} slide under the deck` +
         `${ordered && returning.length > 1 ? ' in your order' : ''}. ` : '') +
       (kept ? `Your Arsenal ${displayName(kept)} stays in hand. ` : '') +
-      `Drew ${S.hand.length - before} (deck ${S.deck.length}, discard ${S.discard.length})`);
+      (holdDraw ? `You will draw the rest once you have chosen your road.`
+                : `Drew ${S.hand.length - before} (deck ${S.deck.length}, discard ${S.discard.length})`));
 
   // Poison lands on the freshly drawn hand, before the next encounter
   if (S.poison > 0 && S.hand.length > 0) {
@@ -6342,6 +6369,8 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">🗺️ THE ROAD TO ${S.dragon.name.toUpperCase()}</div>` +
       `<div class="hint">${S.map && S.map.pos ? 'Choose where to go next.' : 'Choose where to begin.'} ` +
+      `<b>You are carrying ${S.hand.length === 0 ? 'nothing' :
+        S.hand.map(c => displayName(c)).join(', ')}</b> — the rest of your hand is dealt once you set off. ` +
       (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
                 : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
       `</div>` + mapHTML() +
