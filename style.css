@@ -1203,6 +1203,9 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 .mp-peek b { color: #f0dcb2; }
 .mp-dem { color: #e8cd93; }
 
+/* 🧪 the one place a potion's DURATION is stated - the cards themselves say what they do */
+.kit-lab { width: 100%; font-size: .78em; color: #b3a68f; margin: 0 0 4px; }
+
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }

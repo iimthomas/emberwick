@@ -3178,6 +3178,12 @@ function expireContract() {
   log(`📜 <b>${c.name}</b> lapses unkept — ${S.contract.n} of ${c.need}. The coin is gone.`, 'bad');
   S.contract = null;
 }
+// ⚠️ EVERY POTION SAYS "WHEN USED", NEVER "THIS TURN" (2026-08-18). Thomas: *"for potion, it
+// should be more clear, instead of saying, this turn, should say when used."*
+// 🔑 "This turn" reads as something ALREADY HAPPENING - passive, like a hardship. A potion is
+// something you SPEND, on a turn you pick, and the text has to say so at the moment you are
+// deciding whether to buy it. The duration is a property of every potion, so it is stated once on
+// the carry chip rather than seventeen times in the shop.
 const POTIONS = [
   // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
   // fill up these things as well"*). Cheap, small, and correct about one turn in five.
@@ -3190,41 +3196,41 @@ const POTIONS = [
   // would otherwise have lost by one or two points. A potion that can never be right is litter,
   // and litter in a shop is worse than an empty shelf.
   { id: 'chalkwater', name: 'Chalkwater', cost: 2, rarity: 'common',
-    text: '💨 <b>+2 Initiative</b> this turn' },
+    text: '💨 <b>+2 Initiative</b> when used' },
   { id: 'broth',    name: 'Thin Broth',   cost: 2, rarity: 'common',
-    text: '⚔️ <b>+2</b> to your action this turn' },
+    text: '⚔️ <b>+2</b> to your action when used' },
   { id: 'grit',     name: 'Grit',         cost: 2, rarity: 'common',
-    text: '🛡️ every card <b>soaks +1</b> this turn' },
+    text: '🛡️ every card <b>soaks +1</b> when used' },
   { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common',
-    text: '➕ your <b>Surge gives +3</b> more this turn' },
+    text: '➕ your <b>Surge gives +3</b> more when used' },
   { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
-    text: '🌙 <b>+3 Pace</b> against the dark this turn' },
+    text: '🌙 <b>+3 Pace</b> against the dark when used' },
   { id: 'tallow',   name: 'Tallow Stub',  cost: 3, rarity: 'common',
-    text: '🕯️ your candle <b>cannot be snuffed</b> this turn' },
+    text: '🕯️ your candle <b>cannot be snuffed</b> when used' },
   // ---- generic: every class inherits these unchanged ----
   { id: 'haste',   name: 'Draught of Haste', cost: 6, rarity: 'common',
-    text: '💨 <b>+5 Initiative</b> this turn' },
+    text: '💨 <b>+5 Initiative</b> when used' },
   { id: 'ember',   name: 'Emberdraught',     cost: 7, rarity: 'common',
-    text: '⚔️ <b>+6</b> to your action this turn' },
+    text: '⚔️ <b>+6</b> to your action when used' },
   { id: 'ironskin',name: 'Ironskin Tonic',   cost: 6, rarity: 'common',
-    text: '🛡️ every card <b>soaks +3</b> this turn' },
+    text: '🛡️ every card <b>soaks +3</b> when used' },
   { id: 'clarity', name: 'Draught of Clarity', cost: 5, rarity: 'uncommon',
     text: '🕯️ <b>relight your candle</b> — see the road ahead again' },
   { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
     text: '✨ <b>restore a card a level</b> — undo what the road took',
     can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
   { id: 'nightglass', name: 'Nightglass', cost: 6, rarity: 'common',
-    text: '🌙 the dark <b>cannot catch you</b> this journey' },
+    text: '🌙 the dark <b>cannot catch you</b> — for the whole journey' },
   { id: 'breath',  name: 'Second Breath',  cost: 10, rarity: 'rare',
-    text: '✦ your <b>Spell is not spent</b> this turn' },
+    text: '✦ your <b>Spell is not spent</b> when used' },
   { id: 'quench',  name: 'Quenching Draught', cost: 11, rarity: 'rare',
-    text: "🛡️ the enemy's <b>defence does nothing</b> this turn" },
+    text: "🛡️ the enemy's <b>defence does nothing</b> when used" },
   { id: 'gravewax', name: 'Grave Wax',     cost: 8, rarity: 'uncommon',
     when: () => (S.trashed || []).length > 0,
     text: '✨ the last card you <b>lost returns</b>, at Lv1' },
   // ---- mage: it names an ELEMENT, which is the mage's suit ----
   { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', cls: 'mage', pick: true,
-    text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
+    text: "✦ one card's <b>element becomes your Spell's</b>",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
   // ---- 🗺️ ONE POTION PER LAND (2026-08-10). Each is the single-turn answer to the thing its
@@ -3233,15 +3239,15 @@ const POTIONS = [
   // ⚠️ And they are CONSUMED, which is why they do not break *lateral power, not vertical* —
   // a potion buys ONE turn where the arrangement you wanted is legal.
   { id: 'skyglass',  name: 'Skyglass',   tier: 2, cost: 5, rarity: 'uncommon',
-    text: '🌀 Your blow <b>cannot be halved</b> this turn' },
+    text: '🌀 Your blow <b>cannot be halved</b> when used' },
   { id: 'stillwater', name: 'Stillwater', tier: 3, cost: 6, rarity: 'uncommon',
-    text: '🛡️ Nothing <b>strikes back</b> at you this turn' },
+    text: '🛡️ Nothing <b>strikes back</b> at you when used' },
   { id: 'hardtack',  name: 'Hardtack',   tier: 3, cost: 2, rarity: 'common',
-    text: '⏳ Any <b>Time Penalty is 1 less</b> this turn' },
+    text: '⏳ Any <b>Time Penalty is 1 less</b> when used' },
   { id: 'deepcurrent', name: 'Deepcurrent', tier: 4, cost: 9, rarity: 'rare',
-    text: '💨 You <b>win Initiative</b> this turn, whatever it is' },
+    text: '💨 You <b>win Initiative</b>, whatever it is' },
   { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', cls: 'mage',
-    text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
+    text: '✦ your <b>Catalyst stays in hand</b> instead of going under the deck' },
 ];
 // 🔓 CHARM TIERS — a STAND-IN for meta-progression (2026-08-05, Thomas: *"since we will have
 // meta progression to unlock better ones, maybe we can simulate it for now — you'll only have
@@ -6552,8 +6558,18 @@ function renderControls() {
     // 🧪 YOUR KIT. Potions are useless if you forget you have them, so they sit ON the turn
     // screen with their full text, not behind a menu.
     const kit = (S.potions || []).map(id => potionById(id)).filter(Boolean);
+    // ⚠️ THREE POTIONS DROPPED THE PHRASE ENTIRELY rather than take it mid-sentence: *"You win
+// Initiative WHEN USED, whatever it is"* and *"your Catalyst stays in hand WHEN USED instead of
+// going under the deck"* both read worse than what they replaced. 🔑 A CLARIFICATION THAT HAS TO
+// BE WEDGED INTO THE MIDDLE OF A SENTENCE IS NOT CLARIFYING IT - the kit line below carries the
+// rule for all of them, so a text that reads cleanly without it simply goes without.
+// ⚠️ THE DURATION IS STATED HERE, ONCE. Every potion lasts exactly the turn you drink it,
+    // so repeating that on all seventeen of them is noise in a shop - the card text says WHAT it
+    // does and that you choose when; this line says how long it lasts.
     const potionRow = kit.length
-      ? `<div class="kit-row">` + kit.map((p, i) =>
+      ? `<div class="kit-row"><div class="kit-lab">🧪 Your kit — tap one to drink it. ` +
+        `<span class="dim">Each is one use, and lasts only the turn you drink it.</span></div>` +
+        kit.map((p, i) =>
           `<button class="kit-potion${S.potionPick === p.id ? ' arming' : ''}" onclick="usePotion('${p.id}')">` +
           `<b>🧪 ${p.name}</b><span class="kit-text">${p.text}</span></button>`).join('') +
         (S.potionPick ? `<div class="kit-ask">Tap a card to use the <b>${potionById(S.potionPick).name}</b> on it — ` +
