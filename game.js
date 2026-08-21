@@ -1146,7 +1146,21 @@ const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST fo
 // somewhere. Thomas: *"it should probably just add to attack instead. and we should probaby lower
 // attack across the board because of it."* The streak runs 0-5 and averages ~1.3, so the card
 // table gives back roughly what the meter now supplies.
-const SPIKE_STEP = { value: 4, init: 1, armor: 1 };
+// ⚠️ value 4 → 3 (2026-08-18). Thomas, after playing: *"rogue attack numbers are higher than
+// mages… was able to get crazy attack numbers right off the bat with rogue and a few upgrades."*
+// 🔑 MEASURED, AND MY FIRST TEST SAID THE OPPOSITE BECAUSE IT WAS THE WRONG TEST. With every card
+// at one level the mage LOOKS ahead at Lv4 (18.4 vs 16.1) - because an all-Lv4 rogue deck gives
+// ⚡0 energy and cannot pay for itself. **Nobody plays a uniform deck.** Re-run against a real one
+// (all Lv2, a few cards pushed to Lv4) and the rogue led by **+3 at every level of investment** and
+// hit 20+ roughly **twice as often**.
+// 🔑 THE MECHANISM: HER SHARPENING IS MULTIPLICATIVE WITH HER UNSHARPENED CARDS. A low-level card
+// is excellent fuel, so upgrading a few blades buys the payload while the rest of the deck still
+// pays for it. The mage's attune bonus is level+1 - linear, no synergy.
+// Growth Lv1→Lv4, averaged over the deck: mage **+4.4**, rogue **+11.5**; her four blades **+18
+// each**. A blade gained +6 a level against the mage's best card at +3 - exactly double.
+// Swept on the realistic-deck test: value 4 → gap +3.2 · **value 3 → gap +0.9** · value 2 → −1.1.
+// ✅ PAID_STEP stays at 2 - the wider paid gap was asked for and is not the thing that was wrong.
+const SPIKE_STEP = { value: 3, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
   const step = SPIKE_STEP[s.spike];
