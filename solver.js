@@ -124,6 +124,18 @@ const SOLVER = (() => {
           if (tinder && tinder === spark) continue;
           for (const ember of opts) {
             if (ember && (ember === spark || ember === tinder)) continue;
+            // ⚠️ EVERY SLOT THE HAND CAN FILL MUST BE FILLED (2026-08-18). `normalizeAssign()`
+            // seats every hand card left-to-right, so a PLAYER with four cards always has all four
+            // slots occupied - they cannot decline to carry an ✦ Arsenal. The bot writes S.assign
+            // directly and was simply omitting it: **an empty Arsenal on 100% of turns.**
+            // 🔑 SO EVERY RULE THAT READS THE ARSENAL HAS BEEN MEASURED AS FREE - ⛰️ Steep (which
+            // adds what it would have given), 🌙 Nightfall, ❄️ Freeze, 🌊 Riptide and 🐉 Rockbind
+            // all take or read a card the bot never held. Thomas found it by asking why Steep only
+            // added 2; the honest answer was that in every measurement it added nothing at all.
+            // 🔑 A BOT THAT CAN DECLINE A RULE THE PLAYER CANNOT DECLINE IS NOT PLAYING THE GAME.
+            // Fourth instrument blind spot of the day, and the same shape as the placement bans:
+            // the UI enforced something the search never saw.
+            if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
             for (const bt of boostTargets) {
               S.assign = {
                 Spell: spell.id,
@@ -364,6 +376,8 @@ const RUNSIM = (() => {
         for (const ember of opts) {
           if (ember && (ember === spark || ember === tinder)) continue;
           if (!ok(ember, 'Reserve')) continue;
+          // ⚠️ see chooseBestOnce - a player cannot leave a slot empty while holding a card
+          if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
           S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                        Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
           const r = computeAction(ember); if (!r) continue;
@@ -407,6 +421,9 @@ const RUNSIM = (() => {
       (best[b2.f + ',' + b2.c] || 0) - (best[a2.f + ',' + a2.c] || 0))[0];
   }
 
+  // ⚠️ how many of the four slots this arrangement actually fills
+  function arranged(a, b, c, d) { return [a, b, c, d].filter(Boolean).length; }
+
   function chooseBestOnce() {
     // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
@@ -447,6 +464,10 @@ const RUNSIM = (() => {
         for (const ember of opts) {
           if (ember && (ember === spark || ember === tinder)) continue;
           if (!ok(ember, 'Reserve')) continue;
+          // ⚠️ see chooseBestOnce - a player cannot leave a slot empty while holding a card.
+          // 🔑 THIS IS THE THIRD COPY OF THE SEARCH. The placement bans needed patching twice for
+          // exactly this reason; if a fourth is ever wanted, extract it instead.
+          if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
           for (const bt of bts) {
             S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                          Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
