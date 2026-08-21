@@ -1205,6 +1205,11 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 .mend-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 .mend-row .card { width: calc(50% - 4px); min-width: 0; }
 
+/* 🗺️ the one detail line, and the ring on the node it is describing */
+.mp-detail { min-height: 2.6em; font-size: .84em; color: #c9bda6; padding: 6px 8px; margin-top: 4px;
+  border-left: 2px solid #6a5a41; background: rgba(0,0,0,.18); border-radius: 0 6px 6px 0; }
+.mp-node.is-peek { box-shadow: 0 0 0 2px rgba(232,205,147,.55); }
+
 /* 🕯️ what a lit candle shows about the roads you can take right now */
 .mp-peek { font-size: .82em; color: #c9bda6; padding: 4px 6px; border-left: 2px solid #6a5a41; margin: 4px 0; }
 .mp-peek b { color: #f0dcb2; }

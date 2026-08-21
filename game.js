@@ -2824,6 +2824,7 @@ function freshGame(stage) {
     defeatMsg: null,
     fork: null,             // ⚠️ dead since the map replaced it; kept so older saves load
     map: null,              // 🗺️ the run's map - floors, edges, and where you stand
+    mapPeek: null,          // 🗺️ the node being looked at (hover, or first tap on touch)
     boon: null,             // 💀 three charms offered for a clean elite kill
     boonOwed: false,        // 💀 an elite was beaten; pay it at the next map return
     pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
@@ -3708,6 +3709,30 @@ function mapTitle(n) {
 // because it is declared later IT WINS. My calls silently invoked the old one, which ignores its
 // argument, so every road on the map reported the SAME creature. 🔑 A second function with the
 // same name does not error; it just quietly replaces the first.
+// 🗺️ which node the pointer (or the first tap) is on
+function isPeeked(f, c) { return !!(S.mapPeek && S.mapPeek.f === f && S.mapPeek.c === c); }
+
+// ⚠️ Writes the detail line DIRECTLY rather than calling render(). A full render rebuilds the map
+// and re-measures every edge, which would flicker the whole panel on every mouse move.
+function peekNode(f, c) {
+  S.mapPeek = (f == null) ? null : { f, c };
+  const el = document.getElementById('mp-detail');
+  if (el) el.innerHTML = peekHTML();
+  document.querySelectorAll('#modal-panel .mp-node').forEach(n =>
+    n.classList.toggle('is-peek', isPeeked(+n.dataset.f, +n.dataset.c)));
+}
+
+function peekHTML() {
+  const m = S.map; if (!m) return '';
+  const p = S.mapPeek;
+  if (!p) return `<span class="dim">${HAS_HOVER ? 'Point at a road to see what is on it.'
+    : 'Tap a road to look at it, tap again to take it.'}</span>`;
+  const n = m.floors[p.f] && m.floors[p.f][p.c];
+  if (!n) return '';
+  return mapPeek(n) ||
+    `<span class="dim">${mapTitle(n)} — your candle is out, so you cannot see what is on it.</span>`;
+}
+
 function mapPeek(n) {
   if (!S.candle || !n.enc) return '';
   const e = n.enc, d = demandOf(n);
@@ -3716,6 +3741,25 @@ function mapPeek(n) {
     : `👣 ${e.mp} · 🌙 ${e.nightfall} · ⏳ ${e.timePenalty} · 🪙 ${e.xp}`;
   return `<div class="mp-peek"><b>${e.name}</b> — ${nums}` +
     (d ? ` <span class="mp-dem">${DEMAND_ICON[d] || '◆'} ${DEMAND_WORD[d] || d}</span>` : '') + `</div>`;
+}
+
+// ⚠️ `hover: hover` is the honest test - false on a phone, true on a mouse - and it decides
+// whether a tap is an inspection or a commitment.
+const HAS_HOVER = (() => { try { return window.matchMedia('(hover: hover)').matches; } catch (e) { return true; } })();
+
+// 🗺️ A TAP ON TOUCH LOOKS FIRST AND COMMITS SECOND. On a mouse the hover already showed you
+// the road, so the click goes straight through.
+// 🔑 NO CAPABILITY TEST AT ALL - the rule is simply *a node you are already looking at is a
+// node you may take*. On a mouse, `mouseenter` fires before `click`, so the node is peeked by the
+// time the click lands and one click moves you. On touch nothing fires first, so the first tap
+// looks and the second takes. Same line of code produces the right behaviour on both.
+// ⚠️ The first version branched on `matchMedia('(hover: hover)')`, which reported FALSE on a
+// desktop browser here - had that shipped, a mouse user would have needed two clicks per move.
+// A CAPABILITY TEST YOU CANNOT VERIFY ON THE TARGET IS A GUESS; derive the behaviour from what
+// actually happened instead.
+function tapNode(f, c) {
+  if (isPeeked(f, c)) { S.mapPeek = null; takeMapNode(f, c); return; }
+  peekNode(f, c);
 }
 
 // 🗺️ STEP ONTO A NODE. Everything the old fork did, plus the node types the fork never had.
@@ -6450,8 +6494,15 @@ function mapHTML() {
       // ⚠️ data-f/data-c are what the edge layer measures against - the lines are drawn from the
       // real rendered positions rather than computed geometry, so they cannot drift from the grid.
       const at = `data-f="${f}" data-c="${c}"`;
+      // 🗺️ HOVER READS THE NODE. Thomas: *"is it possible to see the encounter info on the map
+      // on mouseover? instead of a list at the bottom of the map."*
+      // ⚠️ Hover does not exist on a phone, and this game is played on one daily - so on touch a
+      // tap SELECTS and the second tap moves. Not a workaround bolted on: the nodes are 30px and
+      // routing is irreversible, so a confirm step is worth having there anyway.
+      const hov = `onmouseenter="peekNode(${f},${c})" onfocus="peekNode(${f},${c})"`;
       cells.push(can
-        ? `<button class="${cls}" ${at} onclick="takeMapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
+        ? `<button class="${cls}${isPeeked(f, c) ? ' is-peek' : ''}" ${at} ${hov} ` +
+          `onclick="tapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
         : `<span class="${cls}" ${at} title="${mapTitle(n)}">${mapIcon(n)}</span>`);
     }
     rows.push(`<div class="mp-row${f % MAP_BAND === 0 ? ' mp-band' : ''}">` +
@@ -6479,8 +6530,9 @@ function renderControls() {
                 : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
       `</div>` + mapHTML() +
       `<div class="mp-legend">◇ an encounter · 💀 dangerous · ✦ a place on the road · 🕯️ a hearth</div>` +
-      // 🕯️ lit, the roads you can actually take tell you what is on them
-      (S.candle ? mapChoices(S.map).map(n => mapPeek(n)).join('') : '') +
+      // 🔑 ONE line that follows the pointer, instead of a list of every road at once. A list
+      // states three things you did not ask about; a hover states the one you are considering.
+      `<div class="mp-detail" id="mp-detail">${peekHTML()}</div>` +
       (opts.length ? '' : `<div class="hint">No road left — the lair is ahead.</div>`);
     return;
   }
