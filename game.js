@@ -3956,6 +3956,13 @@ function beginEventTurn() {
 
 function nextTurn() {
   S.turn++;
+  // 🗺️ HAND THE RUN TO THE MAP BEFORE ANY CARDS ARE DEALT.
+  // ⚠️ This guard used to sit 25 lines lower, BELOW the hand top-up - so nextTurn dealt you back
+  // to four and only then sent you to the map. Gating freshGame's own draw did nothing, because
+  // this was the draw that actually fired. 🔑 A GUARD PLACED AFTER THE THING IT MEANS TO PREVENT
+  // IS NOT A GUARD; and the fix looked correct in the source while changing nothing on screen,
+  // which is why Thomas saw a full hand on a build whose diff says otherwise.
+  if (S.map && !S.finalMode) { backToMap(); return; }
   // 🏕️ an event takes the turn INSTEAD of an encounter - see beginEventTurn
   if (S.eventTurnPending) { beginEventTurn(); return; }
   S.regionTurn = (S.regionTurn || 0) + 1;
@@ -3982,7 +3989,6 @@ function nextTurn() {
   S.drawExtra = 0;
   // 🗺️ ON THE MAP, takeMapNode() DOES ALL OF THIS - nextTurn is only reached by the tutorial
   // and by legacy saves, which still walk a region counter and a blind draw.
-  if (S.map && !S.finalMode) { backToMap(); return; }
   if (S.tutorial || !FORK_ENABLED) { drawEncounter(); }
   else {
     offerFork();
