@@ -2311,6 +2311,7 @@ function saveGame() {
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
       lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       fork: S.fork ? S.fork.map(e => e.name) : null,
+      boon: S.boon, boonOwed: S.boonOwed,
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
@@ -2350,7 +2351,7 @@ function loadGame() {
     // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
     // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
     // **Any new phase that can exist without an encounter belongs in this list.**
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick'];
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -2378,6 +2379,7 @@ function loadGame() {
       // would be a DIFFERENT object from the region's own def, and every identity check elsewhere
       // (the queue, beginEncounter, the tutorial's fixed list) compares references.
       fork: d.fork ? d.fork.map(n => region.encounters.find(e => e.name === n)).filter(Boolean) : null,
+      boon: d.boon || null, boonOwed: d.boonOwed || false,
       pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
@@ -2641,6 +2643,34 @@ function rollSetout() {
   while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
   return offers.map(c => c.id);
 }
+// 💀 THE ELITE BOON — beat a dangerous thing, take one of three charms.
+// 🔑 THIS IS WHAT MAKES AN ELITE A DECISION RATHER THAN A TAX. Coins are the reward every node
+// pays; a charm is a RULE, and [[Market_And_Retention]] says rule-changers are the game's build
+// discovery. Routing toward danger for a rule you choose is the strongest reason the map has to
+// exist at all.
+// ⚠️ Drawn from the FULL pool (class charms and generic both, tier-gated as ever), so the elite
+// is the best charm source in the run and the risk is priced.
+// ⚠️ COMPLETE ONLY. Surviving on a Narrow pays the coins and nothing else - the prize is for
+// beating the thing, which is also what stops "take every elite" being free upside.
+function boonPool() {
+  return CHARMS.filter(c => !c.curse && charmUnlocked(c) &&
+    (!c.cls || c.cls === CLASS.id) && !S.charms.includes(c.id) && charmFitsClass(c));
+}
+function rollBoon() {
+  const pool = boonPool().slice();
+  const offers = [];
+  while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
+  return offers.map(c => c.id);
+}
+function pickBoon(id) {
+  if (S.phase !== 'eliteboon' || !S.boon || !S.boon.includes(id)) return;
+  const c = charmById(id); if (!c) return;
+  S.charms.push(id);
+  S.boon = null;
+  log(`💀 You take <b>${c.name}</b> off the thing you killed — ${c.text}`, 'good');
+  backToMap();
+}
+
 function pickSetout(id) {
   if (!S.setout || !S.setout.includes(id)) return;
   const c = charmById(id); if (!c) return;
@@ -2738,6 +2768,8 @@ function freshGame(stage) {
     defeatMsg: null,
     fork: null,             // ⚠️ dead since the map replaced it; kept so older saves load
     map: null,              // 🗺️ the run's map - floors, edges, and where you stand
+    boon: null,             // 💀 three charms offered for a clean elite kill
+    boonOwed: false,        // 💀 an elite was beaten; pay it at the next map return
     pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
     eventAt: 1,             // 🏕️ which encounter this region's event follows
     eventDone: false,       // 🏕️ has this region's event been spent
@@ -3401,9 +3433,14 @@ const MAP_WEIGHTS = [
 //   • elite / wheel / hearth are never CONSECUTIVE along an edge
 //   • a node with 2+ exits must have all destinations distinct
 let MAP_SPECIAL_FLOOR = 4;
+let MAP_STARTS = 3;             // 🗺️ roads leaving the gate, always this many
 // 🐉 an elite is the band's own creature, harder and richer. Untuned on purpose - it is a new
 // reward channel and the whole coin economy is being re-measured anyway.
-const ELITE_HP = 1.5, ELITE_ATK = 2, ELITE_COIN = 2.2;
+// 💀 AN ELITE HAS TO BE WORTH AVOIDING (Thomas: *"i think we should make something hard for
+// the elites, and have better rewards for going against an elite node"*).
+// ⚠️ At ×1.5 HP and +2 atk it was a slightly bigger creature - a detour with no dread in it.
+// The reward is the 💀 BOON below, so the danger has to justify a real prize.
+const ELITE_HP = 2.0, ELITE_ATK = 4, ELITE_COIN = 2.5;
 // 🐉 one place that makes an elite, so the map's preview and the fight itself cannot disagree.
 function eliteVersion(e) {
   if (!e) return e;
@@ -3430,10 +3467,21 @@ function generateMap() {
   // —— 1. walk the paths upward
   // ⚠️ the first two paths must START in different columns, or the map opens on a single node
   // and the whole first floor is a non-choice. That is StS's rule and it is load-bearing.
+  // 🗺️ EXACTLY MAP_STARTS ROADS OUT OF THE GATE (Thomas: *"slay the spire starts off with
+  // like 3 different starts, i think we should just do 3 as well"*).
+  // ⚠️ It was 2-5 and usually 4, because starts were rolled per path and collided at random.
+  // 🔑 The first choice of a run should be the same SIZE every time - it is the one decision every
+  // player makes, and a run that opens on two roads is a different game from one that opens on five.
+  const startCols = [];
+  { const bag = [];
+    for (let c = 0; c < MAP_COLS; c++) bag.push(c);
+    while (startCols.length < Math.min(MAP_STARTS, MAP_COLS) && bag.length)
+      startCols.push(...bag.splice(Math.floor(rnd() * bag.length), 1));
+    startCols.sort((a, b) => a - b); }
   const starts = [];
   for (let p = 0; p < MAP_PATHS; p++) {
-    let c = Math.floor(rnd() * MAP_COLS);
-    if (p === 1) { let guard = 0; while (c === starts[0] && guard++ < 30) c = Math.floor(rnd() * MAP_COLS); }
+    // every path begins on one of the three, so exactly three roads leave the gate
+    let c = startCols[p % startCols.length];
     starts.push(c);
     nodeAt(0, c);
     for (let f = 0; f < MAP_FLOORS - 1; f++) {
@@ -4551,6 +4599,16 @@ function finishResolve() {
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   S.results[r.outcome]++;
   contractTick(r);   // 📜 a contract reads the turn the engine already resolved
+  // 💀 remember a clean elite kill; backToMap() pays it
+  if (S.map && S.map.pos) {
+    const here = S.map.floors[S.map.pos.f][S.map.pos.c];
+    // ⚠️ SURVIVING IT IS THE BAR, NOT A CLEAN KILL. Complete-only was measured first and the
+    // boon fired **0.18 times a run** for the rogue and **0.05** for the mage - a reward almost
+    // nobody ever sees is not a reason to route anywhere.
+    // 🔑 THE PRICE OF AN ELITE IS THE DAMAGE, NOT A PERFECT RESULT. You walked into the dangerous
+    // thing and came out; a Loss means it beat you and pays nothing.
+    if (here && here.type === 'elite' && r.outcome !== 'Loss') S.boonOwed = true;
+  }
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
   S.lastOutcome = r.outcome;
@@ -5142,6 +5200,14 @@ function finishTurn() {
 function backToMap() {
   const m = S.map;
   if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
+  // 💀 a dangerous thing beaten CLEANLY gives up a charm. ⚠️ Paid HERE, at the one place every
+  // node returns through, rather than in the encounter branch - a boon owed after a soak or an
+  // event would otherwise be stepped over.
+  if (S.boonOwed) {
+    S.boonOwed = false;
+    const offers = rollBoon();
+    if (offers.length) { S.boon = offers; S.phase = 'eliteboon'; render(); return; }
+  }
   // 🗺️ THE MAP IS THE CLOCK, SO ONLY THE TOP FLOOR ENDS THE ROAD.
   // ⚠️ Running dry used to end a REGION, and the region break reshuffled your discard back in
   // and carried on. Ported straight across it ended the whole RUN - a bad patch in band 2 would
@@ -5885,7 +5951,7 @@ const isShell = () => SHELL_PHASES.includes(S && S.phase);
 // you stop and make, rather than something you do to the cards in front of you.
 // ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
 // would be a dialog about the thing it was covering.
-const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick'];
+const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
 // 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
@@ -6301,6 +6367,19 @@ function renderControls() {
         `<span class="opt-why">${S.trashed.length
           ? `choose one of the ${S.trashed.length} card${S.trashed.length === 1 ? '' : 's'} damage took — it returns at Lv1`
           : 'nothing of yours has been lost yet'}</span></button>` +
+      `</div>`;
+    return;
+  }
+  if (S.phase === 'eliteboon') {
+    const offers = (S.boon || []).map(id => charmById(id)).filter(Boolean);
+    c.innerHTML =
+      `<div class="phase-label">💀 SOMETHING WORTH TAKING</div>` +
+      `<div class="event-flavor">The dangerous thing is dead, and it was carrying something. ` +
+      `Whatever it was doing out here, it was not doing it unprepared.</div>` +
+      `<div class="setout">` +
+      offers.map(o => `<button class="setout-offer r-${o.rarity}" onclick="pickBoon('${o.id}')">` +
+        `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
+        (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
       `</div>`;
     return;
   }

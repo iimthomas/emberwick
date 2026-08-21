@@ -636,6 +636,15 @@ const RUNSIM = (() => {
       }
       // 🧵 which lost card to take back: the biggest, as a blunt proxy for "the hole that hurts
       // most". ⚠️ They all return at Lv1, so this is a choice about the CARD, not about levels.
+      // 💀 the elite's charm. ⚠️ Teach it or autoRun breaks on the phase.
+      // The bot cannot price a RULE change (it scores one encounter), so it takes the rarest on
+      // offer as a blunt proxy - and every boon number it reports is therefore a floor.
+      else if (p === 'eliteboon') {
+        const offers = (S.boon || []).map(id => charmById(id)).filter(Boolean);
+        if (!offers.length) { S.boon = null; backToMap(); continue; }
+        const rank = { rare: 3, uncommon: 2, common: 1 };
+        pickBoon(offers.slice().sort((x, y) => (rank[y.rarity] || 0) - (rank[x.rarity] || 0))[0].id);
+      }
       else if (p === 'mendpick') {
         const pool = S.trashed.slice();
         if (!pool.length) { cancelMendPick(); }
