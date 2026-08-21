@@ -3399,6 +3399,17 @@ let MAP_SPECIAL_FLOOR = 4;
 // 🐉 an elite is the band's own creature, harder and richer. Untuned on purpose - it is a new
 // reward channel and the whole coin economy is being re-measured anyway.
 const ELITE_HP = 1.5, ELITE_ATK = 2, ELITE_COIN = 2.2;
+// 🐉 one place that makes an elite, so the map's preview and the fight itself cannot disagree.
+function eliteVersion(e) {
+  if (!e) return e;
+  return Object.assign({}, e, {
+    name: `${e.name}, grown bold`, elite: true,
+    hp: e.hp != null ? Math.round(e.hp * ELITE_HP) : e.hp,
+    mp: e.mp != null ? Math.round(e.mp * ELITE_HP) : e.mp,
+    atk: e.atk != null ? e.atk + ELITE_ATK : e.atk,
+    xp: Math.round((e.xp || 0) * ELITE_COIN),
+  });
+}
 
 // ⚠️ `kind` is fight-or-journey, decided AT GENERATION so the node can advertise it. Without it
 // every ordinary node drew ⚔️ and the icon was a lie on the half of them that turned out to be
@@ -3481,11 +3492,23 @@ function generateMap() {
       n.type = t;
     }
   }
-  // fight or journey, for every node that resolves to an encounter
+  // 🗺️ —— 3. every encounter node gets its ACTUAL encounter now, not on arrival.
+  // ⚠️ It has to be decided here or the node cannot advertise what it DEMANDS, and the demand is
+  // the only thing that reliably differs between two encounters. Each band draws from its own
+  // region's bag, refilled as it empties.
+  const bags = {};
+  const takeFrom = band => {
+    const pool = (RUN()[band - 1] || RUN()[0]).encounters;
+    if (!bags[band] || !bags[band].length) bags[band] = shuffle(pool.slice());
+    return bags[band].shift();
+  };
   for (let f = 0; f < MAP_FLOORS; f++)
     for (let c = 0; c < MAP_COLS; c++) {
       const n = floors[f][c];
-      if (n) n.kind = rnd() < 0.5 ? 'fight' : 'journey';
+      if (!n || (n.type !== 'normal' && n.type !== 'elite')) continue;
+      const base = takeFrom(bandOf(f));
+      n.enc = n.type === 'elite' ? eliteVersion(base) : base;
+      n.kind = n.enc && n.enc.type === 'journey' ? 'journey' : 'fight';
     }
   return { floors, pos: null, taken: [] };
 }
@@ -3507,20 +3530,44 @@ function bandOf(f) { return Math.min(4, Math.floor(f / MAP_BAND) + 1); }
 
 const MAP_LABEL = { normal: 'the road', elite: 'a dangerous thing', event: 'a place on the road',
                     wheel: 'the wheel', hearth: 'a hearth' };
-// ⚠️ an ordinary or elite node shows WHICH KIND it is - a fight and a journey are different
-// problems and choosing between them is most of what the map is for.
+// 🗺️ A NODE ADVERTISES ITS **DEMAND**, NOT ITS GENRE (2026-08-18). Thomas: *"initiative is
+// just a number on a card, it doesn't really do anything else. thats why i proposed making an
+// encounter node be random between fight and journey, since they are SORTA the same thing."*
+// 🔑 HE IS RIGHT ABOUT THE EQUATION AND THE MEASUREMENT AGREES. A fight and a journey score
+// `value` with the same line of code; two attempts to split them failed (see [[Blow_And_Distance]]),
+// the second structurally. **⚔️ vs 👣 is a distinction without a mechanical difference, and an icon
+// that promises a difference the rules do not deliver is worse than no icon.**
+// 🔑 BUT THE REAL VARIETY WAS ALREADY THERE, IN THE MODIFIER. Measured over all four roads:
+// fights carry a defence SHAPE **88%** of the time (🛡️17 · 🌀30 · 🧱8), journeys carry a PERIL
+// only **50%** (⛰️9 · 🕳️9 · 🏔️8 · ⏳9). **The shape is what changes your play; the genre is not.**
+// So the map now names what the node DEMANDS, and falls back to a plain road when it demands
+// nothing. ⚠️ 31% of encounters demand nothing at all - that is the content gap this exposes, and
+// it is the thing worth fixing next.
+const DEMAND_ICON = { armour: '🛡️', evasion: '🌀', guard: '🧱',
+  Steep: '⛰️', Toll: '⏳', Treacherous: '🕳️', Updraft: '🏔️', Freeze: '❄️' };
+const DEMAND_WORD = { armour: 'hit it big', evasion: 'hit it first', guard: 'wear it down',
+  Steep: 'the climb takes what you carry', Toll: 'it does not forgive', Treacherous: 'it bites when you fall short',
+  Updraft: 'speed shortens it', Freeze: 'it takes your Arsenal' };
+
+function demandOf(n) {
+  const e = n.enc;
+  if (!e) return null;
+  return e.shape || e.shape2 || e.peril || e.ability || null;
+}
 function mapIcon(n) {
   if (n.type === 'event')  return '✦';
   if (n.type === 'wheel')  return '🎰';
   if (n.type === 'hearth') return '🕯️';
-  if (n.type === 'elite')  return n.kind === 'journey' ? '🐉' : '💀';
-  return n.kind === 'journey' ? '👣' : '⚔️';
+  const d = demandOf(n);
+  if (n.type === 'elite')  return '💀';
+  return d ? (DEMAND_ICON[d] || '◆') : '◇';   // ◇ a plain stretch of road
 }
 function mapTitle(n) {
-  const kind = n.kind === 'journey' ? 'a journey' : 'a fight';
-  if (n.type === 'normal') return kind;
-  if (n.type === 'elite')  return 'a dangerous ' + (n.kind === 'journey' ? 'road' : 'thing') + ' — richer, harder';
-  return MAP_LABEL[n.type];
+  if (n.type === 'event' || n.type === 'wheel' || n.type === 'hearth') return MAP_LABEL[n.type];
+  const d = demandOf(n);
+  const what = n.enc ? (n.enc.type === 'fight' ? 'something in the way' : 'a road onward') : 'the road';
+  const dem = d ? ' — ' + (DEMAND_WORD[d] || d) : ' — nothing but distance';
+  return (n.type === 'elite' ? 'dangerous: ' : '') + what + dem;
 }
 
 // 🗺️ STEP ONTO A NODE. Everything the old fork did, plus the node types the fork never had.
@@ -3550,10 +3597,10 @@ function takeMapNode(f, c) {
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
-    // ⚠️ avoidType is how you STEER the bag - avoiding the other kind picks the one the node
-    // promised. If the bag has run out of that kind you get the other, which is why the icon is a
-    // promise about the PROBLEM and not a contract about the creature.
-    drawEncounter(node.kind === 'fight' ? 'journey' : 'fight', node.type === 'elite');
+    // 🗺️ the node already HOLDS its encounter - chosen when the map was drawn, which is what
+    // lets it advertise the demand. ⚠️ Falling back to a draw keeps saves made before this working.
+    if (node.enc) beginEncounter(node.enc);
+    else drawEncounter(null, node.type === 'elite');
     S.phase = 'assign';
     logChallenge();
   } else if (node.type === 'event') {
@@ -3716,15 +3763,7 @@ function drawEncounter(avoidType, elite) {
   }
   let picked = S.encounterQueue.splice(idx, 1)[0];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
-  if (elite && picked) {
-    picked = Object.assign({}, picked, {
-      name: `${picked.name}, grown bold`, elite: true,
-      hp: picked.hp != null ? Math.round(picked.hp * ELITE_HP) : picked.hp,
-      mp: picked.mp != null ? Math.round(picked.mp * ELITE_HP) : picked.mp,
-      atk: picked.atk != null ? picked.atk + ELITE_ATK : picked.atk,
-      xp: Math.round((picked.xp || 0) * ELITE_COIN),
-    });
-  }
+  if (elite && picked) picked = eliteVersion(picked);
   beginEncounter(picked);
 }
 
