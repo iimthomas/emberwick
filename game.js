@@ -40,7 +40,24 @@ let WHEEL_PER_ENCOUNTER = true;
 //              ⚠️ The ✦ ARSENAL IS EXCLUDED - the card you keep is the progress you did not make.
 // ⚠️ This does NOT reopen ONE VALUE PER CARD. No second stat is printed anywhere; the same
 // single value is simply READ BY MORE CARDS on a journey than in a fight.
-let JOURNEY_MODE = 'distance';
+// ❌ DEFAULT BACK TO 'spike' (2026-08-18, same day) - 'distance' is kept only so the measurement
+// can be re-run. Thomas, before any number said so: *"do you just add up all the attack values in
+// your hand for a journey? that doesn't seem fun, doesn't seem to require any thought, you just
+// press resolve journey during a journey then?"*
+// 🔑 HE WAS RIGHT, AND THE FAULT IS STRUCTURAL, NOT A TUNING MISS: **A SUM IS
+// PERMUTATION-INVARIANT.** Addition does not care about order, so once the score is *add up your
+// committed cards*, placement can only matter through the leftover bonuses.
+// Measured - with the Arsenal held fixed, permuting the other three cards:
+//   journey, spike:    changes the outcome **94%** of the time
+//   journey, distance: changes the outcome only **44%** of the time
+// ⚠️ MY ACCEPTANCE TEST WAS THE WRONG TEST. It asked *is a journey DIFFERENT from a fight* and
+// got a clean pass (65%→29% identical arrangements). It never asked *is a journey INTERESTING*.
+// 🔑 TWO PUZZLES CAN BE DIFFERENT AND ONE OF THEM CAN STILL BE A CONTINUE BUTTON. Any future
+// "make X different" test must measure DEPTH as well as DIFFERENCE.
+// ✅ And the finding that survives: spike-mode journeys were already DEEP (6% flat), just deep in
+// the SAME WAY as fights. The problem was never that a journey had no decision - it is that it is
+// the same decision. See [[Blow_And_Distance]] for the direction that follows from this.
+let JOURNEY_MODE = 'spike';
 // ⚠️ MP is multiplied at runtime rather than hand-edited into REGIONS: those rows are
 // transcribed from the source tables and are not ours to rewrite for a prototype.
 // ⚠️ TUNED BY MEASUREMENT, AND MY FIRST GUESS WAS MILES OUT. I estimated ×2.4 on the reasoning
