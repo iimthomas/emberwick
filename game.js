@@ -2326,6 +2326,20 @@ function saveGame() {
       lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       fork: S.fork ? S.fork.map(e => e.name) : null,
       boon: S.boon, boonOwed: S.boonOwed,
+      // 🗺️ THE MAP IS THE RUN, SO IT HAS TO BE IN THE SAVE. It was not, and a run left on the
+      // map screen came back with nothing to stand on - Thomas: *"if i happen to leave the page when
+      // the map is up, when i come back and try to continue, the map isn't there and i can't
+      // continue."* 🔑 EVERY NEW PIECE OF RUN STATE NEEDS A LINE HERE; `fork` and `boon` got one
+      // the day they were built and the map, which replaced them both, did not.
+      // ⚠️ Encounters are stored by NAME and rebuilt, never as objects - a deserialized copy would
+      // be a different object from the region's own def, and identity checks elsewhere would miss.
+      map: S.map ? {
+        pos: S.map.pos, taken: S.map.taken,
+        floors: S.map.floors.map(row => row.map(n => n ? {
+          t: n.type, k: n.kind, x: n.next, d: n.done,
+          e: n.enc ? (n.enc.baseName || n.enc.name) : null,
+        } : null)),
+      } : null,
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
@@ -2337,6 +2351,29 @@ function saveGame() {
       logEntries: S.logEntries.slice(0, 40),
     }));
   } catch (err) { /* storage unavailable — play on without saves */ }
+}
+
+// 🗺️ rebuild a saved map: node shape back as-is, encounters re-resolved from the band's own
+// region by name, and elites rebuilt through eliteVersion() so they cannot drift.
+function reviveMap(m) {
+  if (!m || !m.floors) return null;
+  return {
+    pos: m.pos || null,
+    taken: m.taken || [],
+    floors: m.floors.map((row, f) => row.map((sn, c) => {
+      if (!sn) return null;
+      // ⚠️ the column comes from the map INDEX, not indexOf - identical node shapes would
+      // otherwise all resolve to the first matching column.
+      const n = mapNode(f, c);
+      n.type = sn.t; n.kind = sn.k || 'fight'; n.next = sn.x || []; n.done = !!sn.d;
+      if (sn.e) {
+        const region = RUN()[bandOf(f) - 1] || RUN()[0];
+        const base = region.encounters.find(e => e.name === sn.e);
+        if (base) n.enc = sn.t === 'elite' ? eliteVersion(base) : base;
+      }
+      return n;
+    })),
+  };
 }
 
 function loadGame() {
@@ -2366,6 +2403,10 @@ function loadGame() {
     // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
     // **Any new phase that can exist without an encounter belongs in this list.**
     const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
+    // ⚠️ A SAVE WRITTEN BEFORE THE MAP WAS SERIALIZED CANNOT BE RESUMED. Builds 287-308 stored a
+    // map phase with no map; loading one produces a run standing on nothing. Refuse it here so the
+    // menu reports a broken save instead of resuming into a dead screen.
+    if (!d.map && MAP_PHASES_NEEDING_MAP.includes(d.phase) && !d.finalMode) return false;
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
@@ -2394,6 +2435,7 @@ function loadGame() {
       // (the queue, beginEncounter, the tutorial's fixed list) compares references.
       fork: d.fork ? d.fork.map(n => region.encounters.find(e => e.name === n)).filter(Boolean) : null,
       boon: d.boon || null, boonOwed: d.boonOwed || false,
+      map: reviveMap(d.map),
       pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
@@ -3470,7 +3512,10 @@ let ELITE_HP = 2.0, ELITE_ATK = 4, ELITE_COIN = 2.5;
 function eliteVersion(e) {
   if (!e) return e;
   return Object.assign({}, e, {
-    name: `${e.name}, grown bold`, elite: true,
+    // ⚠️ baseName is what makes an elite RELOADABLE. An elite is a modified COPY with a changed
+    // name, so it cannot be found again in the region's list - saving the base and rebuilding
+    // through this same function is the only way the reload cannot drift from the original.
+    name: `${e.name}, grown bold`, baseName: e.name, elite: true,
     hp: e.hp != null ? Math.round(e.hp * ELITE_HP) : e.hp,
     mp: e.mp != null ? Math.round(e.mp * ELITE_HP) : e.mp,
     atk: e.atk != null ? e.atk + ELITE_ATK : e.atk,
@@ -6005,6 +6050,8 @@ const isShell = () => SHELL_PHASES.includes(S && S.phase);
 // you stop and make, rather than something you do to the cards in front of you.
 // ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
 // would be a dialog about the thing it was covering.
+// ⚠️ phases that cannot exist without a map behind them
+const MAP_PHASES_NEEDING_MAP = ['map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
 const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
