@@ -6028,6 +6028,42 @@ function applyModal() {
   panel.innerHTML = ctrl.innerHTML;
   ctrl.innerHTML = '';
   sizeModal(panel);
+  drawMapEdges();
+}
+
+// 🗺️ Draw one line per edge, measured from the nodes as they actually landed.
+// ⚠️ Must run AFTER applyModal has moved the markup into the panel and AFTER sizeModal has set
+// the height - measuring before either gives positions from a box that is about to change.
+function drawMapEdges() {
+  const svg = document.querySelector('#modal-panel .mp-lines');
+  if (!svg || !S.map) return;
+  const wrap = svg.parentElement;
+  const box = wrap.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${Math.round(box.width)} ${Math.round(box.height)}`);
+  svg.setAttribute('width', Math.round(box.width));
+  svg.setAttribute('height', Math.round(box.height));
+  const centre = (f, c) => {
+    const el = wrap.querySelector(`[data-f="${f}"][data-c="${c}"]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+  };
+  const here = S.map.pos;
+  const parts = [];
+  for (let f = 0; f < MAP_FLOORS - 1; f++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = S.map.floors[f][c]; if (!n) continue;
+      const a = centre(f, c); if (!a) continue;
+      for (const nc of n.next) {
+        const b = centre(f + 1, nc); if (!b) continue;
+        // 🔑 the roads you could take RIGHT NOW are lit; everything else is the shape of the map
+        const live = here && here.f === f && here.c === c;
+        parts.push(`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" ` +
+          `x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="${live ? 'mp-live' : 'mp-link'}"/>`);
+      }
+    }
+  }
+  svg.innerHTML = parts.join('');
 }
 
 // 📏 THE PANEL IS MEASURED, NOT GUESSED (2026-08-18, found in play).
@@ -6364,14 +6400,23 @@ function mapHTML() {
       const can = reach.includes(key);
       const past = m.taken.includes(key);
       const cls = 'mp-node' + (here ? ' is-here' : '') + (can ? ' is-open' : '') + (past ? ' is-past' : '');
+      // ⚠️ data-f/data-c are what the edge layer measures against - the lines are drawn from the
+      // real rendered positions rather than computed geometry, so they cannot drift from the grid.
+      const at = `data-f="${f}" data-c="${c}"`;
       cells.push(can
-        ? `<button class="${cls}" onclick="takeMapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
-        : `<span class="${cls}" title="${mapTitle(n)}">${mapIcon(n)}</span>`);
+        ? `<button class="${cls}" ${at} onclick="takeMapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
+        : `<span class="${cls}" ${at} title="${mapTitle(n)}">${mapIcon(n)}</span>`);
     }
     rows.push(`<div class="mp-row${f % MAP_BAND === 0 ? ' mp-band' : ''}">` +
       `<span class="mp-f">${f === MAP_FLOORS - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
   }
-  return `<div class="mp">${rows.join('')}</div>`;
+  // 🗺️ THE LINES ARE THE MAP. Without them this is a grid of icons where the game decides
+  // where you may go for reasons you cannot see - Thomas, pointing at an unreachable neighbour:
+  // *"why can't i go to the left node here?"* The node was real, his node simply did not link to
+  // it, and nothing on screen said so.
+  // 🔑 AND WITHOUT EDGES THERE IS NO ROUTING AT ALL. You cannot plan toward an elite three floors
+  // up if you cannot trace a path to it, which is the entire reason the map replaced the fork.
+  return `<div class="mp"><svg class="mp-lines" aria-hidden="true"></svg>${rows.join('')}</div>`;
 }
 
 function renderControls() {

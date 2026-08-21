@@ -1174,6 +1174,13 @@ body.modal-open #controls-panel:empty { display: none; }
   background: linear-gradient(rgba(23,21,15,0), #17150f 55%);
 }
 
+/* 🗺️ THE EDGES. Drawn behind the nodes, from their real measured positions. */
+.mp { position: relative; }
+.mp-lines { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+.mp-lines .mp-link { stroke: #4a3f30; stroke-width: 2; }
+.mp-lines .mp-live { stroke: #d8b06a; stroke-width: 2.5; }
+.mp-row { position: relative; z-index: 1; }
+
 /* 🗺️ THE MAP. Floors read from the top down because the dragon is up there.
    ⚠️ Icons only - a node states its TYPE, never its contents. */
 .mp { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; }
