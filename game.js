@@ -3652,7 +3652,12 @@ function mapChoices(m) {
 // still come from the road's own regions.
 function bandOf(f) { return Math.min(4, Math.floor(f / MAP_BAND) + 1); }
 
-const MAP_LABEL = { normal: 'the road', elite: 'a dangerous thing', event: 'a place on the road',
+// ⚠️ EVENT NODES USE ❓, NOT ✦ (2026-08-18). Thomas: *"place on the road should be called an
+// event, and with a ? symbol instead of the diamond, too similar with encounter."*
+// 🔑 ◇ and ✦ are both small diamonds at 15px - two of the five node types were reading as the
+// same glyph, on the one screen whose entire job is telling node types apart. And *"a place on the
+// road"* was prose where the map needs a NOUN: every other node says what it IS in one word.
+const MAP_LABEL = { normal: 'the road', elite: 'a dangerous thing', event: 'an event',
                     wheel: 'the wheel', hearth: 'a hearth' };
 // 🗺️ A NODE ADVERTISES ITS **DEMAND**, NOT ITS GENRE (2026-08-18). Thomas: *"initiative is
 // just a number on a card, it doesn't really do anything else. thats why i proposed making an
@@ -3691,7 +3696,7 @@ function demandOf(n) {
 // ✅ And with ⚔️/👣 merged there are exactly four things a node can be, which is a map you can
 // read at a glance instead of a wall of symbols.
 function mapIcon(n) {
-  if (n.type === 'event')  return '✦';
+  if (n.type === 'event')  return '❓';
   if (n.type === 'wheel')  return '🎰';
   if (n.type === 'hearth') return '🕯️';
   if (n.type === 'elite')  return '💀';
@@ -6388,7 +6393,7 @@ function renderEncounter() {
   // ⚠️ The SLOT ROW deliberately stays - event pickers live ON the cards, and it is the only
   // place a card is ever drawn.
   if (isEventTurn()) {
-    panel.innerHTML = `<div class="enc-title">✦ A PLACE ON THE ROAD</div>` +
+    panel.innerHTML = `<div class="enc-title">❓ AN EVENT</div>` +
       `<div class="enc-sub">Region ${S.region} · no encounter this turn</div>` +
       `<div class="hint">You spend no cards here. Your hand carries on to the next encounter.</div>`;
     return;
@@ -6529,7 +6534,7 @@ function renderControls() {
       (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
                 : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
       `</div>` + mapHTML() +
-      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ✦ a place on the road · 🕯️ a hearth</div>` +
+      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ❓ an event · 🕯️ a hearth</div>` +
       // 🔑 ONE line that follows the pointer, instead of a list of every road at once. A list
       // states three things you did not ask about; a hover states the one you are considering.
       `<div class="mp-detail" id="mp-detail">${peekHTML()}</div>` +
