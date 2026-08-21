@@ -1198,6 +1198,11 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 .mend-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 .mend-row .card { width: calc(50% - 4px); min-width: 0; }
 
+/* 🕯️ what a lit candle shows about the roads you can take right now */
+.mp-peek { font-size: .82em; color: #c9bda6; padding: 4px 6px; border-left: 2px solid #6a5a41; margin: 4px 0; }
+.mp-peek b { color: #f0dcb2; }
+.mp-dem { color: #e8cd93; }
+
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }

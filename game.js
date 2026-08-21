@@ -747,6 +747,11 @@ function snuffCandle(why) {
 // what waits after this one, if you can see it
 function nextEncounter() {
   if (!S.candle || S.finalMode) return null;
+  // ⚠️ ON THE MAP THERE IS NO SINGLE NEXT ENCOUNTER - there are the roads you can take, and the
+  // queue this used to read is not what chooses them any more. Returning a stale queue entry made
+  // the status line name a creature that was not coming. 🔑 When a system stops driving something,
+  // find every reader that still trusts it.
+  if (S.map) return null;
   return S.encounterQueue && S.encounterQueue.length ? S.encounterQueue[0] : null;
 }
 
@@ -3554,20 +3559,45 @@ function demandOf(n) {
   if (!e) return null;
   return e.shape || e.shape2 || e.peril || e.ability || null;
 }
+// ❌ THE MAP DOES NOT SHOW DEMANDS (reverted the same day). Thomas: *"i don't like showing what
+// a node demands."* He is right twice over:
+// ⚠️ (1) IT IS THE PILLAR. [[Game_Pillars]] is LOCKED on *"hints/direction, not complete
+//     optimizable data"* and *"full destination + FUZZY path"*. Every node's demand, visible from
+//     floor 0, is a whole run solvable before it starts - the spreadsheet the pillar forbids.
+// ⚠️ (2) IT DOUBLE-BOOKS THE 🕯️ CANDLE - the same error I had already found and fixed once. The
+//     candle's job is *what is INSIDE the next step*; a map that prints every demand forever
+//     leaves it nothing to reveal.
+// 🔑 THE DIVISION THAT ACTUALLY WORKS: THE MAP SHOWS THE SHAPE OF THE RUN (types), THE CANDLE
+// SHOWS WHAT IS IN THE NEXT STEP. That is what makes a lit candle worth routing toward.
+// ✅ And with ⚔️/👣 merged there are exactly four things a node can be, which is a map you can
+// read at a glance instead of a wall of symbols.
 function mapIcon(n) {
   if (n.type === 'event')  return '✦';
   if (n.type === 'wheel')  return '🎰';
   if (n.type === 'hearth') return '🕯️';
-  const d = demandOf(n);
   if (n.type === 'elite')  return '💀';
-  return d ? (DEMAND_ICON[d] || '◆') : '◇';   // ◇ a plain stretch of road
+  return '◇';                                  // an encounter. What kind is the candle's business.
 }
 function mapTitle(n) {
   if (n.type === 'event' || n.type === 'wheel' || n.type === 'hearth') return MAP_LABEL[n.type];
-  const d = demandOf(n);
-  const what = n.enc ? (n.enc.type === 'fight' ? 'something in the way' : 'a road onward') : 'the road';
-  const dem = d ? ' — ' + (DEMAND_WORD[d] || d) : ' — nothing but distance';
-  return (n.type === 'elite' ? 'dangerous: ' : '') + what + dem;
+  if (n.type === 'elite') return 'something dangerous';
+  return 'an encounter';
+}
+
+// 🕯️ WHAT THE CANDLE BUYS: the nodes you can step to RIGHT NOW give up their contents.
+// ⚠️ Only those - a lit candle is one step of sight, not a map key.
+// ⚠️ NAMED mapPeek, NOT candleLine - there is already a candleLine() 2,500 lines below, and
+// because it is declared later IT WINS. My calls silently invoked the old one, which ignores its
+// argument, so every road on the map reported the SAME creature. 🔑 A second function with the
+// same name does not error; it just quietly replaces the first.
+function mapPeek(n) {
+  if (!S.candle || !n.enc) return '';
+  const e = n.enc, d = demandOf(n);
+  const nums = e.type === 'fight'
+    ? `❤️ ${e.hp} · 💨 ${e.init} · ⚔️ ${e.atk} · 🪙 ${e.xp}`
+    : `👣 ${e.mp} · 🌙 ${e.nightfall} · ⏳ ${e.timePenalty} · 🪙 ${e.xp}`;
+  return `<div class="mp-peek"><b>${e.name}</b> — ${nums}` +
+    (d ? ` <span class="mp-dem">${DEMAND_ICON[d] || '◆'} ${DEMAND_WORD[d] || d}</span>` : '') + `</div>`;
 }
 
 // 🗺️ STEP ONTO A NODE. Everything the old fork did, plus the node types the fork never had.
@@ -6091,6 +6121,8 @@ function candleLine() {
   if (S.finalMode) return '';
   const n = nextEncounter();
   if (!S.candle) return `<div class="candle out">🕯️ <b>Your candle is out.</b> You cannot see what waits beyond this. <span class="dim">Complete an encounter to relight it.</span></div>`;
+  // 🗺️ with a map, what the candle buys is stated on the map itself, road by road
+  if (S.map) return `<div class="candle lit">🕯️ <b>Lit.</b> <span class="dim">On the map you can read what waits down each road you could take.</span></div>`;
   if (!n) return `<div class="candle lit">🕯️ <b>Lit.</b> <span class="dim">Nothing more on this road — the region ends after this.</span></div>`;
   const what = n.type === 'fight'
     ? `⚔️ <b>${n.name}</b> · ❤️ ${n.hp} · 💨 ${n.init} · ${n.shape === 'armour' ? `🛡️ Armour ${n.shapeV}` : n.shape === 'evasion' ? '🌀 Evasion' : 'unguarded'}`
@@ -6232,7 +6264,9 @@ function renderControls() {
       (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
                 : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
       `</div>` + mapHTML() +
-      `<div class="mp-legend">⚔️ fight · 👣 journey · 💀🐉 dangerous · ✦ a place · 🎰 the wheel · 🕯️ a hearth</div>` +
+      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ✦ a place on the road · 🕯️ a hearth</div>` +
+      // 🕯️ lit, the roads you can actually take tell you what is on them
+      (S.candle ? mapChoices(S.map).map(n => mapPeek(n)).join('') : '') +
       (opts.length ? '' : `<div class="hint">No road left — the lair is ahead.</div>`);
     return;
   }
