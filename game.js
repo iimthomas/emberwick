@@ -4189,8 +4189,34 @@ function drawEncounter(avoidType, elite) {
 // ⚠️ The hardship is rolled HERE, i.e. AFTER the branch is chosen. Rolling it per-branch at offer
 // time would double the rolls and let a player shop for a hardship-free road, which turns a risk
 // into a filter - the *"a hardship must stay a risk, not become a tax"* rule, from the other side.
+// ⚔️ HOW HARD THE ROAD HITS — the one dial for "does damage matter" (2026-08-22).
+//
+// Thomas: *"feels like getting damaged has been inconsequential."* 📏 Measured, and he is right in
+// a way the raw numbers do not show: **the deck is not a health bar, it is an XP bar with a tax.**
+// Across a whole run her total card levels go **32 → 34** — the deepest dip is **1.8 levels out of
+// 32**, and 41% of runs never dip below their starting point at all. 🔑 THE CAUSE IS NOT THAT THE
+// DAMAGE NUMBERS ARE SMALL — IT IS THAT UPGRADES OUTPACE THEM. You take ~1.7 a turn, soak about
+// 0.7 of a card level, and buy back more than that at the Wheel. **The bar only rises.**
+// ⚠️ That also explains why a defensive option reads as boring: *you cannot make a defensive choice
+// appealing while the thing it defends against is inconsequential.* Fix the damage, and every
+// defensive choice in the game gets more interesting for free — none of them need touching.
+//
+// 🔑 APPLIED HERE, AT THE DRAW, AND NOWHERE ELSE. `e.atk` is read in ten places — two maths sites
+// and eight DISPLAYS. Multiplying at the maths sites would make every panel, log line and briefing
+// print a number the game does not use. Scaling the encounter as it is drawn keeps one truth.
+// ⚠️ CLASS-BLIND BY CONSTRUCTION, which is what makes it a legal dial: it touches `atk` only, never
+// an element or a pair, exactly as [[The_Roads]] requires of content.
+// ⚠️ AND IT IS COUPLED TO PAR. Harder hits mean fewer levels at the lair, and the lair is measured
+// against `dragon.par` (36/44/48/52) — so raising this makes the DRAGONS harder for free. Re-read
+// par before blaming a dragon for anything after moving it.
+let FOE_ATK_MULT = 1.0;
+function scaleFoe(e) {
+  if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
+  return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
+}
 function beginEncounter(e) {
   const region = RUN()[S.region - 1];
+  e = scaleFoe(e);
   S.encounter = e;
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
