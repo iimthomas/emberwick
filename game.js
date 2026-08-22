@@ -882,6 +882,16 @@ const MAGE = {
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
     text: 'Bank your Surge instead of spending it. Next turn it fires at its <b>full worth</b>, aimed at your <b>strike</b> or your <b>speed</b> — so a turn already won or lost is never wasted.' },
+  // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
+  // "does this hand hold a same-element pair" and finding it is attuning.
+  // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
+  // what its power IS. This used to live in the engine as a bare element check, which credited
+  // the rogue with phantom chances every turn — see the note at the craft tracker.
+  craft: {
+    label: 'attuned',
+    avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
+    found(r) { return !!r.enhUsed; },
+  },
   // 🎴 THE MAGE'S BOARD STATE. The banked Surge is a thing on the table until it is spent or
   // gutters out, and tapping it is how you aim it — see cycleWake().
   // ⚠️ CLASS-OWNED ON PURPOSE. The Emberwake is the mage's slot ③ and a rogue must never inherit
@@ -1358,6 +1368,17 @@ const ROGUE = {
   trait: { icon: '●', name: 'Momentum',
     text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
       '. Each pip adds <b>+1 to your Strike</b>. Take any damage and the whole streak breaks.' },
+  // 🏅 WHAT THE GRADE CALLS CRAFT — her source of power is PAYING, so availability is "could any
+  // card in this hand have covered another's ⚡ cost" and finding it is striking for the full value.
+  // 🔑 THE MAPPING IS THE ONE ALREADY WRITTEN DOWN FOR HARDSHIPS: *a rule that names ATTUNING,
+  // the rogue reads as PAYING.* Same sentence, one layer up.
+  craft: {
+    label: 'paid in full',
+    avail(hand) {
+      return hand.some(f => hand.some(st => st !== f && pitchOf(f) >= (st.def.energy || 0)));
+    },
+    found(r) { return !!(r.rogue && r.rogue.full); },
+  },
   // 🎴 THE ROGUE'S BOARD STATE — and the token that was already almost one. The pips gave it a
   // body in 2026-08-17; this only moves it onto the table where the rest of the board lives.
   // ⚠️ IT SHOWS AT ZERO, ALWAYS. An empty meter is still a thing you are trying to fill — and
@@ -2574,7 +2595,10 @@ function loadGame() {
       contract: d.contract || null,
       potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
       upgradePick: null,
-      stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
+      // ⚠️ an older save carries the mage-named fields; map them rather than dropping a run's
+      // score on the floor. A missing craft stat reads as 'no chances', which scores 0 — same as
+      // before for the mage, and no longer a phantom zero for anyone else.
+      stats: migrateStats(d.stats),
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -2984,7 +3008,7 @@ function freshGame(stage) {
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
-    stats: { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
+    stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
@@ -4929,12 +4953,22 @@ function finishResolve() {
     else if (r.outcome === 'Complete') lightCandle('you come through cleanly');
     else snuffCandle(r.outcome === 'Narrow' ? 'you scraped through' : 'the encounter went badly');
   }
-  // 📊 CRAFT: could this hand have attuned at all, and did you find it? Availability is a
-  // property of the HAND (any same-element pair), so the stat measures your play, not your luck.
-  if (S.stats) {
-    const els = S.hand.map(c => elOf(c));
-    if (els.some((e, i) => els.indexOf(e) !== i)) S.stats.attuneAvail++;
-    if (r.enhUsed) S.stats.attuned++;
+  // 📊 CRAFT: was your class's source of power AVAILABLE in this hand, and did you find it?
+  // Availability is a property of the HAND, so the stat measures your play, not your luck.
+  //
+  // 🐛 THIS WAS A MAGE RULE SITTING IN THE ENGINE (found 2026-08-21, from a screenshot of a
+  // winning rogue run reading *"✦ craft — attuned 0 of 15 — 0/20"*). It asked "does this hand
+  // hold a same-element pair?", and a rogue card has NO element — so `elOf()` returned null for
+  // all four, `indexOf` found a "duplicate" every single turn, and she was credited with 15
+  // phantom chances to attune and scored ZERO for missing all of them.
+  // 🔑 IT IS NOT A COSMETIC BUG: craft is 20 of 100, so the rogue's ceiling was 80 and she could
+  // never earn an S on any stage — which quietly deletes [[The_Wall]], and the wall is the
+  // retention answer *stages × classes* was built on.
+  // ⚠️ THE CLASS SEAM AGAIN: the engine may ask *"was your power available, did you use it"*;
+  // only the CLASS may say what its power IS.
+  if (S.stats && CLASS.craft) {
+    if (CLASS.craft.avail(S.hand)) S.stats.craftAvail++;
+    if (CLASS.craft.found(r)) S.stats.craftFound++;
   }
   // 🪙 COINS CANNOT GO NEGATIVE (fixed 2026-07-29). ☠️ The Tithe takes 2 from every encounter, so a
   // low-XP one — the Approach pays 0 — drove the purse below zero and the Wheel offered prices
@@ -8216,9 +8250,24 @@ function defeat(msg) {
 //     🃏 the deck you kept  ⚔️ how cleanly you solved hands  ✦ craft  🐉 the kill.
 // A perfect losing run still reaches ~75, which is a B — death is part of the game, not a zero.
 // ============================================================
+// 📦 SAVE MIGRATION for the craft stat (2026-08-21). The counters were named for the mage's rule
+// (`attuneAvail`/`attuned`); they are class-neutral now.
+function migrateStats(d) {
+  const base = { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 };
+  if (!d) return base;
+  return {
+    craftAvail: d.craftAvail != null ? d.craftAvail : (d.attuneAvail || 0),
+    craftFound: d.craftFound != null ? d.craftFound : (d.attuned || 0),
+    duelDmg: d.duelDmg || 0, duelBeats: d.duelBeats || 0,
+  };
+}
 const GRADE_BANDS = [[85, 'S'], [70, 'A'], [55, 'B'], [40, 'C'], [0, 'D']];
+// the grade names the mechanic in the CLASS's own word — 'attuned' for a mage, 'paid in full'
+// for a rogue. ⚠️ Never hard-code it here: a score line that describes the wrong mechanic is
+// how the rogue came to be told she had missed 15 attunes she was never offered.
+const craftLabel = () => (CLASS.craft && CLASS.craft.label) || 'found';
 function gradeRun(won) {
-  const st = S.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 };
+  const st = S.stats || { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 };
   const survivors = [...S.hand, ...S.deck, ...S.discard];
   const levels = survivors.reduce((t, c) => t + c.level, 0);
   const res = S.results, encounters = res.Complete + res.Narrow + res.Loss;
@@ -8227,8 +8276,10 @@ function gradeRun(won) {
   const deck = Math.round(30 * Math.min(1, levels / 40));
   // ⚔️ HOW CLEANLY YOU SOLVED HANDS — a Narrow counts, but only a third as much
   const exec = encounters ? Math.round(25 * Math.min(1, (res.Complete + res.Narrow / 3) / encounters)) : 0;
-  // ✦ CRAFT — of the hands that COULD attune, how many did you find? Measures play, not luck.
-  const craft = st.attuneAvail ? Math.round(20 * (st.attuned / st.attuneAvail)) : 0;
+  // ✦ CRAFT — of the hands where your CLASS's source of power was available, how many did you
+  // find? Measures play, not luck. ⚠️ Class-owned since 2026-08-21: it asked a mage question of
+  // every class, and a rogue scored a guaranteed 0/20 for failing to do a thing she cannot do.
+  const craft = st.craftAvail ? Math.round(20 * (st.craftFound / st.craftAvail)) : 0;
   // 🐉 THE KILL — felling it is most of it; felling it FAST is the rest (⏳ Relentless's demand)
   const kill = won ? 25 - Math.max(0, Math.min(8, (st.duelBeats - 3) * 2)) : 0;
 
@@ -8256,7 +8307,7 @@ function gradeHTML(g, won) {
     `<div class="g-rows">` +
     bar('🃏 the deck you kept', g.deck, 30) +
     bar('⚔️ hands solved', g.exec, 25) +
-    bar(`✦ craft <span class="dim">(attuned ${g.st.attuned} of ${g.st.attuneAvail})</span>`, g.craft, 20) +
+    bar(`✦ craft <span class="dim">(${craftLabel()} ${g.st.craftFound} of ${g.st.craftAvail})</span>`, g.craft, 20) +
     bar(won ? `🐉 the kill <span class="dim">(${g.st.duelBeats} beats)</span>` : '🐉 the kill', g.kill, 25) +
     `</div>` + (won ? '' : `<p class="g-diag">${lossDiagnosis()}</p>`) + `</div>`;
 }
