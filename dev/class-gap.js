@@ -6,7 +6,9 @@
 // and currently the last rung — a victory lap over the on-ramp is a reward, a victory lap over
 // the exam is the ladder ending early. So: measure the gap per stage, not in aggregate.
 'use strict';
-const { sandbox, seed, useClass, getS } = require('./headless.js');
+const { sandbox, seed, useClass, getS, setTunable } = require('./headless.js');
+// optional tunable overrides: node class-gap.js 480 ATTUNE_BONUS=2 BANK_MULT=1.5
+process.argv.slice(3).forEach(a => { const [k, v] = a.split('='); setTunable(k, Number(v)); });
 const N = +(process.argv[2] || 480);   // ⚠️ the round-robin divides by four — read n PER STAGE
 
 function perStage(cls) {

@@ -44,6 +44,26 @@ let UNSEEN_WEIGHT = 3;
 function setUnseenWeight(w) { UNSEEN_WEIGHT = w; }
 const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
 
+// 🔥 CHANNELLING — THE BOT COULD NEVER DO THIS, AND THAT WAS NOT A SMALL GAP (taught 2026-08-22).
+//
+// ⚠️ THE BOT SCORES ONE ENCOUNTER. Channelling gives up this turn's boost for a bigger Emberwake
+// NEXT turn, so to a one-encounter scorer it is *always* strictly negative — it never armed the
+// bank, on any turn, ever. 🔑 A NUMBER PRODUCED BY AN INSTRUMENT THAT STRUCTURALLY CANNOT DO THE
+// THING IS NOT A MEASUREMENT OF THE THING: this is exactly why the old *"the Emberwake fires on
+// 0.8% of turns"* line had to be retracted, after a week of being quoted as evidence.
+//
+// 🔑 THE POLICY, AND IT IS A POLICY. A banked point is worth less than a point spent now, because
+// next turn's hand is unknown and an unspent Emberwake gutters out. So it is credited at
+// BANK_WEIGHT < 1 and sits in the LAST term, below outcome, damage and the approach — the bot will
+// therefore channel only when doing so costs it nothing it can see. That is deliberately the
+// CONSERVATIVE reading: it measures the floor of how often channelling is free, not the ceiling of
+// how often a human who can read the candle would want it.
+// ⚠️ Every number produced with this must be reported alongside BANK_WEIGHT = 0, which reproduces
+// the old never-banks bot exactly.
+let BANK_WEIGHT = 0.6;
+function setBankWeight(w) { BANK_WEIGHT = w; }
+const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) : 0);
+
 function chainValue(r) {
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
   const touched = (r.combatDmg || 0) + (r.early || 0) + (r.timePenalty || 0) > 0;
@@ -369,9 +389,9 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
-       approachValue(r), chainValue(r), r.value];
+       approachValue(r), chainValue(r), r.value + bankValue(r)];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
@@ -493,17 +513,24 @@ const RUNSIM = (() => {
           // exactly this reason; if a fourth is ever wanted, extract it instead.
           if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
           for (const bt of bts) {
-            S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
-                         Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
-            S.boostTarget = bt;
-            const r = computeAction(ember); if (!r) continue;
-            const sc = scoreOf(r);
-            if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, sc };
+            // 🔥 ...and both ways of resolving the Surge. `S.bankArmed` is per-turn STATE rather
+            // than part of the arrangement, so unless the search carries it as a dimension the
+            // bot can never reach the option at all — which is precisely how it went a week
+            // never channelling while a number derived from that was quoted as a measurement.
+            for (const arm of (CLASS.emberwake ? [false, true] : [false])) {
+              S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
+                           Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+              S.boostTarget = bt; S.bankArmed = arm;
+              const r = computeAction(ember); if (!r) continue;
+              const sc = scoreOf(r);
+              if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, sc };
+            }
           }
         }
       }
     }
-    if (best) { S.assign = best.assign; S.boostTarget = best.bt; }
+    S.bankArmed = false;
+    if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
   }
 
@@ -815,7 +842,7 @@ const RUNSIM = (() => {
     return { N, on, off };
   }
   return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight,
-           setUnseenWeight };
+           setUnseenWeight, setBankWeight };
 })();
 
 function runSimulator() {

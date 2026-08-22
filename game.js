@@ -27,9 +27,22 @@ const MAX_LEVEL = 4;
 // finding about creating a DILEMMA. This is a POWER change, and Balance_Log's own pre-planned lever
 // list for the mage opens with *"bonus → lv+2"*. Different question, same constant.
 //
-// 📏 Swept +1..+5 (n=320, per stage). +3 is where her ladder meets the rogue's without passing it:
-//     +1  duel 80/41/18/26   +2  94/54/19/36   **+3  93/69/41/46**   +4  94/85/56/56 (overshoots)
+// 📏 Swept +1..+5 (n=320, per stage), BEFORE channelling paid interest:
+//     +1  duel 80/41/18/26   +2  94/54/19/36   +3  93/69/41/46   +4  94/85/56/56 (overshoots)
 //     rogue control 90/64/49/66 — she is untouched by this constant, having no elements.
+//
+// ⚠️ RE-TUNED 3 → 2 THE SAME DAY, AND THE MISTAKE IS WORTH KEEPING. ⟳ Channelling landed hours
+// later and the two stacked: at +3 with interest she measured **97/77/69/58** and led the rogue at
+// three stages out of four. 🔑 I CHANGED TWO VARIABLES BEFORE MEASURING EITHER — which is the one
+// thing the tuning process explicitly forbids (*smallest change, one variable at a time*), and the
+// result was not attributable to either change.
+// ✅ Re-measured with channelling live (n=120/stage): **+2 → 93/68/51/42** against +3's 97/77/69/58.
+// 🔑 +2-with-channelling lands on top of +3-without at stages 1, 2 and 4 — but stage 3 is BETTER
+// (51 vs 41), i.e. the same total power, concentrated where she was worst, and earned by a decision
+// instead of handed over as a flat number.
+// 🔑 THE RULE FOR CHOOSING WHICH ONE TO GIVE BACK: **if two buffs overshoot, return the FLAT one
+// and keep the CONDITIONAL one.** Flat power answers "miserable"; a recurring decision also answers
+// "too simple", and Thomas reported both.
 // ⚠️ WATCH TWO THINGS. (1) Stage 1 goes 80 → 93 for the bot, and stage 1 is the ON-RAMP — the bot
 // always finds the attuned arrangement and a human misses it about one turn in five, but if it
 // reads soft in play, +2 is the fallback rather than a creature nerf. (2) Attune OBLIGATION rises
@@ -38,7 +51,7 @@ const MAX_LEVEL = 4;
 // ✅ The compensating measurement, and the reason this is not simply "make the number bigger":
 // **naive=optimal FELL, 73% → 66%.** Playing your biggest card is now right LESS often, because the
 // element match is worth more relative to raw size. The turn got slightly less solved, not more.
-let ATTUNE_BONUS = 3;
+let ATTUNE_BONUS = 2;
 // ⚡ how much PAYING is worth to the rogue: value + (paid + PAID_STEP × levels invested).
 // ⚠️ THE STEP EXISTS BECAUSE THE FLAT VERSION SHRANK. Thomas: *"i think attuned and unattuned
 // number gap needs to be a bit wider, feels like im pretty happy with unattuned damage, i need to
@@ -703,7 +716,30 @@ function toggleBank() {
 // in 53.6% of hands (combinatorics over all 1820 four-card hands). It was never unavailable —
 // it was never worth taking. At full value it is a pure tempo trade: move this boost to next
 // turn, and pick its target. Correct on the ~30% of turns the Surge already changes nothing.
-function bankValueOf(surge) { return surge ? eff(surge).boost : 0; }
+// 🔥 CHANNELLING PAYS INTEREST (2026-08-22). Thomas: *"i want the emberwake to be a bigger part of
+// her kit.. the way to get it is probably not good enough"* — and then, on the fix:
+// *"we can think of it as like.. channeling or charging up which seems to fit lore wise for a mage."*
+// ✅ That is the name the original slot-③ proposal used ([[Class_System]]: *"CHANNELLING … banked as
+// an Emberwake worth more next turn"*). He arrived back at it independently; the vocabulary is his.
+//
+// 🔑 THE FAULT WAS THAT THE TRADE WAS BREAK-EVEN BY CONSTRUCTION. You gave up N this turn to get
+// exactly N next turn, so the only turn it was ever correct on was one that did not need the boost.
+// Measured: a Surge card is seated **100%** of turns — availability was never the problem — but
+// banking was FREE on only **47%** (already won 18% · already lost 12% · stuck on Narrow 18%) and
+// **cost an outcome tier on 53%**. 🔑 A MECHANIC YOU ONLY USE WHEN THE TURN IS ALREADY DECIDED IS
+// A CONSOLATION PRIZE, NOT A KIT — which is exactly the feeling reported.
+// ⚠️ And the design always said *worth MORE next turn*; that half simply was never built.
+//
+// 🔑 PROPORTIONAL, NOT FLAT, AND THE REASON IS THE FORK. Flat interest is proportionally biggest on
+// a SMALL boost, so you would dump your junk card into the Surge slot — the slot becomes a bin.
+// ×1.5 makes channelling a BIG boost best, so you put a strong card in ③ *in order to* channel it,
+// giving up using it as your Spell or Catalyst. **That is contention for one card**, which
+// [[The_Arsenal_Question]] records as one of only three fork mechanisms that have ever worked here
+// (the others being an enemy shape and a run-layer price; a rule bolted onto a slot has failed 3×).
+// 📏 Mean boost is 5.0 (spread 1-13), so an average Emberwake goes 5 → 8 against a duel blow of ~15.
+// ⚠️ ✦ Backdraft doubles the result, so it now reads ×3 of the raw boost. Watch it.
+let BANK_MULT = 1.5;
+function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) : 0; }
 // ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
 // you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
 // hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
@@ -910,7 +946,7 @@ const MAGE = {
   // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
-    text: 'Bank your Surge instead of spending it. Next turn it fires at its <b>full worth</b>, aimed at your <b>strike</b> or your <b>speed</b> — so a turn already won or lost is never wasted.' },
+    text: '<b>Channel</b> your Surge instead of spending it and it comes back <b>half again as strong</b>, aimed at your <b>strike</b> or your <b>speed</b> — so the turn you can afford to wait is the turn you get paid for.' },
   // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
   // "does this hand hold a same-element pair" and finding it is attuning.
   // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
@@ -1527,10 +1563,10 @@ const VERBS = {
   Quickfire:    { slot: 'Element', name: 'Outpace',    text: 'You win Initiative automatically.' },
   Flintdart:    { slot: 'Element', name: 'Bedrock',    text: 'You take no Early Damage, even when you lose the race.' },
   // FLOW → SURGE — the fork, the 🔥 Emberwake
-  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Banking from here DOUBLES the Emberwake.' },
-  Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake banked from here lasts a second turn.' },
-  Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Banking from here also gives +3 Initiative this turn.' },
-  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here ALSO fires the boost this turn.' },
+  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Channelling from here DOUBLES the Emberwake.' },
+  Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake channelled from here lasts a second turn.' },
+  Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Channelling from here also gives +3 Initiative this turn.' },
+  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Channelling from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
   Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
   Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
@@ -1774,8 +1810,8 @@ const TUTORIAL = {
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
     { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> can fire now — or <b>bank</b> instead: nothing this turn, but next turn you aim its full power at your <b>strike</b> or your <b>speed</b>. ' +
-            'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
+      text: 'Your <b>SURGE</b> can fire now — or <b>⟳ channel</b> it: nothing this turn, but next turn it returns <b>half again as strong</b>, aimed at your <b>strike</b> or your <b>speed</b>. ' +
+            'The bigger the Surge you channel, the more it pays. 🕯️ Your candle shows you what is coming.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
     // ⚠️ POINTS AT THE TOKEN (2026-08-21). It used to point at `.wake-row`, which no longer
@@ -4800,7 +4836,7 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next turn <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
     // ⚠️ the Surge is a MAGE stat - the rogue's slot ③ pays ⚡ and adds no damage, so printing
     // "Surge +0" reported a mechanic she does not have
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
@@ -4830,7 +4866,7 @@ function resolve() {
     if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next turn <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
@@ -7590,13 +7626,25 @@ function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
   if (!sc) return '';
-  const v = bankValueOf(sc);
+  // 🔑 SHOW BOTH TERMS. The whole point of channelling is that it pays MORE than it costs, and a
+  // trade whose two sides are not on screen together is not a decision — it is a guess.
+  // 🐛 This line used to print `+${bankValueOf(sc)} power now`, i.e. the BANKED figure labelled as
+  // the spent one. Harmless while the two were equal; the moment interest existed it would have
+  // been a straight lie about the cheaper half. *When a value gains a modifier, find every line
+  // that prints the unmodified one.*
+  const now = eff(sc).boost, later = bankValueOf(sc);
   const on = !!S.bankArmed;
   return `<div class="wake-row bank-row"><span class="wake-lab">🔥 Your <b>Surge</b> — ` +
-    (on ? `<b>banking +${v}</b> for next turn` : `+${v} power now`) + `</span>` +
+    (on ? `channelling: <b>+${later}</b> next turn <span class="dim">(instead of +${now} now)</span>`
+        : `<b>+${now}</b> now <span class="dim">— or <b>+${later}</b> channelled</span>`) + `</span>` +
     `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleBank()">` +
-    (on ? 'spend it now instead' : `bank it for next turn`) + `</button>` +
-    `<span class="wake-note">${on ? 'nothing this turn' : 'worth it when this turn is already decided'}</span></div>`;
+    (on ? 'spend it now instead' : `⟳ channel it`) + `</button>` +
+    // ⚠️ STATE THE RULE, NOT A COMPUTED RATIO. This read `worth ${later/now}×`, which prints
+    // "2.0×" on a Surge worth 1 (ceil rounds it up) and "1.5×" on a big one — technically true and
+    // exactly backwards as a teaching line, since the point of a proportional bonus is that the
+    // BIG Surge is the one worth channelling. The two numbers are already on screen above; this
+    // slot should say WHEN, not restate WHAT.
+    `<span class="wake-note">${on ? 'nothing this turn' : 'half again as much, if you can wait a turn'}</span></div>`;
 }
 
 // a one-word mark of the card's fate, shown on the card itself during the action phase
@@ -8244,7 +8292,7 @@ function resolveDuel() {
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next beat`, 'good'));
+  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next beat <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
   if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
