@@ -335,7 +335,7 @@ const REGIONS = [
   // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6 },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 9, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6 },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
@@ -345,7 +345,7 @@ const REGIONS = [
   ]},
   // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
   { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 8, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6 },
@@ -396,7 +396,7 @@ const ROAD_STORMREACH = [
   { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Quillback',      hp: 7, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
     { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
     { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
@@ -419,7 +419,7 @@ const ROAD_STORMREACH = [
   { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
     { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 2, xp: 6 },
+    { type: 'fight',   name: 'Riven Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 6 },
     { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
     { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
@@ -451,7 +451,7 @@ const ROAD_FELLGRIND = [
   ]},
   { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Millstone Crab', hp: 11, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
     { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
@@ -470,7 +470,7 @@ const ROAD_FELLGRIND = [
     { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
   ]},
   { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
-    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Scree Warden',   hp: 12, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
     { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
     { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
@@ -495,7 +495,7 @@ const ROAD_FATHOM = [
     { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
     { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 12, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
@@ -514,7 +514,7 @@ const ROAD_FATHOM = [
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
     { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 2, xp: 7 },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 12, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
     { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
@@ -4567,9 +4567,27 @@ function computeAction(reserve) {
     // 🔑 THAT IS THE EXACT INVERSE OF ARMOUR, and it is why the two shapes cannot be answered by
     // the same turn: Armour is paid per hit and wants ONE, Guard consumes hits and wants MANY.
     // ⚠️ IT IS UNANSWERABLE FOR THE MAGE ON PURPOSE. The mage lands exactly one hit, so a mage
-    // facing Guard is stuck — and being stuck is the stated reason to go and unlock the rogue.
-    // Which is also why Guard must NOT be added to the existing four roads: content is class-blind,
-    // and a shape only one class can answer belongs on the stage built for that class.
+    // ⚠️ THE PARAGRAPH THAT USED TO SIT HERE IS DELETED, NOT SOFTENED. It said *"Guard must NOT be
+    // added to the existing four roads"* — and Guard was added to all four roads three days later.
+    // 🔑 A NOTE THAT THE DATA HAS OVERRULED IS WORSE THAN NO NOTE: it gets believed. Check the data.
+    //
+    // 🔴 THE HARD CONSTRAINT, MEASURED 2026-08-21 — **GUARD MUST BE 1.**
+    // Guard N halves your first N HITS, so it is only answerable if you can bring MORE than N.
+    // The whole game's hit ceiling is **2** (🗡️ Sparkstrike for the mage, Second Fang for the
+    // rogue — one card each), so at Guard 2 every hit anyone can bring is halved and the shape's
+    // own counter-play stops existing. Measured on the three Guard-2 creatures that shipped:
+    //     mage 0C/4N/**96L** · rogue 0C/20N/**80L**  — nobody beats it, so it is not a shape.
+    // ⚠️ Guard 2 only becomes legal if some class can land THREE hits. Until then it is a wall.
+    //
+    // 🔴 AND THE PAIRING RULE THAT MADE IT WORSE: the eight Guard creatures averaged 18 HP, the TOP
+    // of the range, so a shape that HALVES your damage also carried the BIGGEST health pools.
+    // **A shape and a stat that enforce the same thing MULTIPLY, they do not add** — the exact
+    // error the Stormreach's first cut made with 🌀 Evasion plus init 5–7 (measured 32%).
+    // 🔑 A shape that halves your blow wants BELOW-average HP. Guard creatures now run 7–12
+    // against a non-Guard mean of 12.7 (was 11–18), which is the pass that made it playable:
+    //     mage 0C/21N/79L → **8C/49N/43L** · rogue 5C/38N/57L → **20C/58N/22L**
+    // ...against an ordinary fight's 30C/46N/25L (mage) — so Guard is now the hardest ordinary
+    // thing on the road rather than a loss, which is what a shape is supposed to be.
     // 🧱 Deep Cut shaves a hit off the pool · 🗡️ Whetstone sharpens every hit
     const guardPool = (!quenched && foeHas(e, 'guard'))
       ? Math.max(0, (e.shapeV || 0) - (hasCharm('deepcut') ? 1 : 0)) : 0;
@@ -4600,6 +4618,15 @@ function computeAction(reserve) {
     // under the old rule a fully sharpened rogue ALSO dealt zero to a pool.
     const per = Math.max(0, perHit - armorCut);
     let value = (hits - guarded) * per + guarded * Math.floor(per * GUARD_CUT);
+    // 🧱 WHAT THE PLATES ATE — carried so the REVEAL can say so (found 2026-08-21).
+    // 🐛 Armour and Evasion each got a line in the beat display and Guard never did, so a blow
+    // simply arrived halved with no term accounting for it: the encounter panel promised
+    // "halves your first hit" and the resolution never mentioned it again.
+    // 🔑 *Never state a rule about an object without marking the object* — and *legible math
+    // always* means showing the TERMS, which is exactly what a silent halving is not.
+    // ⚠️ This is the payload trap the note on compose() warns about: three bugs this month came
+    // from a value being computed and never reaching the reveal. Add the field WITH the rule.
+    const guardCut = (hits - guarded) * per + guarded * per - value;
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
@@ -4627,7 +4654,7 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -4752,6 +4779,12 @@ function resolve() {
     // 🗡️ Whetstone was invisible: it added +1 per hit and the log never said so
     if (hasCharm('whetstone')) b1.push(L(`🗡️ Whetstone: +1 on every hit`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
+    // 🧱 GUARD, FINALLY SAID OUT LOUD. It had no line at all, so the blow just arrived smaller.
+    // ⚠️ It names the COUNTER-PLAY too, because the shape has one and a single-hit turn should
+    // be told what it was: hits beyond the pool land whole.
+    if (r.guardCut > 0) b1.push(L(
+      `🧱 Guard ${r.guardPool}: ${r.guarded} of your ${r.hits} hit${r.hits === 1 ? '' : 's'} met the plates and was halved — <b>−${r.guardCut}</b>` +
+      (r.hits > r.guarded ? ` (the other ${r.hits - r.guarded} landed whole)` : ` · a second hit would have landed whole`), 'bad'));
     if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
     beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
