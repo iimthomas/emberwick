@@ -954,6 +954,8 @@ const MAGE = {
   // the rogue with phantom chances every turn — see the note at the craft tracker.
   // how many blows this card lands as the Spell — the mage never splits.
   hitsOf(c) { return c.def.hits || 1; },
+  // what gets added to EACH blow rather than divided across them — see `added` in computeAction.
+  perHitBonus() { return (S.potionFx ? S.potionFx.value : 0); },
   craft: {
     label: 'attuned',
     avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
@@ -1092,6 +1094,8 @@ let MOMENTUM_VALUE = 1;   // strike damage per pip
 // answerable. Do not act on that until this has been played; one class reaching 3 hits on 12% of
 // turns is not the same as the game having a hit ceiling of 3.
 let MOMENTUM_FULL = 'add';
+// 🔑 see the note at `added`: a multi-hit card divides its OWN value, never the bonuses on top.
+let SPLIT_ADDS_PER_HIT = true;
 // ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
 // *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
 // work in flesh and blood, blue cards are weaker but they give more pitch."*
@@ -1470,6 +1474,12 @@ const ROGUE = {
   hitsOf(c, isStrike) {
     const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
     return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0);
+  },
+  // ● pips land on every blow, like a potion does. ⚠️ The blade VERB bonus is not shown here —
+  // it depends on the fuel card, which the face cannot know; the reveal still states it.
+  perHitBonus() {
+    return (S.potionFx ? S.potionFx.value : 0)
+         + (MOMENTUM_FULL === 'convert' && (S.momentum||0) >= MOMENTUM_CAP ? 0 : (S.momentum || 0) * MOMENTUM_VALUE);
   },
   craft: {
     label: 'paid in full',
@@ -4655,8 +4665,14 @@ function computeAction(reserve) {
     const wrongType = false;
     // 🗡️ the blade-side verb lands BEFORE the shape does, so 🛡️ Armour is still paid on the total
     // and 🌀 Evasion still halves it. A verb makes the blow bigger; it does not exempt the blow.
-    const base = pileVal + (S.potionFx ? S.potionFx.value : 0)     // 🧪 Emberdraught
-                 + (a.rogue ? (a.rogue.bonus || 0) : 0);
+    // 🔑 THE CARD SPLITS; WHAT YOU ADD TO IT DOES NOT (Thomas, 2026-08-22):
+    // *"if a card does 8x2, any added damage like a +4 potion, will make it 12x2."*
+    // That is how anyone reads a card face, and dividing a buff is the surprising answer — so the
+    // card's OWN value is what a multi-hit strike divides, and every bonus lands on each blow.
+    // ⚠️ It is an ENGINE rule, not a rogue one: 🗡️ Sparkstrike gets it too.
+    const added = (S.potionFx ? S.potionFx.value : 0)               // 🧪 Emberdraught
+                  + (a.rogue ? (a.rogue.bonus || 0) : 0);           // ● pips + the blade verb
+    const base = pileVal + added;
     const withBoost = base + boostEff;
     // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
     // an elemental attack - a rule no non-elemental class could ever join - but a SHAPE, stated
@@ -4741,7 +4757,12 @@ function computeAction(reserve) {
     // silently does nothing is the exact bug the element gate was just fixed for.
     // 🔑 A SPECIAL CASE FOR THE COMMON PATH IS A PLACE FOR A RULE TO GO MISSING.
     // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
-    const perHit = (hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
+    // ⚠️ SPLIT ONLY THE CARD. `withBoost` is card + bonuses + Surge; dividing all of it made a
+    // +4 potion worth +2 a hit, which is not what the face says.
+    const splitBase = withBoost - added;
+    const perHit = (hits > 1 && SPLIT_ADDS_PER_HIT
+                      ? Math.floor(splitBase / hits) + added
+                      : hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
     // 🧱 GUARD REDUCES, IT DOES NOT NULLIFY (softened 2026-08-17, Thomas: *"that doesn't sound
     // fun if a mage literally can't do anything about guard"* / *"i don't want to have to force
     // people to play a different class"*).
@@ -7959,8 +7980,14 @@ function cardHTML(card) {
   // appeared on the card — the rule fired and the face said nothing. Same class of bug as 🧱 Guard
   // having no reveal line and the Surge row printing the banked figure: *a rule that fires without
   // appearing.* ⚠️ The split applies only in the STRIKE slot, so the slot has to be passed in.
-  const nHits = CLASS.hitsOf ? CLASS.hitsOf(card, S.assign && S.assign.Spell === real.id) : (d.hits || 1);
-  const per = n => nHits > 1 ? `${Math.floor(n / nHits)}<span class="v-x">×${nHits}</span>` : `${n}`;
+  const isStrike = !!(S.assign && S.assign.Spell === real.id);
+  const nHits = CLASS.hitsOf ? CLASS.hitsOf(card, isStrike) : (d.hits || 1);
+  // 🔑 AND THE BONUSES LAND ON EACH BLOW, SO THE FACE MUST SAY SO. Thomas: *"if a card does 8x2,
+  // any added damage like a +4 potion, will make it 12x2."* That is a statement about what the
+  // CARD READS, so showing 8x2 while the maths does 12x2 would be the same bug as 🧱 Guard having
+  // no reveal line — a rule that fires without appearing, for the fourth time today.
+  const perAdd = (isStrike && SPLIT_ADDS_PER_HIT && CLASS.perHitBonus) ? CLASS.perHitBonus() : 0;
+  const per = n => nHits > 1 ? `${Math.floor(n / nHits) + perAdd}<span class="v-x">×${nHits}</span>` : `${n + perAdd}`;
   const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
     (CLASS.pairs
       ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${per(attV)}</span>`
