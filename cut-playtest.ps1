@@ -11,8 +11,9 @@
 #  tester mid-run. A drop is a COPY, not a branch: nothing to merge, nothing to
 #  rebase, and the snapshot keeps whatever ?v= it was cut at.
 #
-#  The dev tools (solver.html / solver.js / measure.js) are deliberately NOT
-#  copied -- the playtest build has no bot and no measurement rig.
+#  The dev tools (solver.html / solver.js / measure.js / dev/) are deliberately NOT
+#  copied -- the playtest build has no bot and no measurement rig. The list below is
+#  an ALLOW-list, so a new dev file is excluded by default rather than by memory.
 #
 #  Usage, from prototype/ :
 #      ./cut-playtest.ps1

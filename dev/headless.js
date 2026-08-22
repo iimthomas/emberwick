@@ -1,0 +1,120 @@
+// 📏 HEADLESS EMBERWICK — run game.js + solver.js under node against a DOM stub.
+//
+// ⚠️ NON-INVASIVE BY CONSTRUCTION. It loads both files VERBATIM. It makes exactly two edits, and
+// both are declared here: it deletes the trailing showMenu() boot call (failing LOUDLY if that
+// call ever moves, rather than silently measuring a game that never booted), and it appends an
+// export epilogue that only copies names onto the sandbox.
+//
+// 🐛 THREE GOTCHAS, all the same root cause — a top-level `const` in a vm script is LEXICAL:
+//  1. it never lands on the sandbox, so game.js and solver.js must be ONE script or solver.js
+//     cannot see CARD_DEFS;
+//  2. it is invisible from OUTSIDE the sandbox too, which is what the epilogue is for;
+//  3. normalizeAssign() is called from render(), which is stubbed — so any HAND-DRIVEN test must
+//     seat its own cards. RUNSIM never trips on this because chooseBest() writes S.assign directly.
+'use strict';
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const NL = '\n';
+
+// 🔑 DEFAULTS TO ITS OWN FOLDER. This harness has been rebuilt twice because it lived in a
+// session scratchpad outside the repo; it lives beside game.js now, like solver.js and measure.js.
+const DIR = process.env.EMBERWICK_DIR || path.join(__dirname, '..');
+const load = file => fs.readFileSync(path.join(DIR, file), 'utf8');
+
+let game = load('game.js');
+const BOOT = /\nshowMenu\(\);\s*$/;
+if (!BOOT.test(game)) {
+  throw new Error('headless: the trailing showMenu() boot call is not where it was. ' +
+                  'Find it and update this harness — do NOT guess.');
+}
+game = game.replace(BOOT, NL + '/* boot call removed by headless harness */' + NL);
+const solver = load('solver.js');
+
+// ---- the DOM stub -------------------------------------------------------
+function mkEl() {
+  return {
+    innerHTML: '', textContent: '', value: '', className: '', id: '',
+    style: { setProperty() {}, removeProperty() {}, getPropertyValue: () => '' },
+    dataset: {}, children: [],
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    appendChild(c) { this.children.push(c); return c; },
+    removeChild() {}, remove() {}, setAttribute() {}, getAttribute() { return null; },
+    addEventListener() {}, removeEventListener() {}, focus() {}, blur() {}, click() {},
+    scrollIntoView() {}, closest() { return null; },
+    querySelector() { return null; }, querySelectorAll() { return []; },
+    getBoundingClientRect() { return { top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 }; },
+    insertAdjacentHTML() {},
+  };
+}
+const store = {};
+const els = {};
+const sandbox = {
+  console,
+  document: {
+    body: mkEl(), documentElement: mkEl(),
+    // 🔑 CACHED BY ID, not a fresh stub each call — otherwise innerHTML never persists and a test
+    // can never READ BACK what a render function wrote. That is how a test passes over dead code.
+    getElementById: id => (els[id] || (els[id] = mkEl())),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    createElement: mkEl,
+    addEventListener() {}, removeEventListener() {},
+  },
+  localStorage: {
+    getItem: k => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: k => { delete store[k]; },
+    clear: () => { for (const k in store) delete store[k]; },
+  },
+  location: { href: 'http://localhost/', search: '', hash: '' },
+  navigator: { userAgent: 'node', standalone: false },
+  matchMedia: () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {} }),
+  setTimeout, clearTimeout, setInterval, clearInterval,
+  requestAnimationFrame: fn => setTimeout(fn, 0),
+  performance: { now: () => Date.now() },
+  JSON, Date, Object, Array, String, Number, Boolean, RegExp, Error, Map, Set, isNaN, parseInt, parseFloat,
+};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+sandbox.self = sandbox;
+
+// 🎲 SEEDED RNG so a before/after comparison is BIT-EXACT rather than two noisy percentages.
+// rnd() falls through to Math.random outside the tutorial, so seeding Math.random seeds the game.
+// 🔑 THIS IS WHAT MAKES A NO-RULE-CHANGE REFACTOR TESTABLE: there is no number to compare at
+// n=200 that is not noise, but there IS an exact answer to "did the same seed play the same run?"
+let _seed = 1;
+const seed = n => { _seed = (n >>> 0) || 1; };
+sandbox.Math = Object.create(Math);
+sandbox.Math.random = function () {
+  _seed |= 0; _seed = (_seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(_seed ^ (_seed >>> 15), 1 | _seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+vm.createContext(sandbox);
+// 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
+const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE',
+                 'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD'];
+const epilogue = NL + ';' + NL +
+  EXPORTS.map(n => 'try { globalThis.' + n + ' = ' + n + '; } catch (e) {}').join(NL) + NL +
+  // S is reassigned every run, so it must be exported as a GETTER, never a copied reference.
+  'globalThis.getS = function () { return S; };' + NL;
+vm.runInContext(game + NL + ';' + NL + solver + epilogue, sandbox, { filename: 'emberwick-headless.js' });
+
+const useClass = name => sandbox.setClass(name === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
+module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS() };
+
+// ---- CLI ----------------------------------------------------------------
+if (require.main === module) {
+  const arg = process.argv[2];
+  if (arg === 'runsim') {
+    const N = +(process.argv[3] || 100);
+    useClass(process.argv[4] || 'mage');
+    seed(+(process.argv[5] || 12345));
+    console.log(JSON.stringify(sandbox.RUNSIM.batch(true, N), null, 2));
+  } else if (arg === 'boot') {
+    console.log('booted ok · CARD_DEFS', sandbox.CARD_DEFS.length,
+                '· DRAGONS', sandbox.DRAGONS.length,
+                '· build', sandbox.BUILD);
+  }
+}
