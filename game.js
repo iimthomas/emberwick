@@ -952,6 +952,8 @@ const MAGE = {
   // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
   // what its power IS. This used to live in the engine as a bare element check, which credited
   // the rogue with phantom chances every turn — see the note at the craft tracker.
+  // how many blows this card lands as the Spell — the mage never splits.
+  hitsOf(c) { return c.def.hits || 1; },
   craft: {
     label: 'attuned',
     avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
@@ -1068,7 +1070,28 @@ const MAGE = {
 // 🔑 DECAY WAS THE OTHER HALF OF THE PROBLEM: losing 1 a turn is EROSION, not pressure. Nothing you
 // did caused it, so there was nothing to try at. A streak is fun because BREAKING it is an event
 // and the event is your fault.
-const MOMENTUM_CAP = 5;
+// ⚠️ `let`, not const — these three define the SHAPE of the streak and the shape is the whole
+// question. 📏 Measured 2026-08-22: at a 53% clean-turn rate a reset-on-any-damage streak yields
+// **1.13 pips** and reaches a cap of 5 **4.2%** of the time — predicted from p alone, and the game
+// measured 1.0 and 4%. 🔑 MOMENTUM IS NOT MISTUNED, IT IS ARITHMETICALLY DETERMINED: expected
+// length is p/(1−p) and P(cap) is p^cap, so **no payout tuning can deepen it** — only p, the cap,
+// or the reset RULE can. And p just went DOWN, because damage went up.
+let MOMENTUM_CAP = 3;
+let MOMENTUM_STEP = 1;    // pips earned by a clean turn
+let MOMENTUM_BREAK = 1;   // damage of at least this much breaks the streak (1 = any damage)
+let MOMENTUM_VALUE = 1;   // strike damage per pip
+// ● AT A FULL METER THE STRIKE SPLITS IN TWO. 0 = off · 'add' = an extra hit AND keep the pip
+// damage · 'convert' = an extra hit INSTEAD of the pip damage.
+// 🔑 WHY LATERAL RATHER THAN BIGGER: every other payout knob on this meter is raw damage, so
+// "make Momentum matter" and "do not power-creep the rogue" were the same dial pointing opposite
+// ways — pips worth 2 bought a +10/+20/+2/+16 duel swing. **Multi-hit divides the total instead of
+// raising it**, so a full meter changes the KIND of your strike: better into 🧱 Guard (fewer blows
+// eaten), worse into 🛡️ Armour (subtracted from each). *Lateral power, not vertical.*
+// ⚠️ IT ALSO MOVES A CONSTRAINT WRITTEN THIS MORNING: 🧱 Guard must be 1 because the game's hit
+// ceiling is 2. At a full meter Second Fang lands THREE — so Guard 2 becomes theoretically
+// answerable. Do not act on that until this has been played; one class reaching 3 hits on 12% of
+// turns is not the same as the game having a hit ceiling of 3.
+let MOMENTUM_FULL = 'add';
 // ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
 // *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
 // work in flesh and blood, blue cards are weaker but they give more pitch."*
@@ -1405,7 +1428,12 @@ function rogueMath() {
   const verbBonus = verb === 'fangs'  ? eff(st).value
                   : verb === 'lethal' ? paid
                   : 0;
-  const streakDmg = S.momentum || 0;
+  // ● WHAT ONE PIP IS WORTH. Separated from the cap 2026-08-22 so the two can be traded against
+  // each other: a SHORT meter you actually fill, with pips that matter, is a different design from
+  // a long meter you never fill. Thomas: *"whats so bad about having a momentum cap of 3? what if
+  // we increase what you get as well with a cap of 3"* — that is Design A done properly.
+  const atFullNow = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+  const streakDmg = (MOMENTUM_FULL === 'convert' && atFullNow) ? 0 : (S.momentum || 0) * MOMENTUM_VALUE;
   const bonus = verbBonus + streakDmg;
   return { paired, verb, rawCost, cost, paid, full, fuel, bonus, verbBonus, streakDmg,
            saved: 0, streak: S.momentum || 0 };
@@ -1437,6 +1465,12 @@ const ROGUE = {
   // card in this hand have covered another's ⚡ cost" and finding it is striking for the full value.
   // 🔑 THE MAPPING IS THE ONE ALREADY WRITTEN DOWN FOR HARDSHIPS: *a rule that names ATTUNING,
   // the rogue reads as PAYING.* Same sentence, one layer up.
+  // ● a FULL meter splits the Strike. Reads the same MOMENTUM_FULL the maths does, so the face and
+  // the resolution cannot disagree.
+  hitsOf(c, isStrike) {
+    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+    return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0);
+  },
   craft: {
     label: 'paid in full',
     avail(hand) {
@@ -1453,7 +1487,12 @@ const ROGUE = {
     const now = S.momentum || 0, lone = hasCharm('lonefang');
     return [{
       id: 'mo', icon: '🗡️', name: 'Momentum', count: now, cap: MOMENTUM_CAP,
-      worth: now > 0 ? `your Strike hits for <b>+${now}</b>`
+      // ⚠️ THE TOKEN MUST NAME THE PAYOFF *BEFORE* YOU REACH IT, or filling the meter is a surprise
+      // rather than a goal — "be fun trying to keep up the momentum" needs something to aim at.
+      worth: (MOMENTUM_FULL && now >= MOMENTUM_CAP)
+             ? `<b>+${now}</b> — and your Strike <b>splits in two</b>`
+           : now > 0 ? `your Strike hits for <b>+${now}</b>` +
+               (MOMENTUM_FULL ? ` <span class="dim">· fill it and the Strike splits</span>` : '')
            : (lone ? 'nothing yet — but <b>Lone Fang</b> gives <b>+4</b>' : 'no bonus yet'),
       note: now > 0
         ? `any damage breaks it${hasCharm('secondnature') ? ' back to 2' : ''}`
@@ -1492,7 +1531,9 @@ const ROGUE = {
     // it was built FOR could not. Thomas found it on meeting his first Guard creature:
     // *"how do i do multiple hits as rogue?"*
     // 🔑 A COMMENT THAT DESCRIBES A SYSTEM IS NOT THE SYSTEM - same fault as `defs: null`.
-    const hits = strike.def.hits || 1;   // ⚠️ her card is `strike`, not `spell`
+    // ● A FULL METER SPLITS THE STRIKE — see MOMENTUM_FULL.
+    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+    const hits = (strike.def.hits || 1) + (atFull ? 1 : 0);   // ⚠️ her card is `strike`, not `spell`
     return {
       value: Math.max(0, dmg + (duelFx().value || 0)
         + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
@@ -5153,7 +5194,11 @@ function finishResolve() {
   // cards is a turn that touched you whatever the variable is called.
   // 🔑 ONE DEFINITION, THE SAME ONE THE HEALTH BAR USES: did this turn cost you cards?
   if (r.rogue) {
-    const touched = damage > 0 || r.timePenalty > 0;
+    // 🔑 WHAT COUNTS AS "TOUCHED" IS THE ONLY LEVER THAT CHANGES THE STREAK'S SHAPE.
+    // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
+    // a graze no longer breaks your rhythm but a real blow does — which is the one change that
+    // lifts p without touching how often you get hit.
+    const touched = damage >= MOMENTUM_BREAK || r.timePenalty > 0;
     const before = S.momentum || 0;
     if (touched) {
       // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
@@ -5163,7 +5208,7 @@ function finishResolve() {
       // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
       // Read here, not in compose(), because THIS turn's outcome does not exist until now — the
       // same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
-      const step = 1 + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
+      const step = MOMENTUM_STEP + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
                      + (r.rogue.verb === 'surge' ? 2 : 0);
       S.momentum = Math.min(MOMENTUM_CAP, before + step);
       if (S.momentum > before) log(`● Untouched — Momentum ${before} → ${S.momentum}`, 'good');
@@ -7909,7 +7954,12 @@ function cardHTML(card) {
   // ⚠️ Printed PER-HIT × COUNT, not total × count. The total is SPLIT, so "23×2" would promise
   // 46; "11×2" is what actually lands - and it is the number that matters against 🛡️ Armour,
   // because armour comes off each blow separately.
-  const nHits = d.hits || 1;
+  // 🔑 ASK THE CLASS HOW MANY BLOWS THIS CARD WOULD LAND, rather than reading `d.hits` off the def.
+  // ● a full Momentum meter splits the rogue's Strike in two, and reading the DEF meant that never
+  // appeared on the card — the rule fired and the face said nothing. Same class of bug as 🧱 Guard
+  // having no reveal line and the Surge row printing the banked figure: *a rule that fires without
+  // appearing.* ⚠️ The split applies only in the STRIKE slot, so the slot has to be passed in.
+  const nHits = CLASS.hitsOf ? CLASS.hitsOf(card, S.assign && S.assign.Spell === real.id) : (d.hits || 1);
   const per = n => nHits > 1 ? `${Math.floor(n / nHits)}<span class="v-x">×${nHits}</span>` : `${n}`;
   const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
     (CLASS.pairs
