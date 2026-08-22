@@ -30,6 +30,20 @@ function setMomentumWeight(w) { MOMENTUM_WEIGHT = w; }
 // end of this encounter — the same blind spot as the Emberwake bank, ✦ Unspent and 🃏 Reversed.
 // ⚠️ Which is why it is weighted by how DEEP the streak already is: that is the only way to make
 // the instrument prefer keeping a long one, and it is a POLICY, not a fact about the game.
+// ⚔️ THE LAST MILE'S APPROACH — hoisted here for the SAME reason chainValue is, and by this
+// file's own standing instruction (*if a third is ever needed, EXTRACT IT*). There are two
+// scorers in this file; a term that lives in only one of them is how the last three instrument
+// bugs happened. The per-hand analyser builds synthetic encounters and never sets `lastMile`
+// today, so this reads 0 there — but if it ever does, it is already correct.
+//
+// ⚠️ POLICY, NOT FACT. Being unseen pays entirely into the DUEL, which a one-encounter scorer
+// cannot see at all — the same blind spot as the Emberwake bank and ✦ Unspent. It sits BELOW
+// outcome and damage, so the bot never fails the road to arrive quietly, and any number produced
+// with it must be reported alongside UNSEEN_WEIGHT = 0.
+let UNSEEN_WEIGHT = 3;
+function setUnseenWeight(w) { UNSEEN_WEIGHT = w; }
+const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
+
 function chainValue(r) {
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
   const touched = (r.combatDmg || 0) + (r.early || 0) + (r.timePenalty || 0) > 0;
@@ -345,9 +359,19 @@ function SOLVER_pct(n, d) { return d ? Math.round(n / d * 100) : 0; }
 const RUNSIM = (() => {
   const OUT = { Complete: 2, Narrow: 1, Loss: 0 };
   // 🗡️ chainValue() is shared with the analyser's scorer — see the note at the top of this file.
+  // ⚔️ THE LAST MILE'S SECOND RACE (2026-08-21). ⚠️ TEACH IT OR THE MEASUREMENT IS A LIE: the bot
+  // scores ONE encounter, and the Approach band pays entirely into the DUEL — a softened shape and
+  // an opening blow it will never see from here. Left untaught, the bot maximises Move alone,
+  // always arrives loud, and every number we then took would report the penalty as unavoidable
+  // and the boon as unreachable. Same class of error as the bot that never carried an Arsenal.
+  //
+  // 🔑 The terms are stated in the currencies this file already trusts: the rouse is DAMAGE (it is
+  // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
+  // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
     ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value]
-    : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0)), chainValue(r), r.value];
+    : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
+       approachValue(r), chainValue(r), r.value];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
@@ -790,7 +814,8 @@ const RUNSIM = (() => {
     finally { window.render = _r; window.saveGame = _s; try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
-  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight };
+  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight,
+           setUnseenWeight };
 })();
 
 function runSimulator() {

@@ -2035,7 +2035,65 @@ function dragonForStage(n) { return DRAGONS.find(d => d.stage === n) || DRAGONS[
 // 46% Narrow / 3% Loss - which is the point: a bonus earned about half the time and graded the
 // rest, instead of the old Approach's all-or-nothing cliff. Dragon HP was retuned with it
 // (40/44/56/44 -> 44/47/60/42) to land the curve at 85 / 58 / 48 / 36.
-const LAST_MILE = { mp: 16, hpComplete: 14, hpNarrow: 7 };
+// ⚔️ THE LAST MILE — ONE hand, TWO races (second race added 2026-08-21, Thomas).
+//
+// 🔑 IT USED TO ASK ONE QUESTION AND PRINT TWO. `nightfall: 0` meant the Pace line on screen was a
+// race that COULD NOT BE LOST — a term displayed doing nothing, which is the opposite of legible
+// math. Thomas: *"the first MP part, is there only an MP check, nothing else? initiative check
+// too, there should be some sort of consequence as well."*
+//
+// 🔑 AND THE FICTION ALREADY PROMISED IT. *"You fall on it before it stands"* is a claim about
+// SPEED, and it was being paid out by a DISTANCE number. So the two races buy two different things:
+//   👣 MOVE  vs its MP        → how hurt it starts   (dragon HP — unchanged, already tuned)
+//   💨 PACE  vs its INITIATIVE → whether it is ready for you (its SHAPE, and the opening blow)
+//
+// 🔑 THE BOON HALF IS NOT NEW MACHINERY — IT IS THREE FIELDS THAT HAVE BEEN WIRED TO ZERO SINCE
+// 2026-08-05. `dragonState.boon = { armourCut, unseen, calm }` is one softener per defence shape,
+// read by duelArmour() / duelStrike() / duelCounter(), with display strings ("cracked", "unseen
+// you (N left)") that could never fire. They were the clean-Approach reward, deleted with the
+// Approach; the comment left behind said *"a future reward may fill them again."* This is it.
+// ⚠️ [[Balance_Log]]: that boon was worth **+41 points at stage 4** and nothing had replaced it.
+//
+// 🔑 WHY THE PENALTY IS A SOAK, AND WHY THAT IS THE ONLY HONEST COST HERE (Thomas's call):
+// everything re-gathers for the duel, so a Time Penalty or a deck-ORDER cost at the lair is
+// PHANTOM — which is exactly why the old Approach's costs were deleted rather than tuned. But a
+// SOAK downgrades cards permanently and a Lv1 soaked is TRASHED outright, so it carries into the
+// duel as lost levels and lost stamina. Measured: 1 card of duel stamina ≈ 8 points of win rate.
+// ⚠️ AND IT DOES NOT BREAK THE PROMISE THE LAST MILE MAKES. *"Hold nothing back"* is about what you
+// PLAY, and playing still costs nothing — every card you play comes back. Only FAILING costs.
+//
+// ⚠️ BANDS ARE SET FROM THE MEASUREMENT, NOT THE FICTION (dev/lastmile-probe.js, n=120/class).
+// Pace runs a median of 5-6 against a dragon Initiative of 7-10, so "beat its Initiative" is an
+// 18%/27% event — right for a top band — and "below half" is 34% mage / 22% rogue.
+// 🔑 The mage eats the penalty more BECAUSE SHE IS SLOWER, and that is legitimate class texture:
+// classes differ in HOW HARD, never in WHETHER.
+const LAST_MILE = {
+  mp: 16, hpComplete: 14, hpNarrow: 7,
+  // 🌒 what arriving unheard softens — ONE tick of whatever the shape is.
+  // ⚠️ Deliberately gentle on first ship. These are the biggest levers in the game; raise them
+  // from a measurement, never from an argument.
+  armourCut: 2,     // 🛡️ Armour −2
+  unseenBeats: 1,   // 🌀 Evasion sleeps this many beats
+  calmBeats: 1,     // ⏳ the breath holds steady this many beats
+};
+// what arriving unheard is actually worth against THIS dragon — read off its shape rather than
+// stated in prose, so the briefing can never promise a softening the duel does not grant.
+function unseenPromise() {
+  const bits = [];
+  if (hasShape('armour'))     bits.push(`its plate is not set (<b>Armour −${LAST_MILE.armourCut}</b>)`);
+  if (hasShape('evasion'))    bits.push(`<b>Evasion sleeps ${LAST_MILE.unseenBeats}</b> beat${LAST_MILE.unseenBeats === 1 ? '' : 's'}`);
+  if (hasShape('relentless')) bits.push(`<b>its breath holds ${LAST_MILE.calmBeats}</b> beat${LAST_MILE.calmBeats === 1 ? '' : 's'}`);
+  return bits.length ? bits.join(' and ') + '.' : 'it has nothing to set — this one guards nothing.';
+}
+// which of the three bands this Pace lands in. ONE place decides, so the briefing, the beat
+// display, the resolution and the bot can never disagree about what the race was.
+function lastMileApproach(pace) {
+  const di = (S.dragon && S.dragon.init) || 0;
+  if (!di) return 'even';
+  if (pace >= di) return 'unseen';
+  if (pace >= Math.ceil(di / 2)) return 'even';
+  return 'heard';
+}
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 // dragonWeakness CUT 2026-07-29 — "weakness = the elements it does not shield" cannot survive
 // the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
@@ -2395,7 +2453,7 @@ function saveGame() {
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
-      lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
+      lastMileOutcome: S.lastMileOutcome, lastMileApproach: S.lastMileApproach, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       fork: S.fork ? S.fork.map(e => e.name) : null,
       boon: S.boon, boonOwed: S.boonOwed,
       // 🗺️ THE MAP IS THE RUN, SO IT HAS TO BE IN THE SAVE. It was not, and a run left on the
@@ -2500,7 +2558,7 @@ function loadGame() {
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
       beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
-      lastMileOutcome: d.lastMileOutcome || null, duelBeat: d.duelBeat || 0, duelResult: null,
+      lastMileOutcome: d.lastMileOutcome || null, lastMileApproach: d.lastMileApproach || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
       // ⚠️ re-resolved from the region by NAME, never stored as objects - a serialized copy
       // would be a DIFFERENT object from the region's own def, and every identity check elsewhere
@@ -2891,6 +2949,7 @@ function freshGame(stage) {
     finalPhase: null,     // 'lastmile' | 'duel'
     dragonState: null,    // { hp, maxHp, boon } — the persistent dragon
     lastMileOutcome: null,  // ⚔️ what the run's final journey earned
+    lastMileApproach: null, // ⚔️ ...and how loudly it arrived (unseen / even / heard)
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
@@ -4593,6 +4652,14 @@ function computeAction(reserve) {
   if (timePenalty && S.potionFx && S.potionFx.tpCut) timePenalty = Math.max(0, timePenalty - S.potionFx.tpCut);
   const stormDmg = h === 'Storm' ? timePenalty : 0;
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
+  // ⚔️ THE LAST MILE'S SECOND RACE — its INITIATIVE, not Nightfall. See LAST_MILE.
+  // 🔑 IT LIVES IN computeAction() FOR THE SAME REASON EVERYTHING ELSE DOES: resolution, the
+  // reveal and the bot must share one source. Put the rouse in finishResolve instead and the
+  // solver's scorer cannot see it, so the bot would never trade Move for Pace — and every number
+  // we then took would say the penalty was unavoidable. *Teach the instrument or it measures a
+  // game we are not shipping.*
+  const lastMile = e.lastMile ? lastMileApproach(pace) : null;
+  const rouse = lastMile === 'heard' ? Math.ceil((S.dragon.breath || 0) / 2) : 0;
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
@@ -4604,6 +4671,7 @@ function computeAction(reserve) {
            stride, strideNames: strideCards.map(c => c.def.name),
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
+           lastMile, rouse,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
@@ -4684,10 +4752,23 @@ function resolve() {
 
     const b2 = [];
     if (r.paceBless) b2.push(L(`Gray Pilgrim's blessing: +2 Pace → ${r.pace}`, 'good'));
+    // ⚔️ ON THE LAST MILE, PACE RACES THE DRAGON — NOT NIGHTFALL. It used to print
+    // "vs Nightfall 0 → home before dark", a race that could not be lost, on the most important
+    // turn of the run. 🔑 A term shown doing nothing is worse than no term: it teaches the player
+    // that the number does not matter, on the exact turn it matters most.
+    if (r.lastMile) {
+      const di = S.dragon.init, half = Math.ceil(di / 2);
+      if (r.lastMile === 'unseen') b2.push(L(`🌒 Pace ${r.pace} vs its Initiative ${di} → you match it. You come up on the ${S.dragon.name} unheard — ${stripTags(unseenPromise())}`, 'good'));
+      else if (r.lastMile === 'heard') b2.push(L(`🐉 Pace ${r.pace} vs its Initiative ${di} (half ${half}) → it hears you coming, and takes the opening blow: ${r.rouse} damage`, 'bad'));
+      else b2.push(L(`Pace ${r.pace} vs its Initiative ${di} → you arrive without waking it, but it is set for you. No blow given, none taken.`));
+      beats.push({ label: '💨 APPROACH', big: r.pace, vs: `vs 💨 Init ${di} (half ${half})`,
+                   numCls: r.lastMile === 'heard' ? 'bad' : r.lastMile === 'unseen' ? 'enh' : 'ok', lines: b2 });
+    } else {
     if (r.nightCaught && r.emberShielded) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark, but the Ember Hollow wards your Arsenal (${r.reserve.def.name}) — it survives`, 'good'));
     else if (r.nightCaught) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark${r.reserve ? ` → the night snuffs your Arsenal (${r.reserve.def.name})` : ' (no Arsenal to lose)'}`, 'bad'));
     else b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → home before dark`, 'good'));
     beats.push({ label: '🌙 PACE', big: r.pace, vs: `vs Nightfall ${r.nightfall}`, numCls: r.nightCaught && !r.emberShielded ? 'bad' : 'ok', lines: b2 });
+    }
 
     beats.push({ outcomeBeat: true, final: true, lines: [
       L(`Move ${r.value} vs MP ${r.mpEff} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Time Penalty ${e.timePenalty}` : ''}`,
@@ -4809,7 +4890,7 @@ function finishResolve() {
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
   S.lastOutcome = r.outcome;
-  if (S.finalMode && S.finalPhase === 'lastmile') S.lastMileOutcome = r.outcome;
+  if (S.finalMode && S.finalPhase === 'lastmile') { S.lastMileOutcome = r.outcome; S.lastMileApproach = r.lastMile; }
   S.lastAttuned = !!r.enhUsed;
   // 🗡️ ADVANCE THE CHAIN. Sits beside lastAttuned/lastOutcome because it is the same kind of thing:
   // a breadcrumb the NEXT turn's class rule reads. The engine records it; only the rogue asks.
@@ -4870,6 +4951,14 @@ function finishResolve() {
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
+  // ⚔️ THE LAST MILE — arriving loud. It goes through `damage` rather than getting its own
+  // mechanism, so the ordinary soak phase handles it and nothing new had to be built.
+  // ⚠️ AND IT MUST SIT ABOVE THE MOMENTUM BLOCK: ● the streak breaks on *any* damage, and being
+  // heard by the dragon is damage. That is correct and it is free — one rule, not a special case.
+  if (r.rouse > 0) {
+    damage += r.rouse;
+    log(`🐉 It heard you coming. The ${S.dragon.name} is already up as you reach the mouth, and takes the opening blow — <b>${r.rouse}</b> damage.`, 'bad');
+  }
   if (r.loseReserve) S.loseReserve = r.loseReserve;
   if (r.poison > 0) S.poison = r.poison;
   S.damageEl = null;   // dead since soak doubling was cut 2026-07-26; kept in the schema for old saves
@@ -6574,13 +6663,29 @@ function renderEncounter() {
     panel.className = 'journey';
     panel.innerHTML =
       `<div class="enc-type">⚔️ THE LAST MILE</div>` + dragonBar +
-      `<div class="enc-stats"><span>👣 MP <b>${LAST_MILE.mp}</b> (half ${Math.ceil(LAST_MILE.mp / 2)})</span></div>` +
+      // ⚔️ TWO RACES, STATED AS TWO. Both targets are printed as numbers, in the same grammar as
+      // every other encounter, because the whole point of the second race is that it is a race
+      // you can SEE yourself winning or losing while you arrange.
+      `<div class="enc-stats">` +
+        `<span>👣 MP <b>${LAST_MILE.mp}</b> (half ${Math.ceil(LAST_MILE.mp / 2)})</span>` +
+        `<span>💨 vs Init <b>${S.dragon.init}</b> (half ${Math.ceil(S.dragon.init / 2)})</span>` +
+      `</div>` +
       `<div class="enc-mod lastmile-deal">` +
-        `<b>Complete it</b> and you fall on the ${S.dragon.name} before it stands — it begins the duel <b>−${LAST_MILE.hpComplete} HP</b>.<br>` +
+        `<b>👣 How hard you arrive</b> — how hurt it starts.<br>` +
+        `<b>Complete it</b> and you fall on the ${S.dragon.name} before it stands — <b>−${LAST_MILE.hpComplete} HP</b>.<br>` +
         `<b>Fall short</b> (half MP) and you land one blow as it turns — <b>−${LAST_MILE.hpNarrow} HP</b>.<br>` +
         `<b>Fail</b> and it meets you whole.` +
       `</div>` +
-      `<div class="enc-hint">🔄 <b>Nothing here costs you cards.</b> Spent, stacked or kept — you gather your whole deck for the duel either way. <b>Hold nothing back.</b></div>`;
+      `<div class="enc-mod lastmile-deal">` +
+        `<b>💨 How quietly you arrive</b> — whether it is ready for you.<br>` +
+        `<b>Match its Initiative</b> and it never hears you — ${unseenPromise()}<br>` +
+        `<b>Below half</b> and it is already up: it takes the opening blow, <b>${Math.ceil(S.dragon.breath / 2)} damage</b>, and you soak it with your deck.` +
+      `</div>` +
+      // ⚠️ THIS LINE USED TO SAY "NOTHING HERE COSTS YOU CARDS", FULL STOP, AND THAT IS NOW FALSE.
+      // 🔑 The promise it was making is still kept, though, and it is worth keeping precisely:
+      // what you PLAY costs nothing — every card comes back. Only FAILING costs. When a rule gains
+      // an exception, the line that states the rule has to gain it in the same edit.
+      `<div class="enc-hint">🔄 <b>Nothing you play here costs you cards.</b> Spent, stacked or kept — you gather your whole deck for the duel either way, so <b>hold nothing back</b>. Only arriving <i>loud</i> costs you: that blow is soaked, and blunted cards stay blunted.</div>`;
     return;
   }
   if (S.phase === 'intro' || S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
@@ -7826,6 +7931,19 @@ function finishLastMile() {
       : `You arrive late, but not spent, and land one blow as it turns — <b>−${cut} HP</b>. ${S.dragonState.hp} of ${S.dragonState.maxHp} remain.`, 'good result');
   } else {
     log(`You come to the lair mouth with nothing left in you. The ${S.dragon.name} meets you whole.`, 'bad');
+  }
+  // 🌒 THE SECOND RACE PAYS INTO THE SHAPE, NOT INTO HP — two races, two currencies, so neither
+  // is a bigger version of the other. Arriving unheard means it is not set for you yet.
+  // ⚠️ The blow for arriving LOUD was already taken on the road (see r.rouse) — it went through
+  // the ordinary soak, so those levels are gone before the duel begins. Nothing to apply here.
+  if (S.lastMileApproach === 'unseen' && S.dragonState) {
+    const b = S.dragonState.boon, bits = [];
+    if (hasShape('armour'))     { b.armourCut = LAST_MILE.armourCut;  bits.push(`🛡️ its plate is not set — Armour <b>−${LAST_MILE.armourCut}</b>`); }
+    if (hasShape('evasion'))    { b.unseen    = LAST_MILE.unseenBeats; bits.push(`🌀 it has not seen you — Evasion sleeps <b>${LAST_MILE.unseenBeats}</b> beat${LAST_MILE.unseenBeats === 1 ? '' : 's'}`); }
+    if (hasShape('relentless')) { b.calm      = LAST_MILE.calmBeats;   bits.push(`⏳ it has not drawn breath — the breath holds <b>${LAST_MILE.calmBeats}</b> beat${LAST_MILE.calmBeats === 1 ? '' : 's'}`); }
+    // ⚠️ an unshaped dragon exists (stage 0), and a reward that silently pays NOTHING is worse
+    // than one that says so — never print a boon you did not actually grant.
+    if (bits.length) log(`🌒 You came up on it unheard: ${bits.join(' · ')}.`, 'good result');
   }
   startDuel();
 }
