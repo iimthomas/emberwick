@@ -1633,20 +1633,31 @@ let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned
 //
 // ⚠️ IT IS A GUIDE, NOT A VERDICT. At stage 4, decks below par still win 24% of the time and
 // decks above it still lose. Never phrase it as a prediction, and never gate anything on it.
+// ⚠️ PAR RE-MEASURED 2026-08-22 (36/44/48/52 → 36/34/34/32) BECAUSE `FOE_ATK_MULT` MOVED.
+// 🔑 `par` is a MEASUREMENT, not a design choice — it is *the deck a winner brings to this lair*.
+// Harder hits mean fewer levels survive the road, so a stale par would have made the Standing chip
+// read `Deck 31 → 48 by the lair` on essentially every run at every stage. **A display that always
+// says you are losing is worse than no display** — the exact bug the Standing shipped with.
+// 📏 n≈350/stage: winners arrive with 36 / 34 / 34 / 32, losers with 28 / 30 / 30 / 27.
+// ⚠️ NOTE THE SHAPE CHANGED, NOT JUST THE NUMBERS. The old pars RISE (36→52) and the new ones are
+// flat-to-falling. That is honest: later dragons are not harder because they demand a bigger deck,
+// they are harder at the SAME deck — and the later roads take more off you, so you arrive with less.
+// 🔑 Par was never a cross-stage difficulty predictor; it judges you against THIS lair, from region
+// 4 only, and it remains a pure display — nothing reads it, nothing gates on it.
 const DRAGONS = [
   { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 52,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 55,
+  { stage: 2, name: 'Skyrender', par: 34, element: 'Lightning', init: 10, breath: 8, hp: 55,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 68,
+  { stage: 3, name: 'Cragmourn', par: 34, element: 'Stone', init: 7, breath: 5, hp: 68,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 50,
+  { stage: 4, name: 'Fathomdread', par: 32, element: 'Water', init: 10, breath: 7, hp: 50,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -4209,7 +4220,7 @@ function drawEncounter(avoidType, elite) {
 // ⚠️ AND IT IS COUPLED TO PAR. Harder hits mean fewer levels at the lair, and the lair is measured
 // against `dragon.par` (36/44/48/52) — so raising this makes the DRAGONS harder for free. Re-read
 // par before blaming a dragon for anything after moving it.
-let FOE_ATK_MULT = 1.0;
+let FOE_ATK_MULT = 1.5;
 function scaleFoe(e) {
   if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
   return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
