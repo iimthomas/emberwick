@@ -701,7 +701,20 @@ function bankCostPhrase(surge) {
 const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
 function wakeReady() { return hasEmberwake() && S.wake > 0 && isAssignPhase(); }
-function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
+// 🎴 AIMED BY TAPPING THE TOKEN ITSELF (2026-08-21). It used to be a labelled row of buttons in
+// the controls panel, which meant the Emberwake was drawn in TWO places — a prose line in the
+// status bar saying what you held, and a button row somewhere else for doing something with it.
+// 🔑 A TOKEN YOU CAN ACT ON IS THE CONTROL. Picking it up and putting it on a target is the
+// board-game gesture, and it collapses the two displays into the one object.
+// ⚠️ It never cycles back to UNAIMED: an unaimed Emberwake simply gutters out, so "no target" is
+// not a choice anyone would make — offering it would be the picker rule again, an option that is
+// never correct. First tap aims at ⚔️ attack (indexOf(-1) + 1 === 0), then it toggles.
+function cycleWake() {
+  if (!wakeReady()) return;
+  const keys = Object.keys(WAKE_TARGETS);
+  S.wakeTarget = keys[(keys.indexOf(S.wakeTarget) + 1) % keys.length];
+  render();
+}
 
 // ============================================================
 // 🕯️ THE CANDLE (2026-07-29, Thomas). While it is lit you can see the NEXT encounter.
@@ -869,6 +882,22 @@ const MAGE = {
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
     text: 'Bank your Surge instead of spending it. Next turn it fires at its <b>full worth</b>, aimed at your <b>strike</b> or your <b>speed</b> — so a turn already won or lost is never wasted.' },
+  // 🎴 THE MAGE'S BOARD STATE. The banked Surge is a thing on the table until it is spent or
+  // gutters out, and tapping it is how you aim it — see cycleWake().
+  // ⚠️ CLASS-OWNED ON PURPOSE. The Emberwake is the mage's slot ③ and a rogue must never inherit
+  // it by sharing an array; that is the same mistake as making the rule generic, one layer down.
+  tokens() {
+    if (!S.wake) return null;
+    return [{
+      id: 'wake', icon: '🔥', name: 'Emberwake', count: S.wake,
+      worth: S.wakeTarget ? `→ <b>${WAKE_TARGETS[S.wakeTarget]}</b>` : '<b>unaimed</b> — tap to aim it',
+      // 🔑 EVERY TOKEN SAYS HOW IT DIES, and this one has two deaths — ✦ Deepwell buys it an extra
+      // turn, and a note that stated only the usual one would be the ✦ Second Flame trap again:
+      // a second way for something to happen, with every line still explaining the first.
+      note: S.wakeDeep ? '✦ Deepwell — it survives one unspent turn' : 'spend it or lose it',
+      tap: wakeReady() ? 'cycleWake()' : null,
+    }];
+  },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
@@ -1329,6 +1358,22 @@ const ROGUE = {
   trait: { icon: '●', name: 'Momentum',
     text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
       '. Each pip adds <b>+1 to your Strike</b>. Take any damage and the whole streak breaks.' },
+  // 🎴 THE ROGUE'S BOARD STATE — and the token that was already almost one. The pips gave it a
+  // body in 2026-08-17; this only moves it onto the table where the rest of the board lives.
+  // ⚠️ IT SHOWS AT ZERO, ALWAYS. An empty meter is still a thing you are trying to fill — and
+  // 🗡️ Lone Fang pays +4 *precisely while the streak is broken*, so hiding an empty token would
+  // hide that charm's entire payout. The Mirror Fen rule: show the terms even when they are zero.
+  tokens() {
+    const now = S.momentum || 0, lone = hasCharm('lonefang');
+    return [{
+      id: 'mo', icon: '🗡️', name: 'Momentum', count: now, cap: MOMENTUM_CAP,
+      worth: now > 0 ? `your Strike hits for <b>+${now}</b>`
+           : (lone ? 'nothing yet — but <b>Lone Fang</b> gives <b>+4</b>' : 'no bonus yet'),
+      note: now > 0
+        ? `any damage breaks it${hasCharm('secondnature') ? ' back to 2' : ''}`
+        : 'come through a turn untouched to start it',
+    }];
+  },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
@@ -1683,9 +1728,11 @@ const TUTORIAL = {
             'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
+    // ⚠️ POINTS AT THE TOKEN (2026-08-21). It used to point at `.wake-row`, which no longer
+    // exists — a lesson whose target is gone silently rings nothing at all.
     { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
-      point: '.wake-row:not(.bank-row)',
-      text: '🔥 You are holding an <b>Emberwake</b>. Aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
+      point: '#field .tok-wake',
+      text: '🔥 You are holding an <b>Emberwake</b>. <b>Tap it</b> to aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
             '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
@@ -6223,6 +6270,7 @@ function render() {
     $('status-bar').innerHTML = '';
     $('encounter-panel').innerHTML = ''; $('encounter-panel').className = '';
     $('slots-panel').innerHTML = '';
+    renderField();          // 🎴 clears the board — a shell screen is outside any run
     const sc = $('scene'); if (sc) sc.innerHTML = '';
     renderControls();
     applyModal();    // 🚪 isShell() is false-y for modals, so this CLOSES one left open
@@ -6240,6 +6288,7 @@ function render() {
   renderScene();
   renderEncounter();
   renderControls();
+  renderField();
   renderSlots();
   renderLog();
   } finally {
@@ -6291,14 +6340,105 @@ function pointAtLesson() {
 // - it means show the TERMS. Temporary blessings lived as bare counters and were just as invisible.
 // The NAME is flavour; the EFFECT is the maths. They're separate spans so a phone can drop the
 // name and still show you every term you're calculating against.
+// ============================================================
+// 🎴 THE FIELD — persistent state as OBJECTS instead of counters (2026-08-21, Thomas)
+//
+// > *"thats how i envisioned tokens, like emberwake, and momentum. they are token cards that stay
+// >  out on the field until removed. boardstate. and yeah i want to dive into more boardstate
+// >  stuff because it feels more boardgamey, and it can open up gameplay a lot."*
+//
+// 🔑 THE INSIGHT IS THAT WE ALREADY HAD BOARD STATE AND WERE DRAWING IT AS ARITHMETIC. 🔥 the
+// Emberwake, ● Momentum, an Ember Hollow shield, a Glimpse, a curse — every one is an object with
+// a lifetime: it appears, it persists, something removes it. They READ as numbers because they
+// were BUILT as numbers, one variable at a time, in five unrelated places.
+//
+// ⚠️ THIS CHANGES NO RULE, AND WAS CHECKED AS ONE: same seed, same run, turn by turn, before and
+// after (scratchpad/identity.js). 🔑 A PURE REFACTOR HAS NO NUMBER TO MOVE, so "the win rate did
+// not change" would have proved nothing at n=200 — the noise band is wider than most real changes.
+// The provable claim is *did the same seed play the same game*, and that is what the test asks.
+//
+// 🔑 WHY BUILD IT BEFORE ANY CLASS NEEDS IT: the Engineer's turret, the Forager's planted seed and
+// the Mason's standing work are ONE system with three fillings if the field exists, and three
+// bespoke features if it does not. See [[Board_State_And_Tokens]].
+//
+// 🔑 AND IT IS THE MOAT ARGUMENT EXACTLY — a counter is a number, a token is a THING, and things
+// can be animated, thrown, shattered and swept off a table. ⚠️ WHICH IS PRECISELY WHY NONE OF THAT
+// IS BUILT HERE. The row is deliberately plain: staging is the engine's job, and building juice in
+// the prototype is the one category that is 100% throwaway.
+//
+// ⚠️ THE RULE THAT MATTERS MOST: THE FIELD *REPLACES* carried()'s HALF OF THIS — IT MUST NEVER SIT
+// BESIDE IT. `carried()` exists because of the Mirror Fen bug: a run-long −2 Pace that was
+// invisible because only one screen drew it. Two ledgers for persistent state is that same bug in
+// a new coat, so everything that moved here came OUT of carried() in the same edit.
+//
+// THE LINE BETWEEN THE TWO: the field holds what a TURN creates and a turn consumes — one-shot,
+// expiring, breakable. The status bar keeps what you OWN for the run: charms, a contract, the
+// Standing. In board terms, tokens on the table versus cards in your play area.
+//
+// 🌱 DELIBERATELY NOT BUILT: timers and removal. `timer` is in the shape so a planted token FITS,
+// but nothing counts down and no creature can break anything, because nothing plants yet. Build
+// the machinery when a class needs it — speculative generality is how a seam rots.
+//
+// THE SHAPE OF A TOKEN:
+//   id     stable handle — the CSS/animation hook, and what a tutorial lesson points at
+//   icon   one glyph; the thing you actually recognise it by across the table
+//   name   what it is called
+//   count  optional number carried ON the token
+//   cap    optional — with a count, draws PIPS instead of a numeral (● Momentum)
+//   worth  what it is doing RIGHT NOW. ⚠️ THE TERMS, NEVER A VERDICT.
+//   note   what takes it away. 🔑 EVERY TOKEN SAYS HOW IT DIES — that is what makes it an object
+//          with a lifetime rather than a stat, and it is the half a bare counter never showed.
+//   bane   true when it is working against you
+//   tap    optional handler. 🔑 A TOKEN YOU CAN ACT ON *IS* THE CONTROL — see 🔥 below.
+//   timer  reserved. Nothing reads it yet.
+//
+// ⚠️ THE CLASS OWNS ITS OWN TOKENS (`CLASS.tokens()`); the ENGINE owns the rest and owns the row.
+// Same split that already works for compose(): the engine draws, saves and expires them, the class
+// decides what its tokens MEAN. A rogue must never inherit the mage's Emberwake by sharing an
+// array — that is the slot-③ mistake in a new place.
+// ============================================================
+function fieldTokens() {
+  const out = [];
+  if (CLASS && CLASS.tokens) { const t = CLASS.tokens(); if (t) out.push(...t.filter(Boolean)); }
+  // ---- ENGINE TOKENS: the one-shot boons and banes the road hands you ----
+  if (S.paceBless > 0) out.push({ id: 'glimpse', icon: '🌙', name: 'Glimpse',
+    worth: '<b>+2</b> Pace', note: 'on your next journey' });
+  if (S.emberShield) out.push({ id: 'hollow', icon: '🔥', name: 'Ember Hollow',
+    worth: 'your <b>Arsenal</b> survives Nightfall', note: 'once, then it is gone' });
+  if (S.curseNextFight) out.push({ id: 'followed', icon: '☠️', name: 'Followed', bane: true,
+    worth: 'your next <b>fight</b> carries a Hardship', note: 'until it lands' });
+  return out;
+}
+
+const stripTags = s => String(s).replace(/<[^>]*>/g, '');
+function renderField() {
+  const el = $('field');
+  if (!el) return;
+  // ⚠️ a shell screen has no run, so it has no board either — and S may be a stale run object.
+  const toks = (!isShell() && S && S.deck) ? fieldTokens() : [];
+  el.className = toks.length ? 'has-tokens' : '';
+  if (!toks.length) { el.innerHTML = ''; return; }
+  el.innerHTML = toks.map(t => {
+    const body = (t.cap != null && t.count != null)
+      ? `<span class="tok-pips">${pips(t.count, t.cap)}</span>`
+      : (t.count != null ? `<span class="tok-count">${t.count}</span>` : '');
+    return `<div class="tok tok-${t.id}${t.bane ? ' is-bane' : ''}${t.tap ? ' is-tappable' : ''}"` +
+      (t.tap ? ` onclick="${t.tap}" role="button" tabindex="0"` : '') +
+      ` title="${stripTags(t.name + ' — ' + t.worth + ' · ' + t.note)}">` +
+      `<div class="tok-head"><span class="tok-icon">${t.icon}</span>${body}</div>` +
+      `<div class="tok-name">${t.name}</div>` +
+      `<div class="tok-worth">${t.worth}</div>` +
+      `<div class="tok-note">${t.note}</div>` +
+    `</div>`;
+  }).join('');
+}
+
+// 🧾 WHAT YOU OWN FOR THE RUN — charms and a contract. ⚠️ Everything ONE-SHOT or breakable moved
+// to the field above; do not add it back here, and do not add a token there without taking it out
+// of here. Two ledgers is the Mirror Fen bug again.
 function carried() {
   const out = [];
   for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
-  if (hasEmberwake() && S.wake > 0) out.push({ curse: false, name: 'Emberwake',
-    text: S.wakeTarget ? `🔥 +${S.wake} → ${WAKE_TARGETS[S.wakeTarget]}` : `🔥 +${S.wake} — unaimed` });
-  if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
-  if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
-  if (S.curseNextFight) out.push({ curse: true, name: 'Followed', text: '⚠️ next fight carries a Hardship' });
   // 📜 a contract is a run-layer promise with a deadline — exactly the thing the 2026-07-29
   // rule says must be on screen every turn, with its PROGRESS, not just its name
   const ct = activeContract();
@@ -6355,7 +6495,6 @@ function renderStatus() {
     `<span>🪙 <b style="color:#c9b458">${S.coins}</b></span>` +
     `<span>Results: <b class="good">${S.results.Complete}C</b> / <b>${S.results.Narrow}N</b> / <b>${S.results.Loss}L</b></span>` +
     standingText() +
-    momentumText() +
     carriedText();
 }
 
@@ -6378,20 +6517,12 @@ function pips(n, cap) {
   const full = Math.max(0, Math.min(cap, n | 0));
   return `<span class="pip-on">${PIP_ON.repeat(full)}</span><span class="pip-off">${PIP_OFF.repeat(cap - full)}</span>`;
 }
-// the chip in the status bar: always visible, so the meter is a THING you have rather than a fact
-// you are told. Sits beside 🏃 the Standing for the same reason — both are run-level state.
-function momentumText() {
-  if (!CLASS.momentum || !S || S.momentum === undefined) return '';
-  const m = isAssignPhase() ? rogueMath() : null;
-  const now = S.momentum || 0;
-  // 🧾 ANY PERSISTENT MODIFIER MUST BE ON SCREEN EVERY TURN, and it must show the TERMS rather than
-  // a verdict — so the chip states what the streak is worth right now, not merely how long it is.
-  const tail = now > 0
-    ? ` <span class="good">−${now} ⚡</span>`
-    : ` <span class="dim">no discount</span>`;
-  return `<span class="mo-chip" title="Momentum — turns in a row that cost you no cards. Every pip takes 1 off what your Strike costs. Take any damage and it breaks.">` +
-    `🗡️ ${pips(now, MOMENTUM_CAP)} <b>${now}</b>${tail}</span>`;
-}
+// 🎴 THE STATUS-BAR CHIP IS GONE (2026-08-21) — Momentum is a TOKEN now and lives on the field.
+// It was already most of the way there: the 2026-08-17 pips fix gave it a glyph and a body, which
+// is exactly what separated it from the 🔥 Emberwake (a number inside a sentence, in two places at
+// once). All that was left was to move it onto the table. See ROGUE.tokens().
+// ⚠️ Its chip was DELETED in the same edit rather than left beside the token — when a display
+// moves, the old one goes with it, or the next persistent modifier gets added to the wrong ledger.
 
 // 🕯️ what you can see of the road ahead — and, when the candle is out, that you cannot.
 function candleLine() {
@@ -6750,12 +6881,7 @@ function renderControls() {
           `<button onclick="cancelPotion()">cancel</button></div>` : '') +
         `</div>`
       : '';
-    const wakeRow = hasEmberwake() && S.wake > 0
-      ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
-        Object.keys(WAKE_TARGETS).map(k =>
-          `<button class="wake-btn${S.wakeTarget === k ? ' on' : ''}" onclick="aimWake('${k}')">${WAKE_TARGETS[k]}</button>`).join('') +
-        `<span class="wake-note">spend it or lose it</span></div>`
-      : '';
+    // 🎴 the Emberwake's aim row is GONE — the token on the field is the control now (cycleWake).
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
@@ -6768,9 +6894,8 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      wakeRow +
       bankRowHTML() +
-      momentumRowHTML() +
+      strikePromptHTML() +
       boostRow +
       facing +
       resolveBtn +
@@ -7249,29 +7374,15 @@ function rogueZoneHint(zone, isFight) {
 // Same treatment as the 🏃 Standing chip: show the TERMS and let the player do the arithmetic.
 // 🔑 It reads off rogueMath(), the same function the damage does, so the number you are shown and
 // the number you get cannot drift.
-function momentumRowHTML() {
+// 🎴 WAS momentumRowHTML(). Everything it said about the streak — what it is worth and what takes
+// it away — is on the ● token now, so all that is left here is the PROMPT: the rogue's maths needs
+// a Strike before it can say anything at all.
+// ⚠️ RENAMED RATHER THAN GUTTED IN PLACE. A function still called momentumRowHTML that no longer
+// draws momentum is the "a comment that describes a system is not the system" trap, one level down.
+function strikePromptHTML() {
   if (!CLASS.momentum || !isAssignPhase()) return '';
-  const m = rogueMath();
-  if (!m) return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
-  // 🔑 NO BUTTONS ANY MORE. Momentum is not spent — it is KEPT, so the only thing to show is what
-  // it is doing for you and what will take it away. (The old row offered "💨 +N Initiative" and
-  // "spend on initiative" is a menu.
-  // "🎯 N hits" — both were dead: she already wins 99–100% of races, and hits only answer 🧱 Guard,
-  // which is on no creature. The meter was never the problem; the shop was empty.)
-  const now = S.momentum || 0;
-  // 🧾 ⚠️ AT ZERO, SAY WHAT IS STILL HAPPENING. 🗡️ Lone Fang pays +4 precisely while the streak is
-  // broken, and a row reading only "no discount" while a charm quietly adds 4 is the Mirror Fen bug
-  // again — a modifier doing real work with nothing on screen to account for it.
-  const head = now > 0
-    ? `🗡️ <b>${now} ●</b> — your Strike hits for <b>+${now}</b>`
-    : (hasCharm('lonefang')
-        ? `🗡️ <b>0 ●</b> — nothing yet, but <b>Lone Fang</b> gives your strike <b>+4</b>`
-        : `🗡️ <b>0 ●</b> — no bonus yet`);
-  const risk = now > 0
-    ? `take any damage this turn and it breaks${hasCharm('secondnature') ? ' back to 2' : ' to 0'}`
-    : `come through a turn untouched to start a streak`;
-  return `<div class="wake-row bank-row"><span class="wake-lab">${head}</span> ` +
-    `<span class="wake-note">${risk}</span></div>`;
+  if (rogueMath()) return '';
+  return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
 }
 
 function bankRowHTML() {

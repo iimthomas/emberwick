@@ -715,6 +715,47 @@ button.stage.locked .stage-shape { font-style: italic; }
 @media (max-width: 900px) { .carry-name { display: none; } .carry-chip { font-size: .76em; padding: 0 6px; } }
 
 
+/* ============================================================
+   🎴 THE FIELD — persistent state as tokens on the table, between the encounter and your hand.
+   ⚠️ DELIBERATELY PLAIN. A token is a THING and things can be thrown, shattered and swept off a
+   table — but none of that belongs in a bare HTML prototype. Staging is the engine's job, and
+   presentation is the one category of work here that is 100% throwaway. This is a legible object
+   with room around it; the juice gets built once, in Godot.
+   ============================================================ */
+#field { display: none; }
+#field.has-tokens {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+  margin: 0 0 10px;
+}
+.tok {
+  flex: 0 1 auto; min-width: 128px; max-width: 210px;
+  padding: 6px 10px 7px; border-radius: 10px;
+  border: 1px solid rgba(232,145,60,.42);
+  background: linear-gradient(180deg, rgba(232,145,60,.16), rgba(232,145,60,.06));
+  box-shadow: 0 3px 10px -4px rgba(0,0,0,.7);
+}
+.tok-head { display: flex; align-items: baseline; gap: 7px; }
+.tok-icon { font-size: 18px; line-height: 1; }
+.tok-count { font-size: 19px; font-weight: 700; color: #ffd9a0; line-height: 1; }
+.tok-pips { font-size: 15px; line-height: 1; }
+.tok-name { font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase;
+  color: #f0a86a; margin-top: 3px; }
+.tok-worth { font-size: 12.5px; color: #ecdfc8; margin-top: 2px; }
+/* 🔑 every token says how it DIES — that line is what makes it an object with a lifetime
+   rather than a stat, and it is the half a bare counter never showed. */
+.tok-note { font-size: 10.5px; opacity: .58; margin-top: 2px; }
+.tok.is-bane { border-color: rgba(220,110,110,.5);
+  background: linear-gradient(180deg, rgba(180,70,70,.20), rgba(180,70,70,.07)); }
+.tok.is-bane .tok-name { color: #f0b3b3; }
+/* a token you can act on IS the control — so it has to look touchable */
+.tok.is-tappable { cursor: pointer; border-color: #e8913c; }
+.tok.is-tappable:hover { background: linear-gradient(180deg, rgba(232,145,60,.28), rgba(232,145,60,.10)); }
+.tok.is-tappable:focus-visible { outline: 2px solid #ffd9a0; outline-offset: 2px; }
+@media (max-width: 640px) {
+  #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .tok { flex: 0 0 auto; min-width: 118px; }
+}
+
 /* 🔥 the Emberwake — banked blind last turn, aimed now with the encounter in front of you */
 .wake-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px;
   padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(232,145,60,.45);
@@ -762,8 +803,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 .spare-row .pile { display: flex; gap: 8px; flex-wrap: wrap; }
 .spare-row .pile .card { flex: 0 1 150px; max-width: 170px; }
 
-/* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them. */
-.mo-chip { white-space: nowrap; }
+/* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them.
+   🎴 The status-bar chip is gone (2026-08-21); the pips live on the ● token on the field now.
+   .pip-on/.pip-off stay — the token draws with the same helper. */
 /* ⚡ cost and ◇ pitch sit side by side on a rogue card, because as it levels they move in
    OPPOSITE directions - showing one without the other hides the whole trade. */
 /* ⚠️ BOTH NUMBERS ARE ⚡ ENERGY - one resource, asked twice: what a card NEEDS to be struck
@@ -1304,7 +1346,11 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
     /* the explicit column is REQUIRED: without it, `-1` in #scene's grid-area resolves
        back to line 1 and the scene collapses to a zero-width sliver */
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr auto;
+    /* 🎴 FOUR rows now: hud · the flexing middle · the field · the hand.
+       ⚠️ #scene spans 1/-1 so it does not care how many rows there are, but #slots-panel is
+       pinned by NUMBER and had to move 3 -> 4. A row inserted above a pinned child silently
+       stacks two sections on top of each other. */
+    grid-template-rows: auto 1fr auto auto;
     min-height: 0;
     isolation: isolate;
   }
@@ -1316,8 +1362,13 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
     border-radius: 12px;
   }
   /* lift the UI above the scene. Target these by ID only — a `#left-col > section`
-     selector outranks `#scene` and would knock the scene out of position:absolute. */
-  #hud, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+     selector outranks `#scene` and would knock the scene out of position:absolute.
+     ⚠️ #field MUST be in this list: a new section left out of it renders BEHIND the art. */
+  #hud, #field, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+
+  /* 🎴 the field sits just above the hand, aligned with it — board state is in front of YOU,
+     not floating over the enemy. It collapses to nothing when you hold no tokens. */
+  #field.has-tokens { grid-row: 3; margin: 0 8px 6px 30%; }
 
   /* enemy vitals — floating TOP-LEFT on the art (moved 2026-07-29, Thomas). The mage is cropped
      at the waist now, so the top-left is empty sky; the foe gets the whole top-right instead. */
@@ -1352,7 +1403,7 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
   /* the hand — narrower cards, pushed further right so the mage's outstretched arm has the
      space to its left instead of being occluded by the row. */
   #slots-panel {
-    grid-row: 3;
+    grid-row: 4;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 0 8px 8px 30%;
     gap: 8px;
@@ -1376,6 +1427,7 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
   #left-col { height: calc(100vh - 74px); }
   #hud { width: 46%; margin: 6px 6px 0 0; }
   #controls-panel { width: 46%; margin: 0 6px 6px 0; }
+  #field.has-tokens { margin: 0 6px 4px 13%; }
   #slots-panel { margin: 0 6px 6px 13%; gap: 6px; }
   .slot-hint { display: none; }   /* tight row — the label alone carries it */
 }
@@ -1394,6 +1446,13 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
   .el { font-size: 10px; padding: 0 5px; }
   .slot-head { padding: 2px 6px 3px; }
   .slot-name { font-size: 9.5px; letter-spacing: 1.4px; }
+  /* 🎴 a phone on its side has ~375px of height — the token keeps its icon, count and worth,
+     and drops the how-it-dies line. ⚠️ It is the first thing to go and the LAST thing to cut
+     anywhere taller: it is the half that makes a token an object rather than a stat. */
+  .tok { min-width: 106px; padding: 4px 8px 5px; }
+  .tok-icon { font-size: 15px; } .tok-count { font-size: 16px; }
+  .tok-name { font-size: 9.5px; } .tok-worth { font-size: 11px; }
+  .tok-note { display: none; }
   #controls-panel { padding: 6px 9px; max-height: 38vh; }
   #controls-panel .howto { display: none; }   /* reachable on desktop; pure cost here */
   #controls-panel .hint { font-size: 11.5px; margin-bottom: 5px; }
