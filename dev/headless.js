@@ -95,14 +95,32 @@ vm.createContext(sandbox);
 // 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
 const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE',
                  'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD'];
+// the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;
+// ⚠️ it must be `let` in game.js or the assignment throws.
+const TUNABLES = ['ATTUNE_BONUS', 'PAID_STEP', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
+                  'RELENTLESS_STEP', 'JOURNEY_MP_MULT', 'FORK_ENABLED', 'WHEEL_PER_ENCOUNTER'];
 const epilogue = NL + ';' + NL +
   EXPORTS.map(n => 'try { globalThis.' + n + ' = ' + n + '; } catch (e) {}').join(NL) + NL +
   // S is reassigned every run, so it must be exported as a GETTER, never a copied reference.
-  'globalThis.getS = function () { return S; };' + NL;
+  'globalThis.getS = function () { return S; };' + NL +
+  // ⚠️ SWEEP TUNABLES IN PLACE — never by patching game.js on disk.
+  // 🐛 A sweep that writes a patched game.js and restores it in a `finally` LEAVES THE GAME
+  // PATCHED if the process is killed (a timeout, a ^C). That happened: game.js was found holding
+  // ATTUNE_BONUS = 5 after a sweep timed out, and only git had the real value.
+  // 🔑 These are declared `let` in game.js precisely so they can be set. A lexical binding
+  // cannot be assigned by name dynamically, hence the generated switch — it is the whole reason
+  // this lives in the epilogue rather than being done from outside.
+  'globalThis.setTunable = function (k, v) { switch (k) {' +
+    TUNABLES.map(n => `case ${JSON.stringify(n)}: ${n} = v; return true;`).join(' ') +
+    ' default: throw new Error("unknown tunable: " + k); } };' + NL +
+  'globalThis.getTunable = function (k) { switch (k) {' +
+    TUNABLES.map(n => `case ${JSON.stringify(n)}: return ${n};`).join(' ') +
+    ' default: throw new Error("unknown tunable: " + k); } };' + NL;
 vm.runInContext(game + NL + ';' + NL + solver + epilogue, sandbox, { filename: 'emberwick-headless.js' });
 
 const useClass = name => sandbox.setClass(name === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
-module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS() };
+module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS(),
+  setTunable: (k, v) => sandbox.setTunable(k, v), getTunable: k => sandbox.getTunable(k) };
 
 // ---- CLI ----------------------------------------------------------------
 if (require.main === module) {

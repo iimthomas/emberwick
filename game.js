@@ -9,7 +9,36 @@
 const START_LEVEL = 2;
 const MAX_LEVEL = 4;
 // ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
-let ATTUNE_BONUS = 1;
+//
+// 🔑 RAISED 1 → 3 ON 2026-08-22, from a feel report: *"doing the dragons now with mage and it just
+// seems miserable compared to rogue. even on the first one."*
+//
+// 🔑 THE CAUSE WAS IN THE FORMULA, NOT IN THE CARDS. Compare the two classes' payoff for FULL
+// investment, which is the thing a run is spent buying:
+//     mage   attuned = value + level + ATTUNE_BONUS        → Lv4: value + 5
+//     rogue  paid    = value + paid  + PAID_STEP×(level−1) → Lv4: value + 4 + 6 = value + 10
+// **Her return on a fully sharpened card was exactly half the rogue's.** Measured duel blow bore it
+// out: ~13.0 against her ~18.0. Sharpening is the only progression system in the game, so a class
+// that gets half as much for it is not a harder class, it is a class playing a worse game.
+//
+// ⚠️ THIS IS NOT THE RETRY THE OTHER NOTE FORBIDS. The 2026-07-29 sweep that says *"measured twice,
+// do not retry"* was asking whether a bigger bonus turns the attune/Initiative fork into a
+// SACRIFICE — it does not (lv+0→5 moved "paid a lost Initiative to attune" only 3%→8%). That is a
+// finding about creating a DILEMMA. This is a POWER change, and Balance_Log's own pre-planned lever
+// list for the mage opens with *"bonus → lv+2"*. Different question, same constant.
+//
+// 📏 Swept +1..+5 (n=320, per stage). +3 is where her ladder meets the rogue's without passing it:
+//     +1  duel 80/41/18/26   +2  94/54/19/36   **+3  93/69/41/46**   +4  94/85/56/56 (overshoots)
+//     rogue control 90/64/49/66 — she is untouched by this constant, having no elements.
+// ⚠️ WATCH TWO THINGS. (1) Stage 1 goes 80 → 93 for the bot, and stage 1 is the ON-RAMP — the bot
+// always finds the attuned arrangement and a human misses it about one turn in five, but if it
+// reads soft in play, +2 is the fallback rather than a creature nerf. (2) Attune OBLIGATION rises
+// 66% → 76% (attuned-when-available), which is further outside the 35–50% band the 16-card brief
+// asks for — that band was already blown at +1, but this widens it.
+// ✅ The compensating measurement, and the reason this is not simply "make the number bigger":
+// **naive=optimal FELL, 73% → 66%.** Playing your biggest card is now right LESS often, because the
+// element match is worth more relative to raw size. The turn got slightly less solved, not more.
+let ATTUNE_BONUS = 3;
 // ⚡ how much PAYING is worth to the rogue: value + (paid + PAID_STEP × levels invested).
 // ⚠️ THE STEP EXISTS BECAUSE THE FLAT VERSION SHRANK. Thomas: *"i think attuned and unattuned
 // number gap needs to be a bit wider, feels like im pretty happy with unattuned damage, i need to
