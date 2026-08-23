@@ -2928,7 +2928,7 @@ function stashHTML() {
   // only say what is on the next node, which is no use for deciding where to GO.
   const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
   for (const stage of [1, 2, 3, 4]) {
-    const list = Object.values(CREATURE_INDEX).filter(c => c.road === stage);
+    const list = Object.values(CREATURE_INDEX).filter(c => c.road === stage && c.quarry);
     if (!list.length) continue;
     const owned = list.filter(c => st.mats[partIdOf(c.name)] > 0).length;
     body += `<div class="stash-tier">🏆 ${ROAD_NAME[stage] || 'Road ' + stage}` +
@@ -2939,7 +2939,7 @@ function stashHTML() {
           `<div class="stash-head"><span class="stash-icon">🏆</span><span class="stash-n">×${n}</span></div>` +
           `<div class="stash-name">${d.name}</div>` +
           `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
-          `<div class="stash-rate">${Math.round(DROP_RATE.signature * 100)}% on a clean win · ${Math.round(DROP_RATE.narrowSignature * 100)}% on a scrape</div></div>`;
+          `<div class="stash-rate">${c.region} · certain on a clean kill</div></div>`;
       }).join('') + `</div>`;
   }
   return `<div class="phase-label">📦 STASH</div>` +
@@ -5757,10 +5757,28 @@ const MATERIALS = [
 // 📦 Signature parts are NOT in MATERIALS. There are 66 of them and they are derived, not authored
 // — a table entry per creature would be 66 rows of data that the creature list already implies.
 // Their ids are `p:<creature name>`, and matDef() resolves them synthetically.
+// 🏆 ONE WORD PER GREAT BEAST, AUTHORED. Deriving the body word from the defence shape was the
+// right call at 66 creatures and the wrong one at 16: the biggest creature in a region is usually
+// an 🛡️ Armour creature, so 14 of the 16 came out "Plate" — Cairnstag Plate, Ashen Boar Plate,
+// Basalt Basilisk Plate. 🔑 CUTTING THE LIST TO 16 IS WHAT MADE HAND-WRITING IT CHEAP, and that is
+// the whole payoff of the great-beast tier: a roster that reads handmade instead of generated.
+// ⚠️ The shape-derived word stays as the FALLBACK, so a roster change can never leave a beast
+// nameless — it just reads blander until someone writes it a word.
+const BEAST_WORD = {
+  // 🕯️ The Ember Hollow
+  'Cairnstag': 'Antler', 'Ashen Boar': 'Tusk', 'Basalt Basilisk': 'Scale', 'Mirewyrm Elder': 'Coil',
+  // ⚡ The Stormreach
+  'Scarp Ram': 'Fleece', 'Gorse Lurcher': 'Claw', 'Anvil Toad': 'Hide', 'Stormcrown Roc': 'Talon',
+  // 🪨 The Fellgrind
+  'Fen Ox': 'Horn', 'Grindtooth': 'Fang', 'Deepdelver': 'Mandible', 'Cinderjaw': 'Jawbone',
+  // 🌊 The Sunless Fathom
+  'Shoal Drifter': 'Membrane', 'Silt Crawler': 'Carapace', 'Lanternjaw': 'Lure', 'Pressureback': 'Shell',
+};
 const PART_WORD = { armour: 'Plate', evasion: 'Plume', guard: 'Hide' };
 // ⚠️ A creature with BOTH shapes takes the first — stage 4 stacks them, and a part named after two
 // body plans reads like a bug. Shapeless creatures give a Fang.
 function partWordFor(e) {
+  if (e && BEAST_WORD[e.name]) return BEAST_WORD[e.name];
   const sh = (shapesOf(e) || [])[0];
   return PART_WORD[sh] || 'Fang';
 }
@@ -5782,23 +5800,48 @@ function matDef(id) {
 }
 // where every creature lives — built once from the roads, so the Stash and the drop table can
 // never disagree about which road holds what.
+// 🏆 GREAT BEASTS — the 16 creatures that carry a signature part, one per region.
+//
+// 🔴 THE PROBLEM THIS SOLVES (Thomas, 2026-08-23): *"we have so many monsters though... i don't
+// know if we can come up with enough armor to utilize every single monster."* He is right. 66
+// signature parts against a realistic ~20 pieces of armour leaves forty kinds of junk, and junk
+// that no recipe names is just a longer list.
+//
+// 🔑 MONSTER HUNTER ALREADY ANSWERED THIS AND WE HAD THE STRUCTURE WITHOUT USING IT: small
+// monsters drop generic bits, LARGE monsters carry named parts. There are 4 creatures per region
+// and 16 regions, so the biggest in each region is the region's quarry — 16 named parts, which is
+// an authorable number of marquee recipes, and the other 50 creatures keep dropping the common and
+// shape materials that fill the bulk of every recipe.
+//
+// ✅ AND IT FIXES SOMETHING ELSE THAT WAS ALREADY WRONG: 66 interchangeable stat blocks becomes
+// 50 fodder and 16 you remember. The roster has no hierarchy today — every creature is a name on a
+// number. Mirewyrm Elder, Basalt Basilisk, Stormcrown Roc and Pressureback already read like
+// things you would go looking for; nothing in the game currently says they are worth more.
+//
+// ⚠️ DERIVED, NOT AUTHORED — the biggest `hp` in each region, so adding a creature cannot leave
+// the quarry list stale. ⚠️ Ties break on list order, deterministically.
 const CREATURE_INDEX = (() => {
   const out = {};
   for (const stage of [1, 2, 3, 4]) {
     const road = roadFor(stage);
-    for (const region of road) for (const e of (region.encounters || [])) {
-      if (e.type !== 'fight') continue;
-      if (!out[e.name]) out[e.name] = { ...e, road: stage, region: region.name };
+    for (const region of road) {
+      const fights = (region.encounters || []).filter(e => e.type === 'fight');
+      let quarry = null;
+      for (const e of fights) if (!quarry || (e.hp || 0) > (quarry.hp || 0)) quarry = e;
+      for (const e of fights) {
+        if (!out[e.name]) out[e.name] = { ...e, road: stage, region: region.name, quarry: e === quarry };
+      }
     }
   }
   return out;
 })();
+const isQuarry = name => !!(CREATURE_INDEX[name] && CREATURE_INDEX[name].quarry);
 const creatureByName = n => CREATURE_INDEX[n] || null;
 
 const SHAPE_MAT = { armour: 'slag', evasion: 'quill', guard: 'hide' };
 // the published rates. ⚠️ Keep these and the Stash's text in step — a rate the player cannot read
 // is the difference between a plan and a fruit machine.
-const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 0.5, narrowSignature: 0.25 };
+const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 1, narrowSignature: 0.4 };
 
 // 💰 GOLD — the meta currency, earned EVERY run, win or lose.
 // 🔴 THIS IS THE "A LOSS MUST PAY" FIX and it is the load-bearing half of the whole meta layer.
@@ -5836,9 +5879,13 @@ function rollDrops(e, outcome) {
   }
   if (e.type !== 'fight') return bag;                // a road is walked, not carved
   add('shard', clean ? 2 : 1);
-  // 🏆 the signature part — the reason to come to THIS road for THIS creature
+  // 🏆 the signature part — the reason to come to THIS region for THIS beast.
+  // 🔑 CERTAIN ON A CLEAN KILL, and that is the design, not generosity: there is one quarry per
+  // region, so *"I need 3 Mist Crane Plumes, so that is 3 clean kills"* is a COUNTABLE plan. A
+  // random roll on top of "did the beast even turn up" is two lotteries stacked, and the whole
+  // reason the rates are printed is that a plan beats a fruit machine.
   const base = e.baseName || e.name;
-  if (creatureByName(base) && rnd() < (clean ? DROP_RATE.signature : DROP_RATE.narrowSignature)) add(partIdOf(base), 1);
+  if (isQuarry(base) && (clean || rnd() < DROP_RATE.narrowSignature)) add(partIdOf(base), 1);
   const shapes = shapesOf(e) || [];
   for (const sh of shapes) {
     const mat = SHAPE_MAT[sh];
