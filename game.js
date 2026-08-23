@@ -2698,6 +2698,7 @@ function saveGame(key) {
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
+      loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked, goldEarned: S.goldEarned,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
@@ -2813,6 +2814,8 @@ function loadGame(key) {
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
       // 🛡️ filtered against the live table, so a piece removed in a later build cannot
       // resurrect as `undefined` and throw on armourBlock().
+      loot: d.loot || {}, encountersDone: d.encountersDone || 0,
+      runBanked: !!d.runBanked, goldEarned: d.goldEarned || 0,
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
@@ -2865,6 +2868,53 @@ const DEV_DECKS = {
   mediocre: { label: 'Mediocre', cards: 15, offset: -2,  hint: 'about par — a coin flip' },
   strong:   { label: 'Strong',   cards: 16, offset: +6,  hint: 'a run that went well' },
 };
+// 📦 THE STASH — what you own, and where every material comes from.
+// 🔑 THE `from` AND THE RATE ARE THE POINT, not the counts. Monster Hunter publishes its drop
+// tables, and that is the entire difference between a grind and a fruit machine: a printed rate
+// turns *"keep playing and hope"* into *"about five more Evasion creatures"*. A material you own
+// none of still has to say where it comes from, or you cannot plan a hunt.
+function stashLine() {
+  const st = loadStash();
+  const kinds = Object.keys(st.mats).filter(k => st.mats[k] > 0).length;
+  return `💰 ${st.gold} gold · ${kinds} kind${kinds === 1 ? '' : 's'} of material`;
+}
+function showStash() {
+  S = S || {};
+  S.phase = 'stash';
+  S.encounter = null;
+  render();
+}
+function stashHTML() {
+  const st = loadStash();
+  const TIER = { common: 'Common', shape: 'From a shape', elite: 'From the dangerous', rare: 'Rare', dragon: 'From a dragon' };
+  const rate = m => m.tier === 'shape' ? `${Math.round(DROP_RATE.shape * 100)}% on a clean win · ${Math.round(DROP_RATE.narrowShape * 100)}% on a scrape`
+    : m.tier === 'common' ? '2 on a clean win · 1 on a scrape'
+    : m.tier === 'elite' ? 'always — if you survive one'
+    : m.tier === 'rare' ? `${Math.round(DROP_RATE.heart * 100)}% when a dragon falls`
+    : '2 when it falls';
+  let body = '';
+  for (const t of ['common', 'shape', 'elite', 'rare', 'dragon']) {
+    const list = MATERIALS.filter(m => m.tier === t);
+    if (!list.length) continue;
+    body += `<div class="stash-tier">${TIER[t]}</div><div class="stash-grid">` +
+      list.map(m => {
+        const n = st.mats[m.id] || 0;
+        return `<div class="stash-mat${n ? '' : ' is-none'}">` +
+          `<div class="stash-head"><span class="stash-icon">${m.icon}</span><span class="stash-n">×${n}</span></div>` +
+          `<div class="stash-name">${m.name}</div>` +
+          `<div class="stash-from">${m.from}</div>` +
+          `<div class="stash-rate">${rate(m)}</div></div>`;
+      }).join('') + `</div>`;
+  }
+  return `<div class="phase-label">📦 STASH</div>` +
+    `<div class="stash"><div class="stash-gold">💰 <b>${st.gold}</b> gold` +
+    `<span class="dim"> · earned every run, win or lose</span></div>` +
+    body +
+    `<p class="dev-note">⚙️ The Workshop is not built yet — there is nothing to spend these on for now. ` +
+    `Parts will GATE a piece of armour; gold pays the fee.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
+
 function showDev() {
   if (!DEV_ENABLED) return;   // 🔧 not in the playtest build
   S = S || {};
@@ -3330,6 +3380,9 @@ function freshGame(stage) {
     // (it is the first thing in the game that adds health from outside the deck).
     armour: STARTER_LOADOUT.slice(0, ARMOUR_SLOTS_OPEN).map(id => newArmour(id)),
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
+    // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
+    // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
+    loot: {}, encountersDone: 0, runBanked: false, goldEarned: 0,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -5402,6 +5455,9 @@ function finishResolve() {
   // against a debt. A curse should take what you HAVE, never put you in the red: negative money
   // is a state with no way back, and it silently taxed every future encounter too.
   // The log also printed "+-2 coins", which is its own small lie about what happened.
+  // 🦴 CARVE FIRST, THEN THE PURSE — the same order the log reads.
+  S.encountersDone = (S.encountersDone || 0) + 1;
+  grantDrops(S.encounter, r.outcome);
   if (r.outcome !== 'Loss') {
     const g = Math.round((e.xp + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0)) * COIN_MULT) + charmMod('coin');
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
@@ -5610,6 +5666,117 @@ function soakWithArmour(aid) {
   log(`${S.damage} damage remaining.`, 'bad');
   const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
   if (maxSoak < S.damage) knockOut(); else render();
+}
+
+// ============================================================
+// 🦴 MATERIALS AND DROPS — spec in `08_Ideas/Armour_And_The_Workshop.md`.
+//
+// 🔑 DROPS KEY OFF THE CREATURE'S **SHAPE**, NOT ITS NAME. Three reasons, and the third is the
+// one that matters:
+//   1. the shape is already in the data, so this needs no new content;
+//   2. 66 individual drop tables is unmaintainable, and hunting one creature out of 66 is a slot
+//      machine inside a slot machine;
+//   3. 🕯️ THE SHAPE IS ALREADY VISIBLE. The candle prints the next encounter's shape and the
+//      turn-1 reveal names it — so *"I need Evasion parts"* is a hunt you can actually run, using
+//      the mechanism Thomas identified: *"which also lends itself into why you want your candle
+//      lit, so you can find that monster you need."*
+//
+// ⚠️ RANDOM, BUT THE ODDS ARE PRINTED. Monster Hunter publishes its rates, and that is the whole
+// difference between a grind and a slot machine: *"I need 3 scales, I get one 60% of the time, so
+// that is about five encounters"* is a PLAN. A hidden table is a fruit machine with a 20-minute
+// pull. Every rate here is shown in the Stash and on the recipe.
+//
+// 🔑 AND THE OUTCOME MATTERS, which hands Complete/Narrow/Loss a THIRD consequence beyond coins
+// and the candle: a clean win carves the beast, a scrape gets you less, a loss gets you nothing.
+// ============================================================
+const MATERIALS = [
+  { id: 'shard',  icon: '🦴', name: 'Bone Shard',  tier: 'common',   from: 'any creature' },
+  { id: 'slag',   icon: '🪨', name: 'Slagplate',   tier: 'shape',    from: '🛡️ Armour creatures' },
+  { id: 'quill',  icon: '🪶', name: 'Windquill',   tier: 'shape',    from: '🌀 Evasion creatures' },
+  { id: 'hide',   icon: '🧱', name: 'Wardhide',    tier: 'shape',    from: '🧱 Guard creatures' },
+  { id: 'sinew',  icon: '🔩', name: 'Prime Sinew', tier: 'elite',    from: '💀 dangerous foes' },
+  { id: 'heart',  icon: '🔆', name: 'Emberheart',  tier: 'rare',     from: 'a felled dragon — rarely' },
+  { id: 'd1',     icon: '🔥', name: 'Cindermaw Scale',    tier: 'dragon', from: 'felling Cindermaw' },
+  { id: 'd2',     icon: '⚡', name: 'Skyrender Pinion',   tier: 'dragon', from: 'felling Skyrender' },
+  { id: 'd3',     icon: '🪨', name: 'Cragmourn Core',     tier: 'dragon', from: 'felling Cragmourn' },
+  { id: 'd4',     icon: '🌊', name: 'Fathomdread Pearl',  tier: 'dragon', from: 'felling Fathomdread' },
+];
+const matDef = id => MATERIALS.find(m => m.id === id) || null;
+const SHAPE_MAT = { armour: 'slag', evasion: 'quill', guard: 'hide' };
+// the published rates. ⚠️ Keep these and the Stash's text in step — a rate the player cannot read
+// is the difference between a plan and a fruit machine.
+const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2 };
+
+// 💰 GOLD — the meta currency, earned EVERY run, win or lose.
+// 🔴 THIS IS THE "A LOSS MUST PAY" FIX and it is the load-bearing half of the whole meta layer.
+// ⚠️ Parts GATE a piece; gold GREASES it. Crafting from drops alone would mean a run that ends
+// early gives you nothing at all — which is exactly the problem this layer exists to solve.
+// ⚠️ It is NOT 🪙 coins. Coins are spent inside a run and die with it; gold survives the run.
+const GOLD_PER_ENCOUNTER = 10;
+const GOLD_FOR_THE_KILL = 60;
+
+// 📦 THE STASH — everything that survives a run. Its own key, like the ladder and the grades.
+const STASH_KEY = 'emberwick-stash-1' + KEY_NS;
+function loadStash() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STASH_KEY) || 'null');
+    if (!d || typeof d !== 'object') throw 0;
+    return { gold: d.gold || 0, mats: d.mats || {}, owned: Array.isArray(d.owned) ? d.owned : [] };
+  } catch (e) { return { gold: 0, mats: {}, owned: [] }; }
+}
+function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
+
+// 🦴 WHAT THIS ENCOUNTER DROPPED. Returns a { matId: qty } bag; the caller banks it.
+// ⚠️ PURE-ISH BY DESIGN — it reads the encounter and rolls, and touches no screen. The rules layer
+// stays detachable, which is the whole insurance policy for the Godot port.
+function rollDrops(e, outcome) {
+  const bag = {};
+  if (!e || outcome === 'Loss') return bag;          // a loss carves nothing
+  const add = (id, n) => { if (n > 0) bag[id] = (bag[id] || 0) + n; };
+  const clean = outcome === 'Complete';
+  if (e.dragon) {
+    // 🐉 the dragon is the hunt. Its part is certain; the rare is the thing you come back for.
+    const d = DRAGONS.find(x => x.name === e.name);
+    if (d) add('d' + d.stage, 2);
+    if (rnd() < DROP_RATE.heart) add('heart', 1);
+    return bag;
+  }
+  if (e.type !== 'fight') return bag;                // a road is walked, not carved
+  add('shard', clean ? 2 : 1);
+  const shapes = shapesOf(e) || [];
+  for (const sh of shapes) {
+    const mat = SHAPE_MAT[sh];
+    if (mat && rnd() < (clean ? DROP_RATE.shape : DROP_RATE.narrowShape)) add(mat, 1);
+  }
+  // 💀 SURVIVING an elite is the achievement, not beating it cleanly. Measured: elites turn up
+  // 0.6 times a run and a CLEAN win against one is rare enough that gating Prime Sinew on Complete
+  // dropped it exactly zero times in twelve runs. ⚠️ An accidental ultra-rare is worse than a
+  // designed one — it makes a recipe that names it uncraftable without anyone deciding that.
+  // 🔑 It matches the reward already there: the elite charm is paid for SURVIVING one.
+  if (e.elite) { add('sinew', 1); add('shard', 1); }
+  return bag;
+}
+// 🎒 the run's haul, kept on S so the summary can show it and a LOSS still banks it
+function grantDrops(e, outcome) {
+  const bag = rollDrops(e, outcome);
+  const got = [];
+  for (const id in bag) {
+    S.loot[id] = (S.loot[id] || 0) + bag[id];
+    got.push(`${matDef(id).icon} ${matDef(id).name} ×${bag[id]}`);
+  }
+  if (got.length) log(`🧰 Carved: ${got.join(' · ')}`, 'good');
+}
+// 💰 banked when the run ENDS, however it ends. ⚠️ Called from victory() and defeat() — the two
+// places a run can stop — never from cleanup, or a quit mid-run would pay nothing.
+function bankRun(won) {
+  if (S.runBanked) return;                            // a run banks exactly once
+  S.runBanked = true;
+  const st = loadStash();
+  const gold = (S.encountersDone || 0) * GOLD_PER_ENCOUNTER + (won ? GOLD_FOR_THE_KILL : 0);
+  st.gold += gold;
+  for (const id in (S.loot || {})) st.mats[id] = (st.mats[id] || 0) + S.loot[id];
+  saveStash(st);
+  S.goldEarned = gold;
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -6943,7 +7110,24 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // ⚠️ The stages screen only ever worked because boot used to call freshGame() first, so `S`
 // always held a run even on a menu. Booting to a real menu broke that assumption immediately
 // (`renderStatus` reads `S.deck[0]`). Anything reachable before a run starts belongs in here.
-const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev'];
+// 🧰 WHAT YOU CARRIED OUT. ⚠️ Shown on a DEFEAT as loudly as on a victory — a loss that pays
+// is only worth anything if you can SEE that it paid, in the same breath as being told you died.
+function haulHTML() {
+  const ids = Object.keys(S.loot || {});
+  if (!ids.length && !S.goldEarned) return '';
+  const rows = ids.map(id => {
+    const m = matDef(id); if (!m) return '';
+    return `<span class="haul-mat">${m.icon} ${m.name} <b>×${S.loot[id]}</b></span>`;
+  }).join('');
+  return `<div class="haul"><div class="haul-lab">🧰 CARRIED OUT</div>` +
+    (S.goldEarned ? `<div class="haul-gold">💰 <b>${S.goldEarned}</b> gold` +
+      `<span class="dim"> · ${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'}` +
+      `${S.phase === 'victory' ? ' + the kill' : ''}</span></div>` : '') +
+    (rows ? `<div class="haul-mats">${rows}</div>` : `<div class="haul-none">nothing carved</div>`) +
+    `<div class="haul-note">it is in your 📦 Stash</div></div>`;
+}
+
+const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash'];
 const isShell = () => SHELL_PHASES.includes(S && S.phase);
 
 // 🚪 WHICH PHASES TAKE THE MIDDLE OF THE SCREEN. A phase belongs here when it is a DECISION
@@ -7922,6 +8106,7 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">💀 DEFEAT</div>` +
       gradeHTML(gradeRun(false), false) +
+      haulHTML() +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
       `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
@@ -7959,6 +8144,8 @@ function renderControls() {
         `<span>learn the game in one short run · always open</span></button>` +
       `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
         `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      `<button class="menu-item" onclick="showStash()"><b>📦 Stash</b>` +
+        `<span>${stashLine()}</span></button>` +
       `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
         `<span>the charms and potions you can be offered</span></button>` +
       (DEV_ENABLED ? `<button class="menu-item quiet" onclick="showDev()"><b>🔧 Dev</b>` +
@@ -7968,6 +8155,8 @@ function renderControls() {
       `<div class="menu-stamp">${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD}` +
         `${CHANNEL === 'play' ? ' · <b>found a bug?</b> say what the build number was' : ''}</div>` +
       `</div>`;
+  } else if (S.phase === 'stash') {
+    c.innerHTML = stashHTML();
   } else if (S.phase === 'collection') {
     // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
     // the only meta fact the player currently has — and says plainly that unlocking and banning
@@ -8089,6 +8278,7 @@ function renderControls() {
     c.innerHTML =
       `<div class="phase-label">🏆 THE ${S.dragon.name.toUpperCase()} FALLS — VICTORY</div>` +
       gradeHTML(gradeRun(true), true) +
+      haulHTML() +
       `<div class="summary">` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
       `<table><tr><th>Card</th><th>Level</th></tr>` +
@@ -9054,6 +9244,9 @@ function defeat(msg) {
   log(`💀 DEFEAT — ${msg}`, 'bad result');
   // 🏆 a graded loss still goes on the wall — death is part of the game, not a blank
   if (S.dragon) recordGrade(S.dragon.stage, gradeRun(false), false);
+  // 🔴 A LOSS STILL PAYS. This is the whole point of the meta layer: if unlocks came only
+  // from winning, a lost run is wasted time and the grind punishes the players who need it most.
+  bankRun(false);
   S.defeatMsg = msg;
   S.phase = 'defeat';
   render();
@@ -9150,6 +9343,10 @@ function victory() {
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
   if (next && S.dragon.stage > was) log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
   else if (!next) log(`🪜 Every stage stands open — take whichever you like.`, 'good result');
+  // 🐉 the hunt's prize, and the run's pay. ⚠️ Both go through the same helpers the road uses,
+  // so a dragon is not a special case — it is an encounter with a better table.
+  grantDrops({ dragon: true, name: S.dragon.name, type: 'fight' }, 'Complete');
+  bankRun(true);
   S.phase = 'victory';
   render();
 }
