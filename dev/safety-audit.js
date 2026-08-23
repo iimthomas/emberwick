@@ -82,12 +82,23 @@ const phases = new Set(); let saved = 0; const failed = new Set();
 const realRender = sandbox.render;
 sandbox.render = function () {
   const st = getS();
-  if (st && st.phase && st.deck && !phases.has(st.phase)) {
-    phases.add(st.phase);
+  // 🔴 SAMPLE EVERY DISTINCT SITUATION, NOT THE FIRST OF EACH PHASE (fixed 2026-08-23).
+  // Keying on phase alone meant ONE save per phase across 160 runs — and it hid a real bug for
+  // weeks: EVERY ELITE ENCOUNTER WAS UNRESUMABLE, because the save stored the decorated name
+  // ("Mirefen Road, grown bold"), which exists in no region list, so loadGame() returned false
+  // — silently, which is indistinguishable from "no save yet". The first 'soak' this sampled
+  // just happened to be an ordinary creature nearly every time.
+  // 🔑 A TEST THAT EXERCISES ONE CASE PER CATEGORY IS A BLIND SPOT WITH A TICK NEXT TO IT.
+  const e = st && st.encounter;
+  const key = st && st.phase
+    ? st.phase + '|' + (e ? (e.elite ? 'elite' : e.dragon ? 'dragon' : e.type) : 'none')
+    : null;
+  if (key && st.deck && !phases.has(key)) {
+    phases.add(key);
     try {
       sandbox.saveGame(); saved++;
-      if (!sandbox.loadGame()) failed.add(st.phase);
-    } catch (e) { failed.add(st.phase + ' (threw: ' + e.message + ')'); }
+      if (!sandbox.loadGame()) failed.add(key);
+    } catch (err) { failed.add(key + ' (threw: ' + err.message + ')'); }
   }
   return realRender.apply(this, arguments);
 };
@@ -97,8 +108,8 @@ for (const cls of ['mage', 'rogue']) for (let i = 0; i < 80; i++) {
   try { sandbox.RUNSIM.autoRun(true); } catch (e) {}
 }
 sandbox.render = realRender;
-console.log('   phases exercised (' + phases.size + '): ' + [...phases].sort().join(', '));
-if (failed.size) bad('phases that would NOT reload', [...failed].join(', '));
-else console.log('   \u2705 ' + saved + ' saves round-tripped across ' + phases.size + ' distinct phases');
+console.log('   situations exercised (' + phases.size + '): ' + [...phases].sort().join(', '));
+if (failed.size) bad('situations that would NOT reload', [...failed].join(', '));
+else console.log('   \u2705 ' + saved + ' saves round-tripped across ' + phases.size + ' distinct situations');
 
 console.log(`\n${fail === 0 ? '✅ NO FAILURES' : '❌ ' + fail + ' FAILURE(S)'}`);

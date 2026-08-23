@@ -805,6 +805,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 .stash-name { font-size: 12.5px; color: #ecdfc8; margin-top: 3px; }
 .stash-from { font-size: 10.5px; opacity: .62; margin-top: 3px; }
 .stash-rate { font-size: 10px; opacity: .5; margin-top: 2px; font-style: italic; }
+/* 🏆 the road tally — "6/16" is the bestiary's whole job in three characters */
+.stash-tier { display: flex; justify-content: space-between; align-items: baseline; }
+.stash-tally { font-size: 11px; letter-spacing: .5px; opacity: .7; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }

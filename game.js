@@ -2669,7 +2669,14 @@ function saveGame(key) {
       discard: S.discard.map(card), trashed: S.trashed.map(card),
       queue: S.encounterQueue.map(e => e.name),
       results: S.results, phase: S.phase,
-      encounter: S.encounter ? S.encounter.name : null,
+      // 🔴 SAVE THE BASE NAME, NOT THE DECORATED ONE (fixed 2026-08-23). An elite is a COPY
+      // with a changed name ("Mirefen Road, grown bold"), so looking that name up in the region's
+      // encounter list on load finds nothing and loadGame() returns false — SILENTLY, which is
+      // indistinguishable from "no save yet". Every run that quit during an elite was gone.
+      // ⚠️ eliteVersion()'s own comment says *"baseName is what makes an elite RELOADABLE"*, and
+      // the save never used it. **A comment that describes a system is not the system.**
+      encounter: S.encounter ? (S.encounter.baseName || S.encounter.name) : null,
+      encounterElite: !!(S.encounter && S.encounter.elite),
       hardship: S.hardship, rangedDodge: S.rangedDodge, loseReserve: S.loseReserve,
       poison: S.poison, afterSoak: S.afterSoak,
       assign: S.assign, divertsUsed: S.divertsUsed,
@@ -2767,7 +2774,11 @@ function loadGame(key) {
     const road = d.tutorial ? TUTORIAL.regions : roadFor(savedDragon ? savedDragon.stage : 1);
     const region = road[d.region - 1];
     if (!region) return false;
-    const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
+    // ⚠️ Try the stored name first so saves written before the fix (which hold the decorated
+    // name) are not made worse; then rebuild the elite through the SAME eliteVersion() the fight
+    // used, which is the only way the reload cannot drift from the original.
+    let encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
+    if (encounter && d.encounterElite) encounter = eliteVersion(encounter);
     // ⚠️ PHASES THAT LEGITIMATELY HAVE NO ENCOUNTER. 🛤️ 'fork' had to be added the day it was
     // built: during a fork no encounter has been chosen yet, so S.encounter is null, and this
     // guard sent every mid-fork load down the `return false` path.
@@ -2884,6 +2895,12 @@ function showStash() {
   S.encounter = null;
   render();
 }
+// 🕯️ the shape is what the CANDLE prints, so it is the tag that makes a trophy findable
+function shapeTagOf(c) {
+  const sh = shapesOf(c) || [];
+  const ICON = { armour: '🛡️', evasion: '🌀', guard: '🧱' };
+  return sh.length ? ' · ' + sh.map(x => ICON[x] || '').join('') : '';
+}
 function stashHTML() {
   const st = loadStash();
   const TIER = { common: 'Common', shape: 'From a shape', elite: 'From the dangerous', rare: 'Rare', dragon: 'From a dragon' };
@@ -2904,6 +2921,25 @@ function stashHTML() {
           `<div class="stash-name">${m.name}</div>` +
           `<div class="stash-from">${m.from}</div>` +
           `<div class="stash-rate">${rate(m)}</div></div>`;
+      }).join('') + `</div>`;
+  }
+  // 🏆 TROPHIES, GROUPED BY ROAD — and this is the bestiary in its first form. 🔑 Which road a
+  // creature lives on is the ONE fact a hunt needs and the game never told you; the candle can
+  // only say what is on the next node, which is no use for deciding where to GO.
+  const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
+  for (const stage of [1, 2, 3, 4]) {
+    const list = Object.values(CREATURE_INDEX).filter(c => c.road === stage);
+    if (!list.length) continue;
+    const owned = list.filter(c => st.mats[partIdOf(c.name)] > 0).length;
+    body += `<div class="stash-tier">🏆 ${ROAD_NAME[stage] || 'Road ' + stage}` +
+      `<span class="stash-tally">${owned}/${list.length}</span></div><div class="stash-grid">` +
+      list.map(c => {
+        const id = partIdOf(c.name), n = st.mats[id] || 0, d = matDef(id);
+        return `<div class="stash-mat${n ? '' : ' is-none'}">` +
+          `<div class="stash-head"><span class="stash-icon">🏆</span><span class="stash-n">×${n}</span></div>` +
+          `<div class="stash-name">${d.name}</div>` +
+          `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
+          `<div class="stash-rate">${Math.round(DROP_RATE.signature * 100)}% on a clean win · ${Math.round(DROP_RATE.narrowSignature * 100)}% on a scrape</div></div>`;
       }).join('') + `</div>`;
   }
   return `<div class="phase-label">📦 STASH</div>` +
@@ -5701,11 +5737,68 @@ const MATERIALS = [
   { id: 'd3',     icon: '🪨', name: 'Cragmourn Core',     tier: 'dragon', from: 'felling Cragmourn' },
   { id: 'd4',     icon: '🌊', name: 'Fathomdread Pearl',  tier: 'dragon', from: 'felling Fathomdread' },
 ];
-const matDef = id => MATERIALS.find(m => m.id === id) || null;
+// 🏆 AND THE NAMED HALF — a SIGNATURE PART per creature. Thomas: *"i just thought it would be cool
+// to further tie into the candle, knowing what monsters you have out there, like you need a mist
+// crane wing, and you see that you can fight a mist crane because your candle is lit."*
+//
+// 🔴 I ARGUED AGAINST THIS AND THE ARGUMENT USED THE WRONG NUMBER. "Hunting one creature out of 66
+// is a slot machine" measured at 9% of runs — but a creature lives on ONE road and a run walks ONE
+// road, so 9% was really *"you were on the wrong road three times in four."*
+// 📏 On the RIGHT road it is 23–55% of runs, median 35%. The Mist Crane is on 55% of stage-1 runs.
+//
+// 🔑 SO THE STAGE IS THE QUEST BOARD. Picking stage 1 to hunt a Mist Crane is Monster Hunter's
+// quest select, and it was already built. The candle then says whether it is on your next node,
+// and the Stash says which road it lives on. Every piece of the hunt already existed.
+//
+// ⚠️ BOTH TIERS, WHICH IS ALSO WHAT MONSTER HUNTER DOES: Bone Shard and the shape materials are
+// its Monster Bone Small — they drop from dozens of things and fill the bulk of a recipe. A
+// signature part is its Rathalos Scale: one creature, and it is the reason you go there.
+//
+// 📦 Signature parts are NOT in MATERIALS. There are 66 of them and they are derived, not authored
+// — a table entry per creature would be 66 rows of data that the creature list already implies.
+// Their ids are `p:<creature name>`, and matDef() resolves them synthetically.
+const PART_WORD = { armour: 'Plate', evasion: 'Plume', guard: 'Hide' };
+// ⚠️ A creature with BOTH shapes takes the first — stage 4 stacks them, and a part named after two
+// body plans reads like a bug. Shapeless creatures give a Fang.
+function partWordFor(e) {
+  const sh = (shapesOf(e) || [])[0];
+  return PART_WORD[sh] || 'Fang';
+}
+const partIdOf = name => 'p:' + name;
+const partNameOf = (name, word) => `${name} ${word}`;
+// 🔑 ONE RESOLVER. A signature part answers matDef() like anything else, so every consumer — the
+// haul, the Stash, and the recipes to come — needs no special case for it.
+function matDef(id) {
+  const m = MATERIALS.find(x => x.id === id);
+  if (m) return m;
+  if (typeof id === 'string' && id.startsWith('p:')) {
+    const name = id.slice(2);
+    const e = creatureByName(name);
+    const word = e ? partWordFor(e) : 'Fang';
+    return { id, icon: '🏆', name: partNameOf(name, word), tier: 'signature',
+             from: name, road: e ? e.road : null };
+  }
+  return null;
+}
+// where every creature lives — built once from the roads, so the Stash and the drop table can
+// never disagree about which road holds what.
+const CREATURE_INDEX = (() => {
+  const out = {};
+  for (const stage of [1, 2, 3, 4]) {
+    const road = roadFor(stage);
+    for (const region of road) for (const e of (region.encounters || [])) {
+      if (e.type !== 'fight') continue;
+      if (!out[e.name]) out[e.name] = { ...e, road: stage, region: region.name };
+    }
+  }
+  return out;
+})();
+const creatureByName = n => CREATURE_INDEX[n] || null;
+
 const SHAPE_MAT = { armour: 'slag', evasion: 'quill', guard: 'hide' };
 // the published rates. ⚠️ Keep these and the Stash's text in step — a rate the player cannot read
 // is the difference between a plan and a fruit machine.
-const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2 };
+const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 0.5, narrowSignature: 0.25 };
 
 // 💰 GOLD — the meta currency, earned EVERY run, win or lose.
 // 🔴 THIS IS THE "A LOSS MUST PAY" FIX and it is the load-bearing half of the whole meta layer.
@@ -5743,6 +5836,9 @@ function rollDrops(e, outcome) {
   }
   if (e.type !== 'fight') return bag;                // a road is walked, not carved
   add('shard', clean ? 2 : 1);
+  // 🏆 the signature part — the reason to come to THIS road for THIS creature
+  const base = e.baseName || e.name;
+  if (creatureByName(base) && rnd() < (clean ? DROP_RATE.signature : DROP_RATE.narrowSignature)) add(partIdOf(base), 1);
   const shapes = shapesOf(e) || [];
   for (const sh of shapes) {
     const mat = SHAPE_MAT[sh];
