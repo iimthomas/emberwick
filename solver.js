@@ -666,7 +666,17 @@ const RUNSIM = (() => {
           // after it. ⚠️ The 'upgrade' phase no longer fires, so a bot that only sharpened there
           // would silently stop buying levels entirely and report a game nobody plays. Same policy
           // as before: buy the most expensive card it can afford, then close.
-          const up = S.hand.filter(cc => upgradable(cc)).sort((a, b) => eff(b).cost - eff(a).cost)[0];
+          // 🐛 ...AND IT MUST ASK WHETHER SHARPENING IS EVEN OPEN (fixed 2026-08-22, same day it
+          // broke). ⏳ A Time Penalty now shuts the forge, so `buyUpgrade` began silently
+          // returning early — the bot never reached wheelDone(), the phase never advanced, and the
+          // run spun until the 800-step guard killed it. Measured: **489 of 600 runs ended in the
+          // 'wheel' phase**, and every run-level number taken between the two changes was noise.
+          // 🔑 A PLAYER WAS NEVER STUCK — the Wheel's "Move on" button is unconditional. This is
+          // the bot-only half of the same bug class as the never-carried Arsenal: *a rule the
+          // engine enforces silently is a rule the instrument cannot see it has hit.*
+          const up = canSharpenNow()
+            ? S.hand.filter(cc => upgradable(cc)).sort((a, b) => eff(b).cost - eff(a).cost)[0]
+            : null;
           if (up) buyUpgrade(up.id); else wheelDone();
         }
       }
