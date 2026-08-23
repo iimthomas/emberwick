@@ -2798,6 +2798,7 @@ function devShapeDeck(cards, target) {
   S.hand = []; S.deck = all;   // beginFinalBattle() gathers them anyway
 }
 function devJump() {
+  // 🔧 no guard here on purpose — the dev menu exists to jump, and nagging it would be noise.
   const d = S.dev, cfg = DEV_DECKS[d.deck] || DEV_DECKS.mediocre;
   const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
   freshGame(stage);
@@ -2924,7 +2925,30 @@ function showStages() {
   S.encounter = null;
   render();
 }
-function startStage(n) {
+// 🛡️ IS THERE A RUN ON DISK THAT IS STILL BEING PLAYED? (2026-08-22)
+// Used to guard everything that calls freshGame(), which DELETES THE SAVE on its first line.
+function liveRunSaved() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    return !!(d && d.v === SAVE_VERSION && !['victory', 'defeat'].includes(d.phase));
+  } catch (e) { return false; }
+}
+
+// 🐛 STARTING A STAGE SILENTLY DESTROYED AN IN-PROGRESS RUN (found in play 2026-08-22).
+// Thomas: *"don't know if the continue run is working, my run wasn't saved."*
+// It was saving fine — `freshGame()` deletes the save on its FIRST LINE, and the 🗺️ Stages screen
+// called `startStage(n)` with no confirmation at all. One tap and the run was gone before anything
+// rendered. ⚠️ The Stages button sits directly under ▶ Continue on the menu.
+//
+// 🔑 THE TELL WAS AN ASYMMETRY: `newGame()` — the ⟳ New Run button — already asked *"This run will
+// be lost."* **The same destructive act was guarded in one place and unguarded in the other**, which
+// is how a hazard hides: the guarded path teaches you the game asks, so you trust the other one.
+// ⚠️ THE GUARD BELONGS IN startStage, NOT AT THE CALL SITES — every future caller inherits it,
+// which is the whole reason the Stages screen was missing one.
+function startStage(n, confirmed) {
+  if (!confirmed && liveRunSaved() && !confirm(
+      'You have a run in progress. Starting a stage will END it — your saved run is lost. Start anyway?')) return;
+
   // ⚠️ THE CLASS MUST BE SET BEFORE freshGame — it is freshGame that deals the deck, and the deck
   // is the class's (16 unique for the mage, 8 x 2 for the rogue).
   // 🎓 Stage 0 is MAGE by construction: its authored deck order names mage cards, and the tutorial
@@ -3269,7 +3293,7 @@ function newGame() {
   if (!S || isShell()) { showMenu(); return; }
   const st = S.tutorial ? 0 : (S.dragon && S.dragon.stage) || 1;
   const what = st === 0 ? 'the tutorial' : `stage ${st} — ${S.dragon.name}`;
-  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st);
+  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st, true);
 }
 
 function nextRegion() {
