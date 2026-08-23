@@ -2577,7 +2577,11 @@ const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // two can never drift again. Bumped to 5 here because dragons changed shape (shields -> SHAPE).
 const SAVE_VERSION = 5;
 
-function saveGame() {
+// 🔑 THE KEY IS A PARAMETER SO DEV SLOTS SHARE THIS EXACT SERIALIZER (2026-08-22).
+// ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
+// in July — and a slot that saved a slightly different shape would load into a subtly wrong run,
+// which is the worst possible bug in a TESTING tool: it would make you chase ghosts in the game.
+function saveGame(key) {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
@@ -2587,7 +2591,7 @@ function saveGame() {
       const o = { id: c.id, n: CLASS.defs.indexOf(c.def), lv: c.level };
       return o;
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
+    localStorage.setItem(key || SAVE_KEY, JSON.stringify({
       v: SAVE_VERSION, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn, regionTurn: S.regionTurn,
       deck: S.deck.map(card), hand: S.hand.map(card),
@@ -2655,9 +2659,9 @@ function reviveMap(m) {
   };
 }
 
-function loadGame() {
+function loadGame(key) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(key || SAVE_KEY);
     if (!raw) return false;
     const d = JSON.parse(raw);
     if (d.v !== SAVE_VERSION) return false;
@@ -2672,7 +2676,22 @@ function loadGame() {
     };
     const deck = d.deck.map(mk), hand = d.hand.map(mk), discard = d.discard.map(mk), trashed = d.trashed.map(mk);
     if ([...deck, ...hand, ...discard, ...trashed].some(c => !c)) return false; // card data changed since save
-    const region = RUN()[d.region - 1];
+    // 🔴 RESOLVE THE SAVED RUN'S OWN ROAD — NEVER `RUN()` (fixed 2026-08-22, found by Thomas:
+    // *"don't know if the continue run is working, my run wasn't saved"*).
+    // 🐛 `RUN()` reads `S.dragon.stage` — the run currently IN MEMORY — and this line used it to
+    // look up an encounter belonging to the run being LOADED. On a cold boot `S` is null, so
+    // RUN() fell back to stage 1's road; a save from stages 2-4 hunted its creature in the wrong
+    // land, found nothing, and `loadGame` returned false.
+    // 🔑 AND THE FAILURE IS SILENT — `loadGame()` returning false is indistinguishable from "no
+    // save yet", so it read as a fresh run and the menu simply stopped offering Continue. That is
+    // the exact shape of the July save-version bug, which is why this file already says: **always
+    // round-trip a save after touching the schema.** It was not the schema this time; it was the
+    // ROAD, which is chosen by state that has not been restored yet at this point in the function.
+    // ⚠️ Every save from stage 2, 3 or 4 was unresumable after closing the app. Stage 1 worked by
+    // pure coincidence — it is what the fallback happens to return.
+    const savedDragon = d.dragon ? DRAGONS.find(x => x.name === d.dragon) : null;
+    const road = d.tutorial ? TUTORIAL.regions : roadFor(savedDragon ? savedDragon.stage : 1);
+    const region = road[d.region - 1];
     if (!region) return false;
     const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
     // ⚠️ PHASES THAT LEGITIMATELY HAVE NO ENCOUNTER. 🛤️ 'fork' had to be added the day it was
@@ -2797,6 +2816,79 @@ function devShapeDeck(cards, target) {
   }
   S.hand = []; S.deck = all;   // beginFinalBattle() gathers them anyway
 }
+// ============================================================
+// 💾 DEV SAVE SLOTS (2026-08-22) — Thomas: *"just save, and load, for me, for my own testing
+// purposes, so i don't have to replay runs from the beginning."*
+//
+// 🔑 A TESTING TOOL, NOT A FEATURE. It is gated on DEV_ENABLED like the rest of the dev menu,
+// so it exists only at `?dev` and is invisible in the playtest drop. ⚠️ Player-facing save/load
+// would delete the genre — deck-as-health, a spent Spell and a blunted card are all permanent by
+// design, and a load button makes every one of them optional.
+//
+// ⚠️ IT REUSES saveGame()/loadGame() BY PASSING A KEY. There is no second serializer, because a
+// slot that wrote a slightly different shape would load into a subtly wrong run — and in a tool
+// whose whole job is reproducing a situation, that would send you hunting bugs that are not there.
+// ⚠️ The slot keys take KEY_NS like every other persistent key, or the live build and the frozen
+// playtest build would fight over the same storage.
+const DEV_SLOTS = 6;
+const devSlotKey = i => `emberwick-devslot-${i}` + KEY_NS;
+
+function devSlotInfo(i) {
+  try {
+    const d = JSON.parse(localStorage.getItem(devSlotKey(i)) || 'null');
+    if (!d) return null;
+    const stale = d.v !== SAVE_VERSION;
+    const where = d.finalMode ? (d.finalPhase === 'duel' ? `duel beat ${d.duelBeat}` : 'the lair')
+                : d.map && d.map.pos ? `floor ${d.map.pos.f + 1}`
+                : `region ${d.region}`;
+    return { stale, cls: d.cls || 'mage', dragon: d.dragon || '?', where,
+             phase: d.phase, turn: d.turn, cards: (d.deck || []).length + (d.hand || []).length };
+  } catch (e) { return null; }
+}
+function devSlotSave(i) {
+  if (!DEV_ENABLED) return;
+  if (!S || !S.deck) { alert('No run to save — start or continue one first.'); return; }
+  // ⚠️ the reveal guard lives inside saveGame(); a mid-reveal slot save would silently write nothing
+  if (S.phase === 'reveal') { alert('Finish the reveal first — a mid-reveal state cannot be saved.'); return; }
+  saveGame(devSlotKey(i));
+  render();
+}
+function devSlotLoad(i) {
+  if (!DEV_ENABLED) return;
+  const info = devSlotInfo(i);
+  if (!info) return;
+  if (info.stale) { alert('That slot was saved by an older build and cannot be loaded.'); return; }
+  if (!loadGame(devSlotKey(i))) { alert('That slot would not load — it may predate a save change.'); return; }
+  // 🔑 write it straight back to the REAL save too, so a reload after loading a slot resumes
+  // the slot rather than whatever run was there before. Without this, testing a slot then reloading
+  // silently drops you back into the previous run — exactly the confusion this tool exists to avoid.
+  saveGame();
+  render();
+}
+function devSlotClear(i) {
+  if (!DEV_ENABLED) return;
+  try { localStorage.removeItem(devSlotKey(i)); } catch (e) {}
+  render();
+}
+function devSlotsHTML() {
+  if (!DEV_ENABLED) return '';
+  const rows = [];
+  for (let i = 0; i < DEV_SLOTS; i++) {
+    const it = devSlotInfo(i);
+    const label = it
+      ? (it.stale ? `<span class="dim">slot ${i + 1} — stale build</span>`
+        : `<b>${it.cls}</b> · ${it.dragon} · ${it.where} · turn ${it.turn} · ${it.cards} cards <span class="dim">(${it.phase})</span>`)
+      : `<span class="dim">slot ${i + 1} — empty</span>`;
+    rows.push(`<div class="dev-slot"><span class="dev-slot-lab">${label}</span>` +
+      `<button onclick="devSlotSave(${i})">${it ? 'overwrite' : 'save here'}</button>` +
+      (it && !it.stale ? `<button class="primary" onclick="devSlotLoad(${i})">load</button>` : '') +
+      (it ? `<button onclick="devSlotClear(${i})">✕</button>` : '') + `</div>`);
+  }
+  return `<div class="dev-slots"><div class="kit-lab">💾 Save slots <span class="dim">— dev only; ` +
+    `saving writes the CURRENT run, loading replaces it and becomes your live save.</span></div>` +
+    rows.join('') + `</div>`;
+}
+
 function devJump() {
   // 🔧 no guard here on purpose — the dev menu exists to jump, and nagging it would be noise.
   const d = S.dev, cfg = DEV_DECKS[d.deck] || DEV_DECKS.mediocre;
@@ -7546,6 +7638,7 @@ function renderControls() {
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
+      devSlotsHTML() +
       `<button onclick="showMenu()">← Menu</button>` +
       `</div>`;
   } else if (S.phase === 'ladder') {
