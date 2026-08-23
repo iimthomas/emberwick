@@ -864,6 +864,13 @@ button.stage.locked .stage-shape { font-style: italic; }
 .tok-acts { display: flex; gap: 5px; margin-top: 6px; }
 .tok-act { flex: 1; font-size: 10.5px; padding: 4px 5px; border-color: #7fd8ff; color: #cfe9ff; }
 
+/* 🧰 THE CARVE — the last beat of the reveal. It reads warm and it reads as a REWARD, which is the
+   one beat in the sequence that is not arithmetic. ⚠️ Above the media queries. */
+.pv-carve { border-color: rgba(232,145,60,.55) !important;
+  background: linear-gradient(180deg, rgba(232,145,60,.15), rgba(232,145,60,.04)) !important; }
+.pv-carve .pv-num { font-size: 30px; }
+.pv-carve .pv-label { color: #f0a86a; }
+
 /* 🎭 the roster ahead — legible, smaller, and obviously not yet yours */
 .class-row.is-soon { opacity: .5; }
 .class-row.is-soon .class-pick { padding: 8px 10px; }

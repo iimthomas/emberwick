@@ -5407,6 +5407,21 @@ function resolve() {
     ] });
   }
 
+  // 🧰 THE CARVE IS THE LAST BEAT (2026-08-23, Thomas: *"after that, lets show the drops we got
+  // from that encounter"*).
+  // 🔑 IT COSTS NO CLICK. Beats auto-advance every 1400ms and only the FINAL one waits — so moving
+  // `final` onto the carve makes it play as one more stage of the same reveal rather than a screen
+  // you have to dismiss. *A weightless decision is not a rest, it is homework* — this is not a
+  // decision at all, it is a beat of pacing, which is the one thing the reveal is FOR.
+  // ⚠️ Rolled HERE rather than in finishResolve() so the beat can show it. finishResolve() then
+  // banks what was rolled instead of rolling again — two rolls would have shown you one haul and
+  // given you another.
+  r.drops = rollDrops(S.encounter, r.outcome);
+  if (Object.keys(r.drops).length) {
+    beats[beats.length - 1].final = false;
+    beats.push({ carveBeat: true, final: true, lines: [] });
+  }
+
   S.pendingR = r;
   S.beats = beats;
   S.beatIndex = -1;
@@ -5495,6 +5510,15 @@ function beatDisplayHTML(beat, isNew) {
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
     return `<div class="pv-stat pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>${subs.join('')}</div>`;
+  }
+  if (beat.carveBeat) {
+    const ids = Object.keys(r.drops || {});
+    return `<div class="pv-stat pv-carve${pop}">` +
+      `<div class="pv-num good">\u{1F9F0}</div>` +
+      `<div class="pv-label">CARVED</div>` +
+      ids.map(id => `<div class="pv-sub good">${matDef(id).icon} ${matDef(id).name}` +
+        `${r.drops[id] > 1 ? ` <b>\u00d7${r.drops[id]}</b>` : ''}</div>`).join('') +
+      `</div>`;
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
     `<div class="pv-label">${beat.label} ${beat.vs}</div>` +
@@ -5585,7 +5609,7 @@ function finishResolve() {
   // The log also printed "+-2 coins", which is its own small lie about what happened.
   // 🦴 CARVE FIRST, THEN THE PURSE — the same order the log reads.
   S.encountersDone = (S.encountersDone || 0) + 1;
-  grantDrops(S.encounter, r.outcome);
+  bankDrops(r.drops || rollDrops(S.encounter, r.outcome));
   if (r.outcome !== 'Loss') {
     const g = Math.round((e.xp + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0)) * COIN_MULT) + charmMod('coin');
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
@@ -6164,9 +6188,10 @@ function rollDrops(e, outcome) {
   if (e.elite) { add('sinew', 1); add('shard', 1); }
   return bag;
 }
-// 🎒 the run's haul, kept on S so the summary can show it and a LOSS still banks it
-function grantDrops(e, outcome) {
-  const bag = rollDrops(e, outcome);
+// 🎒 the run's haul, kept on S so the summary can show it and a LOSS still banks it.
+// ⚠️ TAKES AN ALREADY-ROLLED BAG. The reveal rolls it so the carve beat can show it, and this
+// banks that same bag — rolling again here would have shown you one haul and given you another.
+function bankDrops(bag) {
   const got = [];
   for (const id in bag) {
     S.loot[id] = (S.loot[id] || 0) + bag[id];
@@ -7544,7 +7569,14 @@ const isShell = () => SHELL_PHASES.includes(S && S.phase);
 // would be a dialog about the thing it was covering.
 // ⚠️ phases that cannot exist without a map behind them
 const MAP_PHASES_NEEDING_MAP = ['map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
-const MODAL_PHASES = ['wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
+// 🚪 'reveal' JOINED THE LIST 2026-08-23 (Thomas: *"the resolving happens in another window, and
+// then the wheel comes up in another window. lets combine them"*). Resolving used to draw inline
+// while the Wheel popped up over it, so finishing an encounter threw you between two different
+// windows for one continuous moment. They are one panel now: strike → outcome → 🧰 carve → the
+// Wheel, all in the same frame.
+// ⚠️ It is safe here for the reason the panel is top-anchored in the first place: the reveal
+// animates the SLOT ROW (`beatFx`), and the modal never covers the hand.
+const MODAL_PHASES = ['reveal', 'wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
 // 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
@@ -9807,7 +9839,7 @@ function victory() {
   else if (!next) log(`🪜 Every stage stands open — take whichever you like.`, 'good result');
   // 🐉 the hunt's prize, and the run's pay. ⚠️ Both go through the same helpers the road uses,
   // so a dragon is not a special case — it is an encounter with a better table.
-  grantDrops({ dragon: true, name: S.dragon.name, type: 'fight' }, 'Complete');
+  bankDrops(rollDrops({ dragon: true, name: S.dragon.name, type: 'fight' }, 'Complete'));
   bankRun(true);
   S.phase = 'victory';
   render();
