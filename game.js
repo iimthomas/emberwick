@@ -8775,15 +8775,21 @@ function renderControls() {
         const hero = (() => {
           const cls = CLASSES[picked], t = cls && cls.trait;
           return `<div class="hero-art" id="hero-art">` +
-            `<img class="hero-img" alt="" src="art/classes/${picked}.png?v=${BUILD}" ` +
+            // ⚠️ .jpg, not .png. Key art has a solid dark ground and needs no alpha, and the PNG
+            // was 2.2 MB against 197 KB for a JPEG at q90 — eleven times the weight for a channel
+            // nothing uses. The FOE plates stay PNG because their transparency is the whole point.
+            `<img class="hero-img" alt="" src="art/classes/${picked}.jpg?v=${BUILD}" ` +
               `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">` +
             `<div class="hero-fallback">${t ? t.icon : '✦'}</div>` +
             `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
             `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +
           `</div>`;
         })();
+        // 🖼️ ART LEFT, ROSTER RIGHT — the classic character-select layout, and the panel was already
+        // 1180px wide while the portrait sat at 313. Stacking them wasted two thirds of the screen
+        // on empty margin and made the art small, which is the one thing it must not be.
         return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
-          hero +
+          `<div class="picker-split">` + hero + `<div class="picker-list">` +
           `<div class="class-row">` +
           row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
           row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
@@ -8797,7 +8803,7 @@ function renderControls() {
           soon('⚖️', 'The Paladin', 'declaration — call the turn before you take it') +
           soon('🕯️', 'The Warlock', 'sacrifice — spend what you cannot get back') +
           soon('⚔️', 'The Knight', 'stance — this turn decides how the next one is fought') +
-          `</div>`;
+          `</div></div></div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
 

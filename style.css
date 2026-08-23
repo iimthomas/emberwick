@@ -935,8 +935,13 @@ button.stage.locked .stage-shape { font-style: italic; }
    and the roster is the best thing this screen has to show. ⚠️ Above the media queries.
    🔑 It is finished before any art exists: the emblem shows through until an image loads, and a
    missing file removes itself. Art never blocks design. */
-.hero-art { position: relative; width: min(560px, 100%); margin: 10px auto 14px;
-  aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden;
+/* ⚠️ 3:4 PORTRAIT, matched to the art rather than guessed. The frame was 3:2 landscape before any
+   picture existed, and `object-fit: cover` on a 3:4 illustration would have cropped her head and
+   boots off to fill it — the classic "the frame was decided before the content" bug.
+   🔑 Sized by HEIGHT (a max-height with an auto width), because a standing figure is height-limited:
+   capping the width would have let it grow taller than the screen on a narrow panel. */
+.hero-art { position: relative; height: min(520px, 58vh); aspect-ratio: 3 / 4;
+  width: auto; margin: 10px auto 14px; border-radius: 14px; overflow: hidden;
   border: 1px solid rgba(201,162,74,.34);
   background: radial-gradient(120% 90% at 50% 20%, #2a221a 0%, #17140f 70%, #100e0a 100%);
   display: flex; align-items: center; justify-content: center; }
@@ -951,7 +956,19 @@ button.stage.locked .stage-shape { font-style: italic; }
   background: linear-gradient(to top, rgba(8,7,6,.92), rgba(8,7,6,.55) 55%, transparent); }
 .hero-cap b { font-size: 17px; color: #f0d9a8; letter-spacing: .02em; }
 .hero-cap span { font-size: 12px; color: #b9ae9a; }
-@media (max-width: 700px) { .hero-art { aspect-ratio: 4 / 3; } .hero-fallback { font-size: 64px; } }
+
+/* 🖼️ ART LEFT, ROSTER RIGHT. The portrait is the anchor and gets a fixed lane; the list flexes. */
+.picker-split { display: flex; gap: 20px; align-items: flex-start; margin: 10px 0 14px; }
+.picker-split .hero-art { margin: 0; flex: 0 0 auto; height: min(560px, 62vh); }
+.picker-list { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.picker-list .class-row { margin: 0; }
+/* ⚠️ stacks under 820px — below that the two lanes fight and the portrait wins by shrinking */
+@media (max-width: 820px) {
+  .picker-split { flex-direction: column; align-items: center; }
+  .picker-split .hero-art { height: min(420px, 46vh); }
+  .picker-list { width: 100%; }
+}
+@media (max-width: 700px) { .hero-art { height: min(400px, 52vh); } .hero-fallback { font-size: 64px; } }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }
