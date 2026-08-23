@@ -863,6 +863,13 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* 🔋 a token with more than one thing to do carries its own buttons */
 .tok-acts { display: flex; gap: 5px; margin-top: 6px; }
 .tok-act { flex: 1; font-size: 10.5px; padding: 4px 5px; border-color: #7fd8ff; color: #cfe9ff; }
+
+/* 🎭 the roster ahead — legible, smaller, and obviously not yet yours */
+.class-row.is-soon { opacity: .5; }
+.class-row.is-soon .class-pick { padding: 8px 10px; }
+.class-row.is-soon .class-pick b { font-size: .95em; }
+.class-pick.locked { cursor: default; border-style: dashed; }
+.class-pick.locked:hover { background: inherit; }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }

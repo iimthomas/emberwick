@@ -1013,7 +1013,7 @@ const MAGE = {
   // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
-    text: '<b>Channel</b> your Surge instead of spending it and it comes back <b>half again as strong</b>, aimed at your <b>strike</b> or your <b>speed</b> — so the turn you can afford to wait is the turn you get paid for.' },
+    text: '<b>Channel</b> your Surge instead of spending it and you carry it into next turn as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b> — and one big hit beats 🛡️ Armour, which is only subtracted once.' },
   // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
   // "does this hand hold a same-element pair" and finding it is attuning.
   // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
@@ -1946,7 +1946,7 @@ const TUTORIAL = {
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
     { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> can fire now — or <b>⟳ channel</b> it: nothing this turn, but next turn it returns <b>half again as strong</b>, aimed at your <b>strike</b> or your <b>speed</b>. ' +
+      text: 'Your <b>SURGE</b> can fire now — or <b>⟳ channel</b> it: nothing this turn, but next turn you spend it as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b>. ' +
             'The bigger the Surge you channel, the more it pays. 🕯️ Your candle shows you what is coming.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
@@ -8679,10 +8679,32 @@ function renderControls() {
             (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> — ${t.text}</span>` : '') +
             `</button>`;
         };
+        // 🎭 THE PLANNED ROSTER, SHOWN LOCKED (2026-08-23, Thomas: *"i also want to add the classes
+        // to our character selector, just to add some excitement about my ambitions for the future
+        // of the game"*).
+        // 🔑 EACH LINE IS ITS SOURCE OF POWER, because that is what a class IS here — the rule that
+        // unlocks a card's big value. Never a matchup, never a stat: three defence shapes only
+        // permit ~6 profiles, and a roster designed from its matchup table becomes reskins.
+        // ⚠️ AN HONEST SHELF, the same rule the Collection follows: it says plainly that these are
+        // not built rather than showing a button that lies. A locked thing you can SEE is a goal.
+        const soon = (icon, name, line) =>
+          `<button class="class-pick locked" disabled><b>${icon} ${name}</b>` +
+          `<span class="class-line">${line}</span>` +
+          `<span class="class-trait dim">not built yet</span></button>`;
         return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
           `<div class="class-row">` +
           row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
           row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
+          `</div>` +
+          `<div class="wall-line dim">…and the road ahead</div>` +
+          `<div class="class-row is-soon">` +
+          soon('🎲', 'The Berserker', 'risk — you know the faces, not the roll') +
+          soon('🎭', 'The Illusionist', 'summoning — your buffs and your armour are the same things') +
+          soon('🛡️', 'The Guardian', 'retaliation — what hits you pays for it') +
+          soon('🏹', 'The Ranger', 'foreknowledge — you set the order the deck comes back in') +
+          soon('⚖️', 'The Paladin', 'declaration — call the turn before you take it') +
+          soon('🕯️', 'The Warlock', 'sacrifice — spend what you cannot get back') +
+          soon('⚔️', 'The Knight', 'stance — this turn decides how the next one is fought') +
           `</div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
