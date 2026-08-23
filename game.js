@@ -2627,7 +2627,9 @@ const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // BUG FOUND 2026-07-29: the writer said `v: 4` while the reader demanded `d.v !== 3`, so EVERY
 // load silently failed and every reload started a fresh run. One constant now, used by both - the
 // two can never drift again. Bumped to 5 here because dragons changed shape (shields -> SHAPE).
-const SAVE_VERSION = 5;
+// ⚙️ 6 — 🛡️ armour (2026-08-23). ⚠️ loadGame() failing is SILENT (indistinguishable from
+// "no save yet"), so always round-trip a save after touching the schema.
+const SAVE_VERSION = 6;
 
 // 🔑 THE KEY IS A PARAMETER SO DEV SLOTS SHARE THIS EXACT SERIALIZER (2026-08-22).
 // ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
@@ -2679,6 +2681,8 @@ function saveGame(key) {
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
+      armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
+      armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
       taught: S.taught, lessonsOff: S.lessonsOff,
@@ -2790,6 +2794,11 @@ function loadGame(key) {
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
+      // 🛡️ filtered against the live table, so a piece removed in a later build cannot
+      // resurrect as `undefined` and throw on armourBlock().
+      armour: (d.armour || []).filter(a => a && armourDef(a.id)),
+      armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
+      armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
       duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
       contract: d.contract || null,
       potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
@@ -2842,7 +2851,7 @@ const DEV_DECKS = {
 function showDev() {
   if (!DEV_ENABLED) return;   // 🔧 not in the playtest build
   S = S || {};
-  S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '' };
+  S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '', arm0: '', arm1: '' };
   S.phase = 'dev';
   S.encounter = null;
   render();
@@ -2947,6 +2956,12 @@ function devJump() {
   const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
   freshGame(stage);
   S.dev = d;
+  // 🛡️ an explicit dev loadout REPLACES the granted one; leaving every slot 'empty' is how you
+  // measure the bare game, which is the state the ladder is tuned at.
+  if (Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => d['arm' + i]).some(Boolean)) {
+    S.armour = Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => d['arm' + i])
+      .filter(id => id && armourDef(id)).map(id => ({ id, wear: armourDef(id).wear }));
+  }
   devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
   S.candle = !!d.candle;
   if (d.charm && charmById(d.charm)) S.charms.push(d.charm);
@@ -3292,6 +3307,12 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 🛡️ THE LOADOUT. `wear` counts DOWN from the piece's printed wear; at 0 it is battered
+    // through for the rest of the run. ⚠️ Nothing here is ever destroyed for good — you forged it,
+    // you keep it. What a piece costs is the RUN, and that is the only reason it may exist at all
+    // (it is the first thing in the game that adds health from outside the deck).
+    armour: STARTER_LOADOUT.slice(0, ARMOUR_SLOTS_OPEN).map(id => ({ id, wear: armourDef(id).wear })),
+    armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -4820,7 +4841,7 @@ function computeAction(reserve) {
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
+  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0) + (S.armourPace || 0);   // 🧪 Draught of Haste · 👞 Quickstep
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
   const boostEff = h === 'Rationed' ? 0                                   // ⏳ nothing is spare
@@ -4851,7 +4872,7 @@ function computeAction(reserve) {
     // That is how anyone reads a card face, and dividing a buff is the surprising answer — so the
     // card's OWN value is what a multi-hit strike divides, and every bonus lands on each blow.
     // ⚠️ It is an ENGINE rule, not a rogue one: 🗡️ Sparkstrike gets it too.
-    const added = (S.potionFx ? S.potionFx.value : 0)               // 🧪 Emberdraught
+    const added = (S.potionFx ? S.potionFx.value : 0) + (S.armourStrike || 0)   // 🧪 Emberdraught · 🧤 Cinderfist
                   + (a.rogue ? (a.rogue.bonus || 0) : 0);           // ● pips + the blade verb
     const base = pileVal + added;
     const withBoost = base + boostEff;
@@ -5007,7 +5028,7 @@ function computeAction(reserve) {
   // ONE VALUE PER CARD, so a blade-side verb reads as PROGRESS here exactly as it reads as damage
   // in a fight. ⚠️ Anything added to `base` in the fight branch must be added here too, or a rule
   // silently applies to half the game — the branches are parallel and neither one warns you.
-  const added = (S.potionFx ? S.potionFx.value : 0) + (a.rogue ? (a.rogue.bonus || 0) : 0);
+  const added = (S.potionFx ? S.potionFx.value : 0) + (S.armourStrike || 0) + (a.rogue ? (a.rogue.bonus || 0) : 0);
   const base = pileVal + added;
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
@@ -5410,6 +5431,111 @@ function finishResolve() {
   else startUpgrade();
 }
 
+// ============================================================
+// 🛡️ ARMOUR — the loadout you bring, spec in `08_Ideas/Armour_And_The_Workshop.md`.
+//
+// 🔑 IT IS THE ANSWER TO THE BUILD-DISCOVERY GAP, and it pays that debt without spending the
+// pillar: the 16 cards stay fixed, the deck still starts at 32 levels, nothing is acquired
+// mid-run. What changes is *what you walked in wearing* — a layer OUTSIDE the deck.
+//
+// 🔴 THE LOAD-BEARING RULE: ARMOUR IS ARMOUR. Its job is to take a hit your DECK would otherwise
+// take. Abilities are garnish. A piece whose effect is a number that is always on is the wrong
+// piece — four permanent passives is a difficulty curve that inverts the longer you play.
+// ✅ ENFORCED BY CONSTRUCTION IN V1: every ability triggers ON BLOCK (`onBlock`). There is no
+// field for an always-on effect, so a vertical piece cannot be written.
+//
+// 🔴 AND THE REASON IT MAY EXIST AT ALL: it is the first thing in the game that adds health from
+// OUTSIDE the deck. That is acceptable ONLY because it breaks. Deck-as-health dies the day a
+// piece stops running out. Every piece has `wear`, and the field row prints it as pips.
+//
+// 📦 PORT: `onBlock` is a STRING KEY dispatched by one named helper, deliberately NOT an arrow
+// function — this table is pure data and can move to data/*.json whole. Keep it that way.
+// ============================================================
+const ARMOUR_SLOTS = {
+  Head:  { icon: '🪖', label: 'Head',  job: 'what you can see' },
+  Chest: { icon: '🥋', label: 'Chest', job: 'what you can take' },
+  Arms:  { icon: '🧤', label: 'Arms',  job: 'what you strike for' },
+  Legs:  { icon: '👢', label: 'Legs',  job: 'how fast you move' },
+};
+// how many slots you may fill. ⚠️ Thomas's call 2026-08-23: START AT TWO, earn the other two.
+let ARMOUR_SLOTS_OPEN = 2;
+
+// break rules, stolen wholesale from Flesh and Blood because they are three different feelings:
+//   'worn'    (Battleworn) — loses 1 block each time, decays to nothing, never leaves. THE DEFAULT.
+//   'shatter' (Blade Break) — blocks once at full value, then it is gone for the run. A panic button.
+// ⚠️ Nothing is ever destroyed for GOOD. You forged it, you keep it — what a piece costs is the RUN.
+const ARMOUR = [
+  // 🪖 HEAD — information. The candle's slot.
+  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",   block: 2, wear: 3, brk: 'worn' },
+  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',  block: 2, wear: 2, brk: 'worn',
+    onBlock: 'relight', text: 'When it blocks, your candle relights.' },
+  // 🥋 CHEST — what you can afford to lose. The workhorse slot.
+  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',         block: 4, wear: 3, brk: 'worn' },
+  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',     block: 3, wear: 2, brk: 'worn',
+    onBlock: 'coins', text: 'When it blocks, you find 3 coins.' },
+  // 🧤 ARMS — the blow.
+  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 3, wear: 1, brk: 'shatter',
+    onBlock: 'strike', text: 'When it shatters, your next strike hits for 4 more.' },
+  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace', block: 3, wear: 2, brk: 'worn' },
+  // 👢 LEGS — tempo.
+  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',    block: 2, wear: 3, brk: 'worn' },
+  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves', block: 2, wear: 2, brk: 'worn',
+    onBlock: 'pace', text: 'When it blocks, you move 3 faster next turn.' },
+];
+// ⚠️ TEMPORARY — step 1 has no Workshop, so the loadout is granted. The measurement this build
+// exists to take is *does one card still cover 72% of hits*, and a FIXED, plain loadout is what
+// makes that measurement clean. Replaced by the forge in step 3.
+const STARTER_LOADOUT = ['kiln', 'hood'];
+
+const armourDef = id => ARMOUR.find(a => a.id === id) || null;
+const armourWorn = () => (S.armour || []).filter(a => a.wear > 0);
+// what a piece turns aside RIGHT NOW. 'worn' decays: a Worn 3 Kilnplate blocks 4, then 3, then 2.
+function armourBlock(a) {
+  const d = armourDef(a.id); if (!d || a.wear <= 0) return 0;
+  // 🐛 THE WEAR GUARD IS LOAD-BEARING FOR THE DISPLAY, not just the maths. Without it a
+  // SHATTERED piece still reported its printed block, so the field row said *"turns 3"* about a
+  // plate that was gone — `armourEligible()` filtered it correctly and the token did not.
+  // 🔑 One function answers "what does this turn aside", and the screen asks the same one the
+  // rules ask. A number the display computes its own way is the whole *rule that fires without
+  // appearing* family, running backwards.
+  return d.brk === 'shatter' ? d.block : Math.max(0, d.block - (d.wear - a.wear));
+}
+function armourEligible() { return armourWorn().filter(a => armourBlock(a) > 0); }
+function armourMaxSoak() { return armourEligible().reduce((t, a) => t + armourBlock(a), 0); }
+
+// 🔑 ONE NAMED HELPER, dispatched by a string key — see the port note above. Every ability in the
+// game that fires when a piece blocks passes through here and nowhere else.
+function applyArmourBlock(key, d) {
+  if (key === 'relight') { lightCandle(`${d.name} turns the blow and the wick catches`); }
+  else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — you find 3 coins in the wreck. (you now hold ${S.coins})`, 'good'); }
+  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike hits for 4 more.`, 'good'); }
+  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — you move 3 faster next turn.`, 'good'); }
+}
+
+// 🛡️ SOAK WITH A PIECE INSTEAD OF A CARD. ⚠️ INSTEAD, not before — that is the whole point.
+// A buffer that absorbs automatically would just be a bigger health bar; making it a PICK in the
+// same phase turns *which card do I least mind blunting* (a lookup — best plate 5.8 vs an average
+// hit of 4.6, so one card covered 72% of hits) into *break a piece, or blunt a card?*
+function soakWithArmour(aid) {
+  const a = (S.armour || []).find(x => x.id === aid);
+  if (!a || S.damage <= 0) return;
+  const d = armourDef(a.id); const blocked = armourBlock(a);
+  if (!d || blocked <= 0) return;
+  if (d.brk === 'shatter') { a.wear = 0; log(`🛡️ ${d.name} turns aside ${blocked} and SHATTERS.`, 'bad'); }
+  else {
+    a.wear--;
+    const left = armourBlock(a);
+    log(`🛡️ ${d.name} turns aside ${blocked}` +
+        (a.wear > 0 ? ` — it will turn ${left} next time.` : ` — it is battered through; it turns nothing more this run.`), a.wear > 0 ? '' : 'bad');
+  }
+  if (d.onBlock) applyArmourBlock(d.onBlock, d);
+  S.damage = Math.max(0, S.damage - blocked);
+  if (S.damage <= 0) { log(`All damage soaked.`); exitSoak(); return; }
+  log(`${S.damage} damage remaining.`, 'bad');
+  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
+  if (maxSoak < S.damage) knockOut(); else render();
+}
+
 // ---------- Phase 3: soak damage by downgrading ----------
 function soakValue(card) {
   // SOAK DOUBLING CUT 2026-07-26 - an element check in the most stressful phase in the game,
@@ -5425,7 +5551,9 @@ function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
 
 function startSoak() {
   S.phase = 'soak';
-  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0);
+  // 🛡️ armour counts toward what you CAN cover, or a knock-out would fire while you still had
+  // a plate on. A rule the engine enforces only for cards is a rule the player cannot use.
+  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
   if (maxSoak < S.damage) knockOut();
   else render();
 }
@@ -5466,7 +5594,7 @@ function soakWith(cardId) {
     exitSoak();
   } else {
     log(`${S.damage} damage remaining.`, 'bad');
-    const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0);
+    const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
     if (maxSoak < S.damage) knockOut();
     else render();
   }
@@ -5475,6 +5603,9 @@ function soakWith(cardId) {
 function knockOut() {
   // being knocked out mid-fight ENDS the fight — you're in no shape to keep swinging
   log(`Cannot soak all the damage → KNOCKED OUT`, 'bad result');
+  // 🛡️ the armour goes with it. A knock-out that leaves a plate intact reads as the game
+  // declining to use something you were wearing.
+  for (const a of armourEligible()) { const d = armourDef(a.id); a.wear = 0; log(`🛡️ ${d.name} is battered through (knock-out).`, 'bad'); }
   for (const card of soakEligible()) downgrade(card, ' (knock-out)');
   const n = Math.min(KO_DECK_DISCARD, S.deck.length);
   if (n > 0) {
@@ -5801,7 +5932,13 @@ function tickMomentum(damage, r) {
   }
 }
 
-function rollWake() {
+// 🛡️ ...and armour's on-block effects roll here too, for exactly the same reason. A piece that
+// says *"your next strike hits for 4 more"* is granted during SOAK, at the end of one turn, and
+// must survive into the next one — which is the same shape as the Emberwake and therefore the same
+// trap. Anything per-turn added here is inherited by the road, the Last Mile and the duel at once.
+function rollTurnTokens() {
+  S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
+  S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
   if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
   else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
@@ -5812,7 +5949,7 @@ function rollWake() {
 }
 
 function endTurn() {
-  rollWake();
+  rollTurnTokens();
   let spentIds = pouredIds();
   // ✦ UNSPENT - a clean win costs you nothing. The Spell is the only card the turn CONSUMES, so
   // this is the biggest rule in the game to bend: it turns "what is my biggest card" into "what is
@@ -6958,6 +7095,25 @@ function pointAtLesson() {
 // ============================================================
 function fieldTokens() {
   const out = [];
+  // 🛡️ ARMOUR SITS ON THE FIELD, not in a row of its own. It is board state with a countdown,
+  // which is exactly the token shape — and 🔑 EVERY TOKEN SAYS HOW IT DIES, which for a piece of
+  // armour is the whole design. ⚠️ A second row would also mean re-pinning `#slots-panel`, which
+  // is fixed by grid-row number in the immersive block.
+  for (const a of (S.armour || [])) {
+    const d = armourDef(a.id); if (!d) continue;
+    const live = armourBlock(a), sl = ARMOUR_SLOTS[d.slot];
+    const pickable = S.phase === 'soak' && S.damage > 0 && live > 0;
+    out.push({
+      id: 'arm-' + a.id, icon: sl.icon, name: d.name, count: a.wear, cap: d.wear, armour: true,
+      spent: live <= 0, ready: pickable,
+      worth: live > 0 ? `turns <b>${live}</b>` : '<b>battered through</b>',
+      note: live <= 0 ? 'it turns nothing more this run'
+          : pickable ? '<b>tap to take the blow</b>'
+          : d.brk === 'shatter' ? 'one blow, then it is gone'
+          : `${a.wear} blow${a.wear === 1 ? '' : 's'} left, weaker each time`,
+      tap: pickable ? `soakWithArmour('${a.id}')` : null,
+    });
+  }
   if (CLASS && CLASS.tokens) { const t = CLASS.tokens(); if (t) out.push(...t.filter(Boolean)); }
   // ---- ENGINE TOKENS: the one-shot boons and banes the road hands you ----
   if (S.paceBless > 0) out.push({ id: 'glimpse', icon: '🌙', name: 'Glimpse',
@@ -6987,7 +7143,8 @@ function renderField() {
     const body = (t.cap != null && t.count != null)
       ? `<span class="tok-pips">${pips(t.count, t.cap)}</span>`
       : (t.count != null ? `<span class="tok-count">${t.count}</span>` : '');
-    return `<div class="tok tok-${t.id}${t.bane ? ' is-bane' : ''}${t.tap ? ' is-tappable' : ''}"` +
+    return `<div class="tok tok-${t.id}${t.bane ? ' is-bane' : ''}${t.tap ? ' is-tappable' : ''}` +
+      `${t.armour ? ' is-armour' : ''}${t.spent ? ' is-spent' : ''}${t.ready ? ' is-ready' : ''}"` +
       (t.tap ? ` onclick="${t.tap}" role="button" tabindex="0"` : '') +
       ` title="${stripTags(t.name + ' — ' + t.worth + ' · ' + t.note)}">` +
       `<div class="tok-head"><span class="tok-icon">${t.icon}</span>${body}</div>` +
@@ -7757,6 +7914,13 @@ function renderControls() {
       `<div class="dev-row"><span>🕯️ Candle</span><div>` +
         pick('candle', 'true', 'Lit', d.candle) + pick('candle', 'false', 'Out', !d.candle) +
       `</div></div>` +
+      // 🛡️ one row per OPEN slot. ⚠️ A dev tool, and dev tools port last if ever — the real
+      // picker is the Workshop, and this row is deleted the day it lands.
+      Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) =>
+        `<div class="dev-row"><span>🛡️ Slot ${i + 1}</span><div>` +
+        pick('arm' + i, '', 'empty', !d['arm' + i]) +
+        ARMOUR.map(x => pick('arm' + i, x.id, `${ARMOUR_SLOTS[x.slot].icon} ${x.name}`, d['arm' + i] === x.id)).join('') +
+        `</div></div>`).join('') +
       `<div class="dev-row"><span>Charm</span><div>` +
         pick('charm', '', 'none', !d.charm) +
         CHARMS.filter(x => x.cls === CLASS.id).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
@@ -8618,7 +8782,7 @@ function staminaBar() {
 function startDuel() {
   S.finalPhase = 'duel';
   S.duelBeat = 0;
-  rollWake();   // 🔥 the Last Mile was a turn too — collect what it banked before the deck is gathered
+  rollTurnTokens();   // 🔥 the Last Mile was a turn too — collect what it banked before the deck is gathered
 
   // steel yourself at the lair's mouth: gather every card you still hold (spent-set and all)
   // into a fresh deck — this is your finite duel stamina. Only cards TRASHED on the approach
@@ -8783,7 +8947,7 @@ function finishDuel() {
 }
 
 function duelCleanupAndNext() {
-  rollWake();   // 🔥 end of a beat IS end of a turn — before the set leaves the hand, so Deepwell can still read it
+  rollTurnTokens();   // 🔥 end of a beat IS end of a turn — before the set leaves the hand, so Deepwell can still read it
   const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
   S.discard.push(...setCards);

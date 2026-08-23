@@ -758,6 +758,20 @@ button.stage.locked .stage-shape { font-style: italic; }
 .tok.is-tappable { cursor: pointer; border-color: #e8913c; }
 .tok.is-tappable:hover { background: linear-gradient(180deg, rgba(232,145,60,.28), rgba(232,145,60,.10)); }
 .tok.is-tappable:focus-visible { outline: 2px solid #ffd9a0; outline-offset: 2px; }
+
+/* 🛡️ ARMOUR — cool steel against the warm ember tokens, because it is the one thing on the field
+   that came from OUTSIDE the run. ⚠️ Inserted here, above the media query, not appended: the
+   responsive blocks have to stay last in this file. */
+.tok.is-armour { border-color: rgba(150,175,200,.45);
+  background: linear-gradient(180deg, rgba(140,165,195,.17), rgba(140,165,195,.05)); }
+.tok.is-armour .tok-name { color: #a8c4dd; }
+.tok.is-armour .tok-count, .tok.is-armour .tok-pips { color: #d7e6f3; }
+/* battered through: still worn, still visible, turns nothing. It has to READ as spent rather than
+   vanish — a piece that disappears looks like a bug, and you need to know why you have no plate. */
+.tok.is-armour.is-spent { opacity: .42; border-style: dashed; }
+/* during soak it is a live choice: break a piece, or blunt a card? */
+.tok.is-armour.is-ready { border-color: #7fd8ff; box-shadow: 0 0 0 1px rgba(127,216,255,.35), 0 0 16px -4px rgba(127,216,255,.5); }
+.tok.is-armour.is-ready:hover { background: linear-gradient(180deg, rgba(140,190,225,.30), rgba(140,190,225,.10)); }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }

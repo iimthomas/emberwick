@@ -665,7 +665,21 @@ const RUNSIM = (() => {
         if (rev) stackPick(next.id, st.order.length === 0 ? 'top' : 'bottom');
         else stackPick(next.id);
       }
-      else if (p === 'soak') { const c = soakEligible().slice().sort((a, b) => soakValue(b) - soakValue(a))[0]; if (c) soakWith(c.id); else break; }
+      // 🛡️ SOAK: ARMOUR FIRST, THEN THE FATTEST CARD.
+      // ⚠️ A BOT THAT CANNOT USE A THING THE PLAYER CAN IS NOT PLAYING THE GAME — the mirror of
+      // the 2026-08-10 finding that a bot which could DECLINE a rule the player cannot made
+      // ⛰️ Steep, 🌙 Nightfall and ❄️ Freeze all measure as free. Leave armour out of this line and
+      // every plate in the game measures as decoration.
+      // 🔑 THE POLICY, AND IT IS A POLICY: armour before cards, because a card blunted is a
+      // permanent loss of deck-health and a piece spent only costs this run. Reported against the
+      // no-armour build. It is deliberately the SIMPLE reading — a human weighing *break a piece or
+      // blunt a card* against the encounters still to come is doing something this cannot model.
+      else if (p === 'soak') {
+        const a = armourEligible().slice().sort((x, y) => armourBlock(y) - armourBlock(x))[0];
+        if (a) { soakWithArmour(a.id); continue; }
+        const c = soakEligible().slice().sort((x, y) => soakValue(y) - soakValue(x))[0];
+        if (c) soakWith(c.id); else break;
+      }
       // 🔼 SHARPEN — free choice from hand now (the Wheel stopped selling levels 2026-08-05).
       // Bot policy: buy the most expensive card it can afford, i.e. sharpen the sharpest, then stop.
       else if (p === 'upgrade') {
