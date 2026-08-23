@@ -1343,6 +1343,15 @@ body.modal-open #modal-layer { display: flex; align-items: flex-start; justify-c
    for three buttons.
    ⚠️ CSS ONLY, no render changes: every shell phase (menu · stash · workshop · collection ·
    ladder · dev) already draws into #controls-panel, so they all widen at once. */
+/* 🐛 AND THE TURN LOG GETS OUT OF THE WAY (Thomas: *"the main menu overlaps the turn log"*).
+   #controls-panel lives inside #left-col, which is 62% of the stage — so a 1180px panel simply
+   grew out of its own column and over the log in the other one.
+   🔑 THE RIGHT FIX IS TO REMOVE THE COLUMN, NOT TO SHRINK THE PANEL. The log belongs to a RUN;
+   render() says so in its own comment ("on the shell there may be no run at all"). A menu, a Stash
+   and a Workshop have nothing to log, and defeat/victory are NOT shell phases — so the one screen
+   where last-run history matters keeps it. Nothing is lost and the panel gets the whole stage. */
+body.shell #right-col { display: none; }
+body.shell #left-col { flex: 1 1 100%; }
 body.shell #controls-panel {
   width: min(1180px, calc(100vw - 28px));
   margin: 2.5vh auto;
