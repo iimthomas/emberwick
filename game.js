@@ -227,17 +227,17 @@ const CARD_DEFS = [
 // low Initiative, which is why a ☠️ Ranged creature (whose Early Damage is certain) could roll none
 // at all. None of the three below touch Early Damage.
 const HARDSHIPS = {
-  'Ambush':       'Double the Early Damage you suffer this encounter.',
-  'Hazards':      'Suffer 1 Time Penalty if you take Early Damage, and 1 more if you take Combat Damage.',
+  'Ambush':       'Early Damage against you is <b>doubled</b>.',
+  'Hazards':      'Take Early Damage: <b>+1 Time Penalty</b>. Take Combat Damage: <b>+1 more</b>.',
   // ⚠️ ENGINE TERMS, NOT ONE CLASS'S STAT. "Your Boost" is a mage word, and a hardship that
   // names it is a free ride for every class without a boost - which was literally true for the
   // rogue until 2026-08-18.
-  'Night Travel': "What your third slot gives is reduced by your second slot's Initiative (min 0).",
-  'Storm':        'Any Time Penalties this encounter also deal that much damage.',
+  'Night Travel': "Your <b>{slot:Boost}</b> gives its value minus your {slot:Element}'s Initiative (min 0).",
+  'Storm':        'Time Penalties also deal <b>that much damage</b>.',
   // ⚖️ aims straight at the most-solved part of the turn: the Spell is simply your biggest card 83%
-  'Dead Weight':  'Your heaviest card cannot be your Spell.',
+  'Dead Weight':  'Your <b>heaviest</b> card cannot be your {slot:Spell}.',
   // 🐌 the same trick on the race — your fastest card is barred from the Catalyst
-  'Mire':         'Your fastest card cannot be your Catalyst.',
+  'Mire':         'Your <b>fastest</b> card cannot be your {slot:Element}.',
   // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
   // mage that means no attuning, for a rogue it would mean no chain.
   // ⚠️ "ACCORD" MEANT NOTHING TO ANYONE (2026-08-22). Thomas: *"what does accord even mean"* —
@@ -247,7 +247,7 @@ const HARDSHIPS = {
   // word AND the mage's word, contradicting its own reason for existing.
   // 🔑 THE FIX IS THE ONE ALREADY BUILT FOR THE GRADE THIS MORNING: **the ENGINE owns the rule,
   // the CLASS owns the noun.** `{gate}` is filled from CLASS.craft.gate — see hardshipText().
-  'Dead Air':     'Your cards cannot {gate} this encounter — nothing at all.',
+  'Dead Air':     'Nothing can <b>{gate}</b> this encounter.',
   // 🌪️ STAGE 2's OWN TWO (2026-08-05). A land should press on the thing its dragon presses on,
   // so Skyrender's country attacks SPEED from both ends — one takes your fast card away from the
   // race, the other makes the race a condition on your class rule.
@@ -255,25 +255,25 @@ const HARDSHIPS = {
   // 🔃 Vertigo is the INVERSE of Mire, and that is the point: Mire bars your fastest card from
   // the Catalyst, Vertigo nails it INTO the Spell. Same card, opposite instruction, and both are
   // stated in engine terms (`init`), so a rogue meets them unchanged.
-  'Vertigo':      'The ground falls away — your <b>fastest</b> card must be your <b>Spell</b>.',
+  'Vertigo':      'Your <b>fastest</b> card must be your {slot:Spell}.',
   // ⚡ Squall puts a SECOND condition on the Catalyst, which is the one card already serving two
   // masters. ⚠️ We measured in July that a permanent second condition produces search, not
   // sacrifice — with 12 arrangements you can usually satisfy both. A HARDSHIP is where that
   // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
   // problem you solve rather than a tax you route around forever.
-  'Squall':       'The air will not hold — your cards can only {gate} <b>if you win Initiative</b>.',
+  'Squall':       'Cards can only <b>{gate}</b> if you <b>win Initiative</b>.',
   // ⏳ STAGE 3's TWO. Cragmourn's demand is *waste nothing*, so its land takes away the slack
   // you did not know you were relying on.
   // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
   // just pays nothing, so no slot is sealed and no choice is removed (sealed slots shipped once and
   // were killed the same day).
-  'Rationed':     'Nothing is spare here — your <b>third slot gives nothing</b> this encounter.',
+  'Rationed':     'Your <b>{slot:Boost}</b> gives <b>nothing</b>.',
   // ⚖️ Exacting is the mountain's own logic: half-measures are nothing. It is the harshest
   // hardship in the game and it is deliberately confined to late Fellgrind regions.
-  'Exacting':     'It gives no half credit — a <b>Narrow counts as a Loss</b>.',
+  'Exacting':     'A <b>Narrow counts as a Loss</b>.',
   // 🌊 STAGE 4's. The Arsenal is the one slot that is identical in every class, and this is the
   // only rule that takes the carry itself — the exam's way of saying *nothing you save is safe*.
-  'Riptide':      'The current takes what you held — your <b>Arsenal is spent</b>, not kept.',
+  'Riptide':      'Your <b>{slot:Reserve}</b> is <b>spent</b>, not kept.',
 };
 // 🔑 A HARDSHIP IS STATED IN ENGINE TERMS AND EACH CLASS READS ITS OWN WORD FOR IT.
 // `{gate}` becomes "attune" for the mage and "be paid in full" for the rogue — the same rule the
@@ -283,7 +283,9 @@ const HARDSHIPS = {
 function hardshipText(name) {
   const t = HARDSHIPS[name] || '';
   const gate = (CLASS.craft && CLASS.craft.gate) || 'combine';
-  return t.replace(/\{gate\}/g, `<b>${gate}</b>`);
+  return t
+    .replace(/\{gate\}/g, gate)
+    .replace(/\{slot:(\w+)\}/g, (_, z) => `<b>${SLOT_LABEL[z] || z}</b>`);
 }
 
 const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
