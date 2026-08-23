@@ -8636,8 +8636,11 @@ function renderControls() {
       `<button class="${(hasSave() || cleared) ? '' : 'primary '}menu-item" onclick="startStage(0)">` +
         `<b>📖 Tutorial</b>${gradeBadge(0, 'mage')}` +
         `<span>learn the game in one short run · always open</span></button>` +
-      `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
-        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      // ⚔️ "NEW GAME", not "Stages" (2026-08-23, Thomas). It is the door into a RUN, and a menu
+      // should name what is behind a door in the player's words rather than the designer's. "Stages"
+      // is our word for how the content is organised; "New Game" is what you are about to do.
+      `<button class="menu-item" onclick="showStages()"><b>⚔️ New Game</b>` +
+        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
       `<button class="menu-item" onclick="showWorkshop()"><b>⚒️ The Workshop</b>` +
         `<span>${workshopLine()}</span></button>` +
       `<button class="menu-item" onclick="showStash()"><b>📦 Stash</b>` +
@@ -8725,11 +8728,17 @@ function renderControls() {
           `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
       // 🗡️ WHO ARE YOU TAKING? Sits ABOVE the stages because it changes what every one of them
       // means — the same dragon is a different problem to a different class, which is the whole
-      // economy: +1 class = xN content. Hidden entirely until it is earned, rather than shown
-      // greyed-out: a locked door you cannot read is a tease, and the Collection already states
-      // what is not built. Once open it is two buttons, and the game says what each one IS.
+      // economy: +1 class = ×N content.
+      // ⚠️ SHOWN FROM THE FIRST SECOND, even on a fresh account (2026-08-23, Thomas: *"even if its
+      // a fresh account or w/e, we should show the character selector"*). It used to be hidden
+      // entirely until the rogue was earned, on the reasoning that *a locked door you cannot read
+      // is a tease* — but that reasoning was wrong for the ROSTER, because the roster is the single
+      // best thing this game has to show a new player. Hiding it meant run one looked like a game
+      // with one character.
+      // 🔑 The Collection's own rule settles it: an HONEST SHELF beats an empty room. A locked class
+      // that tells you its source of power and how to unlock it is an advertisement; a hidden one
+      // is nothing at all.
       (() => {
-        if (!classUnlocked('rogue')) return '';
         const picked = pickedClassId();
         // ⚠️ THE ROGUE'S OLD LINE WAS FALSE: *"strikes chain — many small ones"*. Her compose()
         // returns `hits: 1` - she lands ONE blow exactly like the mage. That text is left over from
@@ -8737,10 +8746,12 @@ function renderControls() {
         // 🔑 A CLASS DESCRIPTION IS A PROMISE ABOUT THE RULES; this one would have sold a player
         // the answer to 🧱 Guard, which is precisely what she does not have.
         const row = (id, name, line) => {
-          const cls = CLASSES[id], t = cls && cls.trait;
-          return `<button class="class-pick${picked === id ? ' on' : ''}" onclick="pickClass('${id}')">` +
+          const cls = CLASSES[id], t = cls && cls.trait, open = classUnlocked(id);
+          return `<button class="class-pick${picked === id ? ' on' : ''}${open ? '' : ' locked'}"` +
+            (open ? ` onclick="pickClass('${id}')"` : ' disabled') + `>` +
             `<b>${name}</b><span class="class-line">${line}</span>` +
             (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> — ${t.text}</span>` : '') +
+            (open ? '' : `<span class="class-trait dim">🔒 fell a dragon to unlock her</span>`) +
             `</button>`;
         };
         // 🎭 THE PLANNED ROSTER, SHOWN LOCKED (2026-08-23, Thomas: *"i also want to add the classes
@@ -8755,7 +8766,24 @@ function renderControls() {
           `<button class="class-pick locked" disabled><b>${icon} ${name}</b>` +
           `<span class="class-line">${line}</span>` +
           `<span class="class-trait dim">not built yet</span></button>`;
+        // 🖼️ THE PORTRAIT — big, and it is the point of the screen.
+        // 🔑 SAME CONTRACT AS foeArt(): found by NAME, and NOTHING BREAKS WHILE THE FOLDER IS
+        // EMPTY. A miss removes itself and the frame falls back to the class emblem, so art never
+        // blocks design and the screen is finished before a single picture exists.
+        // ⚠️ The URL carries ?v=BUILD. An unversioned image cached once serves forever and looks
+        // exactly like a failed render — this project has lost time to a cache three times.
+        const hero = (() => {
+          const cls = CLASSES[picked], t = cls && cls.trait;
+          return `<div class="hero-art" id="hero-art">` +
+            `<img class="hero-img" alt="" src="art/classes/${picked}.png?v=${BUILD}" ` +
+              `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">` +
+            `<div class="hero-fallback">${t ? t.icon : '✦'}</div>` +
+            `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
+            `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +
+          `</div>`;
+        })();
         return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
+          hero +
           `<div class="class-row">` +
           row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
           row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
