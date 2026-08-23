@@ -8103,6 +8103,14 @@ function cardHTML(card) {
   // price the trade before you place anything. It lights up only on the pair that is live.
   const attV = eff(card).attuned;
   const attLive = attunedNow() && (zoneOf(card.id) === 'Spell' || zoneOf(card.id) === 'Element');
+  // 🐛 A LOOSE ATTUNE LOOKED EXACTLY LIKE A FULL ONE (found in play 2026-08-22). ✦ Loose Weave
+  // makes ANY Catalyst attune, so `attunedNow()` is true either way — and the card lit the same
+  // gold "✦ attuned!" glow whether you had earned the whole bonus or half of it.
+  // 🔑 Thomas: *"the stone and lightning color are too similar, i got that mixed up, i thought it
+  // was a full atune."* The colours are half the story; the other half is that **the game
+  // confirmed his misreading.** A signal that fires identically for two different outcomes is not
+  // a signal. Same class as 🧱 Guard having no reveal line — the rule fired, nothing marked it.
+  const looseLive = attLive && looseOnly();
   const enhLine = d.wild ? '🌈 Wild' : '';
   const forged = '';
 
@@ -8231,7 +8239,13 @@ function cardHTML(card) {
   const per = n => nHits > 1 ? `${Math.floor(n / nHits) + perAdd}<span class="v-x">×${nHits}</span>` : `${n + perAdd}`;
   const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
     (CLASS.pairs
-      ? `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${per(attV)}</span>`
+      // ⚠️ AND THE NUMBER MUST BE THE ONE THIS ARRANGEMENT ACTUALLY GIVES. It printed the card's
+      // full attuned value even while Loose Weave was halving it — so the card promised 13 and the
+      // charm quietly delivered 10, which is precisely the misread above.
+      ? `<span class="v-att${attLive ? ' att-live' : ''}${looseLive ? ' is-loose' : ''}" title="${looseLive
+            ? 'half the bonus — your Catalyst does not share its element (✦ Loose Weave)'
+            : 'its value when the Catalyst shares its element'}">✦${per(looseLive
+            ? v.value + Math.floor((attV - v.value) / 2) : attV)}</span>`
       // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
       // damage" - the same borrowed-vocabulary fault as the reveal printing "unattuned" at her.
       // 🔑 ◆ is the DAMAGE you get once the energy is paid — a different kind of number from
@@ -8269,7 +8283,7 @@ function cardHTML(card) {
   })();
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const isMate = pairMateId() === card.id;
-  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') +
+  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? (looseLive ? ' attuned-pair is-loose' : ' attuned-pair') : '') +
     (previewing ? ' card-preview' : '') + (isMate ? ' pair-mate' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';

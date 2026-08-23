@@ -180,10 +180,10 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .card-enh { color: #9fd18a; }
 
 /* element tints — the whole card carries its element, not just the pill */
-.card.card-el-Fire      { background: linear-gradient(160deg, #33201a, #241a18); border-color: #7a4432; }
-.card.card-el-Water     { background: linear-gradient(160deg, #182735, #161d26); border-color: #33587a; }
-.card.card-el-Lightning { background: linear-gradient(160deg, #302b16, #221f16); border-color: #7a6b32; }
-.card.card-el-Stone    { background: linear-gradient(160deg, #2b2820, #1e1c17); border-color: #6b6350; }
+.card.card-el-Fire      { background: linear-gradient(160deg, #3a1e15, #261815); border-color: #a04328; }
+.card.card-el-Water     { background: linear-gradient(160deg, #16293c, #141d29); border-color: #3a6ea8; }
+.card.card-el-Lightning { background: linear-gradient(160deg, #38300d, #26210f); border-color: #b39a1e; }
+.card.card-el-Stone    { background: linear-gradient(160deg, #2f2e2b, #212120); border-color: #8a8378; }
 .card.card-el-wild      { background: linear-gradient(160deg, #2a2233 20%, #1a2430 80%); border-color: #7a6b9a; }
 .card.card-el-none      { background: #262b34; }
 .card-action { margin-top: 6px; }
@@ -191,10 +191,10 @@ label.radio { margin-right: 14px; cursor: pointer; }
 
 /* element chips */
 .el { padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: bold; }
-.el-Fire { background: #7a2e1c; color: #ffb59e; }
-.el-Water { background: #1c4a7a; color: #9ecfff; }
-.el-Lightning { background: #7a6a1c; color: #fff29e; }
-.el-Stone { background: #4a4438; color: #d8c9a8; }
+.el-Fire { background: #8f3016; color: #ffb59e; }
+.el-Water { background: #17518f; color: #9ecfff; }
+.el-Lightning { background: #8a7605; color: #fff8b0; }
+.el-Stone { background: #565452; color: #e2ded6; }
 .el-none { background: #3a3a3a; color: #bbb; }
 
 /* ---------- log ---------- */
@@ -682,7 +682,14 @@ body.shell #scene { display: none; }
    POTENTIAL, not a fact - and it ignites only on the Spell+Catalyst pair that is actually live. */
 .v-att { font-size: .62em; margin-left: .35em; opacity: .45; letter-spacing: .02em; vertical-align: .12em; }
 .v-att.att-live { opacity: 1; color: #ffd98a; text-shadow: 0 0 10px rgba(255,190,90,.55); }
-.card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
+/* 🐛 THE FULL-ATTUNE GLOW NEVER SHOWED IN THE MAIN LAYOUT (found 2026-08-22). The immersive block
+   at the end of the file sets `.slot .card { box-shadow: ... }` — same specificity as
+   `.card.attuned-pair` but LATER, so it won every time. The one visual that says "this pair is
+   working" was silently overridden in the layout the game is actually played in, which is a large
+   part of why a loose pair and a full one were indistinguishable.
+   ⚠️ Fixed by specificity, not by moving the rule: the media queries must stay last in this file. */
+.card.attuned-pair,
+.slot .card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
 .card.attuned-pair .el-identity .el { background: rgba(255,196,96,.24); color: #ffe6b0; }
 
 
@@ -767,6 +774,16 @@ button.stage.locked .stage-shape { font-style: italic; }
 .carry-panel .carry-chip { margin-left: 0; }
 .event-outcome p { margin: 6px 0; }
 
+/* ✦ A LOOSE ATTUNE MUST NOT LOOK LIKE A FULL ONE (2026-08-22).
+   Loose Weave makes ANY Catalyst attune, so the card lit the same gold glow whether you had
+   earned the whole bonus or half of it — and it confirmed a misread instead of correcting one.
+   A signal that fires identically for two different outcomes is not a signal. */
+.card.attuned-pair.is-loose,
+.slot .card.attuned-pair.is-loose { box-shadow: 0 0 0 2px rgba(150,170,190,.55), 0 0 12px rgba(130,150,175,.22); }
+.card.attuned-pair.is-loose .el-identity .el { background: rgba(150,170,190,.20); color: #cfe0ee; }
+.v-att.is-loose { opacity: .85; }
+.v-att.is-loose::after { content: " half"; font-size: .72em; opacity: .7; letter-spacing: .3px; }
+
 /* 💾 DEV SAVE SLOTS — dev menu only, deliberately plain. */
 .dev-slots { margin: 10px 0 6px; }
 .dev-slot { display: flex; align-items: center; gap: 6px; margin: 4px 0;
@@ -848,8 +865,8 @@ button.stage.locked .stage-shape { font-style: italic; }
   color: #b9b4a5; opacity: .85; margin-right: auto; }
 .card-el-Fire .card-type      { color: #e08a5a; }
 .card-el-Water .card-type     { color: #7fb0c4; }
-.card-el-Lightning .card-type { color: #d8c470; }
-.card-el-Stone .card-type     { color: #a89a86; }
+.card-el-Lightning .card-type { color: #f0d84e; }
+.card-el-Stone .card-type     { color: #b9b5ae; }
 
 /* 👁️ THE FACING BAR - the encounter's demands, restated where the decision is.
    ⚠️ It sits directly above Resolve on purpose. The encounter panel is 422px away in the
