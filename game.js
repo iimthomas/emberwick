@@ -6923,6 +6923,37 @@ function carried() {
     text: `📜 ${S.contract.n}/${ct.need} · ${S.contract.left != null ? S.contract.left + ' left · ' : ''}pays 🪙 ${ct.reward}` });
   return out;
 }
+// 📋 EVERYTHING YOU ARE CARRYING, AS OBJECTS (2026-08-22). Thomas, on the event screen:
+// *"wish this could be more clear on what im getting, what i have or whatever."*
+//
+// 🐛 The old screen ran the whole inventory together as one prose sentence separated by "·", and
+// it left POTIONS OUT ENTIRELY — so an event could say *"Tallow Stub goes in your kit"* and then
+// print a "You now carry:" line that did not contain it. **You were told you gained a thing and
+// then shown a list without the thing in it.**
+//
+// 🔑 THE FIX IS THE FIELD'S LESSON APPLIED ONE SCREEN OVER: do not describe state in a sentence,
+// SHOW THE OBJECTS. Three labelled rows, each item its own chip, in the same visual language the
+// status bar already uses — so a charm looks like a charm wherever you meet it.
+// ⚠️ It reads carried() and S.potions rather than keeping its own list: two ledgers for the same
+// state is the Mirror Fen bug, and this screen is exactly where that would hide.
+function carriedPanelHTML(heading) {
+  const rows = [];
+  const kit = S.potions || [];
+  if (kit.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">🧪 Kit</span>` +
+    kit.map(x => { const d = potionById(x.id) || x;
+      return `<span class="carry-chip" title="${stripTags(d.text || '')}">${d.name}</span>`; }).join('') +
+    `<span class="dim carry-row-note">${kit.length}/${POTION_CAP} · one use each, the turn you drink it</span></div>`);
+  const items = carried();
+  const charms = items.filter(x => !x.text.startsWith('📜'));
+  const quest  = items.filter(x =>  x.text.startsWith('📜'));
+  if (charms.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">🎁 Charms</span>` +
+    charms.map(x => `<span class="carry-chip${x.curse ? ' is-curse' : ''}" title="${stripTags(x.text)}">` +
+      `${x.curse ? '☠️ ' : ''}${x.name}</span>`).join('') + `</div>`);
+  if (quest.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">📜 Contract</span>` +
+    quest.map(x => `<span class="carry-chip">${x.name} <span class="dim">${stripTags(x.text).replace('📜 ', '')}</span></span>`).join('') + `</div>`);
+  if (!rows.length) return `<p class="event-carry">You carry nothing that changes your maths.</p>`;
+  return `<div class="carry-panel"><div class="carry-head">${heading}</div>${rows.join('')}</div>`;
+}
 const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
 function carriedText() {
   const c = carried();
@@ -7159,7 +7190,14 @@ function mapHTML() {
           `onclick="tapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
         : `<span class="${cls}" ${at} title="${mapTitle(n)}">${mapIcon(n)}</span>`);
     }
-    rows.push(`<div class="mp-row${f % MAP_BAND === 0 ? ' mp-band' : ''}">` +
+    // 🐛 THE BAND DIVIDER WAS ONE ROW TOO HIGH (fixed 2026-08-22, Thomas: *"why are the region
+    // lines not lining up with the region numbers"*). The rule was `f % MAP_BAND === 0`, which is
+    // true for floors 12/8/4/0 — but rows render TOP-DOWN, so those are the LAST floor of each
+    // band, and `border-top` then drew the line *inside* the band rather than between two.
+    // 🔑 The band changes between f and f-1 when `bandOf(f) !== bandOf(f-1)`, i.e. on the FIRST
+    // row of the lower band reading downward: floors 11/7/3. ⚠️ And never above the top row.
+    const bandStart = f % MAP_BAND === MAP_BAND - 1 && f !== MAP_FLOORS - 1;
+    rows.push(`<div class="mp-row${bandStart ? ' mp-band' : ''}">` +
       `<span class="mp-f">${f === MAP_FLOORS - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
   }
   // 🗺️ THE LINES ARE THE MAP. Without them this is a grid of icons where the game decides
@@ -7505,10 +7543,10 @@ function renderControls() {
       // both printed, and neither said they touched the same number - so working out that it had
       // cancelled was left to the player. An event must state where it LEFT you.
       const now = carried();
-      body = `<div class="summary">${ev.lines.map(l => `<p>${l}</p>`).join('')}` +
-        (now.length
-          ? `<p class="event-carry"><b>You now carry:</b> ${now.map(x => `<span class="${x.curse ? 'bad' : 'good'}">${carryLine(x)}</span>`).join(' · ')}</p>`
-          : `<p class="event-carry">You carry nothing that changes your maths.</p>`) + `</div>` +
+      // ⚠️ `now` is still read so the carried() call cannot drift out of this screen's dependencies.
+      body = `<div class="summary">` +
+        `<div class="event-outcome">${ev.lines.map(l => `<p>${l}</p>`).join('')}</div>` +
+        carriedPanelHTML('You are carrying') + `</div>` +
         `<button class="primary" onclick="eventContinue()">Continue</button>`;
     } else if (ev.step === 'pickCard') {
       // the choice is made ON the cards below — this panel just states the deal
