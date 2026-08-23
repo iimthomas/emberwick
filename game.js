@@ -2993,7 +2993,7 @@ function pieceCardHTML(d, st, equipped) {
       ? `<button class="wk-btn on" onclick="unequipPiece('${d.id}')">✓ Worn — remove</button>`
       : `<button class="wk-btn" onclick="equipPiece('${d.id}')">Wear it</button>`;
   } else if (!r) {
-    foot = `<span class="wk-none">no recipe yet</span>`;
+    foot = `<span class="wk-none">${d.starter ? 'yours from the start' : 'no recipe yet'}</span>`;
   } else {
     const chk = craftCheck(d.id);
     const cost = Object.keys(r.mats).map(m =>
@@ -5727,20 +5727,20 @@ let ARMOUR_SLOTS_OPEN = 2;
 // 🛡️ And a piece may block nothing at all (`block: 0`): those are pure ability pieces.
 const ARMOUR = [
   // 🕶️ HEAD — information. The candle's slot.
-  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'relight', text: 'When it blocks, relight your candle.' },
   { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
   // 🧥 CHEST — what you can afford to lose.
-  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
   // 🟠 the one piece that measured as a different category of power, now labelled as one
   { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn', rarity: 'legendary',
     every: 'encounter', text: 'It blocks again every encounter.' },
   // 🧤 ARMS — the blow.
-  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
   { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
@@ -5756,7 +5756,7 @@ const ARMOUR = [
     cls: 'rogue', uses: 1, use: 'quicken', consume: true,
     text: 'Break it: your ● Momentum fills to full.' },
   // 👞 LEGS — tempo.
-  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
   { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn', rarity: 'rare',
@@ -5782,10 +5782,8 @@ const ARMOUR = [
 // PERSISTENCE, and persistence is what the measurement says is expensive.
 const RECIPE = {
   // 💥 basic — one run's worth. The gear you have while you are still learning the road.
-  hood:     { mats: { shard: 8 } },
-  kiln:     { mats: { shard: 8 } },
-  vambrace: { mats: { shard: 8 } },
-  boots:    { mats: { shard: 8 } },
+  // ⚪ the four commons have NO recipe — you start with them. ⚠️ Deleted rather than left as
+  // unreachable prices: a cost you can never pay is dead data pretending to be a goal.
   // 💥 with an ability — two or three runs, and it names a SHAPE, so the candle points at it
   visor:    { mats: { shard: 14, quill: 2 } },
   tithe:    { mats: { shard: 14, slag: 2 } },
@@ -6036,6 +6034,21 @@ const BEAST_WORD = {
 //   🟢 uncommon   — 💥 shatters, one ON-BLOCK ability.
 //   🔵 rare       — 🩹 worn: it stays, because an ONGOING RULE is live while you wear it.
 //   🟠 legendary  — it does something no other piece can, and it names a great beast.
+// ⚪ THE COMMONS ARE THE TEACHING SET (2026-08-23, Thomas: *"i think you should start off with
+// super basic armor. just 1 block on everything. so players can start learning about armor right
+// away"*).
+// 🔴 THE PROBLEM: the loadout started EMPTY, so a new player never met armour at all until they
+// had forged something — about a run's worth of shards. An entire mechanic, and the soak screen's
+// only real choice, was invisible for the whole of run one.
+// ✅ SO THE FOUR COMMONS ARE OWNED FROM THE START and two of them are already worn. You meet
+// "break a piece, or blunt a card?" on your first hit, before you know what a recipe is.
+// 🔑 AND THEY BLOCK 1, NOT 2 — which is what makes granting them safe. Two block-2 pieces measured
+// +3/+0 on the ladder; at block 1 that is under a point. **A teaching object should be visible and
+// almost free**, and the lesson here is the CHOICE, never the number.
+// ⚠️ Everything above common still blocks 2, so forging one is a real step up.
+const STARTER_PIECES = ['kiln', 'hood', 'vambrace', 'boots'];
+const STARTER_WORN = ['kiln', 'hood'];
+
 const RARITY = {
   common:    { label: 'Common',    icon: '⚪' },
   uncommon:  { label: 'Uncommon',  icon: '🟢' },
@@ -6140,12 +6153,24 @@ function loadStash() {
     // an empty loadout and a fresh run wore nothing — with no error anywhere.
     // 🔑 A whitelisting reader is the right shape (it is what keeps a corrupt stash from
     // crashing the menu), but it means ADDING A FIELD IS TWO EDITS, and the second one is silent.
-    return { mats: d.mats || {},
+    return seedStarter({ mats: d.mats || {},
              owned: Array.isArray(d.owned) ? d.owned : [],
-             loadout: Array.isArray(d.loadout) ? d.loadout : [] };
-  } catch (e) { return { mats: {}, owned: [], loadout: [] }; }
+             loadout: Array.isArray(d.loadout) ? d.loadout : [],
+             seeded: !!d.seeded });
+  } catch (e) { return seedStarter({ mats: {}, owned: [], loadout: [], seeded: false }); }
 }
 function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
+// ⚪ hand out the teaching set, exactly once. ⚠️ GUARDED BY A FLAG, not by "is the loadout empty" —
+// otherwise deliberately stripping your loadout would silently re-arm it, and a player who emptied
+// two slots on purpose would find them full again next run.
+function seedStarter(st) {
+  if (st.seeded) return st;
+  st.seeded = true;
+  for (const id of STARTER_PIECES) if (!st.owned.includes(id)) st.owned.push(id);
+  if (!st.loadout.length) st.loadout = STARTER_WORN.slice(0, ARMOUR_SLOTS_OPEN);
+  saveStash(st);
+  return st;
+}
 
 // 🦴 WHAT THIS ENCOUNTER DROPPED. Returns a { matId: qty } bag; the caller banks it.
 // ⚠️ PURE-ISH BY DESIGN — it reads the encounter and rolls, and touches no screen. The rules layer
