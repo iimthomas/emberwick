@@ -97,7 +97,7 @@ const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE
                  'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD'];
 // the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;
 // ⚠️ it must be `let` in game.js or the assignment throws.
-const TUNABLES = ['ATTUNE_BONUS', 'PAID_STEP', 'BANK_MULT', 'FOE_ATK_MULT', 'MOMENTUM_CAP', 'MOMENTUM_STEP', 'MOMENTUM_BREAK', 'MOMENTUM_VALUE', 'MOMENTUM_FULL', 'SPLIT_ADDS_PER_HIT', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
+const TUNABLES = ['ATTUNE_BONUS', 'PAID_STEP', 'BANK_MULT', 'FOE_ATK_MULT', 'MOMENTUM_CAP', 'MOMENTUM_STEP', 'MOMENTUM_BREAK', 'MOMENTUM_VALUE', 'MOMENTUM_FULL', 'SPLIT_ADDS_PER_HIT', 'TIME_PENALTY_MULT', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
                   'RELENTLESS_STEP', 'JOURNEY_MP_MULT', 'FORK_ENABLED', 'WHEEL_PER_ENCOUNTER'];
 const epilogue = NL + ';' + NL +
   EXPORTS.map(n => 'try { globalThis.' + n + ' = ' + n + '; } catch (e) {}').join(NL) + NL +

@@ -1,0 +1,20 @@
+'use strict';
+const { sandbox, seed, useClass, getS, setTunable } = require('./headless.js');
+setTunable('TIME_PENALTY_MULT', 3.0);
+useClass('mage'); seed(8201);
+let added = 0, spent = 0, stops = 0, assigns = 0;
+const realDone = sandbox.wheelDone;
+sandbox.wheelDone = function(){ const S=getS(); stops++; if(S.delayed>0) spent++; return realDone.apply(this,arguments); };
+let prev = 0;
+sandbox.RUNSIM.setHook({ onAssign(){ const S=getS(); if(S.finalMode) return; assigns++;
+  if (S.delayed > prev) added += S.delayed - prev; prev = S.delayed||0; } });
+sandbox.RUNSIM.autoRun(true);
+const S = getS();
+console.log(`assigns ${assigns} · wheelDone calls ${stops} · delay ADDED (seen) ${added} · stops while delayed ${spent} · delayed now ${S.delayed}`);
+console.log('phases the bot actually visited are what matter — is `wheel` one of them?');
+// count phases across a fresh run
+useClass('mage'); seed(8202); const seen = {};
+const realRender = sandbox.render;
+sandbox.RUNSIM.setHook({ onAssign(){ const S=getS(); seen[S.phase]=(seen[S.phase]||0)+1; } });
+sandbox.RUNSIM.autoRun(true);
+console.log('WHEEL_PER_ENCOUNTER =', sandbox.getTunable ? '(see game.js)' : '?');

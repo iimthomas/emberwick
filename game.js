@@ -1093,6 +1093,7 @@ let MOMENTUM_VALUE = 1;   // strike damage per pip
 // ceiling is 2. At a full meter Second Fang lands THREE — so Guard 2 becomes theoretically
 // answerable. Do not act on that until this has been played; one class reaching 3 hits on 12% of
 // turns is not the same as the game having a hit ceiling of 3.
+let TIME_PENALTY_MULT = 1.0;   // ⏳ scales every encounter's printed Time Penalty
 let MOMENTUM_FULL = 'add';
 // 🔑 see the note at `added`: a multi-hit card divides its OWN value, never the bonuses on top.
 let SPLIT_ADDS_PER_HIT = true;
@@ -2622,7 +2623,7 @@ function saveGame() {
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
-      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
+      delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
@@ -2725,6 +2726,7 @@ function loadGame() {
       // ⚠️ an older save carries the mage-named fields; map them rather than dropping a run's
       // score on the floor. A missing craft stat reads as 'no chances', which scores 0 — same as
       // before for the mage, and no longer a phantom zero for anyone else.
+      delayed: d.delayed || 0,
       stats: migrateStats(d.stats),
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
@@ -3138,6 +3140,7 @@ function freshGame(stage) {
     stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
+    delayed: 0,            // ⏳ shop stops still owed to a Time Penalty — no sharpening while > 0
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
@@ -5193,19 +5196,29 @@ function finishResolve() {
   if (r.loseReserve) S.loseReserve = r.loseReserve;
   if (r.poison > 0) S.poison = r.poison;
   S.damageEl = null;   // dead since soak doubling was cut 2026-07-26; kept in the schema for old saves
+  // ⏳ TIME PENALTY = STOPS WITHOUT SHARPENING (2026-08-22). It used to move cards deck → discard,
+  // and the MAP DELETED THE CURRENCY THAT COST WAS DENOMINATED IN: nothing ends a region any more,
+  // band boundaries reshuffle everything back, and running dry reshuffles and continues. Measured:
+  // it landed on 19% of turns, burned 6.4 cards a run, and cost **0.11 points of damage** — the
+  // third phantom cost this project has found, and it was announced on the panel as a threat.
+  //
+  // 🔑 Thomas named the feel he wanted from the old rule: *"you have to end a region short and may
+  // not get to upgrade as much as you wanted."* **The consequence he named IS the mechanic now** —
+  // no cards are destroyed (*"trashed sounds pretty rough"*), you simply arrive too late to trade.
+  //
+  // ⚠️ A COUNTDOWN, NOT A METER, AND THE DISTINCTION IS THE WHOLE REASON HE REJECTED THE FIRST
+  // VERSION: *"i don't like that it has to fill up, kinda unintuitive."* A meter separates the cause
+  // from the cost — fail a journey now, lose a shop three turns later, against a threshold you had
+  // to learn. **A countdown puts the cause and the cost in the same event, and the number printed on
+  // the encounter says exactly how long it lasts.** Same fault the press-your-luck sneak was cut for.
+  //
+  // ✅ And it finally makes the NUMBER mean something: `Time Penalty 3` was identical to `2` while
+  // both did nothing. It also restores the second thing that separates a journey from a fight —
+  // a failed fight costs cards NOW, a failed journey costs GROWTH.
   if (r.timePenalty > 0) {
-    if (r.type === 'fight') log(`Hazards: ${r.timePenalty} Time Penalt${r.timePenalty === 1 ? 'y' : 'ies'} (early/combat damage suffered)`, 'bad');
-    const fromDeck = Math.min(r.timePenalty, S.deck.length);
-    const burned = S.deck.splice(0, fromDeck);
-    if (fromDeck > 0) {
-      S.discard.push(...burned);
-      log(`Time Penalty: discarded ${fromDeck} from top of deck (${burned.map(c => c.def.name).join(', ')})`, 'bad');
-    }
-    const overflow = r.timePenalty - fromDeck;
-    if (overflow > 0) {
-      damage += overflow;
-      log(`Deck is empty — remaining Time Penalty ${overflow} becomes damage`, 'bad');
-    }
+    S.delayed = (S.delayed || 0) + Math.max(1, Math.round(r.timePenalty * TIME_PENALTY_MULT));
+    log(`⏳ Time Penalty ${r.timePenalty} — the road ran long. No sharpening for your next ` +
+        `${S.delayed} encounter${S.delayed === 1 ? '' : 's'}.`, 'bad');
   }
   // ❌ the 🛡️ armour aim was CUT 2026-08-12 (chosen 2.3% of the time, and the one target the
   // candle cannot inform) — its absorption branch goes with it, in the same commit as the rule.
@@ -5219,7 +5232,11 @@ function finishResolve() {
     // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
     // a graze no longer breaks your rhythm but a real blow does — which is the one change that
     // lifts p without touching how often you get hit.
-    const touched = damage >= MOMENTUM_BREAK || r.timePenalty > 0;
+    // ⚠️ A TIME PENALTY NO LONGER BREAKS THE STREAK (2026-08-22), and the reason is this block's
+    // own stated definition: *did this turn cost you cards?* Since Time Penalty stopped touching
+    // the deck it costs GROWTH, not cards — so leaving it here would have been a rule outliving
+    // the thing it was about. ⚠️ It is a buff to her; measured alongside the change, not assumed.
+    const touched = damage >= MOMENTUM_BREAK;
     const before = S.momentum || 0;
     if (touched) {
       // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
@@ -5474,7 +5491,8 @@ function startUpgrade() {
 // ⚠️ The `'upgrade'` phase is kept, unentered, so a save written mid-forge by an older build
 // still loads. It is dead code the day save version 5 stops mattering.
 function startSharpen() { doneUpgrades(); }
-const canSharpenNow = () => S.phase === 'upgrade' || S.phase === 'wheel';
+// 🔼 ...and ⏳ A TIME PENALTY IS WHAT SHUTS IT (2026-08-22). See `delayed` in finishResolve.
+const canSharpenNow = () => (S.phase === 'upgrade' || S.phase === 'wheel') && !(S.delayed > 0);
 
 // 🔼 tap a card to see what it BECOMES; tap again to buy it
 function pickUpgrade(id) {
@@ -5539,6 +5557,19 @@ function wheelIsEmptyHanded() {
 
 function wheelDone() {
   const camp = S.wheel && S.wheel.rich;
+  // ⏳ THE COUNTDOWN TICKS HERE, AND FINDING OUT WHERE "HERE" IS TOOK TWO TRIES.
+  // 🐛 I moved it to nextTurn() on the strength of a probe that showed the delay never being
+  // spent — and nextTurn fires **ONCE PER RUN**, because the map replaced it. Instrumented:
+  // over a 14-encounter run, nextTurn 1 · wheelDone 14 · endTurn 14 · finishTurn 15.
+  // 🔑 A COUNTDOWN MUST TICK ON SOMETHING THAT HAPPENS EVERY ENCOUNTER, and on a map run that is
+  // wheelDone/endTurn, NOT nextTurn. ⚠️ The same class of mistake as the six-build cleanup bug:
+  // *a function whose name says "turn" stopped being the per-turn function when the map landed.*
+  if (S.delayed > 0) {
+    S.delayed--;
+    log(S.delayed > 0
+      ? `⏳ Still behind — ${S.delayed} more encounter${S.delayed === 1 ? '' : 's'} before you can sharpen.`
+      : `⏳ You have made the time back up. You can sharpen again.`, S.delayed > 0 ? 'bad' : 'good');
+  }
   S.wheel = null;
   S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
@@ -6731,6 +6762,12 @@ function fieldTokens() {
     worth: 'your <b>Arsenal</b> survives Nightfall', note: 'once, then it is gone' });
   if (S.curseNextFight) out.push({ id: 'followed', icon: '☠️', name: 'Followed', bane: true,
     worth: 'your next <b>fight</b> carries a Hardship', note: 'until it lands' });
+  // ⏳ the countdown, on screen the whole time it runs. ⚠️ This is the token that makes it a
+  // COUNTDOWN rather than a hidden state — the cost has to be visible while you are paying it,
+  // or it is a punishment you only notice at the shop.
+  if (S.delayed > 0) out.push({ id: 'delayed', icon: '⏳', name: 'Delayed', bane: true,
+    count: S.delayed, timer: S.delayed,
+    worth: 'you cannot <b>sharpen</b>', note: `${S.delayed} more encounter${S.delayed === 1 ? '' : 's'}` });
   return out;
 }
 
@@ -7929,6 +7966,12 @@ function cardHTML(card) {
     action = eventCanPick(opt, card)
       ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
       : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
+  // ⏳ THE SHOP MUST SAY WHY IT IS SHUT. Without this the card simply offers no sharpen button at
+  // a Wheel and the player is left to guess — *never state a rule about an object without marking
+  // the object*, and a cost you cannot see being charged is the phantom problem in reverse.
+  } else if ((S.phase === 'upgrade' || S.phase === 'wheel') && S.delayed > 0) {
+    action = `<div class="card-action muted">⏳ you arrived too late to sharpen — ` +
+      `${S.delayed} more encounter${S.delayed === 1 ? '' : 's'}</div>`;
   } else if (canSharpenNow()) {
     // ⚠️ every number here reads off `real`, never the previewed copy — the cost of the NEXT
     // level is not the cost printed by the level you are looking at.
