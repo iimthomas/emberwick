@@ -846,6 +846,23 @@ button.stage.locked .stage-shape { font-style: italic; }
 .wk-btn.on { border-color: #7fd8ff; color: #cfe9ff; }
 .wk-btn[disabled] { opacity: .5; cursor: not-allowed; font-size: 10.5px; }
 .wk-none { font-size: 10.5px; opacity: .5; font-style: italic; }
+
+/* 💎 RARITY. 🔑 A restrained left rail, not a full recolour — the pieces still have to read as one
+   shelf, and the tier is a classification, not a mood. ⚠️ Above the media queries. */
+.wk-piece { border-left-width: 3px; }
+.wk-piece.rar-common    { border-left-color: rgba(190,190,190,.45); }
+.wk-piece.rar-uncommon  { border-left-color: rgba(120,200,140,.7); }
+.wk-piece.rar-rare      { border-left-color: rgba(110,175,235,.8); }
+.wk-piece.rar-legendary { border-left-color: #f0a030;
+  box-shadow: inset 3px 0 14px -8px rgba(240,160,48,.85); }
+.wk-rar { letter-spacing: .4px; }
+.wk-piece.rar-legendary .wk-name { color: #ffd9a0; }
+/* another class's gear is SHOWN, never hidden — you should see what the rogue gets before you have her */
+.wk-piece.is-locked { opacity: .45; }
+
+/* 🔋 a token with more than one thing to do carries its own buttons */
+.tok-acts { display: flex; gap: 5px; margin-top: 6px; }
+.tok-act { flex: 1; font-size: 10.5px; padding: 4px 5px; border-color: #7fd8ff; color: #cfe9ff; }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }

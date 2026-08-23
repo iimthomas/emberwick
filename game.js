@@ -803,7 +803,9 @@ function toggleBank() {
 // ⚠️ Its DISPLAY had to change with it: "+5 next turn (it was worth +5 now)" reads as a pure
 // loss. The reveal now names the real payoff — you carry it, and you choose where it lands.
 let BANK_MULT = 1.0;
-function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) : 0; }
+// 🔥 ×2 while the Emberwake Band is broken this turn. ⚠️ HERE, in the ONE place a bank is
+// valued, so the Surge row, the reveal line and the token can never disagree about the number.
+function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) * (S && S.armourTwin ? 2 : 1) : 0; }
 // ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
 // you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
 // hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
@@ -1001,6 +1003,7 @@ const MAGE = {
   // the free space where a CLASS poses its signature fork. A generic rule sitting in ③ does not
   // give every class a gift; it spends the only room each class had.
   // So: flag it, and gate every consumer. A rogue's ③ is its own (extend the chain, or cycle).
+  name: 'Mage',
   emberwake: true,
   // 🎭 THE PASSIVE TRAIT (2026-08-18). Thomas: *"lets give them a passive trait, just so
   // players can see what they do at a glance on the character select screen."*
@@ -1531,6 +1534,7 @@ const ROGUE = {
   pairs: false,            // ✦ no elements, so nothing ever attunes
   boosts: false,           // ➕ no Surge stat either
   energy: true,            // ⚡ the Strike costs, slot ③ pays
+  name: 'Rogue',
   momentum: true,          // ● the untouched streak — earned by taking nothing, lost by taking anything
   trait: { icon: '●', name: 'Momentum',
     text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
@@ -2972,10 +2976,17 @@ function workshopLine() {
 }
 function pieceCardHTML(d, st, equipped) {
   const owned = st.owned.includes(d.id);
+  const rar = RARITY[d.rarity || 'common'];
+  // 🎭 another class's gear is SHOWN, never hidden — you should be able to see what the rogue gets
+  // before you unlock her, the same way the Collection states what is not built rather than
+  // pretending it does not exist.
+  const wrongClass = d.cls && d.cls !== CLASS.id;
   const r = RECIPE[d.id];
   const kind = d.brk === 'worn' ? '🩹 worn — it stays' : '💥 shatters after one block';
   let foot;
-  if (owned) {
+  if (wrongClass) {
+    foot = `<span class="wk-none">${(CLASSES[d.cls] && CLASSES[d.cls].name) || d.cls} only</span>`;
+  } else if (owned) {
     foot = equipped
       ? `<button class="wk-btn on" onclick="unequipPiece('${d.id}')">✓ Worn — remove</button>`
       : `<button class="wk-btn" onclick="equipPiece('${d.id}')">Wear it</button>`;
@@ -2989,10 +3000,12 @@ function pieceCardHTML(d, st, equipped) {
       ? `<button class="wk-btn craft" onclick="craftPiece('${d.id}')">⚒️ Forge it</button>`
       : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`);
   }
-  return `<div class="wk-piece${owned ? ' is-owned' : ''}${equipped ? ' is-worn' : ''}">` +
+  return `<div class="wk-piece rar-${d.rarity || 'common'}${owned ? ' is-owned' : ''}` +
+    `${equipped ? ' is-worn' : ''}${wrongClass ? ' is-locked' : ''}">` +
     `<div class="wk-top"><span class="wk-icon">${ARMOUR_SLOTS[d.slot].icon}</span>` +
-    `<span class="wk-name">${d.name}</span><span class="wk-block">blocks ${d.block}</span></div>` +
-    `<div class="wk-kind">${kind}</div>` +
+    `<span class="wk-name">${d.name}</span>` +
+    `<span class="wk-block">${d.block > 0 ? 'blocks ' + d.block : 'no block'}</span></div>` +
+    `<div class="wk-kind"><span class="wk-rar">${rar.icon} ${rar.label}</span> · ${kind}</div>` +
     (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
     `<div class="wk-foot">${foot}</div></div>`;
 }
@@ -3008,7 +3021,9 @@ function workshopHTML() {
         `<span class="dim">blocks ${d.block}</span></div>`;
     }).join('') + `</div></div>`;
   for (const slot of Object.keys(ARMOUR_SLOTS)) {
-    const list = ARMOUR.filter(a => a.slot === slot);
+    // ⚠️ sorted by rarity so a zone reads as a ladder rather than as the order I typed them in
+    const list = ARMOUR.filter(a => a.slot === slot)
+      .slice().sort((x, y) => RARITY_ORDER.indexOf(x.rarity || 'common') - RARITY_ORDER.indexOf(y.rarity || 'common'));
     if (!list.length) continue;
     body += `<div class="stash-tier">${ARMOUR_SLOTS[slot].icon} ${ARMOUR_SLOTS[slot].label}` +
       `<span class="stash-tally">${ARMOUR_SLOTS[slot].job}</span></div>` +
@@ -5686,29 +5701,49 @@ let ARMOUR_SLOTS_OPEN = 2;
 // 🛡️ And a piece may block nothing at all (`block: 0`): those are pure ability pieces.
 const ARMOUR = [
   // 🕶️ HEAD — information. The candle's slot.
-  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 2, brk: 'shatter' },
-  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter',
+  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'relight', text: 'When it blocks, relight your candle.' },
-  { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn',
+  { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
   // 🧥 CHEST — what you can afford to lose.
-  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 2, brk: 'shatter' },
-  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter',
+  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
-  { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn',
+  // 🟠 the one piece that measured as a different category of power, now labelled as one
+  { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn', rarity: 'legendary',
     every: 'encounter', text: 'It blocks again every encounter.' },
   // 🧤 ARMS — the blow.
-  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 2, brk: 'shatter' },
-  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter',
+  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
-  { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn',
+  { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
     uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
+  // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
+  // own power source into the strike — which is exactly what that zone is for.
+  // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
+  // and the grade: the ENGINE owns the slot, the CLASS owns the noun.
+  { id: 'wakeband', slot: 'Arms', name: 'Emberwake Band',     block: 0, brk: 'worn', rarity: 'legendary',
+    cls: 'mage', uses: 1, use: 'twinflame', consume: true,
+    text: 'Break it: this turn, what you channel is DOUBLED.' },
+  { id: 'fangcord', slot: 'Arms', name: 'Fangcord',           block: 0, brk: 'worn', rarity: 'legendary',
+    cls: 'rogue', uses: 1, use: 'quicken', consume: true,
+    text: 'Break it: your ● Momentum fills to full.' },
   // 👞 LEGS — tempo.
-  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, brk: 'shatter' },
-  { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter',
+  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, brk: 'shatter', rarity: 'common' },
+  { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
-  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn',
+  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'surefooted', text: 'You ignore Time Penalties.' },
+  // 🔋 A PIECE THAT REWARDS NOT NEEDING IT (Thomas). It is the first armour with a TIMER, which
+  // [[Board_State_And_Tokens]] specced and nothing had ever planted. ⚠️ Its payoff is a NUMBER,
+  // which this system otherwise bans — legal only because it is bounded to once per five
+  // encounters, which makes it potion-shaped rather than a passive.
+  // ⚠️ +6, not the +2 first suggested: five encounters is half a run, and a reward you wait half a
+  // run for has to be worth a turn's whole plan or the timer is just a wait.
+  { id: 'longkiln', slot: 'Legs', name: 'Slowburn Plate',      block: 0, brk: 'worn', rarity: 'legendary',
+    charge: 5, use: 'discharge',
+    text: 'Gains a mark each encounter. At 5, spend it for +6 strike or +6 Initiative.' },
 ];
 // ⚒️ RECIPES — priced against the MEASURED drop rates, not by feel:
 //   🦴 Bone Shard 7.2/run · 🪶 Windquill 1.2 · 🪨 Slagplate 0.6 · 🔩 Prime Sinew 0.4 · 🧱 Wardhide 0.1
@@ -5735,6 +5770,10 @@ const RECIPE = {
   cuirass:  { mats: { shard: 24, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
   greaves:  { mats: { shard: 20, hide: 1, 'p:Scarp Ram': 1 } },
   wraps:    { mats: { shard: 18, sinew: 2, 'p:Cinderjaw': 1 } },
+  // 🟠 legendary — each names a great beast AND wants the rarest thing in the game
+  wakeband: { mats: { shard: 26, heart: 1, 'p:Basalt Basilisk': 1 } },
+  fangcord: { mats: { shard: 26, heart: 1, 'p:Mirewyrm Elder': 1 } },
+  longkiln: { mats: { shard: 30, hide: 2, sinew: 3, 'p:Deepdelver': 1 } },
 };
 // 🔨 BREAKING DOWN — the release valve, and it pays in the same material every recipe eats.
 // 🔑 Monster Hunter needs one for the same reason we do: you will always own piles of things no
@@ -5778,12 +5817,12 @@ function breakMat(id) {
 // between runs and survives them, which is the whole point of a loadout.
 function loadoutIds() {
   const st = loadStash();
-  return (st.loadout || []).filter(id => armourDef(id) && st.owned.includes(id)).slice(0, ARMOUR_SLOTS_OPEN);
+  return (st.loadout || []).filter(id => armourDef(id) && armourFitsClass(armourDef(id)) && st.owned.includes(id)).slice(0, ARMOUR_SLOTS_OPEN);
 }
 // ⚠️ ONE PIECE PER SLOT. Equipping a Chest piece replaces the Chest piece you had, never the
 // Head one — the four zones are the whole reason the system has zones.
 function equipPiece(id) {
-  const d = armourDef(id); if (!d) return;
+  const d = armourDef(id); if (!d || !armourFitsClass(d)) return;
   const st = loadStash();
   if (!st.owned.includes(id)) return;
   let cur = (st.loadout || []).filter(x => armourDef(x) && armourDef(x).slot !== d.slot && x !== id);
@@ -5800,7 +5839,11 @@ function unequipPiece(id) {
 }
 
 const armourDef = id => ARMOUR.find(a => a.id === id) || null;
-const newArmour = id => ({ id, wear: (armourDef(id).block > 0 ? 1 : 0), uses: armourDef(id).uses || 0 });
+const newArmour = id => ({ id, wear: (armourDef(id).block > 0 ? 1 : 0),
+                           uses: armourDef(id).uses || 0, charge: 0 });
+// 🎭 A CLASS PIECE IS ONLY WEARABLE BY ITS CLASS. ⚠️ Checked at the point of WEARING, not only in
+// the Workshop, because the loadout is stored between runs and you can change class between them.
+const armourFitsClass = d => !d || !d.cls || d.cls === CLASS.id;
 // 🔑 EVERY piece you brought, spent or not — a battered plate STAYS ON THE BOARD, because
 // blocking is only one of the things a piece does and you need to see why you have no plate left.
 const armourWorn = () => (S.armour || []);
@@ -5830,16 +5873,34 @@ function applyArmourBlock(key, d) {
 // 🔑 A TOKEN YOU CAN ACT ON IS THE CONTROL — the same rule that deleted the Emberwake's aim row.
 // No new phase, no new button: the piece sits on the field and you tap it on the turn you want it.
 // ⚠️ Charges are per RUN, not per turn. That is what keeps a 0-block piece from being a passive.
-function useArmour(aid) {
+function armourReady(a) {
+  const d = armourDef(a.id); if (!d || !d.use) return false;
+  return d.charge ? (a.charge || 0) >= d.charge : armourUsesLeft(a) > 0;
+}
+function useArmour(aid, opt) {
   const a = (S.armour || []).find(x => x.id === aid);
-  if (!a || !isAssignPhase() || armourUsesLeft(a) <= 0) return;
+  if (!a || !isAssignPhase() || !armourReady(a)) return;
   const d = armourDef(a.id);
-  a.uses--;
-  applyArmourUse(d.use, d);
+  if (d.charge) a.charge = 0; else a.uses--;
+  applyArmourUse(d.use, d, opt);
+  // 🔨 "Break it" is literal — a consumed piece leaves the board, the way a shattered one does.
+  if (d.consume) S.armour = S.armour.filter(x => x !== a);
   render();
 }
-function applyArmourUse(key, d) {
+function applyArmourUse(key, d, opt) {
   if (key === 'relight') lightCandle(`${d.name} shows you the road ahead`);
+  // 🔋 the battery, spent where this encounter actually needs it
+  else if (key === 'discharge') {
+    if (opt === 'init') { S.armourPace = (S.armourPace || 0) + 6; log(`🛡️ ${d.name} — you spend the mark on speed: +6 Initiative this turn.`, 'good'); }
+    else { S.armourStrike = (S.armourStrike || 0) + 6; log(`🛡️ ${d.name} — you spend the mark on the blow: +6 strike this turn.`, 'good'); }
+  }
+  // 🔥 mage — what you channel this turn is doubled. ⚠️ Read by bankValueOf(), so it lands on the
+  // Surge row, the reveal line and the Emberwake alike; a flag consumed anywhere else would show
+  // one number and pay another.
+  else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — what you channel this turn is DOUBLED.`, 'good'); }
+  // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
+  // legendary-sized effect without being a number.
+  else if (key === 'quicken') { S.momentum = MOMENTUM_CAP; log(`🛡️ ${d.name} breaks — ● Momentum fills to ${MOMENTUM_CAP}.`, 'good'); }
   // ⚠️ LIVE THIS TURN, not pending — you tapped it during assign, so it must land on the strike
   // you are arranging right now. rollTurnTokens() wipes it at cleanup, which is exactly right.
   else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + 8; log(`🛡️ ${d.name} — your strike gets +8 this turn.`, 'good'); }
@@ -5938,6 +5999,24 @@ const BEAST_WORD = {
   // 🌊 The Sunless Fathom
   'Shoal Drifter': 'Membrane', 'Silt Crawler': 'Carapace', 'Lanternjaw': 'Lure', 'Pressureback': 'Shell',
 };
+// 💎 RARITY (2026-08-23, Thomas: *"we should add rarity types to the armor, just so we can
+// classify them too"*).
+// 🔑 IT ALSO ANSWERS *"anvil cuirass seems a bit too good"* WITHOUT NERFING IT. A piece that blocks
+// again EVERY encounter measured at +13/+24 on the ladder — a different CATEGORY of power, not a
+// tier of it. Rarity is the word for that. The fix for an outlier is to make it RARE, not weak.
+// ⚠️ SO RARITY MUST DESCRIBE WHAT KIND OF THING A PIECE IS, NEVER JUST ITS PRICE — otherwise it is
+// a colour on a price tag. Each tier maps to a mechanical property:
+//   ⚪ common     — 💥 shatters, no ability. Starter gear, one run's shards.
+//   🟢 uncommon   — 💥 shatters, one ON-BLOCK ability.
+//   🔵 rare       — 🩹 worn: it stays, because an ONGOING RULE is live while you wear it.
+//   🟠 legendary  — it does something no other piece can, and it names a great beast.
+const RARITY = {
+  common:    { label: 'Common',    icon: '⚪' },
+  uncommon:  { label: 'Uncommon',  icon: '🟢' },
+  rare:      { label: 'Rare',      icon: '🔵' },
+  legendary: { label: 'Legendary', icon: '🟠' },
+};
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'legendary'];
 const PART_WORD = { armour: 'Plate', evasion: 'Plume', guard: 'Hide' };
 // ⚠️ A creature with BOTH shapes takes the first — stage 4 stacks them, and a part named after two
 // body plans reads like a bug. Shapeless creatures give a Fang.
@@ -6504,6 +6583,7 @@ function tickMomentum(damage, r) {
 // must survive into the next one — which is the same shape as the Emberwake and therefore the same
 // trap. Anything per-turn added here is inherited by the road, the Last Mile and the duel at once.
 function rollTurnTokens() {
+  S.armourTwin = false;   // 🔥 a doubled channel lasts exactly the turn you broke the band on
   S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
   // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
   // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
@@ -6511,6 +6591,9 @@ function rollTurnTokens() {
     const d = armourDef(a.id);
     if (d && d.every === 'encounter' && d.block > 0) a.wear = 1;
     if (d && d.every === 'encounter' && d.uses) a.uses = d.uses;
+    // 🔋 a charge piece gains a mark. ⚠️ HERE rather than in one turn loop, for the build-339
+    // reason: the finale is a third turn loop and would have skipped it entirely.
+    if (d && d.charge) a.charge = Math.min(d.charge, (a.charge || 0) + 1);
   }
   S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
@@ -7698,18 +7781,27 @@ function fieldTokens() {
     const d = armourDef(a.id); if (!d) continue;
     const live = armourBlock(a), sl = ARMOUR_SLOTS[d.slot], charges = armourUsesLeft(a);
     const canBlock = S.phase === 'soak' && S.damage > 0 && a.wear > 0 && live > 0;
-    const canUse = isAssignPhase() && charges > 0;
+    const canUse = isAssignPhase() && armourReady(a);
+    // 🔋 a charge piece reads its MARKS, not its uses — a different clock, so a different counter.
+    const charging = !!d.charge;
     // 🔑 A PIECE HAS TWO LIVES AND THE TOKEN HAS TO SHOW WHICH ONE IS LEFT: blows it can still
     // take, and charges it can still spend. Pips read whichever it actually has.
     const isUseOnly = d.block <= 0;
     out.push({
       id: 'arm-' + a.id, icon: sl.icon, name: d.name, armour: true,
-      count: isUseOnly ? charges : a.wear, cap: isUseOnly ? (d.uses || 0) : 1,
-      spent: isUseOnly ? charges <= 0 : (a.wear <= 0 && charges <= 0),
+      count: charging ? (a.charge || 0) : isUseOnly ? charges : a.wear,
+      cap: charging ? d.charge : isUseOnly ? (d.uses || 0) : 1,
+      spent: charging ? false : isUseOnly ? charges <= 0 : (a.wear <= 0 && charges <= 0),
       ready: canBlock || canUse,
+      // 🔋 two ways to spend a mark, so the token carries two buttons rather than one tap. A single
+      // tap would have had to pick for you, and picking WHERE it lands is the entire mechanic.
+      acts: (canUse && d.use === 'discharge')
+        ? [{ label: '⚔️ +6 strike', call: `useArmour('${a.id}','atk')` },
+           { label: '💨 +6 speed', call: `useArmour('${a.id}','init')` }] : null,
       worth: isUseOnly ? (d.text || '') : `blocks <b>${d.block}</b>`,
       note: canBlock ? '<b>tap to block</b>'
-          : canUse ? '<b>tap to use it</b>'
+          : canUse && d.use !== 'discharge' ? '<b>tap to use it</b>'
+          : charging ? ((a.charge || 0) >= d.charge ? '<b>full — spend it</b>' : `${a.charge || 0} of ${d.charge} marks · one more each encounter`)
           : isUseOnly ? (charges > 0 ? 'once a run — tap it on the turn you want it' : 'spent for this run')
           // 🐛 THE STAT AND THE STATE ARE DIFFERENT LINES. `blocks 2` is what is PRINTED on the
           // piece and never changes — like a card's value. Whether it can still do it is STATE, and
@@ -7718,7 +7810,7 @@ function fieldTokens() {
           : a.wear <= 0 && d.block > 0 ? 'block spent' + (d.text ? ' · ' + d.text : '')
           : d.text ? d.text
           : d.brk === 'shatter' ? 'one block, then it shatters' : 'one block this run',
-      tap: canBlock ? `soakWithArmour('${a.id}')` : canUse ? `useArmour('${a.id}')` : null,
+      tap: canBlock ? `soakWithArmour('${a.id}')` : (canUse && d.use !== 'discharge') ? `useArmour('${a.id}')` : null,
     });
   }
   if (CLASS && CLASS.tokens) { const t = CLASS.tokens(); if (t) out.push(...t.filter(Boolean)); }
@@ -7758,6 +7850,10 @@ function renderField() {
       `<div class="tok-name">${t.name}</div>` +
       `<div class="tok-worth">${t.worth}</div>` +
       `<div class="tok-note">${t.note}</div>` +
+      // 🔑 a token with more than one thing to do carries its own buttons. Same principle as one
+      // tap: a token you can act on IS the control — there is just more than one act.
+      (t.acts ? `<div class="tok-acts">` + t.acts.map(x =>
+        `<button class="tok-act" onclick="${x.call}">${x.label}</button>`).join('') + `</div>` : '') +
     `</div>`;
   }).join('');
 }
