@@ -6182,15 +6182,36 @@ function loadStash() {
   } catch (e) { return seedStarter({ mats: {}, owned: [], loadout: [], seeded: false }); }
 }
 function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
-// ⚪ hand out the teaching set, exactly once. ⚠️ GUARDED BY A FLAG, not by "is the loadout empty" —
-// otherwise deliberately stripping your loadout would silently re-arm it, and a player who emptied
-// two slots on purpose would find them full again next run.
+// ⚪ THE STARTER SET IS A FLOOR, NOT A ONE-TIME GIFT (fixed 2026-08-23).
+//
+// 🔴 THE BUG, reported in play: *"just started a new run, but i don't see the starting armor in my
+// slots, its empty."* Build 356 seeded the old commons (`kiln`/`hood`/`vambrace`/`boots`) and set
+// `seeded: true`. Build 361 DELETED those four pieces and replaced them with the Adventurer's set
+// — so an existing stash owned four ids that no longer resolve, `loadoutIds()` filtered every one
+// of them out, and the seeding that would have fixed it returned early because the flag said the
+// job was already done.
+// 🔑 A ONE-TIME MIGRATION FLAG IS A LOCK ON THE ONLY CODE THAT COULD REPAIR THE DATA. Whatever the
+// starter set becomes next, this must survive it — so ownership is now RESTATED every load rather
+// than granted once. It cannot go stale because it is not a memory, it is a floor.
+//
+// ⚠️ THE LOADOUT KEEPS ITS GUARD, and the distinction is the delicate part: an empty loadout
+// because the PLAYER stripped it must stay empty (otherwise deliberate choices get silently
+// undone), but an empty loadout because pieces were DELETED under them is damage and gets
+// repaired. `lostToMigration` is exactly that difference.
 function seedStarter(st) {
-  if (st.seeded) return st;
+  // 🧹 drop ids that no longer resolve, so a removed piece cannot linger as a ghost you own
+  const wornBefore = st.loadout.length;
+  st.owned = st.owned.filter(id => armourDef(id));
+  st.loadout = st.loadout.filter(id => armourDef(id));
+  const lostToMigration = st.loadout.length < wornBefore;
+
+  let changed = !st.seeded || lostToMigration;
+  for (const id of STARTER_PIECES) if (!st.owned.includes(id)) { st.owned.push(id); changed = true; }
+  if (!st.seeded || lostToMigration) {
+    if (!st.loadout.length) st.loadout = STARTER_PIECES.slice(0, ARMOUR_SLOTS_OPEN);
+  }
   st.seeded = true;
-  for (const id of STARTER_PIECES) if (!st.owned.includes(id)) st.owned.push(id);
-  if (!st.loadout.length) st.loadout = STARTER_PIECES.slice(0, ARMOUR_SLOTS_OPEN);
-  saveStash(st);
+  if (changed) saveStash(st);
   return st;
 }
 
