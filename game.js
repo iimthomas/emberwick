@@ -240,7 +240,14 @@ const HARDSHIPS = {
   'Mire':         'Your fastest card cannot be your Catalyst.',
   // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
   // mage that means no attuning, for a rogue it would mean no chain.
-  'Dead Air':     'Your cards find no accord — nothing attunes this encounter.',
+  // ⚠️ "ACCORD" MEANT NOTHING TO ANYONE (2026-08-22). Thomas: *"what does accord even mean"* —
+  // and he is right: it is a word invented so ONE sentence could cover two classes, because the
+  // mage ATTUNES and the rogue PAYS and neither word fits both. This one was worse still: it said
+  // *"find no accord"* and then *"nothing attunes"* in the same breath, i.e. the invented neutral
+  // word AND the mage's word, contradicting its own reason for existing.
+  // 🔑 THE FIX IS THE ONE ALREADY BUILT FOR THE GRADE THIS MORNING: **the ENGINE owns the rule,
+  // the CLASS owns the noun.** `{gate}` is filled from CLASS.craft.gate — see hardshipText().
+  'Dead Air':     'Your cards cannot {gate} this encounter — nothing at all.',
   // 🌪️ STAGE 2's OWN TWO (2026-08-05). A land should press on the thing its dragon presses on,
   // so Skyrender's country attacks SPEED from both ends — one takes your fast card away from the
   // race, the other makes the race a condition on your class rule.
@@ -254,7 +261,7 @@ const HARDSHIPS = {
   // sacrifice — with 12 arrangements you can usually satisfy both. A HARDSHIP is where that
   // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
   // problem you solve rather than a tax you route around forever.
-  'Squall':       'The air will not hold — your cards find accord <b>only if you win Initiative</b>.',
+  'Squall':       'The air will not hold — your cards can only {gate} <b>if you win Initiative</b>.',
   // ⏳ STAGE 3's TWO. Cragmourn's demand is *waste nothing*, so its land takes away the slack
   // you did not know you were relying on.
   // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
@@ -268,6 +275,17 @@ const HARDSHIPS = {
   // only rule that takes the carry itself — the exam's way of saying *nothing you save is safe*.
   'Riptide':      'The current takes what you held — your <b>Arsenal is spent</b>, not kept.',
 };
+// 🔑 A HARDSHIP IS STATED IN ENGINE TERMS AND EACH CLASS READS ITS OWN WORD FOR IT.
+// `{gate}` becomes "attune" for the mage and "be paid in full" for the rogue — the same rule the
+// grade follows, and the same one already written down for hardships: *a rule that names ATTUNING,
+// the rogue reads as PAYING.* ⚠️ Every consumer must go through here; a raw HARDSHIPS[x] lookup
+// would print the placeholder.
+function hardshipText(name) {
+  const t = HARDSHIPS[name] || '';
+  const gate = (CLASS.craft && CLASS.craft.gate) || 'combine';
+  return t.replace(/\{gate\}/g, `<b>${gate}</b>`);
+}
+
 const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
 // ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
 // road it would either never fire or always fire. A hardship that cannot be answered is weather.
@@ -957,7 +975,7 @@ const MAGE = {
   // what gets added to EACH blow rather than divided across them — see `added` in computeAction.
   perHitBonus() { return (S.potionFx ? S.potionFx.value : 0); },
   craft: {
-    label: 'attuned',
+    label: 'attuned', gate: 'attune',
     avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
     found(r) { return !!r.enhUsed; },
   },
@@ -1483,7 +1501,7 @@ const ROGUE = {
          + (MOMENTUM_FULL === 'convert' && (S.momentum||0) >= MOMENTUM_CAP ? 0 : (S.momentum || 0) * MOMENTUM_VALUE);
   },
   craft: {
-    label: 'paid in full',
+    label: 'paid in full', gate: 'be paid in full',
     avail(hand) {
       return hand.some(f => hand.some(st => st !== f && pitchOf(f) >= (st.def.energy || 0)));
     },
@@ -4440,7 +4458,7 @@ function logChallenge() {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · 🪙 ${e.xp})`);
     if (e.peril) log(`PERIL — ${e.peril}: ${PERILS[e.peril]}`, 'bad');
   }
-  if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${HARDSHIPS[S.hardship]}`, 'bad');
+  if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${hardshipText(S.hardship)}`, 'bad');
 }
 
 // 🏕️ WHICH ENCOUNTER THIS REGION'S EVENT FOLLOWS. Rolled once per region rather than
@@ -7112,7 +7130,7 @@ function renderEncounter() {
   const modLines =
     (e.ability ? `<div class="enc-mod">☠️ <b>${e.ability}</b> — ${ABILITIES[e.ability]}</div>` : '') +
     (e.peril ? `<div class="enc-mod">⛰️ <b>${e.peril}</b> — ${PERILS[e.peril]}</div>` : '') +
-    (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${HARDSHIPS[S.hardship]}</div>` : '');
+    (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${hardshipText(S.hardship)}</div>` : '');
   if (e.type === 'fight') {
     panel.innerHTML =
       `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
