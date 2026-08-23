@@ -5367,32 +5367,7 @@ function finishResolve() {
   // source of damage has been totalled. ⚠️ It must sit BELOW the Time Penalty block: that burns
   // cards straight off the deck without ever passing through `damage`, and a turn that cost you
   // cards is a turn that touched you whatever the variable is called.
-  // 🔑 ONE DEFINITION, THE SAME ONE THE HEALTH BAR USES: did this turn cost you cards?
-  if (r.rogue) {
-    // 🔑 WHAT COUNTS AS "TOUCHED" IS THE ONLY LEVER THAT CHANGES THE STREAK'S SHAPE.
-    // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
-    // a graze no longer breaks your rhythm but a real blow does — which is the one change that
-    // lifts p without touching how often you get hit.
-    // ⚠️ A TIME PENALTY NO LONGER BREAKS THE STREAK (2026-08-22), and the reason is this block's
-    // own stated definition: *did this turn cost you cards?* Since Time Penalty stopped touching
-    // the deck it costs GROWTH, not cards — so leaving it here would have been a rule outliving
-    // the thing it was about. ⚠️ It is a buff to her; measured alongside the change, not assumed.
-    const touched = damage >= MOMENTUM_BREAK;
-    const before = S.momentum || 0;
-    if (touched) {
-      // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
-      S.momentum = hasCharm('secondnature') ? Math.min(before, 2) : 0;
-      if (before > 0) log(`● Momentum broken — ${before} → ${S.momentum}`, 'bad');
-    } else {
-      // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
-      // Read here, not in compose(), because THIS turn's outcome does not exist until now — the
-      // same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
-      const step = MOMENTUM_STEP + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
-                     + (r.rogue.verb === 'surge' ? 2 : 0);
-      S.momentum = Math.min(MOMENTUM_CAP, before + step);
-      if (S.momentum > before) log(`● Untouched — Momentum ${before} → ${S.momentum}`, 'good');
-    }
-  }
+  tickMomentum(damage, r);
   S.damage = damage;
   if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
@@ -5741,8 +5716,55 @@ function doneUpgrading() { if (S.phase === 'upgrade') { doneUpgrades(); return; 
 // which cards the turn CONSUMES. Engine-side this is just "ask the class".
 function pouredIds() { return CLASS.spentIds(); }
 
-function endTurn() {
-  // 🔥 the token you banked this turn arrives now; the one you were holding expires, spent or not
+// 🔥 THE EMBERWAKE ROLLS OVER — what you banked arrives, what you were holding expires.
+//
+// 🔐 EXTRACTED 2026-08-22 BECAUSE THE FINALE IS A THIRD TURN LOOP AND NEVER RAN IT.
+// Thomas: *"i channeled +20 for next turn, but i only got 2 emberwake, what happened"*. Nothing
+// happened — that is the bug. `startLastMile()` and `startDuelBeat()` both carry the warning
+// *"THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too"*, and both
+// obeyed it. But this block lived in **endTurn()**, which the finale never calls either, and no
+// comment said so. Measured over 211 duel beats: the wake changed value **zero times**, and 14
+// Last Mile banks were still sitting in `wakePending` when the duel began.
+// So in the finale a channelled Emberwake was announced (*"+9 for next beat"*) and then silently
+// discarded, while whatever you walked in holding was spent free, every beat, forever.
+// ⚠️ THE INSTRUMENT COULD NOT HAVE CAUGHT THIS: solver.js states in its own comment that the
+// bot never banks — it scores one encounter, so channelling always reads as a loss. 0 banks in
+// 466 duel beats. *A number produced by an instrument that structurally cannot do the thing is not
+// a measurement of the thing* — the same trap, now twice on the same mechanic.
+// 🔑 THE RULE: a per-turn TOKEN belongs in a function all three turn loops call, never inline
+// in one of them. Anything added here is inherited by the road, the Last Mile and the duel at once.
+// ● THE STREAK IS JUDGED — did this turn cost you cards?
+// 🔑 ONE DEFINITION, THE SAME ONE THE HEALTH BAR USES. Extracted alongside rollWake() and for
+// the same reason: the finale is a third turn loop, and a class token that cannot move during the
+// boss fight is a token the boss fight does not have.
+function tickMomentum(damage, r) {
+  if (!r || !r.rogue) return;
+  // 🔑 WHAT COUNTS AS "TOUCHED" IS THE ONLY LEVER THAT CHANGES THE STREAK'S SHAPE.
+  // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
+  // a graze no longer breaks your rhythm but a real blow does — which is the one change that
+  // lifts p without touching how often you get hit.
+  // ⚠️ A TIME PENALTY NO LONGER BREAKS THE STREAK (2026-08-22), and the reason is this block's
+  // own stated definition: *did this turn cost you cards?* Since Time Penalty stopped touching
+  // the deck it costs GROWTH, not cards — so leaving it here would have been a rule outliving
+  // the thing it was about. ⚠️ It is a buff to her; measured alongside the change, not assumed.
+  const touched = damage >= MOMENTUM_BREAK;
+  const before = S.momentum || 0;
+  if (touched) {
+    // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
+    S.momentum = hasCharm('secondnature') ? Math.min(before, 2) : 0;
+    if (before > 0) log(`● Momentum broken — ${before} → ${S.momentum}`, 'bad');
+  } else {
+    // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
+    // Read here, not in compose(), because THIS turn's outcome does not exist until now — the
+    // same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
+    const step = MOMENTUM_STEP + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
+                   + (r.rogue.verb === 'surge' ? 2 : 0);
+    S.momentum = Math.min(MOMENTUM_CAP, before + step);
+    if (S.momentum > before) log(`● Untouched — Momentum ${before} → ${S.momentum}`, 'good');
+  }
+}
+
+function rollWake() {
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
   if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
   else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
@@ -5750,6 +5772,10 @@ function endTurn() {
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
   S.wakeTarget = null;
+}
+
+function endTurn() {
+  rollWake();
   let spentIds = pouredIds();
   // ✦ UNSPENT - a clean win costs you nothing. The Spell is the only card the turn CONSUMES, so
   // this is the biggest rule in the game to bend: it turns "what is my biggest card" into "what is
@@ -8554,6 +8580,7 @@ function staminaBar() {
 function startDuel() {
   S.finalPhase = 'duel';
   S.duelBeat = 0;
+  rollWake();   // 🔥 the Last Mile was a turn too — collect what it banked before the deck is gathered
 
   // steel yourself at the lair's mouth: gather every card you still hold (spent-set and all)
   // into a fresh deck — this is your finite duel stamina. Only cards TRASHED on the approach
@@ -8656,6 +8683,8 @@ function resolveDuel() {
       log(`🐉 ${ds.active.name} takes ${displayName(gone)} — it is gone for the rest of the duel.`, 'bad');
     }
   }
+  // 🔥 the finale never reaches finishResolve(), so the bank is collected here instead.
+  if (r.banks) S.wakePending = r.bank;
   S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
@@ -8701,8 +8730,11 @@ function resolveDuel() {
 // runs when the duel reveal finishes (dispatched from advanceBeat)
 function finishDuel() {
   const dr = S.duelResult;
+  const rr = S.pendingR;
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   if (dr.kill) { victory(); return; }
+  // ● the streak is judged on the RAW blow, before you soak it — same order as the road
+  tickMomentum(dr.damage, rr);
   if (dr.damage <= 0) { log(`No counterstrike lands — press the assault.`); duelCleanupAndNext(); return; }
   log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — soak it with your remaining cards.`, 'bad');
   S.damage = dr.damage;
@@ -8713,6 +8745,7 @@ function finishDuel() {
 }
 
 function duelCleanupAndNext() {
+  rollWake();   // 🔥 end of a beat IS end of a turn — before the set leaves the hand, so Deepwell can still read it
   const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
   S.discard.push(...setCards);
