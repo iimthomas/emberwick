@@ -179,6 +179,23 @@ const CARD_DEFS = [
   // weaknesses fall, so a card becomes more itself, never simply better. Lv1 is the damaged
   // state (soaking softens a card back toward the middle); Lv4 is the extreme.
   //   FORCE -> the Spell   SPARK -> the Catalyst   FLOW -> the Surge   WARD -> soaking
+  //
+  // 🛡️ ARMOUR IS CAPPED AND THE WARD SPIKE IS +1 A LEVEL (2026-08-23). Thomas: *"there
+  // shouldnt be a lvl 2 card that has like 4+ armor."* It was far past that: the WARD spike ran
+  // **+3 a level**, so Cairnguard blocked 5 / 8 / 11 / **14** while every other card in the game
+  // sat between 1 and 4. 🔑 A Lv2 WARD card blocked FOUR TIMES what a piece of crafted armour does.
+  // ✅ WARD armour is now **2 / 3 / 4 / 5** on all four, and the rogue's Shadow Double matches.
+  // ⚠️ The four WARD cards no longer differ by armour NUMBER, and that is deliberate — they
+  // differ by element (the mage's whole combination rule) and by their Lv4 verb. The 16-card brief
+  // asks for one shape per archetype × four elements; it never asked the numbers to differ too.
+  //
+  // 🔴 THIS IS THE CAUSE THE 2026-08-22 DAMAGE BUFF WAS TREATING AS A SYMPTOM. `FOE_ATK_MULT`
+  // went to 1.5 because *one card covered 72% of hits* — but that was true because ONE ARCHETYPE
+  // had plates three to five times everyone else's. Fix the plates and the designated victim goes
+  // with them. Re-measure the multiplier in the same commit; a workaround outliving its cause is
+  // how two dials end up fighting.
+  // ⚠️ The standing rule *never hand-edit a level row* still holds. This edits ONE COLUMN across
+  // ALL FOUR cards of an archetype, systematically — that is a rule change, not a tweak.
   //   Fire hits harder / guards worse .. Water fuels and endures, never fast
   //   Lightning is speed at the cost of guard .. Stone is armour, slow and dry
   // Row = [value, (dead), init, boost, armor, (dead), costToNextLevel]
@@ -189,7 +206,7 @@ const CARD_DEFS = [
   { name: 'Bellowsbreath', element: 'Fire', arch: 'FLOW',
     lv: [[4,null,3,3,1,null,2], [3,null,2,6,1,null,3], [3,null,1,9,1,null,4], [3,null,1,12,1,null,null]] },
   { name: 'Hearthwall', element: 'Fire', arch: 'WARD',
-    lv: [[4,null,3,2,2,null,2], [3,null,2,1,5,null,3], [4,null,1,1,8,null,4], [5,null,1,1,11,null,null]] },
+    lv: [[4,null,3,2,2,null,2], [3,null,2,1,3,null,3], [4,null,1,1,4,null,4], [5,null,1,1,5,null,null]] },
   { name: 'Tidebreak', element: 'Water', arch: 'FORCE',
     lv: [[3,null,1,3,3,null,2], [5,null,0,2,2,null,3], [7,null,0,1,1,null,4], [9,null,0,1,1,null,null]] },
   { name: 'Riverstep', element: 'Water', arch: 'SPARK',
@@ -197,7 +214,7 @@ const CARD_DEFS = [
   { name: 'Wellspring', element: 'Water', arch: 'FLOW',
     lv: [[2,null,2,4,3,null,2], [2,null,1,7,2,null,3], [2,null,0,10,1,null,4], [2,null,0,13,1,null,null]] },
   { name: 'Rimeguard', element: 'Water', arch: 'WARD',
-    lv: [[2,null,2,3,4,null,2], [2,null,1,2,7,null,3], [3,null,0,1,10,null,4], [4,null,0,1,13,null,null]] },
+    lv: [[2,null,2,3,2,null,2], [2,null,1,2,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
   // ⚡ THE ONE MAGE CARD THAT FORKS (2026-08-17, Thomas: *"doesn't feel fair for mage to not have
   // ANY if this is a shape we want to add. maybe its a lightning spell"*). Right, and it is the same
   // argument that softened 🧱 Guard: a shape a class cannot engage with AT ALL is not difficulty.
@@ -216,7 +233,7 @@ const CARD_DEFS = [
   { name: 'Stormglass', element: 'Lightning', arch: 'FLOW',
     lv: [[3,null,5,3,1,null,2], [2,null,4,6,1,null,3], [2,null,3,9,1,null,4], [2,null,3,12,1,null,null]] },
   { name: 'Staticwall', element: 'Lightning', arch: 'WARD',
-    lv: [[3,null,5,2,2,null,2], [2,null,4,1,5,null,3], [3,null,3,1,8,null,4], [4,null,3,1,11,null,null]] },
+    lv: [[3,null,5,2,2,null,2], [2,null,4,1,3,null,3], [3,null,3,1,4,null,4], [4,null,3,1,5,null,null]] },
   { name: 'Rockfall', element: 'Stone', arch: 'FORCE',
     lv: [[4,null,1,1,4,null,2], [6,null,0,1,3,null,3], [8,null,0,1,2,null,4], [10,null,0,1,2,null,null]] },
   { name: 'Flintdart', element: 'Stone', arch: 'SPARK',
@@ -224,7 +241,7 @@ const CARD_DEFS = [
   { name: 'Deepvein', element: 'Stone', arch: 'FLOW',
     lv: [[3,null,2,2,4,null,2], [2,null,1,5,3,null,3], [2,null,0,8,2,null,4], [2,null,0,11,2,null,null]] },
   { name: 'Cairnguard', element: 'Stone', arch: 'WARD',
-    lv: [[3,null,2,1,5,null,2], [2,null,1,1,8,null,3], [3,null,0,1,11,null,4], [4,null,0,1,14,null,null]] },
+    lv: [[3,null,2,1,2,null,2], [2,null,1,1,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
 ];
 
 // ---------- modifiers (source rulebook) ----------
@@ -1292,7 +1309,7 @@ const ROGUE_SPEC = [
   { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [5, 2, 0], paid: 4, verb: 'lethal'  },
   { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'cycle2' },
   { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [4, 2, 3], paid: 4, verb: 'nocounter' },
-  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 5, 3], paid: 3, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 5, 2], paid: 3, verb: 'surge' },
   { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [5, 2, 1], paid: 4, verb: 'unspent' },
 ];
 const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST for every class now
@@ -4472,7 +4489,17 @@ function drawEncounter(avoidType, elite) {
 // ⚠️ AND IT IS COUPLED TO PAR. Harder hits mean fewer levels at the lair, and the lair is measured
 // against `dragon.par` (36/44/48/52) — so raising this makes the DRAGONS harder for free. Re-read
 // par before blaming a dragon for anything after moving it.
-let FOE_ATK_MULT = 1.5;
+// 🔴 1.5 → 1.0 (2026-08-23) — THE WORKAROUND OUTLIVED ITS CAUSE.
+// It was raised to 1.5 because *one card covered 72% of hits* and soaking was a lookup. But that
+// was true because ONE ARCHETYPE had plates three to five times everyone else's: the mage's WARD
+// spike ran +3 a level, so a Lv2 Cairnguard blocked 8 and a Lv4 blocked 14 while every other card
+// in the game sat between 1 and 4. 🔑 The designated victim was a DATA problem wearing a damage
+// problem's clothes. WARD armour is 2/3/4/5 now, and the multiplier can go home.
+// 📏 Measured against the compressed plates: at ×1.0 one card covers 39% of hits — BETTER than
+// the 45% the ×1.5 workaround bought on the old plates, and bought by fixing the cause instead.
+// ⚠️ ×1.25 holds an even sharper soak (25%) but reopens a 12-point class gap, because the plate
+// compression already fell far harder on the mage (her mean plate 2.9 → 2.1; the rogue's 1.5 → 1.4).
+let FOE_ATK_MULT = 1.0;
 function scaleFoe(e) {
   if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
   return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
