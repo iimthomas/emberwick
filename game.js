@@ -5350,6 +5350,7 @@ function finishResolve() {
   if (!S.finalMode) {
     if (r.nightCaught) snuffCandle('the dark caught you on the road');
     else if (r.outcome === 'Complete') lightCandle('you come through cleanly');
+    else if (r.outcome === 'Narrow' && hasArmourRule('steadyflame')) log(`🛡️ Farseer's Circlet — your candle holds through the scrape.`, 'good');
     else snuffCandle(r.outcome === 'Narrow' ? 'you scraped through' : 'the encounter went badly');
   }
   // 📊 CRAFT: was your class's source of power AVAILABLE in this hand, and did you find it?
@@ -5414,7 +5415,8 @@ function finishResolve() {
   // ✅ And it finally makes the NUMBER mean something: `Time Penalty 3` was identical to `2` while
   // both did nothing. It also restores the second thing that separates a journey from a fight —
   // a failed fight costs cards NOW, a failed journey costs GROWTH.
-  if (r.timePenalty > 0) {
+  if (r.timePenalty > 0 && hasArmourRule('surefooted')) log(`🛡️ Quickstep Greaves — you ignore the Time Penalty.`, 'good');
+  else if (r.timePenalty > 0) {
     S.delayed = (S.delayed || 0) + Math.max(1, Math.round(r.timePenalty * TIME_PENALTY_MULT));
     log(`⏳ Time Penalty ${r.timePenalty} — the road ran long. No sharpening for your next ` +
         `${S.delayed} encounter${S.delayed === 1 ? '' : 's'}.`, 'bad');
@@ -5460,59 +5462,63 @@ const ARMOUR_SLOTS = {
 // how many slots you may fill. ⚠️ Thomas's call 2026-08-23: START AT TWO, earn the other two.
 let ARMOUR_SLOTS_OPEN = 2;
 
-// 🔑 WEAR IS A COUNT OF BLOWS, NOT A DECAYING NUMBER (Thomas, 2026-08-23):
-// *"worn 2 should mean it only blocks 2, and thats it, it sticks around because maybe it has an
-// ability that can be used again and again."*
-// So a Worn 2 Kilnplate turns **4, then 4**, and then turns nothing. It does NOT decay 4→3→2.
-// ✅ It is the more legible rule and it is the reason to prefer it: *"turns 4, twice"* is a fact you
-// can hold in your head at the soak screen; *"turns 4, then 3, then 2"* is arithmetic you have to
-// redo every hit. FaB's Battleworn decays because a physical card tracks it with counters — we
-// have a token row that can just print the count.
-// ⚠️ WEAR CAPS AT 2 FOR NOW. Wear 3 is reserved for late gear (stage 4 tier), so the ceiling has
-// somewhere to go. 🔑 A spent piece is NEVER removed — it stays on the board, because blocking is
-// only one of the things a piece can do.
+// 🔑 A PIECE HAS ONE NUMBER, AND TWO KINDS (Thomas, 2026-08-23):
+//   *"worn 2, blocks for 2, and then doesn't block for anything anymore."*
+//   *"shatter should still be there, basic armor pieces will just block once, and disappear.
+//    worn will atleast stick around if the armor has an ongoing ability, or an ability that could
+//    be used once every encounter."*
 //
-// ❌ `brk` / 'shatter' is GONE. Under a count-of-blows model, Blade Break is just wear 1, and a
-// second field that means the same thing as `wear: 1` is a rule with two names.
+//     💥 SHATTER — blocks once, then it is GONE from the board. The basic piece.
+//     🩹 WORN    — blocks once, but STAYS, because it is still doing something.
 //
-// 🛡️ AND A PIECE MAY BLOCK NOTHING AT ALL (`block: 0`) — Thomas: *"some armor can have 0 armor,
-// maybe it just has a one time use ability."* Those are the potion-shaped pieces: they carry
-// `uses` charges of an ACTIVATED ability instead of a defence value.
+// ⚠️ I had invented a second number (a block VALUE plus a separate USES count) and it made the
+// rule need a sentence: *"turns 4, then 4, then nothing"*. It needs one number.
+//   🛡️ Kilnplate — blocks 2. Once. Then it is gone.
+// ✅ *Rules text states the rule and nothing else* applies to a rule's SHAPE, not only its wording.
+// If it takes a sentence to say, the shape is wrong.
 //
-// 🔴 THE DISCIPLINE STILL HOLDS, AND IT IS THE WHOLE REASON THIS SYSTEM IS SAFE:
-//     every effect is either ON BLOCK (bounded by `wear`) or ACTIVATED (bounded by `uses`).
-//     THERE IS NO FIELD FOR AN ALWAYS-ON EFFECT, so a permanent passive cannot be written.
-// A piece whose effect is a number that is always on would be vertical power on a game tuned for
-// someone wearing nothing, and four slots of it is a difficulty curve that inverts as you play.
+// 🔑 WORN HAS TO EARN ITS NAME. A piece that stays on the board with nothing left to do is
+// clutter, so `brk: 'worn'` is only legal alongside ONE of:
+//     • `ongoing`  — a rule that is live while you wear it
+//     • `every: 'encounter'` — its block comes back at every encounter
+//     • `uses` + `use` — charges of an activated ability
+//
+// ⚠️ `ongoing` IS THE ONE DANGEROUS FIELD, because it is the always-on effect this system spent
+// three revisions avoiding. It is allowed, under the bar already written for CHARMS and for the
+// same reason: 🔴 AN ONGOING ABILITY MUST CHANGE A RULE, NEVER ADD A NUMBER. *"Your candle is not
+// snuffed by a Narrow"* is a rule. *"+2 to your strike"* is power creep with a slot on it.
+//
+// ⚠️ BLOCK CAPS AT 2 FOR NOW — 3 is late gear (stage-4 tier), so the ceiling has somewhere to go.
+// 🛡️ And a piece may block nothing at all (`block: 0`): those are pure ability pieces.
 const ARMOUR = [
   // 🕶️ HEAD — information. The candle's slot.
-  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 2, wear: 2 },
-  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, wear: 2,
-    onBlock: 'relight', text: 'Each time it blocks, your candle relights.' },
-  { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 0, wear: 0, uses: 1,
-    use: 'relight', text: 'Once a run: relight your candle.' },
-  // 🧥 CHEST — what you can afford to lose. The workhorse slot.
-  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 4, wear: 2 },
-  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 3, wear: 2,
-    onBlock: 'coins', text: 'Each time it blocks, you find 3 coins.' },
+  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 2, brk: 'shatter' },
+  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter',
+    onBlock: 'relight', text: 'When it blocks, relight your candle.' },
+  { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn',
+    ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
+  // 🧥 CHEST — what you can afford to lose.
+  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 2, brk: 'shatter' },
+  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter',
+    onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
+  { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn',
+    every: 'encounter', text: 'It blocks again every encounter.' },
   // 🧤 ARMS — the blow.
-  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 3, wear: 2 },
-  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, wear: 2,
-    onBlock: 'strike', text: 'Each time it blocks, your next strike hits for 4 more.' },
-  { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, wear: 0, uses: 1,
-    use: 'burst', text: 'Once a run: your strike hits for 8 more this turn.' },
+  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 2, brk: 'shatter' },
+  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter',
+    onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
+  { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn',
+    uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
   // 👞 LEGS — tempo.
-  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, wear: 2 },
-  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, wear: 2,
-    onBlock: 'pace', text: 'Each time it blocks, you move 3 faster next turn.' },
+  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, brk: 'shatter' },
+  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn',
+    ongoing: 'surefooted', text: 'You ignore Time Penalties.' },
 ];
-// ⚠️ TEMPORARY — step 1 has no Workshop, so the loadout is granted. The measurement this build
-// exists to take is *does one card still cover the whole hit*, and a FIXED, plain loadout is what
-// makes that measurement clean. Replaced by the forge in step 3.
+// ⚠️ TEMPORARY — step 1 has no Workshop, so the loadout is granted. Replaced by the forge.
 const STARTER_LOADOUT = ['kiln', 'hood'];
 
 const armourDef = id => ARMOUR.find(a => a.id === id) || null;
-const newArmour = id => ({ id, wear: armourDef(id).wear || 0, uses: armourDef(id).uses || 0 });
+const newArmour = id => ({ id, wear: (armourDef(id).block > 0 ? 1 : 0), uses: armourDef(id).uses || 0 });
 // 🔑 EVERY piece you brought, spent or not — a battered plate STAYS ON THE BOARD, because
 // blocking is only one of the things a piece does and you need to see why you have no plate left.
 const armourWorn = () => (S.armour || []);
@@ -5523,15 +5529,18 @@ function armourBlock(a) {
 }
 function armourUsesLeft(a) { const d = armourDef(a.id); return d && d.use ? (a.uses || 0) : 0; }
 function armourEligible() { return armourWorn().filter(a => a.wear > 0 && armourBlock(a) > 0); }
+// 🔴 ONE LOOKUP FOR EVERY ONGOING RULE. Ask it by name at the site the rule is about — never
+// scatter `S.armour.some(...)` through the engine, which is how a rule ends up half-applied.
+function hasArmourRule(key) { return (S.armour || []).some(a => { const d = armourDef(a.id); return d && d.ongoing === key; }); }
 function armourMaxSoak() { return armourEligible().reduce((t, a) => t + armourBlock(a), 0); }
 
 // 🔑 ONE NAMED HELPER, dispatched by a string key — see the port note above. Every ability in the
 // game that fires when a piece blocks passes through here and nowhere else.
 function applyArmourBlock(key, d) {
-  if (key === 'relight') { lightCandle(`${d.name} turns the blow and the wick catches`); }
-  else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — you find 3 coins in the wreck. (you now hold ${S.coins})`, 'good'); }
-  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike hits for 4 more.`, 'good'); }
-  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — you move 3 faster next turn.`, 'good'); }
+  if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
+  else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — gain 3 coins. (you now hold ${S.coins})`, 'good'); }
+  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike gets +4.`, 'good'); }
+  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — your next turn gets +3 Initiative.`, 'good'); }
 }
 
 // 🛡️ THE OTHER HALF: A PIECE YOU USE RATHER THAN ONE THAT TAKES A HIT.
@@ -5550,7 +5559,7 @@ function applyArmourUse(key, d) {
   if (key === 'relight') lightCandle(`${d.name} shows you the road ahead`);
   // ⚠️ LIVE THIS TURN, not pending — you tapped it during assign, so it must land on the strike
   // you are arranging right now. rollTurnTokens() wipes it at cleanup, which is exactly right.
-  else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + 8; log(`🛡️ ${d.name} — your strike hits for 8 more this turn.`, 'good'); }
+  else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + 8; log(`🛡️ ${d.name} — your strike gets +8 this turn.`, 'good'); }
 }
 
 // 🛡️ SOAK WITH A PIECE INSTEAD OF A CARD. ⚠️ INSTEAD, not before — that is the whole point.
@@ -5563,9 +5572,11 @@ function soakWithArmour(aid) {
   const d = armourDef(a.id); const blocked = armourBlock(a);
   if (!d || blocked <= 0) return;
   a.wear--;
-  log(`🛡️ ${d.name} turns aside ${blocked}` +
-      (a.wear > 0 ? ` — ${a.wear} more blow${a.wear === 1 ? '' : 's'} in it.`
-                  : ` — it is battered through; it turns nothing more this run.`), a.wear > 0 ? '' : 'bad');
+  // 💥 the basic piece is GONE from the board, not dimmed. 🩹 a worn one stays, because it is
+  // still doing something — that is the whole difference between the two kinds.
+  if (d.brk === 'shatter') S.armour = S.armour.filter(x => x !== a);
+  log(`🛡️ ${d.name} blocks ${blocked}. ` +
+      (d.brk === 'shatter' ? 'It shatters.' : 'It blocks nothing more this run.'), 'bad');
   if (d.onBlock) applyArmourBlock(d.onBlock, d);
   S.damage = Math.max(0, S.damage - blocked);
   if (S.damage <= 0) { log(`All damage soaked.`); exitSoak(); return; }
@@ -5643,7 +5654,7 @@ function knockOut() {
   log(`Cannot soak all the damage → KNOCKED OUT`, 'bad result');
   // 🛡️ the armour goes with it. A knock-out that leaves a plate intact reads as the game
   // declining to use something you were wearing.
-  for (const a of armourEligible()) { const d = armourDef(a.id); a.wear = 0; log(`🛡️ ${d.name} is battered through (knock-out).`, 'bad'); }
+  for (const a of armourEligible()) { const d = armourDef(a.id); a.wear = 0; log(`🛡️ ${d.name} — spent in the knock-out.`, 'bad'); }
   for (const card of soakEligible()) downgrade(card, ' (knock-out)');
   const n = Math.min(KO_DECK_DISCARD, S.deck.length);
   if (n > 0) {
@@ -5976,6 +5987,13 @@ function tickMomentum(damage, r) {
 // trap. Anything per-turn added here is inherited by the road, the Last Mile and the duel at once.
 function rollTurnTokens() {
   S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
+  // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
+  // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
+  for (const a of (S.armour || [])) {
+    const d = armourDef(a.id);
+    if (d && d.every === 'encounter' && d.block > 0) a.wear = 1;
+    if (d && d.every === 'encounter' && d.uses) a.uses = d.uses;
+  }
   S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
   if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
@@ -7147,15 +7165,20 @@ function fieldTokens() {
     const isUseOnly = d.block <= 0;
     out.push({
       id: 'arm-' + a.id, icon: sl.icon, name: d.name, armour: true,
-      count: isUseOnly ? charges : a.wear, cap: isUseOnly ? (d.uses || 0) : d.wear,
+      count: isUseOnly ? charges : a.wear, cap: isUseOnly ? (d.uses || 0) : 1,
       spent: isUseOnly ? charges <= 0 : (a.wear <= 0 && charges <= 0),
       ready: canBlock || canUse,
-      worth: isUseOnly ? (d.text || '') : (a.wear > 0 ? `turns <b>${live}</b>` : '<b>battered through</b>'),
-      note: canBlock ? '<b>tap to take the blow</b>'
+      worth: isUseOnly ? (d.text || '') : `blocks <b>${d.block}</b>`,
+      note: canBlock ? '<b>tap to block</b>'
           : canUse ? '<b>tap to use it</b>'
           : isUseOnly ? (charges > 0 ? 'once a run — tap it on the turn you want it' : 'spent for this run')
-          : a.wear > 0 ? `${a.wear} blow${a.wear === 1 ? '' : 's'} left` + (d.text ? ' · ' + d.text : '')
-          : 'it turns nothing more this run',
+          // 🐛 THE STAT AND THE STATE ARE DIFFERENT LINES. `blocks 2` is what is PRINTED on the
+          // piece and never changes — like a card's value. Whether it can still do it is STATE, and
+          // it belongs here, next to the pip. A spent piece that only said "blocks 2" was promising
+          // something it could no longer do.
+          : a.wear <= 0 && d.block > 0 ? 'block spent' + (d.text ? ' · ' + d.text : '')
+          : d.text ? d.text
+          : d.brk === 'shatter' ? 'one block, then it shatters' : 'one block this run',
       tap: canBlock ? `soakWithArmour('${a.id}')` : canUse ? `useArmour('${a.id}')` : null,
     });
   }
