@@ -871,6 +871,59 @@ button.stage.locked .stage-shape { font-style: italic; }
 .pv-carve .pv-num { font-size: 30px; }
 .pv-carve .pv-label { color: #f0a86a; }
 
+/* ══ 🛡️ THE EQUIPMENT RAIL ══════════════════════════════════════════════════
+   Flesh and Blood's own zone layout, copied because it is genuinely the right shape:
+       HEAD    across the top
+       CHEST   ARMS     side by side
+       LEGS    below
+   🔑 It reads as a BODY, which is what makes four abstract slots memorable — you never have to
+   ask which box is which. ⚠️ Above the media queries; the responsive blocks stay last. */
+#armour-rail { display: none; }
+#armour-rail.has-rail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: "head  ." "chest arms" "legs  .";
+  gap: 7px;
+  width: 218px;
+  margin: 0 0 8px;
+}
+.eq-head  { grid-area: head; }
+.eq-chest { grid-area: chest; }
+.eq-arms  { grid-area: arms; }
+.eq-legs  { grid-area: legs; }
+
+.eq {
+  min-height: 74px; padding: 7px 9px; border-radius: 9px;
+  border: 1px solid rgba(150,175,200,.4);
+  background: linear-gradient(180deg, rgba(140,165,195,.15), rgba(140,165,195,.04));
+  display: flex; flex-direction: column; gap: 1px;
+}
+.eq-zone { font-size: 9px; letter-spacing: 1.3px; text-transform: uppercase; color: #a8c4dd; }
+.eq-name { font-size: 11.5px; color: #ecdfc8; line-height: 1.15; }
+.eq-block { font-size: 10.5px; color: #d7e6f3; margin-top: auto; }
+.eq-pips { font-size: 11px; color: #d7e6f3; line-height: 1; }
+.eq-cue { font-size: 9.5px; color: #7fd8ff; letter-spacing: .3px; }
+.eq-acts { display: flex; gap: 4px; margin-top: 3px; }
+.eq-acts .tok-act { font-size: 9.5px; padding: 2px 3px; }
+
+/* 🔑 A ZONE YOU HAVE NOT UNLOCKED READS LOCKED, NEVER EMPTY. A locked thing you can see is a goal;
+   an empty box is a bug you go looking for. */
+.eq.is-locked { border-style: dashed; opacity: .3; align-items: center; justify-content: center; }
+.eq.is-locked .eq-lock { font-size: 15px; }
+.eq.is-empty  { border-style: dashed; opacity: .5; }
+/* a spent plate STAYS VISIBLE — you need to know why you have no block left */
+.eq.is-spent { opacity: .42; }
+.eq.is-ready { border-color: #7fd8ff; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(127,216,255,.32), 0 0 14px -4px rgba(127,216,255,.5); }
+.eq.is-ready:hover { background: linear-gradient(180deg, rgba(140,190,225,.28), rgba(140,190,225,.09)); }
+
+/* 💎 the same restrained rarity rail the Workshop uses, so a piece looks the same in both places */
+.eq { border-left-width: 3px; }
+.eq.rar-common    { border-left-color: rgba(190,190,190,.45); }
+.eq.rar-uncommon  { border-left-color: rgba(120,200,140,.7); }
+.eq.rar-rare      { border-left-color: rgba(110,175,235,.8); }
+.eq.rar-legendary { border-left-color: #f0a030; }
+
 /* 🎭 the roster ahead — legible, smaller, and obviously not yet yours */
 .class-row.is-soon { opacity: .5; }
 .class-row.is-soon .class-pick { padding: 8px 10px; }
@@ -1556,8 +1609,49 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
   }
   /* lift the UI above the scene. Target these by ID only — a `#left-col > section`
      selector outranks `#scene` and would knock the scene out of position:absolute.
-     ⚠️ #field MUST be in this list: a new section left out of it renders BEHIND the art. */
-  #hud, #field, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+     ⚠️ #field MUST be in this list: a new section left out of it renders BEHIND the art.
+     🛡️ #armour-rail joined it 2026-08-23 — and it is exactly the trap that note warns about. */
+  #hud, #field, #armour-rail, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+
+  /* 🛡️ THE RAIL — left of the stage, on the art, under the enemy panel.
+     ⚠️ It is ABSOLUTELY POSITIONED rather than given a grid row, deliberately: #slots-panel is
+     pinned by row NUMBER, and the comment above says a row inserted above a pinned child silently
+     stacks two sections on top of each other. Taking the rail out of flow means the grid is
+     untouched and that trap cannot fire.
+     ⚠️ The mage stands lower-left, so the rail hugs the top and stays narrow. */
+  /* 🛡️ BOTTOM-LEFT OF THE FLEXING MIDDLE ROW — a real grid child, not an absolute guess.
+     🔴 THE FIRST VERSION HARDCODED `top: 96px` AND LANDED ON THE ENEMY PANEL. The panel's height
+     changes with its contents (an elite and a dragon draw taller), so ANY fixed offset is wrong
+     for some encounters — it just happens to look right for the one you tested.
+     ✅ Row 2 is the row that flexes, and `align-self: end` pins the rail to the bottom of it: it
+     sits under whatever the enemy panel turns out to be and above the cards, at every height.
+     ⚠️ It shares row 2 with #controls-panel, which is `justify-self: end` — one lane each, and the
+     grid keeps them apart without either knowing about the other.
+     ⚠️ NOT a new row: #slots-panel is pinned by row NUMBER, and inserting one above it silently
+     stacks two sections on top of each other (the note on grid-template-rows says so). */
+  #armour-rail.has-rail {
+    /* 🔴 `grid-column: 1` IS LOAD-BEARING, and leaving it off cost a build. #controls-panel is
+       also in row 2, so two items with no explicit column made the grid AUTO-PLACE the second one
+       into an implicit COLUMN 2 — measured `116.359px 648.719px`. #hud's `width: min(34%, 400px)`
+       then resolved against a 116px track, collapsed to 40px, and the whole left column stacked
+       into a 1112px tower.
+       🔑 This is the phantom-column trap the top of this file already warns about, arriving from a
+       different direction: last time from a selector, this time from auto-placement. **Two children
+       sharing an explicit ROW must also share an explicit COLUMN**, or the grid invents one. */
+    grid-row: 2; grid-column: 1; justify-self: start; align-self: end;
+    width: 190px; margin: 0 0 6px 10px;
+  }
+  #armour-rail.has-rail .eq { pointer-events: auto; backdrop-filter: blur(4px);
+    background: linear-gradient(180deg, rgba(14,18,24,.82), rgba(10,13,18,.72)); }
+  /* under 1100px the art is tight and the rail would sit on the mage — shrink it rather than
+     move it, so it never changes side and you never lose it */
+  #armour-rail.has-rail .eq { min-height: 52px; padding: 5px 8px; }
+  @media (max-width: 1100px) {
+    #armour-rail.has-rail { width: 148px; }
+    #armour-rail.has-rail .eq { min-height: 46px; padding: 4px 6px; }
+    #armour-rail.has-rail .eq-name { font-size: 10px; }
+    #armour-rail.has-rail .eq-block { font-size: 9.5px; }
+  }
 
   /* 🎴 the field sits just above the hand, aligned with it — board state is in front of YOU,
      not floating over the enemy. It collapses to nothing when you hold no tokens. */
@@ -1565,6 +1659,9 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 
   /* enemy vitals — floating TOP-LEFT on the art (moved 2026-07-29, Thomas). The mage is cropped
      at the waist now, so the top-left is empty sky; the foe gets the whole top-right instead. */
+  /* ⚠️ STAYS TOP-LEFT (a 2026-07-29 call). I moved it right for one build to clear the equipment
+     rail and it simply traded one collision for another — the controls panel owns the right lane,
+     and the panel landed on it. Measured both ways; left is correct and the RAIL had to move. */
   #hud {
     grid-row: 1; justify-self: start;
     position: static; width: min(34%, 400px); margin: 10px 0 0 10px;
@@ -1584,7 +1681,7 @@ button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background:
 
   /* controls — bottom-right, just above the cards */
   #controls-panel {
-    grid-row: 2; align-self: end; justify-self: end;
+    grid-row: 2; grid-column: 1; align-self: end; justify-self: end;
     width: min(40%, 460px); margin: 0 10px 8px 0;
     background: rgba(10, 8, 6, .74);
     border-color: rgba(201, 162, 74, .3);

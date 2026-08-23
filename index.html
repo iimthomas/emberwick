@@ -20,7 +20,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=356">
+<link rel="stylesheet" href="style.css?v=361">
 </head>
 <body>
 <header>
@@ -41,6 +41,11 @@
     </div>
     <!-- 🎴 THE FIELD — persistent state as tokens, sitting on the table in front of your hand.
          Empty until you hold something, and it collapses to nothing when you don't. -->
+    <!-- 🛡️ THE EQUIPMENT RAIL — Flesh and Blood's own zone layout, on the left of the stage:
+         HEAD across the top, CHEST and ARMS side by side, LEGS below. It is separate from #field
+         on purpose: the FIELD holds what a TURN creates and consumes, the RAIL holds what you
+         WEAR for the whole run. Two different clocks, two different places. -->
+    <aside id="armour-rail" aria-label="Equipment"></aside>
     <section id="field"></section>
     <section id="slots-panel"></section>
     <section id="controls-panel"></section>
@@ -59,6 +64,6 @@
   </div>
 </main>
 
-<script src="game.js?v=356"></script>
+<script src="game.js?v=361"></script>
 </body>
 </html>

@@ -5695,7 +5695,18 @@ const ARMOUR_SLOTS = {
   Legs:  { icon: '👢', label: 'Legs',  job: 'how fast you move' },
 };
 // how many slots you may fill. ⚠️ Thomas's call 2026-08-23: START AT TWO, earn the other two.
-let ARMOUR_SLOTS_OPEN = 2;
+// ⚠️ 2 → 4 (2026-08-23). This REVERSES the earlier *"let the armor start off with 2"*, and the
+// reason is his own later, more specific instruction: *"you start off with this full set"* — plus
+// a mockup drawn with four open zones, not two and two locks.
+// 🔴 AND THE LOCKS COULD NOT BE OPENED. Nothing in the game unlocks a slot; there is no
+// mechanism, so a new player met two zones marked 🔒 with no way to ever reach them. **A locked
+// thing you can see is a goal only if it can be won** — otherwise it is a button that lies, which
+// is the exact thing the Collection screen was written to avoid.
+// 📏 Measured, and it is why this is safe: the full set at block 1 takes 22-28% of blows and
+// moves the duel by +2. Wearing four is a bigger TEACHING surface at almost no power.
+// ✅ Slot count remains available as a progression later — it is just not one today, and pretending
+// otherwise cost nothing but honesty.
+let ARMOUR_SLOTS_OPEN = 4;
 
 // 🔑 A PIECE HAS ONE NUMBER, AND TWO KINDS (Thomas, 2026-08-23):
 //   *"worn 2, blocks for 2, and then doesn't block for anything anymore."*
@@ -5726,21 +5737,33 @@ let ARMOUR_SLOTS_OPEN = 2;
 // ⚠️ BLOCK CAPS AT 2 FOR NOW — 3 is late gear (stage-4 tier), so the ceiling has somewhere to go.
 // 🛡️ And a piece may block nothing at all (`block: 0`): those are pure ability pieces.
 const ARMOUR = [
+  // ⚪ THE ADVENTURER'S SET — the gear you start in (2026-08-23, Thomas: *"name it like
+  // adventurer's hood, adventurer's tunic, gloves, and pants. you know like how an RPG would name
+  // their gear. it should have no abilities on it, it just blocks 1 each. and you start off with
+  // this full set"*).
+  // 🔑 IT REPLACES THE FOUR PLAIN COMMONS RATHER THAN JOINING THEM. Those four (Wayfarer's Hood,
+  // Kilnplate, Slagiron Vambrace, Roadworn Boots) were identical to each other except for the zone
+  // and to this set except for the name — filler nobody would ever wear once they owned anything
+  // else. Deleting them means **every craftable piece now has an ability**, which is a much
+  // cleaner ladder: you start in plain cloth and everything you forge DOES something.
+  // ⚠️ Blocks 1, no ability, no recipe. It is a teaching object: visible on one blow in seven and
+  // worth under a point of win rate. The lesson is the CHOICE, never the number.
+  { id: 'a_hood',   slot: 'Head',  name: "Adventurer's Hood",   block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_tunic',  slot: 'Chest', name: "Adventurer's Tunic",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_gloves', slot: 'Arms',  name: "Adventurer's Gloves", block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_pants',  slot: 'Legs',  name: "Adventurer's Pants",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
   // 🕶️ HEAD — information. The candle's slot.
-  { id: 'hood',    slot: 'Head',  name: "Wayfarer's Hood",    block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'relight', text: 'When it blocks, relight your candle.' },
   { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
   // 🧥 CHEST — what you can afford to lose.
-  { id: 'kiln',    slot: 'Chest', name: 'Kilnplate',          block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
   // 🟠 the one piece that measured as a different category of power, now labelled as one
   { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn', rarity: 'legendary',
     every: 'encounter', text: 'It blocks again every encounter.' },
   // 🧤 ARMS — the blow.
-  { id: 'vambrace',slot: 'Arms',  name: 'Slagiron Vambrace',  block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
   { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
@@ -5756,7 +5779,6 @@ const ARMOUR = [
     cls: 'rogue', uses: 1, use: 'quicken', consume: true,
     text: 'Break it: your ● Momentum fills to full.' },
   // 👞 LEGS — tempo.
-  { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
   { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn', rarity: 'rare',
@@ -6046,8 +6068,8 @@ const BEAST_WORD = {
 // +3/+0 on the ladder; at block 1 that is under a point. **A teaching object should be visible and
 // almost free**, and the lesson here is the CHOICE, never the number.
 // ⚠️ Everything above common still blocks 2, so forging one is a real step up.
-const STARTER_PIECES = ['kiln', 'hood', 'vambrace', 'boots'];
-const STARTER_WORN = ['kiln', 'hood'];
+// ⚠️ THE WHOLE SET, and worn in every slot that is OPEN — you start dressed, not shopping.
+const STARTER_PIECES = ['a_hood', 'a_tunic', 'a_gloves', 'a_pants'];
 
 const RARITY = {
   common:    { label: 'Common',    icon: '⚪' },
@@ -6167,7 +6189,7 @@ function seedStarter(st) {
   if (st.seeded) return st;
   st.seeded = true;
   for (const id of STARTER_PIECES) if (!st.owned.includes(id)) st.owned.push(id);
-  if (!st.loadout.length) st.loadout = STARTER_WORN.slice(0, ARMOUR_SLOTS_OPEN);
+  if (!st.loadout.length) st.loadout = STARTER_PIECES.slice(0, ARMOUR_SLOTS_OPEN);
   saveStash(st);
   return st;
 }
@@ -7699,6 +7721,7 @@ function render() {
     $('encounter-panel').innerHTML = ''; $('encounter-panel').className = '';
     $('slots-panel').innerHTML = '';
     renderField();          // 🎴 clears the board — a shell screen is outside any run
+    renderArmourRail();
     const sc = $('scene'); if (sc) sc.innerHTML = '';
     renderControls();
     applyModal();    // 🚪 isShell() is false-y for modals, so this CLOSES one left open
@@ -7722,6 +7745,7 @@ function render() {
   renderEncounter();
   renderControls();
   renderField();
+  renderArmourRail();
   renderSlots();
   renderLog();
   } finally {
@@ -7832,46 +7856,6 @@ function pointAtLesson() {
 // ============================================================
 function fieldTokens() {
   const out = [];
-  // 🛡️ ARMOUR SITS ON THE FIELD, not in a row of its own. It is board state with a countdown,
-  // which is exactly the token shape — and 🔑 EVERY TOKEN SAYS HOW IT DIES, which for a piece of
-  // armour is the whole design. ⚠️ A second row would also mean re-pinning `#slots-panel`, which
-  // is fixed by grid-row number in the immersive block.
-  for (const a of (S.armour || [])) {
-    const d = armourDef(a.id); if (!d) continue;
-    const live = armourBlock(a), sl = ARMOUR_SLOTS[d.slot], charges = armourUsesLeft(a);
-    const canBlock = S.phase === 'soak' && S.damage > 0 && a.wear > 0 && live > 0;
-    const canUse = isAssignPhase() && armourReady(a);
-    // 🔋 a charge piece reads its MARKS, not its uses — a different clock, so a different counter.
-    const charging = !!d.charge;
-    // 🔑 A PIECE HAS TWO LIVES AND THE TOKEN HAS TO SHOW WHICH ONE IS LEFT: blows it can still
-    // take, and charges it can still spend. Pips read whichever it actually has.
-    const isUseOnly = d.block <= 0;
-    out.push({
-      id: 'arm-' + a.id, icon: sl.icon, name: d.name, armour: true,
-      count: charging ? (a.charge || 0) : isUseOnly ? charges : a.wear,
-      cap: charging ? d.charge : isUseOnly ? (d.uses || 0) : 1,
-      spent: charging ? false : isUseOnly ? charges <= 0 : (a.wear <= 0 && charges <= 0),
-      ready: canBlock || canUse,
-      // 🔋 two ways to spend a mark, so the token carries two buttons rather than one tap. A single
-      // tap would have had to pick for you, and picking WHERE it lands is the entire mechanic.
-      acts: (canUse && d.use === 'discharge')
-        ? [{ label: '⚔️ +6 strike', call: `useArmour('${a.id}','atk')` },
-           { label: '💨 +6 speed', call: `useArmour('${a.id}','init')` }] : null,
-      worth: isUseOnly ? (d.text || '') : `blocks <b>${d.block}</b>`,
-      note: canBlock ? '<b>tap to block</b>'
-          : canUse && d.use !== 'discharge' ? '<b>tap to use it</b>'
-          : charging ? ((a.charge || 0) >= d.charge ? '<b>full — spend it</b>' : `${a.charge || 0} of ${d.charge} marks · one more each encounter`)
-          : isUseOnly ? (charges > 0 ? 'once a run — tap it on the turn you want it' : 'spent for this run')
-          // 🐛 THE STAT AND THE STATE ARE DIFFERENT LINES. `blocks 2` is what is PRINTED on the
-          // piece and never changes — like a card's value. Whether it can still do it is STATE, and
-          // it belongs here, next to the pip. A spent piece that only said "blocks 2" was promising
-          // something it could no longer do.
-          : a.wear <= 0 && d.block > 0 ? 'block spent' + (d.text ? ' · ' + d.text : '')
-          : d.text ? d.text
-          : d.brk === 'shatter' ? 'one block, then it shatters' : 'one block this run',
-      tap: canBlock ? `soakWithArmour('${a.id}')` : (canUse && d.use !== 'discharge') ? `useArmour('${a.id}')` : null,
-    });
-  }
   if (CLASS && CLASS.tokens) { const t = CLASS.tokens(); if (t) out.push(...t.filter(Boolean)); }
   // ---- ENGINE TOKENS: the one-shot boons and banes the road hands you ----
   if (S.paceBless > 0) out.push({ id: 'glimpse', icon: '🌙', name: 'Glimpse',
@@ -7890,6 +7874,56 @@ function fieldTokens() {
 }
 
 const stripTags = s => String(s).replace(/<[^>]*>/g, '');
+// 🛡️ THE EQUIPMENT RAIL — Flesh and Blood's zone layout, which is worth copying exactly:
+//     HEAD across the top · CHEST and ARMS side by side · LEGS below.
+// 🔑 SEPARATE FROM #field ON PURPOSE, and the line is clean: the FIELD holds what a TURN creates
+// and a turn consumes; the RAIL holds what you WEAR for the whole run. Two clocks, two places.
+// ⚠️ That does NOT reintroduce the two-ledger bug the field was built to kill — armour moved
+// wholesale, it is not drawn in both. Nothing here is duplicated anywhere else.
+// ⚠️ A zone you have not unlocked reads LOCKED, never empty. A locked thing you can see is a goal;
+// an empty box is a bug you go looking for.
+const RAIL_ORDER = ['Head', 'Chest', 'Arms', 'Legs'];
+function renderArmourRail() {
+  const el = $('armour-rail');
+  if (!el) return;
+  if (isShell() || !S || !S.deck) { el.className = ''; el.innerHTML = ''; return; }
+  const worn = {};
+  for (const a of (S.armour || [])) {
+    const d = armourDef(a.id); if (d) worn[d.slot] = a;
+  }
+  const openSlots = ARMOUR_SLOTS_OPEN;
+  let i = 0;
+  el.className = 'has-rail';
+  el.innerHTML = RAIL_ORDER.map(slot => {
+    const sl = ARMOUR_SLOTS[slot], a = worn[slot], open = i++ < openSlots;
+    if (!open) return `<div class="eq eq-${slot.toLowerCase()} is-locked">` +
+      `<div class="eq-zone">${sl.label}</div><div class="eq-lock">🔒</div></div>`;
+    if (!a) return `<div class="eq eq-${slot.toLowerCase()} is-empty">` +
+      `<div class="eq-zone">${sl.label}</div></div>`;
+    const d = armourDef(a.id), live = armourBlock(a), charges = armourUsesLeft(a);
+    const charging = !!d.charge;
+    const canBlock = S.phase === 'soak' && S.damage > 0 && a.wear > 0 && live > 0;
+    const canUse = isAssignPhase() && armourReady(a);
+    const n = charging ? (a.charge || 0) : d.block > 0 ? a.wear : charges;
+    const cap = charging ? d.charge : d.block > 0 ? 1 : (d.uses || 0);
+    const acts = (canUse && d.use === 'discharge')
+      ? `<div class="eq-acts"><button class="tok-act" onclick="useArmour('${a.id}','atk')">⚔️ +6</button>` +
+        `<button class="tok-act" onclick="useArmour('${a.id}','init')">💨 +6</button></div>` : '';
+    const tap = canBlock ? `soakWithArmour('${a.id}')` : (canUse && d.use !== 'discharge') ? `useArmour('${a.id}')` : null;
+    return `<div class="eq eq-${slot.toLowerCase()} rar-${d.rarity || 'common'}` +
+      `${tap ? ' is-ready' : ''}${(d.block > 0 && a.wear <= 0 && !charging) ? ' is-spent' : ''}"` +
+      (tap ? ` onclick="${tap}" role="button" tabindex="0"` : '') +
+      ` title="${stripTags(d.name + ' — ' + (d.text || 'no ability'))}">` +
+      `<div class="eq-zone">${sl.label}</div>` +
+      `<div class="eq-name">${d.name}</div>` +
+      `<div class="eq-block">${d.block > 0 ? 'blocks <b>' + d.block + '</b>' : '<span class="dim">no block</span>'}</div>` +
+      (cap ? `<div class="eq-pips">${pips(n, cap)}</div>` : '') +
+      (canBlock ? `<div class="eq-cue">tap to block</div>` : canUse && !acts ? `<div class="eq-cue">tap to use</div>` : '') +
+      acts +
+    `</div>`;
+  }).join('');
+}
+
 function renderField() {
   const el = $('field');
   if (!el) return;
