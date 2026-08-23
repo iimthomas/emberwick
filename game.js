@@ -2705,7 +2705,7 @@ function saveGame(key) {
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
-      loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked, goldEarned: S.goldEarned,
+      loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
@@ -2826,7 +2826,7 @@ function loadGame(key) {
       // 🛡️ filtered against the live table, so a piece removed in a later build cannot
       // resurrect as `undefined` and throw on armourBlock().
       loot: d.loot || {}, encountersDone: d.encountersDone || 0,
-      runBanked: !!d.runBanked, goldEarned: d.goldEarned || 0,
+      runBanked: !!d.runBanked,
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
@@ -2887,7 +2887,8 @@ const DEV_DECKS = {
 function stashLine() {
   const st = loadStash();
   const kinds = Object.keys(st.mats).filter(k => st.mats[k] > 0).length;
-  return `💰 ${st.gold} gold · ${kinds} kind${kinds === 1 ? '' : 's'} of material`;
+  const shards = st.mats.shard || 0;
+  return `🦴 ${shards} Bone Shard · ${kinds} kind${kinds === 1 ? '' : 's'} of material`;
 }
 function showStash() {
   S = S || {};
@@ -2923,7 +2924,7 @@ function stashHTML() {
           `<div class="stash-rate">${rate(m)}</div>` +
           // 💰 the release valve, on the object itself — never ask for a choice about a thing
           // without showing the thing.
-          (n > 0 ? `<button class="stash-sell" onclick="sellMat('${m.id}')">sell 1 → 💰 ${sellValue(m.id)}</button>` : '') +
+          (n > 0 && breakValue(m.id) > 0 ? `<button class="stash-sell" onclick="breakMat('${m.id}')">🔨 break 1 → 🦴 ${breakValue(m.id)}</button>` : '') +
           `</div>`;
       }).join('') + `</div>`;
   }
@@ -2944,15 +2945,16 @@ function stashHTML() {
           `<div class="stash-name">${d.name}</div>` +
           `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
           `<div class="stash-rate">${c.region} · certain on a clean kill</div>` +
-          (n > 0 ? `<button class="stash-sell" onclick="sellMat('${id}')">sell 1 → 💰 ${sellValue(id)}</button>` : '') +
+          (n > 0 ? `<button class="stash-sell" onclick="breakMat('${id}')">🔨 break 1 → 🦴 ${breakValue(id)}</button>` : '') +
           `</div>`;
       }).join('') + `</div>`;
   }
   return `<div class="phase-label">📦 STASH</div>` +
-    `<div class="stash"><div class="stash-gold">💰 <b>${st.gold}</b> gold` +
-    `<span class="dim"> · earned every run, win or lose</span></div>` +
+    `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
+    `<span class="dim"> · every recipe wants them, and even a lost encounter carves one</span></div>` +
     body +
-    `<p class="dev-note">⚒️ Spend these in <b>The Workshop</b>. Parts GATE a piece of armour; gold pays the fee.</p>` +
+    `<p class="dev-note">⚒️ Spend these in <b>The Workshop</b>. A named part GATES a piece; 🦴 Bone Shards pay for it. ` +
+    `🔨 Break down anything no recipe wants.</p>` +
     `<button onclick="showMenu()">← Menu</button></div>`;
 }
 
@@ -2966,7 +2968,7 @@ function stashHTML() {
 function showWorkshop() { S = S || {}; S.phase = 'workshop'; S.encounter = null; render(); }
 function workshopLine() {
   const st = loadStash();
-  return `💰 ${st.gold} gold · ${st.owned.length}/${ARMOUR.length} pieces forged`;
+  return `🦴 ${st.mats.shard || 0} Bone Shard · ${st.owned.length}/${ARMOUR.length} pieces forged`;
 }
 function pieceCardHTML(d, st, equipped) {
   const owned = st.owned.includes(d.id);
@@ -2981,8 +2983,8 @@ function pieceCardHTML(d, st, equipped) {
     foot = `<span class="wk-none">no recipe yet</span>`;
   } else {
     const chk = craftCheck(d.id);
-    const cost = `💰 ${r.gold}` + Object.keys(r.mats).map(m =>
-      ` · ${matDef(m).icon} ${r.mats[m]} ${matDef(m).name}`).join('');
+    const cost = Object.keys(r.mats).map(m =>
+      `${matDef(m).icon} ${r.mats[m]} ${matDef(m).name}`).join(' · ');
     foot = `<div class="wk-cost">${cost}</div>` + (chk.ok
       ? `<button class="wk-btn craft" onclick="craftPiece('${d.id}')">⚒️ Forge it</button>`
       : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`);
@@ -3013,11 +3015,11 @@ function workshopHTML() {
       `<div class="wk-grid">` + list.map(d => pieceCardHTML(d, st, worn.includes(d.id))).join('') + `</div>`;
   }
   return `<div class="phase-label">⚒️ THE WORKSHOP</div>` +
-    `<div class="stash"><div class="stash-gold">💰 <b>${st.gold}</b> gold` +
+    `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
     `<span class="dim"> · ${st.owned.length} of ${ARMOUR.length} pieces forged</span></div>` +
     body +
     `<p class="dev-note">🏆 A worn piece needs a part from ONE great beast — that is the reason to ` +
-    `go to its region. 📦 Sell what no recipe wants in the Stash.</p>` +
+    `go to its region. 🔨 Break down what no recipe wants in the Stash.</p>` +
     `<button onclick="showMenu()">← Menu</button></div>`;
 }
 
@@ -3491,7 +3493,7 @@ function freshGame(stage) {
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
-    loot: {}, encountersDone: 0, runBanked: false, goldEarned: 0,
+    loot: {}, encountersDone: 0, runBanked: false,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -5719,26 +5721,28 @@ const ARMOUR = [
 // PERSISTENCE, and persistence is what the measurement says is expensive.
 const RECIPE = {
   // 💥 basic — one run's worth. The gear you have while you are still learning the road.
-  hood:     { gold: 60,  mats: { shard: 4 } },
-  kiln:     { gold: 60,  mats: { shard: 4 } },
-  vambrace: { gold: 60,  mats: { shard: 4 } },
-  boots:    { gold: 60,  mats: { shard: 4 } },
+  hood:     { mats: { shard: 8 } },
+  kiln:     { mats: { shard: 8 } },
+  vambrace: { mats: { shard: 8 } },
+  boots:    { mats: { shard: 8 } },
   // 💥 with an ability — two or three runs, and it names a SHAPE, so the candle points at it
-  visor:    { gold: 140, mats: { shard: 6, quill: 2 } },
-  tithe:    { gold: 140, mats: { shard: 6, slag: 2 } },
-  bracers:  { gold: 140, mats: { shard: 6, slag: 2 } },
-  sandals:  { gold: 140, mats: { shard: 6, quill: 2 } },
+  visor:    { mats: { shard: 14, quill: 2 } },
+  tithe:    { mats: { shard: 14, slag: 2 } },
+  bracers:  { mats: { shard: 14, slag: 2 } },
+  sandals:  { mats: { shard: 14, quill: 2 } },
   // 🩹 worn — the hunt. Each names ONE great beast, so each is a reason to go somewhere.
-  circlet:  { gold: 320, mats: { shard: 10, quill: 3, 'p:Stormcrown Roc': 1 } },
-  cuirass:  { gold: 360, mats: { shard: 12, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
-  greaves:  { gold: 320, mats: { shard: 10, hide: 1, 'p:Scarp Ram': 1 } },
-  wraps:    { gold: 300, mats: { shard: 8, sinew: 2, 'p:Cinderjaw': 1 } },
+  circlet:  { mats: { shard: 20, quill: 3, 'p:Stormcrown Roc': 1 } },
+  cuirass:  { mats: { shard: 24, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
+  greaves:  { mats: { shard: 20, hide: 1, 'p:Scarp Ram': 1 } },
+  wraps:    { mats: { shard: 18, sinew: 2, 'p:Cinderjaw': 1 } },
 };
-// 💰 WHAT A MATERIAL SELLS FOR. 🔑 THE RELEASE VALVE, and Monster Hunter needs one for the same
-// reason we do: you will always own piles of things no recipe names. Junk you can sell is a
-// consolation; junk you cannot is a longer list.
-const SELL = { common: 5, shape: 20, elite: 40, signature: 60, rare: 150, dragon: 80 };
-const sellValue = id => { const d = matDef(id); return d ? (SELL[d.tier] || 5) : 0; };
+// 🔨 BREAKING DOWN — the release valve, and it pays in the same material every recipe eats.
+// 🔑 Monster Hunter needs one for the same reason we do: you will always own piles of things no
+// recipe names. Junk you can break down is a consolation; junk you cannot is a longer list.
+// ⚠️ It is BREAKING DOWN, not SELLING — there is no merchant in a workshop, and "sell" was the
+// last word left implying a second economy.
+const BREAK_INTO = { shape: 3, elite: 5, signature: 8, rare: 20, dragon: 10 };
+const breakValue = id => { const d = matDef(id); return d && d.tier !== 'common' ? (BREAK_INTO[d.tier] || 0) : 0; };
 
 // ⚒️ can this be made right now, and if not, WHAT is missing? ⚠️ Returns the shortfall rather than
 // a boolean — *a picker must never offer what it cannot act on*, and "you need 2 more Windquill"
@@ -5747,7 +5751,6 @@ function craftCheck(pieceId) {
   const r = RECIPE[pieceId]; if (!r) return { ok: false, missing: ['no recipe'] };
   const st = loadStash();
   const missing = [];
-  if (st.gold < r.gold) missing.push(`💰 ${r.gold - st.gold} more gold`);
   for (const m in r.mats) {
     const have = st.mats[m] || 0;
     if (have < r.mats[m]) missing.push(`${matDef(m).icon} ${r.mats[m] - have} more ${matDef(m).name}`);
@@ -5758,16 +5761,16 @@ function craftPiece(pieceId) {
   const r = RECIPE[pieceId]; if (!r || !craftCheck(pieceId).ok) return;
   const st = loadStash();
   if (st.owned.includes(pieceId)) return;      // one of each, for now
-  st.gold -= r.gold;
   for (const m in r.mats) st.mats[m] -= r.mats[m];
   st.owned.push(pieceId);
   saveStash(st);
   render();
 }
-function sellMat(id) {
+function breakMat(id) {
   const st = loadStash();
-  if (!(st.mats[id] > 0)) return;
-  st.mats[id]--; st.gold += sellValue(id);
+  const worth = breakValue(id);
+  if (!(st.mats[id] > 0) || worth <= 0) return;
+  st.mats[id]--; st.mats.shard = (st.mats.shard || 0) + worth;
   saveStash(st);
   render();
 }
@@ -6004,13 +6007,22 @@ const SHAPE_MAT = { armour: 'slag', evasion: 'quill', guard: 'hide' };
 // is the difference between a plan and a fruit machine.
 const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 1, narrowSignature: 0.4 };
 
-// 💰 GOLD — the meta currency, earned EVERY run, win or lose.
-// 🔴 THIS IS THE "A LOSS MUST PAY" FIX and it is the load-bearing half of the whole meta layer.
-// ⚠️ Parts GATE a piece; gold GREASES it. Crafting from drops alone would mean a run that ends
-// early gives you nothing at all — which is exactly the problem this layer exists to solve.
-// ⚠️ It is NOT 🪙 coins. Coins are spent inside a run and die with it; gold survives the run.
-const GOLD_PER_ENCOUNTER = 10;
-const GOLD_FOR_THE_KILL = 60;
+// 🪙 THERE IS ONLY ONE MONEY, AND IT DIES WITH THE RUN (2026-08-23).
+// Thomas: *"is it too confusing that you get gold during the run for card upgrades and stuff, but
+// also gold for progression"*. Yes — and the fix is deletion, not a rename.
+//
+// 🔴 THE TWO CURRENCIES DIFFERED ONLY IN A PROPERTY YOU COULD NOT SEE. Both were earned from
+// encounters, both were drawn as money, and the one distinction — that one survives the run — is
+// invisible at the moment you look at either number. Calling the second "scrip" or "cinders" would
+// have been a different word for the same confusion.
+//
+// 🔑 HADES IS THE MODEL HERE, NOT MONSTER HUNTER. It also has an in-run currency that dies
+// (obols), and its meta currencies are deliberately NOT money: Darkness, Keys, Nectar, Titan
+// Blood. A different KIND of thing cannot be mistaken for the thing that dies.
+//
+// ✅ AND WE ALREADY HAD ONE. 🦴 Bone Shard drops ~7 a run from everything and is what every recipe
+// wants in bulk — it was always the fee. The meta economy is MATERIALS, full stop: parts gate a
+// piece, shards pay for it, and 🪙 coins mean exactly one thing again.
 
 // 📦 THE STASH — everything that survives a run. Its own key, like the ladder and the grades.
 const STASH_KEY = 'emberwick-stash-1' + KEY_NS;
@@ -6023,10 +6035,10 @@ function loadStash() {
     // an empty loadout and a fresh run wore nothing — with no error anywhere.
     // 🔑 A whitelisting reader is the right shape (it is what keeps a corrupt stash from
     // crashing the menu), but it means ADDING A FIELD IS TWO EDITS, and the second one is silent.
-    return { gold: d.gold || 0, mats: d.mats || {},
+    return { mats: d.mats || {},
              owned: Array.isArray(d.owned) ? d.owned : [],
              loadout: Array.isArray(d.loadout) ? d.loadout : [] };
-  } catch (e) { return { gold: 0, mats: {}, owned: [], loadout: [] }; }
+  } catch (e) { return { mats: {}, owned: [], loadout: [] }; }
 }
 function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -6035,7 +6047,7 @@ function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st
 // stays detachable, which is the whole insurance policy for the Godot port.
 function rollDrops(e, outcome) {
   const bag = {};
-  if (!e || outcome === 'Loss') return bag;          // a loss carves nothing
+  if (!e) return bag;
   const add = (id, n) => { if (n > 0) bag[id] = (bag[id] || 0) + n; };
   const clean = outcome === 'Complete';
   if (e.dragon) {
@@ -6046,7 +6058,11 @@ function rollDrops(e, outcome) {
     return bag;
   }
   if (e.type !== 'fight') return bag;                // a road is walked, not carved
+  // 🔑 EVEN A LOSS CARVES ONE, and that single number carries the whole "a loss must pay"
+  // principle: if a bad run yields nothing, losing is wasted time and the grind punishes whoever
+  // needs it most. ⚠️ It is what replaces the flat per-run gold that used to guarantee a floor.
   add('shard', clean ? 2 : 1);
+  if (outcome === 'Loss') return bag;                // ...but nothing else — no shape part, no trophy
   // 🏆 the signature part — the reason to come to THIS region for THIS beast.
   // 🔑 CERTAIN ON A CLEAN KILL, and that is the design, not generosity: there is one quarry per
   // region, so *"I need 3 Mist Crane Plumes, so that is 3 clean kills"* is a COUNTABLE plan. A
@@ -6083,11 +6099,8 @@ function bankRun(won) {
   if (S.runBanked) return;                            // a run banks exactly once
   S.runBanked = true;
   const st = loadStash();
-  const gold = (S.encountersDone || 0) * GOLD_PER_ENCOUNTER + (won ? GOLD_FOR_THE_KILL : 0);
-  st.gold += gold;
   for (const id in (S.loot || {})) st.mats[id] = (st.mats[id] || 0) + S.loot[id];
   saveStash(st);
-  S.goldEarned = gold;
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -7425,15 +7438,14 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // is only worth anything if you can SEE that it paid, in the same breath as being told you died.
 function haulHTML() {
   const ids = Object.keys(S.loot || {});
-  if (!ids.length && !S.goldEarned) return '';
+  if (!ids.length) return '';
   const rows = ids.map(id => {
     const m = matDef(id); if (!m) return '';
     return `<span class="haul-mat">${m.icon} ${m.name} <b>×${S.loot[id]}</b></span>`;
   }).join('');
   return `<div class="haul"><div class="haul-lab">🧰 CARRIED OUT</div>` +
-    (S.goldEarned ? `<div class="haul-gold">💰 <b>${S.goldEarned}</b> gold` +
-      `<span class="dim"> · ${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'}` +
-      `${S.phase === 'victory' ? ' + the kill' : ''}</span></div>` : '') +
+    `<div class="haul-gold">${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'} walked` +
+      `${S.phase === 'victory' ? ' · and the beast felled' : ''}</div>` +
     (rows ? `<div class="haul-mats">${rows}</div>` : `<div class="haul-none">nothing carved</div>`) +
     `<div class="haul-note">it is in your 📦 Stash</div></div>`;
 }
