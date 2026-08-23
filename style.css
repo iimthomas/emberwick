@@ -1040,21 +1040,13 @@ button.stage.locked .stage-shape { font-style: italic; }
 .card-el-Lightning .card-type { color: #f0d84e; }
 .card-el-Stone .card-type     { color: #b9b5ae; }
 
-/* 👁️ THE FACING BAR - the encounter's demands, restated where the decision is.
-   ⚠️ It sits directly above Resolve on purpose. The encounter panel is 422px away in the
-   opposite corner at 11px, which is why Thomas kept resolving journeys without reading them.
-   Bigger type than the panel it echoes: this is the copy you are meant to read at a glance. */
-.facing-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  margin: 0 0 8px; padding: 8px 10px; border-radius: 8px;
-  background: rgba(10,8,6,.72); border: 1px solid rgba(201,180,88,.30);
-  border-left: 3px solid #c9b458; }
-.facing-lab { font-size: 12.5px; font-weight: 700; color: #f0e2c6; letter-spacing: .02em;
-  margin-right: 2px; }
-.fc { font-size: 12.5px; padding: 2px 7px; border-radius: 5px; background: rgba(0,0,0,.38);
-  border: 1px solid rgba(255,255,255,.10); color: #e6e2d8; font-variant-numeric: tabular-nums; }
-.fc.need  { color: #f0e2c6; border-color: rgba(201,180,88,.45); }
-.fc.bad   { color: #e08a7a; border-color: rgba(224,138,122,.40); }
-.fc.shape { color: #f0a86a; border-color: rgba(240,168,106,.45); }
+/* ❌ THE FACING BAR IS GONE (2026-08-23, Thomas: *"lets remove the 2nd encounter info from the
+   phase box, think it just makes our screen too busy now, lets just keep the one in the top left"*).
+   ⚠️ KEEPING THE HISTORY, because it was not decoration: this bar existed to fix a real bug he
+   reported — the encounter panel sat across the stage from the Resolve button and *"Thomas kept
+   resolving journeys without reading them"*. The duplicate was the cheap fix.
+   🔑 IF THAT COMES BACK, THE ANSWER IS TO MAKE THE TOP-LEFT PANEL LOUDER, NOT TO PRINT IT
+   TWICE. Two copies of one fact is what made the screen busy enough to be worth removing. */
 .fc .dim  { color: #8a8577; font-weight: 400; }
 .pip-on  { color: #f0a86a; letter-spacing: 1px; }
 .pip-off { color: #4a4436; letter-spacing: 1px; }

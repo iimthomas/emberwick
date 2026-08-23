@@ -158,7 +158,6 @@ const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so i
 const REGION_ENCOUNTERS = 4;
 const REGION_END_THRESHOLD = 5;  // safety net: a deck this thin can't fill a hand
 const KO_DECK_DISCARD = 4;       // knocked out: also discard this many from deck
-const MAX_DIVERTS = 2;           // diverts allowed before you must face an encounter
 
 // BEATS CUT 2026-07-26. A creature is ONE hand again. Per-creature beat counts were arbitrary
 // (nothing said a toad took one exchange and an ape took two), and the pile's depth decision
@@ -3448,8 +3447,9 @@ function freshGame(stage) {
     poison: 0,           // damage owed to the NEXT drawn hand
     afterSoak: 'upgrade', // where the soak phase exits to: 'upgrade' | 'turnEnd'
     assign: { Spell: null, Element: null, Boost: null, Reserve: null }, // card ids
-    divertsUsed: 0,   // resets every time an encounter is actually faced
-    diverting: false, // true while choosing which hand card to discard
+    // ❌ DEAD since 2026-08-23 — ↩️ Divert was deleted (the map made it redundant). Kept in the
+    // shape only so a save written before that still loads.
+    divertsUsed: 0, diverting: false,
     boostTarget: 'Attack',
     coins: 0,          // ROLLS OVER between encounters — the run-layer currency
     charms: [],        // ids of Charms held this run (run-long passives)
@@ -4467,7 +4467,7 @@ function takeMapNode(f, c) {
   // top the hand up on every node - several events and the hearth can thin it
   if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
-  S.divertsUsed = 0; S.diverting = false; S.loseReserve = null;
+  S.loseReserve = null;
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
@@ -4632,7 +4632,7 @@ function takeFork(i) {
 function drawEncounter(avoidType, elite) {
   const region = RUN()[S.region - 1];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
-  // normal turns take the next in the shuffled bag; Divert steers toward a DIFFERENT
+  // normal turns take the next in the shuffled bag; a caller may steer toward a DIFFERENT
   // type (its whole purpose) — falling back to next-in-bag only if the bag has no other type left.
   let idx = 0;
   if (avoidType) {
@@ -4646,7 +4646,7 @@ function drawEncounter(avoidType, elite) {
 }
 
 // 🛤️ EVERYTHING THAT HAPPENS ONCE AN ENCOUNTER IS SETTLED - split out of drawEncounter so the
-// ↩️ Divert path, the ordinary draw and the FORK all run the identical setup.
+// ⚠️ Every path into an encounter runs the identical setup — that is the point of this function.
 // ⚠️ The hardship is rolled HERE, i.e. AFTER the branch is chosen. Rolling it per-branch at offer
 // time would double the rolls and let a player shop for a hardship-free road, which turns a risk
 // into a filter - the *"a hardship must stay a risk, not become a tax"* rule, from the other side.
@@ -4810,7 +4810,7 @@ function nextTurn() {
   else {
     offerFork();
     S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
-    S.divertsUsed = 0; S.diverting = false; S.loseReserve = null;
+    S.loseReserve = null;
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
@@ -4822,8 +4822,6 @@ function nextTurn() {
     return;
   }
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
-  S.divertsUsed = 0;
-  S.diverting = false;
   S.loseReserve = null;
   S.afterSoak = 'upgrade';
   // coins roll over between turns — deliberately NOT reset
@@ -4843,34 +4841,22 @@ function nextTurn() {
   render();
 }
 
-// ---------- Divert (Challenge Phase, optional) ----------
-function canDivert() {
-  return S.phase === 'assign' && !S.finalMode && S.divertsUsed < MAX_DIVERTS && S.deck.length > 0;
-}
+// ❌ ↩️ DIVERT IS DELETED (2026-08-23, Thomas: *"i think we can remove our divert option
+// completely now. it was only because we had no choice in our encounters, its redundant now with
+// our new map layer"*).
+// 🔑 HE IS EXACTLY RIGHT ABOUT WHY. Divert existed to answer *"this encounter is wrong for my
+// hand and I cannot do anything about it"* — a problem that only existed while encounters came out
+// of a shuffled bag. The 🗺️ map answers it properly: you now pick your node, seeing its type, with
+// the 🕯️ candle telling you what is in reach. **Divert was a paid apology for a choice the player
+// did not have, and the map gave them the choice.**
+// ⚠️ THE STANDING RULE APPLIES TO THE WHOLE FEATURE, NOT JUST THE BUTTON: *when a rule is cut, the
+// same commit removes its display.* So the button, the picker phase, the log line and the how-to
+// sentence all go with it. `divertsUsed` / `diverting` survive ONLY in the save schema so older
+// saves still load.
+// 📏 And it takes MAX_DIVERTS with it — a constant that named a rule nobody can invoke is exactly
+// the dead data this project keeps finding.
 
-function beginDivert() { if (canDivert()) { S.diverting = true; render(); } }
-function cancelDivert() { S.diverting = false; render(); }
 
-function divertWith(cardId) {
-  if (!S.diverting || !canDivert()) return;
-  const card = cardById(cardId);
-  if (!card) return;
-  for (const z of ZONES) if (S.assign[z] === cardId) S.assign[z] = null;
-  S.assign.Reserve = null; // hand shrank — reserve re-normalizes (or is gone)
-  S.hand = S.hand.filter(c => c.id !== cardId);
-  S.discard.push(card);
-  const key = S.deck.shift();
-  S.discard.push(key);
-  S.divertsUsed++;
-  S.diverting = false;
-  const skipped = S.encounter.name;
-  const skippedType = S.encounter.type;
-  drawEncounter(skippedType); // steer toward a different encounter type
-  const swapped = S.encounter.type !== skippedType;
-  log(`DIVERT: skipped ${skipped} — burned ${key.def.name} off the top of the deck + ${card.def.name} from hand → ${swapped ? `now a ${S.encounter.type}` : `still a ${S.encounter.type} (no other type left in this stretch)`} (${MAX_DIVERTS - S.divertsUsed} divert${MAX_DIVERTS - S.divertsUsed === 1 ? '' : 's'} left)`, 'bad');
-  logChallenge();
-  render();
-}
 
 // ---------- drag & drop assignment ----------
 let dragId = null;
@@ -4901,7 +4887,7 @@ function dropOn(ev, zone) {
 
 // ---------- the slot row: select a card, then swap it with another (or with a role) ----------
 function tapCard(id) {
-  if (!isAssignPhase() || S.diverting) return;
+  if (!isAssignPhase()) return;
   // a card is already picked up → tapping a second card SWAPS the two
   if (S.selectedId != null && S.selectedId !== id) {
     swapCards(S.selectedId, id);
@@ -8363,13 +8349,6 @@ function renderControls() {
       `<div class="fork-row">${f.map((e, i) => forkBranchHTML(e, i)).join('')}</div>`;
     return;
   }
-  if (S.phase === 'assign' && S.diverting) {
-    c.innerHTML =
-      `<div class="phase-label">PHASE 1 — CHALLENGE · DIVERT</div>` +
-      `<div class="hint">Choose a hand card to discard. The top of the deck (<b>${S.deck[0].def.name}</b>) burns with it, and a new encounter — of a <b>different type</b> (${S.encounter.type === 'fight' ? 'a journey' : 'a fight'}, if one remains) — is revealed.</div>` +
-      `<button onclick="cancelDivert()">Cancel — face ${S.encounter.name}</button>`;
-    return;
-  }
   // ⚠️ A TURN WITHOUT AN ENCOUNTER IS A BUG, BUT IT MUST NOT BE A BLANK SCREEN. Reading
   // `S.encounter.type` blind is what turned one sequencing slip into a frozen game.
   if (S.phase === 'assign' && !S.encounter) {
@@ -8414,34 +8393,7 @@ function renderControls() {
     // bigger panel on the far side of the screen.
     // ⚠️ TERMS ONLY, NEVER THE OUTCOME. Live preview was removed deliberately and stays removed:
     // this says what the encounter DEMANDS, never what your arrangement would do about it.
-    const facing = (() => {
-      // ⚠️ `e` is NOT in scope here - renderControls has no local encounter, and the `const e`
-      // a few lines up belongs to renderEncounter. Read S.encounter directly.
-      const e = S.encounter;
-      if (S.finalMode || !e) return '';
-      const chip = (t, cls) => `<span class="fc ${cls || ''}">${t}</span>`;
-      const bits = [];
-      if (e.type === 'journey') {
-        bits.push(chip(`👣 MP <b>${e.mp}</b> <span class="dim">(half ${Math.ceil(e.mp / 2)})</span>`, 'need'));
-        if (e.nightfall) bits.push(chip(`🌑 Nightfall <b>${e.nightfall}</b>`, 'bad'));
-        if (e.timePenalty) bits.push(chip(`⏳ Time <b>${e.timePenalty}</b>`, 'bad'));
-        if (e.peril) bits.push(chip(`⛰️ ${e.peril}`, 'bad'));
-      } else {
-        bits.push(chip(`❤️ <b>${e.hp}</b> <span class="dim">(half ${Math.ceil(e.hp / 2)})</span>`, 'need'));
-        bits.push(chip(`💨 <b>${e.init}</b>`));
-        bits.push(chip(`⚔️ <b>${e.atk}</b>`, 'bad'));
-        if (shapesOf(e).length) bits.push(chip(shapeText(e), 'shape'));
-        if (e.ability) bits.push(chip(`☠️ ${e.ability}`, 'bad'));
-      }
-      if (S.hardship) bits.push(chip(`⚠️ ${S.hardship}`, 'bad'));
-      // the chips already carry the icons - repeating one in the label just doubles it
-      return `<div class="facing-bar"><span class="facing-lab">${e.name}</span>${bits.join('')}</div>`;
-    })();
 
-    // Divert only makes sense before the first blow is struck
-    const divertBtn = S.finalMode ? '' :
-      `<button onclick="beginDivert()" ${canDivert() ? '' : 'disabled'} title="Burn the top deck card + 1 hand card to swap this encounter for one of a different type">` +
-      `Divert to a ${S.encounter.type === 'fight' ? 'journey' : 'fight'} (${MAX_DIVERTS - S.divertsUsed} left${S.deck.length === 0 ? ' — deck empty' : ` — burns ${S.deck[0].def.name}`})</button>`;
     // the how-to text is tucked into a collapsed toggle at the bottom — out of the way each turn,
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
@@ -8490,9 +8442,7 @@ function renderControls() {
       bankRowHTML() +
       strikePromptHTML() +
       boostRow +
-      facing +
       resolveBtn +
-      divertBtn +
       howto;
   } else if (S.phase === 'reveal') {
     const beat = S.beats[S.beatIndex];
@@ -9068,7 +9018,7 @@ function bankRowHTML() {
     // exactly backwards as a teaching line, since the point of a proportional bonus is that the
     // BIG Surge is the one worth channelling. The two numbers are already on screen above; this
     // slot should say WHEN, not restate WHAT.
-    `<span class="wake-note">${on ? 'nothing this turn' : 'half again as much, if you can wait a turn'}</span></div>`;
+    `<span class="wake-note">${on ? 'nothing this turn' : 'one bigger blow next turn — and 🛡️ Armour only subtracts once'}</span></div>`;
 }
 
 // a one-word mark of the card's fate, shown on the card itself during the action phase
@@ -9201,10 +9151,7 @@ function cardHTML(card) {
   const forged = '';
 
   let action = '';
-  if (S.diverting) {
-    action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
-
-    } else if (isAssignPhase() && S.potionPick) {
+  if (isAssignPhase() && S.potionPick) {
     // ⚠️ A PICKER MUST NEVER OFFER WHAT IT CANNOT ACT ON — same rule the event pickers learned.
     const p = potionById(S.potionPick);
     action = potionCan(p, card)
@@ -9523,7 +9470,6 @@ function startLastMile() {
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Move';
   S.hardship = null; S.rangedDodge = false;
-  S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
@@ -9686,7 +9632,6 @@ function startDuelBeat() {
     init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
-  S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
