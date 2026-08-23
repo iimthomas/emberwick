@@ -8045,11 +8045,30 @@ function cardHTML(card) {
   const verb = verbOf(card);
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
   const fate = (isAssignPhase() && slot) ? fateOf(slot, card.id) : null;
-  // ⚖️🐌 name the barred card outright — "your heaviest" is not something you can read off a row
-  const barred = isAssignPhase() && S.hardship
-    ? (placementBan(card.id, 'Spell') ? '⚖️ too heavy for the SPELL'
-      : placementBan(card.id, 'Element') ? '🐌 too fast for the CATALYST' : null)
-    : null;
+  // ⚖️🐌🌀 name the barred card outright — "your heaviest" is not something you can read off a row.
+  //
+  // 🐛 THIS SAID THE WRONG RULE, AND SAID IT ABOUT A CARD THAT WAS CORRECTLY PLACED (2026-08-22,
+  // found in play). It hard-coded 🐌 Mire's wording for ANY ban on the Catalyst — so under
+  // 🌀 Vertigo, which bars the fastest card from every slot EXCEPT the Spell, the card sitting
+  // happily in the Spell announced *"too fast for the CATALYST"*. Two faults at once:
+  //   1. it stated Mire's rule while Vertigo was the one in force, and
+  //   2. it warned about a card that was exactly where the hardship wanted it.
+  // 🔑 A MARKER EXISTS TO TELL YOU SOMETHING YOU NEED. One that fires on a correct placement reads
+  // as an error and teaches the player to ignore the label — worse than no label at all.
+  // ⚠️ So it asks which zones are ACTUALLY banned right now and phrases from that, rather than
+  // guessing the hardship from a single probe.
+  const barred = (() => {
+    if (!isAssignPhase() || !S.hardship) return null;
+    const banned = ZONES.filter(z => placementBan(card.id, z));
+    if (!banned.length) return null;
+    const here = zoneOf(card.id);
+    // pinned to one slot (🌀 Vertigo) — say nothing once it is there; there is nothing to warn about
+    const allowed = ZONES.filter(z => !banned.includes(z));
+    if (allowed.length === 1) return here === allowed[0] ? null : `🌀 must be your ${SLOT_LABEL[allowed[0]].toUpperCase()}`;
+    if (banned.includes('Spell')) return '⚖️ too heavy for the SPELL';
+    if (banned.includes('Element')) return `🐌 too fast for the ${SLOT_LABEL.Element.toUpperCase()}`;
+    return `⚠️ barred from the ${SLOT_LABEL[banned[0]].toUpperCase()}`;
+  })();
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
   const isMate = pairMateId() === card.id;
   const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') +
