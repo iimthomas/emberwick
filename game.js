@@ -1856,7 +1856,7 @@ const TUTORIAL = {
             '• <b>Narrow</b> — you reach <b>half</b> its HP. You still get past it, but it <b>hits back for its ⚔️</b>.<br>' +
             '• <b>Loss</b> — below half. It hits back and you gain nothing. <i>You still move on</i> — an encounter is never the end of your run.<br><br>' +
             '<b>💨 And the race is separate.</b> If your Catalyst is slower than its 💨, it <b>bites first for its ⚔️</b> — even if your blow then kills it. Speed is not damage; it is whether you get hurt on the way in.<br><br>' +
-            'Each creature also defends with a <b>shape</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
+            'Each creature also has a <b>defence</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
     { title: '👣 A journey asks for distance',
       body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
             '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. You do not bleed; you lose the cards you were about to draw. <i>(Only if your deck is already empty does it become damage.)</i><br><br>' +
@@ -1869,7 +1869,7 @@ const TUTORIAL = {
             '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
             '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
             'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
-            'You will lose runs. That is the game working — you learn the shapes, unlock more, and come back.' },
+            'You will lose runs. That is the game working — you learn the defences, unlock more, and come back.' },
   ],
   // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
   // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
@@ -1900,8 +1900,8 @@ const TUTORIAL = {
             'You pay that in <b>cards</b>, so a small number is not a small thing.' },
     { id: 'f-shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
       point: '#encounter-panel .enc-stats span:nth-child(4)',
-      text: 'Its <b>shape</b> is how it defends. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
-            '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The shape decides what your turn should be.' },
+      text: 'Its <b>defence</b> is how it protects itself. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
+            '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The defence decides what your turn should be.' },
     { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(5)',
       text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
@@ -1930,7 +1930,7 @@ const TUTORIAL = {
     // decides whether banking is informed or a bet, and nothing had ever named it.
     { id: 'candle', when: () => isAssignPhase() && S.candle && !!nextEncounter(),
       point: '.candle',
-      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its shape. ' +
+      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its defence. ' +
             'Plan two encounters, not one.' },
     { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
       point: '.candle',
@@ -2908,17 +2908,19 @@ function shapeTagOf(c) {
 }
 function stashHTML() {
   const st = loadStash();
-  const TIER = { common: 'Common', shape: 'From a shape', elite: 'From the dangerous', rare: 'Rare', dragon: 'From a dragon' };
+  // 🔑 TWO SECTIONS, NOT NINE (Thomas: *"the stash probably shouldn't be categorized that
+  // specifically as well, its a bit too busy"*). Five material tiers and four road headings meant
+  // nine headings over 74 cards, and every card already says where it comes from — the headings
+  // were restating what was written six lines below them.
   const rate = m => m.tier === 'shape' ? `${Math.round(DROP_RATE.shape * 100)}% on a clean win · ${Math.round(DROP_RATE.narrowShape * 100)}% on a scrape`
     : m.tier === 'common' ? '2 on a clean win · 1 on a scrape'
     : m.tier === 'elite' ? 'always — if you survive one'
     : m.tier === 'rare' ? `${Math.round(DROP_RATE.heart * 100)}% when a dragon falls`
     : '2 when it falls';
   let body = '';
-  for (const t of ['common', 'shape', 'elite', 'rare', 'dragon']) {
-    const list = MATERIALS.filter(m => m.tier === t);
-    if (!list.length) continue;
-    body += `<div class="stash-tier">${TIER[t]}</div><div class="stash-grid">` +
+  {
+    const list = MATERIALS;
+    body += `<div class="stash-tier">Materials<span class="stash-tally">${list.filter(m => st.mats[m.id] > 0).length}/${list.length}</span></div><div class="stash-grid">` +
       list.map(m => {
         const n = st.mats[m.id] || 0;
         return `<div class="stash-mat${n ? '' : ' is-none'}">` +
@@ -2936,19 +2938,19 @@ function stashHTML() {
   // creature lives on is the ONE fact a hunt needs and the game never told you; the candle can
   // only say what is on the next node, which is no use for deciding where to GO.
   const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
-  for (const stage of [1, 2, 3, 4]) {
-    const list = Object.values(CREATURE_INDEX).filter(c => c.road === stage && c.quarry);
-    if (!list.length) continue;
+  {
+    const list = Object.values(CREATURE_INDEX).filter(c => c.quarry)
+      .sort((a, b) => a.road - b.road);
     const owned = list.filter(c => st.mats[partIdOf(c.name)] > 0).length;
-    body += `<div class="stash-tier">🏆 ${ROAD_NAME[stage] || 'Road ' + stage}` +
-      `<span class="stash-tally">${owned}/${list.length}</span></div><div class="stash-grid">` +
+    body += `<div class="stash-tier">🏆 Trophies<span class="stash-tally">${owned}/${list.length}</span></div>` +
+      `<div class="stash-grid">` +
       list.map(c => {
         const id = partIdOf(c.name), n = st.mats[id] || 0, d = matDef(id);
         return `<div class="stash-mat${n ? '' : ' is-none'}">` +
           `<div class="stash-head"><span class="stash-icon">🏆</span><span class="stash-n">×${n}</span></div>` +
           `<div class="stash-name">${d.name}</div>` +
           `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
-          `<div class="stash-rate">${c.region} · certain on a clean kill</div>` +
+          `<div class="stash-rate">${ROAD_NAME[c.road]} · ${c.region}</div>` +
           (n > 0 ? `<button class="stash-sell" onclick="breakMat('${id}')">🔨 break 1 → 🦴 ${breakValue(id)}</button>` : '') +
           `</div>`;
       }).join('') + `</div>`;

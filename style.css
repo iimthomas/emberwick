@@ -1334,6 +1334,35 @@ body.modal-open #modal-layer { display: flex; align-items: flex-start; justify-c
 #modal-panel .hint { margin-bottom: 12px; }
 #modal-panel button { font-size: 1em; padding: 11px 14px; }
 
+/* 🚪 SHELL SCREENS ARE A BIG PANEL, not a narrow strip (2026-08-23, Thomas: *"we can also make
+   these windows bigger, for the stash and workshop and stuff. make it popup kinda like the map
+   layer pop up"*).
+   🔑 A SHELL SCREEN HAS NO HAND TO PROTECT, which is the entire reason #modal-panel is top-anchored
+   and height-capped. Outside a run there are no cards underneath, so these can take the screen —
+   the Stash holds 74 cards and the Workshop 15, and both were being poured through a column sized
+   for three buttons.
+   ⚠️ CSS ONLY, no render changes: every shell phase (menu · stash · workshop · collection ·
+   ladder · dev) already draws into #controls-panel, so they all widen at once. */
+body.shell #controls-panel {
+  width: min(1180px, calc(100vw - 28px));
+  margin: 2.5vh auto;
+  max-height: 92vh; overflow-y: auto; overscroll-behavior: contain;
+  background: linear-gradient(#232019, #17150f);
+  border: 1px solid #574a39; border-radius: 16px;
+  box-shadow: 0 26px 70px rgba(0,0,0,.66), 0 0 0 1px rgba(255,220,160,.06) inset;
+  padding: 22px 26px 26px;
+}
+body.shell #controls-panel .phase-label {
+  font-size: 1.02em; letter-spacing: .10em; margin: 0 0 14px;
+  color: #f0d9a8; border-bottom: 1px solid #453a2c; padding-bottom: 9px;
+}
+/* ⚠️ the inner wrappers were capped for the narrow column and would have kept it narrow */
+body.shell .stash { max-width: none; }
+@media (max-width: 700px) {
+  body.shell #controls-panel { width: 100%; margin: 0; max-height: none;
+    border: 0; border-radius: 0; box-shadow: none; padding: 14px 12px 18px; }
+}
+
 /* ⚠️ NO z-index LIFT ON THE HAND - it was tried and it cannot work (see #modal-layer above).
    The overlay is intangible instead, so the hand is reachable without touching stacking at all. */
 /* the empty strip must not hold space while its contents are in the modal */
