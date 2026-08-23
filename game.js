@@ -64,7 +64,18 @@ let ATTUNE_BONUS = 2;
 // [[Levelling_As_Sharpening]] says a level makes a card MORE ITSELF. A flat gap meant sharpening
 // made her blades strong enough UNPAID, which dulls the one rule the class is built on. The spike
 // and the payoff have to climb together or the payoff is a Lv1 mechanic you outgrow.
-let PAID_STEP = 2;
+// ⚡ PAID_STEP 2 → 0 (2026-08-22). Thomas: *"things still feel fairly easy across the board...
+// i want like 40/35/30/20"*. She was the furthest off BY FAR — 96/69/58/56 against a 40/35/30/20
+// target, ~35 points too easy at every rung, while the mage sat at 65/54/33/21.
+// ⚠️ THIS REVERSES A CALL OF HIS (*"the wider paid gap was asked for"*), so it is his to overrule.
+// What it changes: the paid bonus no longer CLIMBS with the card's level. Paying still pays a flat
+// `paid` (6 tool / 4 blade) and a levelled blade still hits harder, because SPIKE_STEP is untouched
+// at +3 a level — sharpening still sharpens, it just no longer sharpens twice over.
+// 📏 Swept at n=100/stage: PAID 2 → 96/69/58/56 · PAID 1 → 83/48/52/42 · **PAID 0 → 46/29/25/30**.
+// ✅ Picked over (SPIKE 2 + PAID 1), which measured 29/28/27/30 — a closer average but it makes
+// stage 1 HARDER for her than for the mage, and *a newly unlocked class steamrolling the on-ramp is
+// how you FEEL an unlock* (2026-08-21). Her being easiest at stage 1 is design, not slack.
+let PAID_STEP = 0;
 // 🛤️ the fork can be switched off, so it can be A/B'd against the blind draw it replaced.
 // ⚠️ Keep it: the fork changes the RUN ECONOMY (free agency where there was only paid agency
 // via ↩️ Divert), so every number taken before it is measured against a different game.
@@ -758,7 +769,23 @@ function toggleBank() {
 // (the others being an enemy shape and a run-layer price; a rule bolted onto a slot has failed 3×).
 // 📏 Mean boost is 5.0 (spread 1-13), so an average Emberwake goes 5 → 8 against a duel blow of ~15.
 // ⚠️ ✦ Backdraft doubles the result, so it now reads ×3 of the raw boost. Watch it.
-let BANK_MULT = 1.5;
+// 🔥 BANK_MULT 1.5 → 1.0 (2026-08-22). ⚠️ THIS REVERSES THIS MORNING'S CALL, and the reason
+// is that the morning's call was measured against a FINALE THAT THREW THE WAKE AWAY (build 339).
+// 🔴 ANY INTEREST RATE ABOVE 1.0 IS UNCONDITIONAL PROFIT IN A DUEL. Against a fixed HP pool,
+// delaying damage costs nothing as long as another beat comes — and in the finale it always does.
+// So BANK_MULT is not a dial, it is a SWITCH: above 1.0 channelling every beat is simply correct.
+// 📏 Measured at a channelling policy (n=100/stage), gain over never channelling:
+//     ×1.0 → +2/14/9/10   ×1.1 → +27/33/40/43   ×1.5 → +33/45/64/55
+// Thomas, playing it: *"mage starting to feel a bit easy with emberwake making some of my damage
+// be like 25+"*. He is describing ×1.5 exactly.
+// ✅ AND THE GOOD NEWS THE SWEEP FOUND: at ×1.0 — pure deferral, zero interest — channelling is
+// STILL worth +10-15 points, because 🔑 CONCENTRATION beats flat 🛡️ ARMOUR. One big blow loses
+// `armour` once; two small ones lose it twice. That is *lateral power, not vertical*: better into
+// Armour, neutral into Evasion, and it costs a turn of tempo. The interest was never what made
+// channelling good — it was what made it MANDATORY.
+// ⚠️ Its DISPLAY had to change with it: "+5 next turn (it was worth +5 now)" reads as a pure
+// loss. The reveal now names the real payoff — you carry it, and you choose where it lands.
+let BANK_MULT = 1.0;
 function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) : 0; }
 // ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
 // you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
@@ -1332,7 +1359,8 @@ const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST fo
 // each**. A blade gained +6 a level against the mage's best card at +3 - exactly double.
 // Swept on the realistic-deck test: value 4 → gap +3.2 · **value 3 → gap +0.9** · value 2 → −1.1.
 // ✅ PAID_STEP stays at 2 - the wider paid gap was asked for and is not the thing that was wrong.
-const SPIKE_STEP = { value: 3, init: 1, armor: 1 };
+let SPIKE_STEP_VALUE = 3;   // 🗡️ the rogue's power dial — `let` so a sweep can move it
+const SPIKE_STEP = { value: SPIKE_STEP_VALUE, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
   const step = SPIKE_STEP[s.spike];
@@ -1721,19 +1749,19 @@ let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned
 // 🔑 Par was never a cross-stage difficulty predictor; it judges you against THIS lair, from region
 // 4 only, and it remains a pure display — nothing reads it, nothing gates on it.
 const DRAGONS = [
-  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 52,
+  { stage: 1, name: 'Cindermaw', par: 34, element: 'Fire', init: 10, breath: 6, hp: 60,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', par: 34, element: 'Lightning', init: 10, breath: 8, hp: 55,
+  { stage: 2, name: 'Skyrender', par: 33, element: 'Lightning', init: 10, breath: 8, hp: 60,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', par: 34, element: 'Stone', init: 7, breath: 5, hp: 68,
+  { stage: 3, name: 'Cragmourn', par: 30, element: 'Stone', init: 7, breath: 5, hp: 68,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', par: 32, element: 'Water', init: 10, breath: 7, hp: 50,
+  { stage: 4, name: 'Fathomdread', par: 29, element: 'Water', init: 10, breath: 7, hp: 50,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -3551,6 +3579,15 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ TRIMMED 3 → 1 on 2026-08-05 after the level-table fix made cards much stronger: Thomas
 // reported "charms and potions are really good too, getting completes easy". The clean win still
 // pays more than a scrape, which was the point — it just stopped being an income firehose.
+// 🪙 COINS ARE THE DIFFICULTY DIAL (2026-07-29), and now there is one knob for it.
+// ⚠️ APPLIED AT THE AWARD, exactly once, for the same reason FOE_ATK_MULT is applied at the
+// draw: `e.xp` is read in several places and most of them are DISPLAYS. Scale anywhere else and
+// the panels print numbers the game does not use.
+let COIN_MULT = 1.0;
+// 🐉 PER-STAGE HP OFFSET — the instrument for the SHAPE of the ladder, where COIN_MULT is the
+// instrument for its HEIGHT. 🔑 1 dragon HP ≈ 2 points of win rate (measured), so this is the
+// finest dial in the game. Read at beginFinalBattle(), so a sweep never edits the data table.
+let DRAGON_HP_ADD = { 1: 0, 2: 0, 3: 0, 4: 0 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
@@ -5079,7 +5116,7 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next turn <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
     // ⚠️ the Surge is a MAGE stat - the rogue's slot ③ pays ⚡ and adds no damage, so printing
     // "Surge +0" reported a mechanic she does not have
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
@@ -5109,7 +5146,7 @@ function resolve() {
     if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next turn <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
@@ -5317,7 +5354,7 @@ function finishResolve() {
   // is a state with no way back, and it silently taxed every future encounter too.
   // The log also printed "+-2 coins", which is its own small lie about what happened.
   if (r.outcome !== 'Loss') {
-    const g = e.xp + charmMod('coin') + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0);
+    const g = Math.round((e.xp + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0)) * COIN_MULT) + charmMod('coin');
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
     S.coins = Math.max(0, S.coins + g);
     if (got >= 0) log(`+${got} coins${r.outcome === 'Complete' ? ` (${e.xp} + ${COMPLETE_BONUS} for the clean win)` : ''} (you now hold ${S.coins})`, 'good');
@@ -7917,7 +7954,7 @@ function zoneHint(zone) {
       if (hasCharm('secondflame') && sc && spellCard() && attunerCard() === sc)
         return `✦ ATTUNES the Spell · +power now`;
       if (sc && S.bankArmed)
-        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, ${bankCostPhrase(sc)}`;
+        return `🔥 CHANNELS — 🔥 ${bankValueOf(sc)} carried to next turn instead, ${bankCostPhrase(sc)}`;
       if (sc) return `+power now — or 🔥 bank it for next turn`;
       return '+power — returns to your deck';
     }
@@ -8431,8 +8468,9 @@ function beginFinalBattle() {
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
   // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
   // the boon fields survive the Approach's deletion because the duel maths reads them.
+  const dhp = Math.max(10, S.dragon.hp + (DRAGON_HP_ADD[S.dragon.stage] || 0));
   S.dragonState = {
-    hp: S.dragon.hp, maxHp: S.dragon.hp,
+    hp: dhp, maxHp: dhp,
     // ⚠️ the clean-Approach boon is GONE with the Approach (2026-08-05). The fields stay at 0
     // because duelArmour()/duelStrike() read them; a future reward may fill them again.
     boon: { armourCut: 0, unseen: 0, calm: 0 },
@@ -8709,7 +8747,7 @@ function resolveDuel() {
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}: <b>+${r.bank}</b> for next beat <span class="dim">(it was worth +${eff(boostC).boost} spent now)</span>`, 'good'));
+  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into the next beat, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
   if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));

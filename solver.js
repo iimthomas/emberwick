@@ -562,11 +562,38 @@ const RUNSIM = (() => {
     const kill = hpAfter <= 0;
     const counter = kill ? 0 : duelCounter(hpAfter);
     const incoming = kill ? 0 : (r.early || 0) + counter;
-    return [kill ? 1 : 0, st.toHp, -incoming];
+    // 🔥 CHANNELLING IS WORTH MOST HERE AND THE BOT COULD NOT DO IT (fixed 2026-08-22).
+    // A banked Emberwake is dead weight to a scorer that only looks at THIS beat — but the duel is
+    // the one fight long enough to cash it, so omitting it did not just under-rate the option, it
+    // deleted the mage's entire slot ② from the only fight that decides a run.
+    // The bank term sits BELOW kill and damage, so it is a tie-break: channel when this beat is
+    // already decided. ⚠️ Report any number produced with it alongside BANK_WEIGHT = 0.
+    // 🔑 IN A DUEL A BANKED WAKE **IS** DEFERRED DAMAGE, so it belongs INSIDE the damage term,
+    // not as a tie-break below it. Next beat is guaranteed here in a way the road's next encounter
+    // never is — that is the whole reason channelling is worth more in the finale, and a
+    // lexicographic tie-break could only ever find it on an exact tie (1 beat in 278, measured).
+    return [kill ? 1 : 0, st.toHp + bankValue(r), -incoming];
   }
+  // 🚨 THIS IS THE **FOURTH** COPY OF THE ARRANGEMENT SEARCH, and it is the one that proves the
+  // point the other three keep making. It silently omitted `bankArmed` AND the wake's aim, so the
+  // mage fought every dragon in the game without her slot ② while her numbers were quoted as
+  // measurements of her. 🔑 EXTRACT THESE FOUR. Until then: anything added to the search must
+  // be added HERE TOO.
   function chooseBestDuel() {
     const hand = S.hand, full = hand.length >= 3;
     let best = null;
+    // 🔥 aim whatever we are holding before searching — same as chooseBestOnce, and off
+    // WAKE_TARGETS rather than a local list, so a retired target can never be aimed at.
+    if (S.wake > 0) {
+      let bestT = 'atk', bestSc = null;
+      for (const t of Object.keys(WAKE_TARGETS)) {
+        S.wakeTarget = t;
+        const r = computeAction(null); if (!r) continue;
+        const sc = evalDuelPlay(r);
+        if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
+      }
+      S.wakeTarget = bestT;
+    }
     for (let w = 0; w < hand.length; w++) {
       const rest = hand.filter((_, i) => i !== w);
       for (const spark of (full ? rest : [null, ...rest])) {
@@ -575,16 +602,19 @@ const RUNSIM = (() => {
           const left = after.filter(c => c !== tinder);
           const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
           for (const bt of ['Attack', 'Initiative']) {
-            S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
-            S.boostTarget = bt;
-            const r = computeAction(ember); if (!r) continue;
-            const sc = evalDuelPlay(r);
-            if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, sc };
+            for (const arm of (CLASS.emberwake ? [false, true] : [false])) {
+              S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+              S.boostTarget = bt; S.bankArmed = arm;
+              const r = computeAction(ember); if (!r) continue;
+              const sc = evalDuelPlay(r);
+              if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, sc };
+            }
           }
         }
       }
     }
-    if (best) { S.assign = best.assign; S.boostTarget = best.bt; }
+    S.bankArmed = false;
+    if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
   }
   const allCards = () => [...S.hand, ...S.deck, ...S.discard];
   // crude "how much card is this" for the stack heuristic — its best single number
