@@ -1033,6 +1033,10 @@ const MAGE = {
       boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: spell.def.hits || 1,   // ⚡ a forking card prints its own
       attuned, attBonus: st.attuned - st.value,
+      // 🔑 THE BONUS ACTUALLY APPLIED, not the one on the card. ✦ Loose Weave halves it, and the
+      // reveal was printing the FULL bonus regardless — see attunedLineText.
+      attApplied: attuned ? (looseOnly() ? Math.floor((st.attuned - st.value) / 2) : st.attuned - st.value) : 0,
+      cardVal: st.value,
       banks, bank, wake: w, wakeTarget: wt,
       vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
       vElem: vElem && vElem.slot === 'Element' ? vElem.name : null,
@@ -4762,7 +4766,8 @@ function computeAction(reserve) {
   // enhUsed/isEnh/enhEl are the engine's long-standing "this action was attuned" fields. The mage
   // supplies them from its own pairing rule; a class that has no elements simply leaves them false.
   const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
-  const attBonus = a.attBonus || 0;
+  const attBonus = a.attBonus || 0, attApplied = a.attApplied != null ? a.attApplied : attBonus;
+  const cardVal = a.cardVal != null ? a.cardVal : null;
   const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0, wakeTarget = a.wakeTarget || null;
   // ⚠️ THE CLASS'S OWN PAYLOAD RIDES ALONG UNREAD. computeAction rebuilds its result field by
   // field, so anything a class returns that the engine does not name is silently dropped — which
@@ -4957,7 +4962,7 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -4965,8 +4970,8 @@ function computeAction(reserve) {
   // ONE VALUE PER CARD, so a blade-side verb reads as PROGRESS here exactly as it reads as damage
   // in a fight. ⚠️ Anything added to `base` in the fight branch must be added here too, or a rule
   // silently applies to half the game — the branches are parallel and neither one warns you.
-  const base = pileVal + (S.potionFx ? S.potionFx.value : 0)     // 🧪 Emberdraught
-               + (a.rogue ? (a.rogue.bonus || 0) : 0);
+  const added = (S.potionFx ? S.potionFx.value : 0) + (a.rogue ? (a.rogue.bonus || 0) : 0);
+  const base = pileVal + added;
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
@@ -5019,7 +5024,7 @@ function computeAction(reserve) {
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
     : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { ...classPayload, type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { ...classPayload, type: 'journey', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            // ⚠️ WHEN compose() GAINS A FIELD, CHECK THE PAYLOAD IN THE SAME EDIT - three separate
            // bugs this month came from a value being computed and then never reaching the reveal.
            stride, strideNames: strideCards.map(c => c.def.name),
@@ -7833,10 +7838,28 @@ function rogueActionLines(r, spell, L, verb) {
   if (rg.streakDmg) out.push(L(`● Momentum ${rg.streakDmg} — +${rg.streakDmg} to the strike`, 'good'));
   return out;
 }
+// 🐛 THIS LINE PRINTED A BREAKDOWN THAT DID NOT MATCH THE MATHS (found in play 2026-08-22).
+// Thomas: *"this doesn't seem right, i used a potion, i shouldve done 13 dmg."* The DAMAGE was
+// right — 10 — but the explanation read *"Atk 5 + 5 = 10"* when the real sum was **2 (card) + 2
+// (half of 5) + 6 (potion)**. Two faults in one line:
+//   1. it used `attBonus`, the bonus PRINTED ON THE CARD, even when ✦ Loose Weave had halved it;
+//   2. it folded the potion silently into the left-hand number, so +6 vanished from view.
+// 🔑 Both numbers were wrong and the total was right, which is the worst combination — the sum
+// checks out, so nothing looks broken, and *legible math always* quietly stops being true.
+// ⚠️ IT NOW ALWAYS ADDS UP BY CONSTRUCTION: anything the named terms do not account for is shown
+// as a remainder rather than hidden, so this can never silently drift again.
 function attunedLineText(r, spell, verb) {
   const src = r.attuner;
   const nm = src ? src.def.name : 'your Catalyst';
-  const sums = `${verb} ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`;
+  const parts = [];
+  const cv = r.cardVal != null ? r.cardVal : (r.base - r.attBonus);
+  parts.push(`${cv}`);
+  if (r.attApplied) parts.push(`+ ${r.attApplied}` +
+    (r.loose ? ` <span class="dim">(half of ${r.attBonus})</span>` : ''));
+  if (r.added) parts.push(`+ ${r.added} <span class="dim">🧪</span>`);
+  const rest = r.base - cv - (r.attApplied || 0) - (r.added || 0);
+  if (rest) parts.push(`${rest > 0 ? '+' : '−'} ${Math.abs(rest)}`);
+  const sums = `${verb} ${parts.join(' ')} = ${r.base}`;
   if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives half → ${sums}`;
   return `✦ ATTUNED — ${nm} is ${src ? elOf(src) : r.spellEl} like ${spell.def.name} → ${sums}`;
 }
