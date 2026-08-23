@@ -8437,7 +8437,13 @@ function renderControls() {
       haulHTML() +
       `<div class="summary"><p>${S.defeatMsg}</p>` +
       `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
-      `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
+      // 🔑 THE LOOP HAS TO CLOSE HERE. You have just been told what you carried out, and this
+      // was the moment the game sent you straight back out with no way to spend it — the Workshop
+      // was only reachable from the main menu. Hades and Monster Hunter both put the meta screen
+      // directly in the death flow, and for the same reason: *the instant you see the haul is the
+      // instant you want to use it.*
+      `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
+      `<button onclick="showStages()">🗺️ Choose a stage</button>`;
   } else if (S.phase === 'intro') {
     const i = Math.min(S.introPage || 0, TUTORIAL.intro.length - 1), pg = TUTORIAL.intro[i];
     const last = i === TUTORIAL.intro.length - 1;
@@ -8621,8 +8627,12 @@ function renderControls() {
       // returning player gets. A picker is a question; what someone who has just been taught needs
       // is the NEXT THING, named. So the tutorial's victory screen points at stage 1 by name, with
       // the one demand it makes — the same briefing language the run itself uses.
+      // 🔑 same reason as the defeat screen: the instant you see the haul is the instant you
+      // want to spend it. ⚠️ Not in the tutorial — that ending has one job, which is naming the
+      // next thing, and a second button is a question where a direction belongs.
       (S.tutorial ? tutorialHandoffHTML()
-        : `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`);
+        : `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
+          `<button onclick="showStages()">🗺️ Choose your next stage</button>`);
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
