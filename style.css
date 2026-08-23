@@ -808,6 +808,44 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* 🏆 the road tally — "6/16" is the bestiary's whole job in three characters */
 .stash-tier { display: flex; justify-content: space-between; align-items: baseline; }
 .stash-tally { font-size: 11px; letter-spacing: .5px; opacity: .7; font-variant-numeric: tabular-nums; }
+
+/* 💰 selling — the release valve, on the material itself */
+.stash-sell { margin-top: 7px; width: 100%; font-size: 10.5px; padding: 4px 6px; }
+
+/* ⚒️ THE WORKSHOP. ⚠️ Above the media queries — the responsive blocks stay last in this file. */
+.wk-loadout { margin-bottom: 6px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(150,175,200,.4);
+  background: linear-gradient(180deg, rgba(140,165,195,.15), rgba(140,165,195,.04)); }
+.wk-lab { font-size: 11px; letter-spacing: 1.4px; color: #a8c4dd; margin-bottom: 9px; }
+.wk-slots { display: flex; flex-wrap: wrap; gap: 9px; }
+.wk-slot { flex: 1 1 180px; padding: 9px 12px; border-radius: 9px; font-size: 13px; color: #ecdfc8;
+  border: 1px solid rgba(150,175,200,.42); background: rgba(140,165,195,.12); }
+.wk-slot .dim { display: block; font-size: 10.5px; margin-top: 2px; }
+.wk-slot.is-empty { border-style: dashed; opacity: .5; font-style: italic; text-align: center; }
+
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px; }
+.wk-piece { padding: 10px 12px; border-radius: 11px; display: flex; flex-direction: column;
+  border: 1px solid rgba(232,145,60,.26);
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); }
+/* owned reads warm, worn reads steel — the same split the field row uses */
+.wk-piece.is-owned { border-color: rgba(232,145,60,.5);
+  background: linear-gradient(180deg, rgba(232,145,60,.13), rgba(232,145,60,.03)); }
+.wk-piece.is-worn { border-color: #7fd8ff; box-shadow: 0 0 0 1px rgba(127,216,255,.28); }
+.wk-top { display: flex; align-items: baseline; gap: 7px; }
+.wk-icon { font-size: 16px; }
+.wk-name { font-size: 13px; color: #ecdfc8; flex: 1; }
+.wk-block { font-size: 12px; color: #ffd9a0; font-variant-numeric: tabular-nums; }
+.wk-kind { font-size: 10.5px; opacity: .6; margin-top: 3px; }
+.wk-text { font-size: 11.5px; color: #cfe0ee; margin-top: 5px; min-height: 2.4em; }
+.wk-text.dim { opacity: .4; font-style: italic; }
+.wk-foot { margin-top: auto; padding-top: 8px; }
+/* 🔑 the shortfall is the whole point of the disabled state — it says where to GO */
+.wk-cost { font-size: 10.5px; opacity: .72; margin-bottom: 6px; line-height: 1.5; }
+.wk-btn { width: 100%; font-size: 11.5px; padding: 6px 8px; }
+.wk-btn.craft { border-color: #e8913c; color: #ffd9a0; }
+.wk-btn.on { border-color: #7fd8ff; color: #cfe9ff; }
+.wk-btn[disabled] { opacity: .5; cursor: not-allowed; font-size: 10.5px; }
+.wk-none { font-size: 10.5px; opacity: .5; font-style: italic; }
 @media (max-width: 640px) {
   #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .tok { flex: 0 0 auto; min-width: 118px; }

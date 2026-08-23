@@ -2920,7 +2920,11 @@ function stashHTML() {
           `<div class="stash-head"><span class="stash-icon">${m.icon}</span><span class="stash-n">×${n}</span></div>` +
           `<div class="stash-name">${m.name}</div>` +
           `<div class="stash-from">${m.from}</div>` +
-          `<div class="stash-rate">${rate(m)}</div></div>`;
+          `<div class="stash-rate">${rate(m)}</div>` +
+          // 💰 the release valve, on the object itself — never ask for a choice about a thing
+          // without showing the thing.
+          (n > 0 ? `<button class="stash-sell" onclick="sellMat('${m.id}')">sell 1 → 💰 ${sellValue(m.id)}</button>` : '') +
+          `</div>`;
       }).join('') + `</div>`;
   }
   // 🏆 TROPHIES, GROUPED BY ROAD — and this is the bestiary in its first form. 🔑 Which road a
@@ -2939,15 +2943,81 @@ function stashHTML() {
           `<div class="stash-head"><span class="stash-icon">🏆</span><span class="stash-n">×${n}</span></div>` +
           `<div class="stash-name">${d.name}</div>` +
           `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
-          `<div class="stash-rate">${c.region} · certain on a clean kill</div></div>`;
+          `<div class="stash-rate">${c.region} · certain on a clean kill</div>` +
+          (n > 0 ? `<button class="stash-sell" onclick="sellMat('${id}')">sell 1 → 💰 ${sellValue(id)}</button>` : '') +
+          `</div>`;
       }).join('') + `</div>`;
   }
   return `<div class="phase-label">📦 STASH</div>` +
     `<div class="stash"><div class="stash-gold">💰 <b>${st.gold}</b> gold` +
     `<span class="dim"> · earned every run, win or lose</span></div>` +
     body +
-    `<p class="dev-note">⚙️ The Workshop is not built yet — there is nothing to spend these on for now. ` +
-    `Parts will GATE a piece of armour; gold pays the fee.</p>` +
+    `<p class="dev-note">⚒️ Spend these in <b>The Workshop</b>. Parts GATE a piece of armour; gold pays the fee.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
+
+// ⚒️ THE WORKSHOP — where parts become armour, and where you choose what to walk in wearing.
+// ⚠️ NOT "the Forge": that name is taken by the sharpening step, which merged into the Wheel in
+// August. The Workshop also fits [[Theme_And_Naming]]'s Witch Hat register, where craft is the
+// whole world.
+// 🔑 A RECIPE YOU CANNOT AFFORD STILL SHOWS ITS SHORTFALL BY NAME. "You need 2 more Windquill"
+// is the difference between a disabled button and a disabled button that teaches you where to go
+// — and where to go is the only thing this whole layer is for.
+function showWorkshop() { S = S || {}; S.phase = 'workshop'; S.encounter = null; render(); }
+function workshopLine() {
+  const st = loadStash();
+  return `💰 ${st.gold} gold · ${st.owned.length}/${ARMOUR.length} pieces forged`;
+}
+function pieceCardHTML(d, st, equipped) {
+  const owned = st.owned.includes(d.id);
+  const r = RECIPE[d.id];
+  const kind = d.brk === 'worn' ? '🩹 worn — it stays' : '💥 shatters after one block';
+  let foot;
+  if (owned) {
+    foot = equipped
+      ? `<button class="wk-btn on" onclick="unequipPiece('${d.id}')">✓ Worn — remove</button>`
+      : `<button class="wk-btn" onclick="equipPiece('${d.id}')">Wear it</button>`;
+  } else if (!r) {
+    foot = `<span class="wk-none">no recipe yet</span>`;
+  } else {
+    const chk = craftCheck(d.id);
+    const cost = `💰 ${r.gold}` + Object.keys(r.mats).map(m =>
+      ` · ${matDef(m).icon} ${r.mats[m]} ${matDef(m).name}`).join('');
+    foot = `<div class="wk-cost">${cost}</div>` + (chk.ok
+      ? `<button class="wk-btn craft" onclick="craftPiece('${d.id}')">⚒️ Forge it</button>`
+      : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`);
+  }
+  return `<div class="wk-piece${owned ? ' is-owned' : ''}${equipped ? ' is-worn' : ''}">` +
+    `<div class="wk-top"><span class="wk-icon">${ARMOUR_SLOTS[d.slot].icon}</span>` +
+    `<span class="wk-name">${d.name}</span><span class="wk-block">blocks ${d.block}</span></div>` +
+    `<div class="wk-kind">${kind}</div>` +
+    (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
+    `<div class="wk-foot">${foot}</div></div>`;
+}
+function workshopHTML() {
+  const st = loadStash(), worn = loadoutIds();
+  const slots = Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => worn[i] || null);
+  let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ WHAT YOU WALK IN WEARING` +
+    `<span class="dim"> · ${ARMOUR_SLOTS_OPEN} slots${ARMOUR_SLOTS_OPEN < 4 ? ' — two more to earn' : ''}</span></div>` +
+    `<div class="wk-slots">` + slots.map(id => {
+      if (!id) return `<div class="wk-slot is-empty">empty</div>`;
+      const d = armourDef(id);
+      return `<div class="wk-slot">${ARMOUR_SLOTS[d.slot].icon} <b>${d.name}</b>` +
+        `<span class="dim">blocks ${d.block}</span></div>`;
+    }).join('') + `</div></div>`;
+  for (const slot of Object.keys(ARMOUR_SLOTS)) {
+    const list = ARMOUR.filter(a => a.slot === slot);
+    if (!list.length) continue;
+    body += `<div class="stash-tier">${ARMOUR_SLOTS[slot].icon} ${ARMOUR_SLOTS[slot].label}` +
+      `<span class="stash-tally">${ARMOUR_SLOTS[slot].job}</span></div>` +
+      `<div class="wk-grid">` + list.map(d => pieceCardHTML(d, st, worn.includes(d.id))).join('') + `</div>`;
+  }
+  return `<div class="phase-label">⚒️ THE WORKSHOP</div>` +
+    `<div class="stash"><div class="stash-gold">💰 <b>${st.gold}</b> gold` +
+    `<span class="dim"> · ${st.owned.length} of ${ARMOUR.length} pieces forged</span></div>` +
+    body +
+    `<p class="dev-note">🏆 A worn piece needs a part from ONE great beast — that is the reason to ` +
+    `go to its region. 📦 Sell what no recipe wants in the Stash.</p>` +
     `<button onclick="showMenu()">← Menu</button></div>`;
 }
 
@@ -3414,7 +3484,10 @@ function freshGame(stage) {
     // through for the rest of the run. ⚠️ Nothing here is ever destroyed for good — you forged it,
     // you keep it. What a piece costs is the RUN, and that is the only reason it may exist at all
     // (it is the first thing in the game that adds health from outside the deck).
-    armour: STARTER_LOADOUT.slice(0, ARMOUR_SLOTS_OPEN).map(id => newArmour(id)),
+    // 🔴 EMPTY BY DEFAULT. The granted starter kit was step-1 scaffolding, and the ladder is
+    // tuned at an EMPTY loadout — a new player owns nothing and crafts up, which is exactly the
+    // curve the measurement assumed. What you wear now comes from the Workshop.
+    armour: loadoutIds().map(id => newArmour(id)),
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
@@ -5630,11 +5703,98 @@ const ARMOUR = [
     uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
   // 👞 LEGS — tempo.
   { id: 'boots',   slot: 'Legs',  name: 'Roadworn Boots',     block: 2, brk: 'shatter' },
+  { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter',
+    onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
   { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn',
     ongoing: 'surefooted', text: 'You ignore Time Penalties.' },
 ];
-// ⚠️ TEMPORARY — step 1 has no Workshop, so the loadout is granted. Replaced by the forge.
-const STARTER_LOADOUT = ['kiln', 'hood'];
+// ⚒️ RECIPES — priced against the MEASURED drop rates, not by feel:
+//   🦴 Bone Shard 7.2/run · 🪶 Windquill 1.2 · 🪨 Slagplate 0.6 · 🔩 Prime Sinew 0.4 · 🧱 Wardhide 0.1
+//   🏆 a given great beast ~0.7/run when you go to its region · 🔆 Emberheart 0.1 · 💰 ~147 gold/run
+//
+// 🔑 THE TIERS ARE THE POWER CURVE MEASURED ON 2026-08-23: two 💥 shatter pieces moved the ladder
+// by +3/+0, two 🩹 worn pieces by +13/+24. So SHATTER IS CHEAP AND WORN IS THE HUNT — a worn piece
+// costs a named part from a specific region, which is the whole reason to go there.
+// ⚠️ RECIPE COST IS THE BALANCE DIAL, NOT BLOCK VALUE. Everything blocks 2; what a recipe buys is
+// PERSISTENCE, and persistence is what the measurement says is expensive.
+const RECIPE = {
+  // 💥 basic — one run's worth. The gear you have while you are still learning the road.
+  hood:     { gold: 60,  mats: { shard: 4 } },
+  kiln:     { gold: 60,  mats: { shard: 4 } },
+  vambrace: { gold: 60,  mats: { shard: 4 } },
+  boots:    { gold: 60,  mats: { shard: 4 } },
+  // 💥 with an ability — two or three runs, and it names a SHAPE, so the candle points at it
+  visor:    { gold: 140, mats: { shard: 6, quill: 2 } },
+  tithe:    { gold: 140, mats: { shard: 6, slag: 2 } },
+  bracers:  { gold: 140, mats: { shard: 6, slag: 2 } },
+  sandals:  { gold: 140, mats: { shard: 6, quill: 2 } },
+  // 🩹 worn — the hunt. Each names ONE great beast, so each is a reason to go somewhere.
+  circlet:  { gold: 320, mats: { shard: 10, quill: 3, 'p:Stormcrown Roc': 1 } },
+  cuirass:  { gold: 360, mats: { shard: 12, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
+  greaves:  { gold: 320, mats: { shard: 10, hide: 1, 'p:Scarp Ram': 1 } },
+  wraps:    { gold: 300, mats: { shard: 8, sinew: 2, 'p:Cinderjaw': 1 } },
+};
+// 💰 WHAT A MATERIAL SELLS FOR. 🔑 THE RELEASE VALVE, and Monster Hunter needs one for the same
+// reason we do: you will always own piles of things no recipe names. Junk you can sell is a
+// consolation; junk you cannot is a longer list.
+const SELL = { common: 5, shape: 20, elite: 40, signature: 60, rare: 150, dragon: 80 };
+const sellValue = id => { const d = matDef(id); return d ? (SELL[d.tier] || 5) : 0; };
+
+// ⚒️ can this be made right now, and if not, WHAT is missing? ⚠️ Returns the shortfall rather than
+// a boolean — *a picker must never offer what it cannot act on*, and "you need 2 more Windquill"
+// is the difference between a disabled button and a disabled button that teaches.
+function craftCheck(pieceId) {
+  const r = RECIPE[pieceId]; if (!r) return { ok: false, missing: ['no recipe'] };
+  const st = loadStash();
+  const missing = [];
+  if (st.gold < r.gold) missing.push(`💰 ${r.gold - st.gold} more gold`);
+  for (const m in r.mats) {
+    const have = st.mats[m] || 0;
+    if (have < r.mats[m]) missing.push(`${matDef(m).icon} ${r.mats[m] - have} more ${matDef(m).name}`);
+  }
+  return { ok: !missing.length, missing };
+}
+function craftPiece(pieceId) {
+  const r = RECIPE[pieceId]; if (!r || !craftCheck(pieceId).ok) return;
+  const st = loadStash();
+  if (st.owned.includes(pieceId)) return;      // one of each, for now
+  st.gold -= r.gold;
+  for (const m in r.mats) st.mats[m] -= r.mats[m];
+  st.owned.push(pieceId);
+  saveStash(st);
+  render();
+}
+function sellMat(id) {
+  const st = loadStash();
+  if (!(st.mats[id] > 0)) return;
+  st.mats[id]--; st.gold += sellValue(id);
+  saveStash(st);
+  render();
+}
+// 🛡️ THE LOADOUT — what you walk in wearing. ⚠️ It lives in the STASH, not the run: it is chosen
+// between runs and survives them, which is the whole point of a loadout.
+function loadoutIds() {
+  const st = loadStash();
+  return (st.loadout || []).filter(id => armourDef(id) && st.owned.includes(id)).slice(0, ARMOUR_SLOTS_OPEN);
+}
+// ⚠️ ONE PIECE PER SLOT. Equipping a Chest piece replaces the Chest piece you had, never the
+// Head one — the four zones are the whole reason the system has zones.
+function equipPiece(id) {
+  const d = armourDef(id); if (!d) return;
+  const st = loadStash();
+  if (!st.owned.includes(id)) return;
+  let cur = (st.loadout || []).filter(x => armourDef(x) && armourDef(x).slot !== d.slot && x !== id);
+  cur.push(id);
+  st.loadout = cur.slice(-ARMOUR_SLOTS_OPEN);
+  saveStash(st);
+  render();
+}
+function unequipPiece(id) {
+  const st = loadStash();
+  st.loadout = (st.loadout || []).filter(x => x !== id);
+  saveStash(st);
+  render();
+}
 
 const armourDef = id => ARMOUR.find(a => a.id === id) || null;
 const newArmour = id => ({ id, wear: (armourDef(id).block > 0 ? 1 : 0), uses: armourDef(id).uses || 0 });
@@ -5659,6 +5819,7 @@ function applyArmourBlock(key, d) {
   if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
   else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — gain 3 coins. (you now hold ${S.coins})`, 'good'); }
   else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike gets +4.`, 'good'); }
+  else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + 5; log(`🛡️ ${d.name} — your next turn gets +5 Initiative.`, 'good'); }
   else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — your next turn gets +3 Initiative.`, 'good'); }
 }
 
@@ -5857,8 +6018,15 @@ function loadStash() {
   try {
     const d = JSON.parse(localStorage.getItem(STASH_KEY) || 'null');
     if (!d || typeof d !== 'object') throw 0;
-    return { gold: d.gold || 0, mats: d.mats || {}, owned: Array.isArray(d.owned) ? d.owned : [] };
-  } catch (e) { return { gold: 0, mats: {}, owned: [] }; }
+    // 🐛 EVERY FIELD MUST BE LISTED HERE OR IT IS SILENTLY DROPPED. `loadout` was written by
+    // equipPiece() and thrown away by the very next read, so equipping a second piece started from
+    // an empty loadout and a fresh run wore nothing — with no error anywhere.
+    // 🔑 A whitelisting reader is the right shape (it is what keeps a corrupt stash from
+    // crashing the menu), but it means ADDING A FIELD IS TWO EDITS, and the second one is silent.
+    return { gold: d.gold || 0, mats: d.mats || {},
+             owned: Array.isArray(d.owned) ? d.owned : [],
+             loadout: Array.isArray(d.loadout) ? d.loadout : [] };
+  } catch (e) { return { gold: 0, mats: {}, owned: [], loadout: [] }; }
 }
 function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -7270,7 +7438,7 @@ function haulHTML() {
     `<div class="haul-note">it is in your 📦 Stash</div></div>`;
 }
 
-const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash'];
+const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop'];
 const isShell = () => SHELL_PHASES.includes(S && S.phase);
 
 // 🚪 WHICH PHASES TAKE THE MIDDLE OF THE SCREEN. A phase belongs here when it is a DECISION
@@ -7387,6 +7555,11 @@ function render() {
   }
   normalizeAssign();
   saveGame();
+  // ⚠️ NOTHING TO DRAW WITHOUT STATE. The Workshop and the Stash are SHELL screens whose
+  // buttons (forge, sell, wear) re-render — and they are reachable before any run exists. Boot
+  // happens to call freshGame() first, so `S` is non-null in practice, but a shell action that
+  // crashes when it is the first thing you touch is a bug waiting for a different boot order.
+  if (!S) return;
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
   $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`) + ` · build ${BUILD}`;
   try {
@@ -8287,6 +8460,8 @@ function renderControls() {
         `<span>learn the game in one short run · always open</span></button>` +
       `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
         `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      `<button class="menu-item" onclick="showWorkshop()"><b>⚒️ The Workshop</b>` +
+        `<span>${workshopLine()}</span></button>` +
       `<button class="menu-item" onclick="showStash()"><b>📦 Stash</b>` +
         `<span>${stashLine()}</span></button>` +
       `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
@@ -8298,6 +8473,8 @@ function renderControls() {
       `<div class="menu-stamp">${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD}` +
         `${CHANNEL === 'play' ? ' · <b>found a bug?</b> say what the build number was' : ''}</div>` +
       `</div>`;
+  } else if (S.phase === 'workshop') {
+    c.innerHTML = workshopHTML();
   } else if (S.phase === 'stash') {
     c.innerHTML = stashHTML();
   } else if (S.phase === 'collection') {

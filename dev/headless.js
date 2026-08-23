@@ -94,7 +94,7 @@ sandbox.Math.random = function () {
 vm.createContext(sandbox);
 // 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
 const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE',
-                 'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MATERIALS', 'CREATURE_INDEX', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD'];
+                 'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MATERIALS', 'CREATURE_INDEX', 'ARMOUR', 'ARMOUR_SLOTS', 'RECIPE', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD'];
 // the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;
 // ⚠️ it must be `let` in game.js or the assignment throws.
 const TUNABLES = ['ATTUNE_BONUS', 'PAID_STEP', 'BANK_MULT', 'FOE_ATK_MULT', 'MOMENTUM_CAP', 'MOMENTUM_STEP', 'MOMENTUM_BREAK', 'MOMENTUM_VALUE', 'MOMENTUM_FULL', 'SPLIT_ADDS_PER_HIT', 'TIME_PENALTY_MULT', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
