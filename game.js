@@ -1012,7 +1012,7 @@ const MAGE = {
   // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
-    text: '<b>Channel</b> your Surge instead of spending it and you carry it into next turn as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b> — and one big hit beats 🛡️ Armour, which is only subtracted once.' },
+    text: '<b>Channel</b> your Surge instead of spending it. You carry it into next turn as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b>. One big hit beats 🛡️ Armour, which is only subtracted once.' },
   // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
   // "does this hand hold a same-element pair" and finding it is attuning.
   // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
@@ -8755,7 +8755,7 @@ function renderControls() {
           return `<button class="class-pick${picked === id ? ' on' : ''}${open ? '' : ' locked'}"` +
             (open ? ` onclick="pickClass('${id}')"` : ' disabled') + `>` +
             `<b>${name}</b><span class="class-line">${line}</span>` +
-            (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> — ${t.text}</span>` : '') +
+            (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> ${t.text}</span>` : '') +
             (open ? '' : `<span class="class-trait dim">🔒 fell a dragon to unlock her</span>`) +
             `</button>`;
         };
@@ -8767,10 +8767,18 @@ function renderControls() {
         // permit ~6 profiles, and a roster designed from its matchup table becomes reskins.
         // ⚠️ AN HONEST SHELF, the same rule the Collection follows: it says plainly that these are
         // not built rather than showing a button that lies. A locked thing you can SEE is a goal.
+        // ✍️ FLAVOUR, NOT MECHANICS (2026-08-23, Thomas: *"lets make the description cooler. no em
+        // dashes. straight to the point. like just give the flavor of the class, concise"*).
+        // 🔑 These lines used to name each class's SOURCE OF POWER — "retaliation", "foreknowledge",
+        // "declaration". That is the vocabulary from Class_System, and it is how WE tell the classes
+        // apart while designing them. It is not what makes someone want to play one.
+        // ⚠️ The old note said *a class description is a promise about the rules* (written after the
+        // rogue's line promised multi-hit she did not have). That still holds for the TRAIT row,
+        // which states the actual mechanic. A flavour line promises nothing, so it cannot lie.
+        // ⚠️ "not built yet" is gone at his request; the dimmed, dashed, disabled styling carries it.
         const soon = (icon, name, line) =>
           `<button class="class-pick locked" disabled><b>${icon} ${name}</b>` +
-          `<span class="class-line">${line}</span>` +
-          `<span class="class-trait dim">not built yet</span></button>`;
+          `<span class="class-line">${line}</span></button>`;
         // 🖼️ THE PORTRAIT — big, and it is the point of the screen.
         // 🔑 SAME CONTRACT AS foeArt(): found by NAME, and NOTHING BREAKS WHILE THE FOLDER IS
         // EMPTY. A miss removes itself and the frame falls back to the class emblem, so art never
@@ -8807,17 +8815,17 @@ function renderControls() {
         return `<div class="wall-line">🎭 <b>Character</b></div>` +
           `<div class="picker-split">` + hero + `<div class="picker-list">` +
           `<div class="class-row">` +
-          row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
-          row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
+          row('mage', '✦ The Mage', 'She knows which flame answers which.') +
+          row('rogue', '🗡️ The Rogue', 'One blade pays for the next.') +
           `</div>` +
           `<div class="class-row is-soon">` +
-          soon('🎲', 'The Berserker', 'risk — you know the faces, not the roll') +
-          soon('🎭', 'The Illusionist', 'summoning — your buffs and your armour are the same things') +
-          soon('🛡️', 'The Guardian', 'retaliation — what hits you pays for it') +
-          soon('🏹', 'The Ranger', 'foreknowledge — you set the order the deck comes back in') +
-          soon('⚖️', 'The Paladin', 'declaration — call the turn before you take it') +
-          soon('🕯️', 'The Warlock', 'sacrifice — spend what you cannot get back') +
-          soon('⚔️', 'The Knight', 'stance — this turn decides how the next one is fought') +
+          soon('🎲', 'The Berserker', 'Swing first. Count the cost after.') +
+          soon('🎭', 'The Illusionist', 'Never alone, and none of them real.') +
+          soon('🛡️', 'The Guardian', 'Strike the wall. The wall strikes back.') +
+          soon('🏹', 'The Ranger', 'Knows what comes next. Dealt it that way.') +
+          soon('⚖️', 'The Paladin', 'Says it aloud, then makes it true.') +
+          soon('🕯️', 'The Warlock', 'Every power has a price. Paid up front.') +
+          soon('⚔️', 'The Knight', 'How you stand decides how you swing.') +
           `</div></div></div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
@@ -8826,7 +8834,7 @@ function renderControls() {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
-          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? stageBadges(d.stage) : ''}` +
+          `<b>${done ? '✔ ' : ''}Stage ${d.stage}: ${open ? d.name : '???'}</b>${open ? stageBadges(d.stage) : ''}` +
           // ❌ THE PICKER DOES NOT SPOIL THE DRAGON (2026-08-05, Thomas: *"lets remove what the
           // boss does, don't think we really need to show that off"*). It used to print the SHAPE
           // and the demand on every stage button.
@@ -8835,8 +8843,8 @@ function renderControls() {
           // twenty turns preparing for it. Printing the same facts on the menu spends the reveal
           // before the run exists, and turns choosing a stage into reading a stat block.
           // What the button says instead is about YOU — what you have done here, not what it does.
-          `<span class="stage-shape">${!open ? 'locked — clear stage ' + (d.stage - 1) + ' to open'
-            : done ? 'felled — go again for a better grade'
+          `<span class="stage-shape">${!open ? 'Clear stage ' + (d.stage - 1) + ' to open.'
+            : done ? 'Felled. Go again for a better grade.'
             : 'not yet felled'}</span>` +
           `</button>`;
       }).join('') +
