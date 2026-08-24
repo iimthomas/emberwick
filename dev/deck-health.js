@@ -1,44 +1,49 @@
-// 🃏 IS THE DECK ACTUALLY A HEALTH BAR?
-//
-// Thomas: *"feels like getting damaged has been inconsequential."*
-// **Deck-as-health is a PILLAR.** If the deck only ever goes UP across a run, then it is not a
-// health bar at all — it is an XP bar with a small tax, and every defensive choice in the game is
-// boring for that reason rather than on its own merits.
-//
-// Tracks the ONE number the grade and the Standing already use: total card levels.
+// 🃏 WHERE DECK-AS-HEALTH ACTUALLY SITS. The pillar couples three things most games separate:
+// your health bar, your damage, and your progression currency. So one lever moves all three, and
+// the instrument has already watched it fail in BOTH directions:
+//   • SNOWBALL — 41% of runs never dipped below their start (upgrades outpaced damage)
+//   • SPIRAL   — 50% of stage-4 losses were unwinnable on arrival, discovered four beats late
+// This reads the current tuning against both.
 'use strict';
-const { sandbox, seed, useClass, getS } = require('./headless.js');
-const N = +(process.argv[2] || 200);
+const H = require('./headless.js');
+const B = H.sandbox, S = () => H.getS();
+const N = +(process.argv[2] || 60);
+H.setTunable('XP_LEVEL_FORCE', 1); H.setTunable('CLASS_LEVEL_FORCE', 1);
+
+const levels = () => {
+  const s = S();
+  return [...s.hand, ...s.deck, ...s.discard].reduce((t, c) => t + c.level, 0);
+};
 
 for (const cls of ['mage', 'rogue']) {
-  let runs = 0, start = 0, lair = 0, trashed = 0, dipped = 0, minSum = 0;
-  let soakLevels = 0, upgrades = 0, turns = 0, dmgSum = 0;
+  H.useClass(cls);
+  const rows = [];
   for (let i = 0; i < N; i++) {
-    useClass(cls); seed(5100 + i);
-    let s0 = null, lo = null, mn = 1e9, lairLv = null;
-    const lv = () => { const S = getS(); return [...S.hand, ...S.deck, ...S.discard].reduce((a, c) => a + c.level, 0); };
-    sandbox.RUNSIM.setHook({
-      onAssign() {
-        const S = getS(); if (S.finalMode) return;
-        if (s0 === null) s0 = lv();
-        const now = lv(); if (now < mn) mn = now;
-        const r = sandbox.computeAction(null);
-        if (r) { turns++; dmgSum += (r.early || 0) + (r.combatDmg || 0); }
-      },
-      onLair() { lairLv = lv(); },
-    });
-    try { sandbox.RUNSIM.autoRun(true); } catch (e) { continue; }
-    const S = getS();
-    runs++; start += (s0 || 32); lair += (lairLv || lv()); trashed += S.trashed.length;
-    minSum += mn === 1e9 ? (s0 || 32) : mn;
-    if (mn < (s0 || 32)) dipped++;
+    H.seed(4400 + i);
+    let lo = Infinity, start = null;
+    B.RUNSIM.setHook({ onAssign: () => {
+      const v = levels();
+      if (start === null) start = v;
+      if (v < lo) lo = v;
+    }});
+    try { B.RUNSIM.autoRun(true); } catch (e) {}
+    B.RUNSIM.setHook({});
+    const s = S();
+    const end = levels();
+    if (start === null) continue;
+    rows.push({ start, lo, end, won: s.phase === 'victory',
+                destroyed: (s.trashed || []).length, par: s.dragon && s.dragon.par });
   }
-  const d = n => (n / (runs || 1)).toFixed(1);
-  console.log(`\n=== ${cls} · ${runs} runs ===`);
-  console.log(`  deck levels: start ${d(start)}  →  LOWEST point in the run ${d(minSum)}  →  at the lair ${d(lair)}`);
-  console.log(`  🔑 net change across the whole run: ${(lair / runs - start / runs >= 0 ? '+' : '')}${(lair / runs - start / runs).toFixed(1)} levels`);
-  console.log(`  runs that EVER dipped below where they started: ${Math.round(100 * dipped / (runs || 1))}%`);
-  console.log(`  cards destroyed outright (Lv1 soaked): ${d(trashed)} of 16`);
-  console.log(`  damage taken per turn: ${(dmgSum / (turns || 1)).toFixed(2)}`);
+  const avg = f => (rows.reduce((t, r) => t + f(r), 0) / rows.length);
+  const pct = f => Math.round(100 * rows.filter(f).length / rows.length);
+  console.log(`\n${cls.toUpperCase()}  (n=${rows.length}, fresh account)`);
+  console.log(`  start ${avg(r => r.start).toFixed(1)}  →  lowest held ${avg(r => r.lo).toFixed(1)}  →  end ${avg(r => r.end).toFixed(1)}`);
+  console.log(`  net change            ${(avg(r => r.end - r.start) >= 0 ? '+' : '') + avg(r => r.end - r.start).toFixed(1)}`);
+  console.log(`  deepest dip           ${avg(r => r.start - r.lo).toFixed(1)} of ${avg(r => r.start).toFixed(0)}`);
+  console.log(`  🔴 never dipped        ${pct(r => r.lo >= r.start)}%   ← snowball signature`);
+  console.log(`  cards destroyed       ${avg(r => r.destroyed).toFixed(1)}`);
+  console.log(`  arrived at/above par  ${pct(r => r.par && r.end >= r.par)}%   (par ${rows[0] && rows[0].par})`);
+  const w = rows.filter(r => r.won), l = rows.filter(r => !r.won);
+  if (w.length && l.length)
+    console.log(`  deck at the end — winners ${(w.reduce((t,r)=>t+r.end,0)/w.length).toFixed(1)} vs losers ${(l.reduce((t,r)=>t+r.end,0)/l.length).toFixed(1)}`);
 }
-console.log(`\n⚠️ deck-as-health is the pillar. A bar that only rises is not a bar.`);
