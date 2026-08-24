@@ -4800,7 +4800,45 @@ function drawEncounter(avoidType, elite) {
 // the 45% the ×1.5 workaround bought on the old plates, and bought by fixing the cause instead.
 // ⚠️ ×1.25 holds an even sharper soak (25%) but reopens a 12-point class gap, because the plate
 // compression already fell far harder on the mage (her mean plate 2.9 → 2.1; the rogue's 1.5 → 1.4).
-let FOE_ATK_MULT = 1.0;
+//
+// 🔥 1.0 → 1.15 (2026-08-23), AND THIS ONE IS A FEEL-REPORT, NOT A MEASUREMENT.
+// Thomas: *"i definitely want damage up, thats sorta how ive been feeling most of the time,
+// whenever i tested so far."* Three sweeps looking for a way to break the deck-health/deck-strength
+// coupling all landed on the same conclusion: **this is the only lever that moves the thing he is
+// describing.** Flattening the level curve made you weaker rather than decoupling anything, and
+// making levels COST armour turned out to be a straight buff (the cost lands at Lv4 and a run ends
+// holding about one Lv4 card).
+//
+// 📏 WHY 1.15 AND NOT 1.25 — measured at ⭐6/🎭3, a real player's state, target 40/35/30/20:
+//   ×1.00  mage 66/43/26/40 · rogue 68/44/26/45   gap −2/−1/0/−5   ← tightest gap ever recorded
+//   ×1.15  mage 66/34/28/28 · rogue 64/39/28/45   gap +2/−5/0/−17
+//   ×1.25  mage 61/33/18/29 · rogue 66/31/33/43   gap −5/+2/−15/−14
+// ×1.15 is the closest the MAGE has been to target at stages 2-4 (34/28/28 against 35/30/20).
+// ⚠️ AND THE COST IS EXACTLY WHAT THE NOTE ABOVE PREDICTED: **the class gap reopens** — 17 points
+// at stage 4, from a starting position of 5. 🔑 *A thinner health bar pays more per point of
+// damage*, and after the plate compression the mage is the thinner one. **Raising damage will
+// always cost class parity in this game; that is structural, not a tuning accident.**
+// ⚠️ Held deliberately: the rogue is over target at stage 4 (45% vs 20%) at EVERY setting. That is
+// the documented shape issue and damage is not its fix.
+// 📏 SETTLED AT 1.30, NOT 1.15 — same seeds at ⭐6/🎭3, and the thing being tuned is
+// *"does the deck ever go DOWN"*, not the win rate:
+//   dmg     mage never-dips / deepest dip     rogue never-dips / dip
+//   ×1.00        28%  /  3.4                      51%  /  2.2
+//   ×1.15        21%  /  4.1                      50%  /  2.6
+//   ×1.30        14%  /  5.3                      40%  /  3.4
+//   ×1.45        14%  /  6.0                      33%  /  3.9
+// 🔑 **×1.15 is below the perception threshold** — it moves the mage's deepest dip by less
+// than one card, and moves the rogue by nothing at all. A change a playtest cannot FEEL is a
+// wasted playtest, and this one exists to answer a feel-report.
+// ⚠️ Cost, stated: the mage's win rate at this level goes 38 → 30%, and the class gap widens.
+//
+// 🔴 AND THE FINDING TO ACT ON LATER: **DAMAGE BARELY TOUCHES THE ROGUE'S SNOWBALL.** Half her
+// runs never lose a card at ×1.0 and still half at ×1.15; ×1.45 only reaches 33%. The cause is
+// already written down elsewhere in this file — *damage only lands on a Narrow or a Loss, so a
+// class that Completes more is simply hit less.* 🔑 **Her problem is the FREQUENCY of being hit,
+// not the SIZE of the hit, and no multiplier reaches frequency.** Fixing her needs something that
+// costs cards on a *Complete*, or a road that can kill you — not this dial.
+let FOE_ATK_MULT = 1.30;
 function scaleFoe(e) {
   if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
   return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
