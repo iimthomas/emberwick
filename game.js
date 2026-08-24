@@ -8776,9 +8776,10 @@ function renderControls() {
         // rogue's line promised multi-hit she did not have). That still holds for the TRAIT row,
         // which states the actual mechanic. A flavour line promises nothing, so it cannot lie.
         // ⚠️ "not built yet" is gone at his request; the dimmed, dashed, disabled styling carries it.
+        // 🎭 the icon is its own element so the tile can lead with it — see .class-row.is-soon
         const soon = (icon, name, line) =>
-          `<button class="class-pick locked" disabled><b>${icon} ${name}</b>` +
-          `<span class="class-line">${line}</span></button>`;
+          `<button class="class-pick locked" disabled><span class="soon-icon">${icon}</span>` +
+          `<b>${name}</b><span class="class-line">${line}</span></button>`;
         // 🖼️ THE PORTRAIT — big, and it is the point of the screen.
         // 🔑 SAME CONTRACT AS foeArt(): found by NAME, and NOTHING BREAKS WHILE THE FOLDER IS
         // EMPTY. A miss removes itself and the frame falls back to the class emblem, so art never

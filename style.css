@@ -924,10 +924,27 @@ button.stage.locked .stage-shape { font-style: italic; }
 .eq.rar-rare      { border-left-color: rgba(110,175,235,.8); }
 .eq.rar-legendary { border-left-color: #f0a030; }
 
-/* 🎭 the roster ahead — legible, smaller, and obviously not yet yours */
-.class-row.is-soon { opacity: .5; }
-.class-row.is-soon .class-pick { padding: 8px 10px; }
-.class-row.is-soon .class-pick b { font-size: .95em; }
+/* 🎭 THE ROSTER AHEAD — A GRID THAT WRAPS, NOT A ROW THAT SQUEEZES (2026-08-23).
+   🔴 It inherited `.class-row`'s `display: flex` with `.class-pick { flex: 1 }`, which was written
+   when the row held TWO cards. At ten it divided 756px into 80px columns — one word per line, and
+   869px of content scrolling inside a 756px box. 🔑 A LAYOUT TUNED FOR TWO ITEMS IS NOT A LAYOUT,
+   IT IS A COINCIDENCE: a flex row with no wrap has no failure mode, it just keeps dividing.
+   ✅ auto-fill rather than a fixed column count, because this list only ever grows — the roster
+   went 7 → 10 the same day, and a hard `repeat(5, …)` would have to be re-picked every time.
+   🔑 AND THE ROWS STRETCH TO FILL THE LANE, which is the actual fix to the dead space: the portrait
+   is a 3:4 standing figure and therefore TALL, while a locked entry is three lines of text and
+   therefore SHORT, so the two columns could never agree by accident. Rather than shrink the art
+   (it is the point of the screen) the tiles take the slack and become what they should have been —
+   a character-select grid, big glyph centred, reading as a roster rather than as dimmed buttons. */
+.class-row.is-soon { display: grid; gap: 8px; opacity: .55;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-auto-rows: minmax(84px, 1fr); align-content: stretch; flex: 1 1 auto; }
+.class-row.is-soon .class-pick { padding: 10px; gap: 4px;
+  align-items: center; justify-content: center; text-align: center; }
+.class-row.is-soon .class-pick b { font-size: .95em; line-height: 1.25; }
+.class-row.is-soon .class-line { line-height: 1.35; }
+/* the emblem does the identifying at a glance; the sentence is for whoever leans in */
+.soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
 .class-pick.locked { cursor: default; border-style: dashed; }
 .class-pick.locked:hover { background: inherit; }
 
@@ -970,7 +987,10 @@ button.stage.locked .stage-shape { font-style: italic; }
 .hero-cap span { font-size: 12px; color: #b9ae9a; }
 
 /* 🖼️ ART LEFT, ROSTER RIGHT. The portrait is the anchor and gets a fixed lane; the list flexes. */
-.picker-split { display: flex; gap: 20px; align-items: flex-start; margin: 10px 0 14px; }
+/* ⚠️ `stretch`, NOT `flex-start` — flex-start is what left the roster lane 167px short of the
+   portrait beside it. The portrait keeps its own explicit height (an item with a set cross-size is
+   never stretched), so this costs the art nothing and hands the leftover to the grid. */
+.picker-split { display: flex; gap: 20px; align-items: stretch; margin: 10px 0 14px; }
 .picker-split .hero-art { margin: 0; flex: 0 0 auto; height: min(560px, 62vh); }
 .picker-list { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .picker-list .class-row { margin: 0; }
