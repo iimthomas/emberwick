@@ -3047,6 +3047,15 @@ function showDev() {
   S.encounter = null;
   render();
 }
+// ⭐ SET THE ACCOUNT LEVEL FOR REAL, not via XP_LEVEL_FORCE. A dev tool should produce a state
+// the game could actually be in — a forced level is the INSTRUMENT's pin and behaves differently
+// (it neither reads nor writes the bar), which is exactly the "a jump behaving differently from a
+// real run is a bug in the jump" rule. This writes the same key a run would.
+function devLevel(n) {
+  ACCOUNT_XP = Math.max(0, (n - 1)) * XP_PER_LEVEL;
+  saveXP(ACCOUNT_XP);
+  render();
+}
 function devSet(k, v) {
   if (!S.dev) return;
   S.dev[k] = (k === 'stage') ? +v : (k === 'candle') ? (v === 'true' || v === true) : v;
@@ -3510,7 +3519,7 @@ function freshGame(stage) {
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
-    loot: {}, encountersDone: 0, runBanked: false,
+    loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -3993,8 +4002,67 @@ const POTIONS = [
 // silently SKIPPED 🏕️ Setting Out on stage 1 - the one screen a new player meets first. Three of
 // the mildest rule-changers (Loose Weave, Held Ember, Reversed) live in tier 1 for that reason:
 // they are lateral, not powerful, and they teach what a rule-charm even is.
+// 🔓 THE UNLOCK LADDER — one level, one named thing.
+//
+// 🔑 ORDERED LEGIBLE → CONDITIONAL, which is [[Charm_Pools]]'s own answer to the trap Thomas
+// spotted there (*"starter charms are super basic and bad, and progressively get better? but yeah
+// there would be a lot of slop"*). Slay the Spire's commons are not BAD, they are SIMPLE — so the
+// axis that grows is how much the charm asks of you, never how big its number is. Level 2 hands
+// you *+2 armour on every card*; level 19 hands you *your Spell is not spent on a Complete*, which
+// is worth nothing until you know what to do with it. **Nothing here is ever a dud**, so there is
+// no slop to filter past — and that keeps *lateral power, not vertical* true of the meta layer too.
+//
+// ⚠️ WHAT IS NOT IN THIS TABLE IS A STARTER. The nine charms a level-1 account already holds are
+// the current tier-1 set, unchanged, because that pool is what stage 1 is tuned against and it is
+// the one pool a new player ever meets. ⚠️ 🏕️ Setting Out only runs if the CLASS list is
+// non-empty, so every class must keep at least one charm off this table — the tiering bug that
+// silently deleted a whole screen is exactly this mistake made once already.
+//
+// ⚠️ CLASSES ARE INTERLEAVED ON PURPOSE. A run of four generic levels would read as a dead patch
+// to whoever is playing the class that got skipped; alternating keeps both curves moving.
+// 🔑 `kind` is here so the table can carry potions and events later without a second system —
+// [[Addiction_Loop]]'s meta-progression unlocks CONTENT, and a charm is only the first kind of it.
+const UNLOCKS = [
+  { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
+  { level: 3,  kind: 'charm', id: 'lanternpace' },
+  { level: 4,  kind: 'charm', id: 'twinblades' },       // 🗡️
+  { level: 5,  kind: 'charm', id: 'tinderbox' },
+  { level: 6,  kind: 'charm', id: 'swiftwick' },
+  { level: 7,  kind: 'charm', id: 'secondflame' },      // ✦ the first that changes an arrangement
+  { level: 8,  kind: 'charm', id: 'ironsplit' },
+  { level: 9,  kind: 'charm', id: 'deepcut' },          // 🗡️
+  { level: 10, kind: 'charm', id: 'brightwick' },
+  { level: 11, kind: 'charm', id: 'coldiron' },         // ✦ the anti-pairing build
+  { level: 12, kind: 'charm', id: 'windreader' },
+  { level: 13, kind: 'charm', id: 'slowfoot' },
+  { level: 14, kind: 'charm', id: 'oathstone' },
+  { level: 15, kind: 'charm', id: 'secondnature' },     // 🗡️
+  { level: 16, kind: 'charm', id: 'threekind' },        // ✦
+  { level: 17, kind: 'charm', id: 'unspent' },          // the whole-run rethink
+  { level: 18, kind: 'charm', id: 'deadhand' },         // 🗡️
+  { level: 19, kind: 'charm', id: 'kindledarsenal' },   // ✦
+];
+const UNLOCK_AT = {};
+for (const u of UNLOCKS) UNLOCK_AT[u.id] = u.level;
+const LEVEL_CAP = UNLOCKS.reduce((m, u) => Math.max(m, u.level), 1);
+// 🐛 A TABLE THAT NAMES A CHARM THAT DOES NOT EXIST IS A LEVEL THAT UNLOCKS NOTHING, silently —
+// the player reaches it, the log says nothing, and the pool never grows. Fail at load instead.
+for (const u of UNLOCKS) {
+  if (!CHARMS.some(c => c.id === u.id)) throw new Error('UNLOCKS names a charm that does not exist: ' + u.id);
+}
+const unlocksAt = lv => UNLOCKS.filter(u => u.level === lv);
+const unlockName = u => (CHARMS.find(c => c.id === u.id) || {}).name || u.id;
+
+// ✅ AND HERE IS WHERE THE SIMULATION ENDS (2026-08-23). The gate above was `c.tier <= stageTier()`
+// — the stand-in. It now reads the account level, which is what that note always said it was
+// waiting for. `tier` survives as the COMPLEXITY BAND (it is what orders `UNLOCKS`), but it no
+// longer gates anything on its own.
+// ⚠️ EVERY LADDER NUMBER ON RECORD WAS MEASURED THROUGH THE OLD GATE. 37/35/33/27 was taken with
+// `tier <= stage`, i.e. a pool of 9 at stage 1 rising to 23 at stage 4. A max-level account now
+// carries all 23 into stage 1. **The stage curve is a BAND now, not a line** — measure it at
+// level 1 and at MAX_LEVEL and quote both, because neither one alone is the game.
 function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.dragon.stage) : 1; }
-function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
+function charmUnlocked(c) { return !UNLOCK_AT[c.id] || UNLOCK_AT[c.id] <= accountLevel(); }
 // 🔑 AN ELEMENT GATE IS A CLASS GATE IN DISGUISE (2026-08-18). Thomas, at the Wheel:
 // *"i have a charm for fire cards but im playing rogue"* - and 🔥 Emberheart can never once fire
 // for her, because every rogue card has `element: null`. Four charms are like this
@@ -5596,6 +5664,8 @@ function finishResolve() {
   // 🦴 CARVE FIRST, THEN THE PURSE — the same order the log reads.
   S.encountersDone = (S.encountersDone || 0) + 1;
   bankDrops(r.drops || rollDrops(S.encounter, r.outcome));
+  // ⭐ every encounter moves the bar, however it went
+  awardXP((XP_AWARD[r.outcome] || 0) * (S.encounterElite ? XP_AWARD.eliteMult : 1));
   if (r.outcome !== 'Loss') {
     const g = Math.round((e.xp + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0)) * COIN_MULT) + charmMod('coin');
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
@@ -6150,6 +6220,57 @@ const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 1, narr
 // wants in bulk — it was always the fee. The meta economy is MATERIALS, full stop: parts gate a
 // piece, shards pay for it, and 🪙 coins mean exactly one thing again.
 
+// ⭐ THE ACCOUNT LEVEL — meta-progression, and deliberately a THIRD KIND OF THING (2026-08-23).
+// Thomas: *"we should start building the charm meta progression stuff. i feel like we need to do
+// account wide exp for that or something. so like different charms unlocks at different levels…
+// i imagine you would get a certain amount of exp per kill, elite kill, boss kill, etc."*
+//
+// 🔑 A BAR, NEVER A PURSE. This is the same trap meta-gold fell into this morning, one step later:
+// two things you SPEND are two budgets, and the player cannot see which purse a number came from.
+// So the meta layer has exactly one shop and the level is not in it:
+//   🪙 coins      — earned and spent inside a run, then gone
+//   🦴 materials  — earned across runs, SPENT at the Workshop
+//   ⭐ level      — earned across runs, spent NOWHERE; it only widens what the game may offer
+// Reaching a level is not a decision, which is precisely why it cannot be confused with one.
+//
+// 🔑 AND THE REWARD IS THE NAMED CHARM, NOT THE NUMBER. `UNLOCKS` is an ordered table: one level,
+// one named thing. *"Cold Iron unlocked"* is a moment; *"you are level 7"* is a progress bar for
+// its own sake. It also buys [[Charm_Pools]]'s answer to the "basic and bad" slop problem for
+// free — the table is ordered **LEGIBLE → CONDITIONAL**, so early levels hand out charms you can
+// read at a glance and later ones hand out the rule-changers that ask you to aim them. Nothing in
+// the pool is ever bad; later charms simply ask more of you.
+//
+// ⚠️ ONE BAR FOR THE WHOLE ACCOUNT, NOT ONE PER CLASS — and the reason is [[Addiction_Loop]]'s
+// own retention bet: *you switch class because the problem told you to*. Per-class XP would mean
+// the class you switch TO is a thinner game than the one you left, punishing exactly the move the
+// design wants. A fresh rogue on a level-12 account gets her charms up to level 12 immediately.
+// Mastering a class is what [[The_Wall]] and the grade are for; do not build it twice.
+const XP_KEY = 'emberwick-xp-1' + KEY_NS;
+let XP_PER_LEVEL = 60;                 // flat, and flat on purpose: *legible math always*
+// 🔑 A LOSS MUST PAY, AND THIS IS THE RULE NOT THE GENEROSITY. [[Charm_Pools]]: *a player who is
+// losing must not get a thinner pool* — gating unlocks behind victories takes options away from
+// exactly the player who needs more of them, and turns a bad run into a worse next one.
+// ⚠️ So "exp per kill" is the one part of the brief I have not built literally: every encounter
+// pays, a clean one pays triple a lost one. Same shape `rollDrops` already uses for shards.
+// ⚠️ ELITES MULTIPLY RATHER THAN ADD, so that losing an elite can never out-earn winning an
+// ordinary fight — an additive bonus would have made 💀 Loss (1+5) beat ◇ Complete (3).
+const XP_AWARD = { Complete: 3, Narrow: 2, Loss: 1, eliteMult: 2, lair: 8, dragon: 15, dragonStep: 5 };
+// 🔧 a sweep pins the level so a measurement is reproducible — see the band note in Balance_Log
+let XP_LEVEL_FORCE = 0;
+function loadXP() { try { const n = parseInt(localStorage.getItem(XP_KEY), 10); return n > 0 ? n : 0; } catch (e) { return 0; } }
+function saveXP(n) { try { localStorage.setItem(XP_KEY, String(n)); } catch (e) {} }
+// ⚠️ CACHED, not read per call — `charmUnlocked()` runs once per Wheel offer and RUNSIM rolls
+// thousands of them. The cache is refreshed at the one place the number can change.
+let ACCOUNT_XP = loadXP();
+// ⚠️ CLAMPED AT THE CAP, and that is a design call not a tidy-up: a bar that keeps filling and
+// resetting while unlocking NOTHING is precisely the empty progress bar this system was built to
+// avoid. The number stops where the content stops.
+// 🔑 And the XP is not thrown away — it keeps banking. Add charms, the cap rises, and the levels
+// already earned are simply revealed. Nobody is ever punished for having played early.
+const levelFor = xp => Math.min(LEVEL_CAP, 1 + Math.floor(xp / XP_PER_LEVEL));
+function accountLevel() { return XP_LEVEL_FORCE || levelFor(ACCOUNT_XP); }
+function awardXP(n) { if (n > 0 && S) S.xpRun = (S.xpRun || 0) + n; }
+
 // 📦 THE STASH — everything that survives a run. Its own key, like the ladder and the grades.
 const STASH_KEY = 'emberwick-stash-1' + KEY_NS;
 function loadStash() {
@@ -6261,6 +6382,21 @@ function bankRun(won) {
   const st = loadStash();
   for (const id in (S.loot || {})) st.mats[id] = (st.mats[id] || 0) + S.loot[id];
   saveStash(st);
+  // ⭐ THE LEVEL BAR BANKS WHERE THE LOOT BANKS, and that is the whole reason it is safe: this
+  // function is already the single place a run pays out, already guarded to fire exactly once,
+  // and already called from BOTH victory() and defeat(). A second payout site is how the finale
+  // froze the Emberwake — a per-run total belongs in a function every ending calls.
+  if (won) awardXP(XP_AWARD.dragon + XP_AWARD.dragonStep * Math.max(0, (S.dragon && S.dragon.stage || 1) - 1));
+  S.xpBefore = ACCOUNT_XP;                            // so the summary can draw the bar moving
+  // 🔬 A PINNED LEVEL IS NOT A REAL ACCOUNT, so it neither reads nor writes one.
+  // 🔴 THE TRAP THIS CLOSES, and it would have been invisible: RUNSIM calls bankRun() on every
+  // single run, so a 200-run sweep would have climbed from level 1 to the cap *inside the
+  // measurement* — run 1 played a 9-charm pool and run 200 a 23-charm one, and the average would
+  // have described a game nobody plays. **An instrument that PROGRESSES is not an instrument.**
+  // ⚠️ It would also have written the bot's XP into the player's own bar in the browser.
+  if (XP_LEVEL_FORCE) return;
+  ACCOUNT_XP += (S.xpRun || 0);
+  saveXP(ACCOUNT_XP);
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -7600,9 +7736,38 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // (`renderStatus` reads `S.deck[0]`). Anything reachable before a run starts belongs in here.
 // 🧰 WHAT YOU CARRIED OUT. ⚠️ Shown on a DEFEAT as loudly as on a victory — a loss that pays
 // is only worth anything if you can SEE that it paid, in the same breath as being told you died.
+// ⭐ ONE BAR, DRAWN IN ONE PLACE. The summary and the Collection show the same thing, so they ask
+// the same function — the `computeAction()` rule applied to a display: two copies drift.
+function xpBarHTML(xp, note) {
+  const lv = levelFor(xp), into = xp % XP_PER_LEVEL, pct = Math.round(100 * into / XP_PER_LEVEL);
+  const capped = lv >= LEVEL_CAP;
+  const next = capped ? '' : (() => { const up = unlocksAt(lv + 1);
+    return up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`; })();
+  return `<div class="xp"><div class="xp-top"><b>⭐ Level ${lv}</b>` +
+    `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${XP_PER_LEVEL} xp`}</span></div>` +
+    `<div class="xp-bar"><i style="width:${capped ? 100 : pct}%"></i></div>` +
+    (note || next ? `<div class="xp-next">${note || next}</div>` : '') + `</div>`;
+}
+// 🔑 THE LEVEL-UP IS THE MOMENT, so it is NAMED. A run that ends "+47 xp" is a number; one that
+// ends "Cold Iron unlocked" is a reason to start another. ⚠️ Reads the span the run crossed, not
+// just the final level — a very good run can cross two.
+function xpGainedHTML() {
+  const before = S.xpBefore || 0, gained = S.xpRun || 0, after = before + gained;
+  if (!gained) return '';
+  const got = [];
+  for (let lv = levelFor(before) + 1; lv <= levelFor(after); lv++)
+    for (const u of unlocksAt(lv)) got.push(`<span class="xp-got">🔓 ${unlockName(u)}</span>`);
+  return xpBarHTML(after, got.length
+    ? `<b>+${gained} xp</b> · ${got.join(' ')}`
+    : `<b>+${gained} xp</b>`);
+}
+
 function haulHTML() {
   const ids = Object.keys(S.loot || {});
-  if (!ids.length) return '';
+  // ⚠️ NO EARLY RETURN ANY MORE. It used to bail when nothing was carved — and XP is earned on
+  // every encounter, so the one run that most needs to be told it still paid (a bad one, which
+  // carves nothing) was the exact run that showed nothing at all.
+  if (!ids.length && !(S.xpRun > 0)) return '';
   const rows = ids.map(id => {
     const m = matDef(id); if (!m) return '';
     return `<span class="haul-mat">${m.icon} ${m.name} <b>×${S.loot[id]}</b></span>`;
@@ -7611,7 +7776,7 @@ function haulHTML() {
     `<div class="haul-gold">${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'} walked` +
       `${S.phase === 'victory' ? ' · and the beast felled' : ''}</div>` +
     (rows ? `<div class="haul-mats">${rows}</div>` : `<div class="haul-none">nothing carved</div>`) +
-    `<div class="haul-note">it is in your 📦 Stash</div></div>`;
+    `<div class="haul-note">it is in your 📦 Stash</div>` + xpGainedHTML() + `</div>`;
 }
 
 const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop'];
@@ -8662,23 +8827,32 @@ function renderControls() {
     // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
     // the only meta fact the player currently has — and says plainly that unlocking and banning
     // are not built yet, rather than showing a button that lies.
-    const tierName = t => ['', 'stage 1+', 'stage 2+', 'stage 3+', 'stage 4'][t] || 'always';
-    const group = t => CHARMS.filter(x => !x.curse && (x.tier || 1) === t);
-    const rows = [1, 2, 3, 4].map(t => {
-      const list = group(t); if (!list.length) return '';
-      return `<div class="coll-tier"><h4>${tierName(t)} <span class="dim">· ${list.length}</span></h4>` +
-        list.map(x => `<div class="coll-row${x.cls ? ' is-mage' : ''}">` +
-          `<b>${x.name}</b>${x.cls ? `<span class="coll-tag">${x.cls}</span>` : ''}` +
-          `<span class="coll-text">${x.text}</span></div>`).join('') + `</div>`;
-    }).join('');
+    // 🔑 IT IS A LADDER NOW, NOT A TIER LIST — and it reads top-down as what you HAVE, then what
+    // is next, then what is far off. ⚠️ A locked charm shows its full text on purpose: a goal you
+    // cannot read is not a goal, and this is the screen whose whole job is to be wanted.
+    const lv = accountLevel();
+    const charmRow = (x, at) => `<div class="coll-row${at && at > lv ? ' is-locked' : ''}">` +
+      `<b>${x.name}</b>${x.cls ? `<span class="coll-tag">${x.cls}</span>` : ''}` +
+      (at && at > lv ? `<span class="coll-lock">⭐ ${at}</span>` : '') +
+      `<span class="coll-text">${x.text}</span></div>`;
+    const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
+    const have = UNLOCKS.filter(u => u.level <= lv), want = UNLOCKS.filter(u => u.level > lv);
+    const byId = id => CHARMS.find(x => x.id === id);
+    const block = (head, list) => list.length
+      ? `<div class="coll-tier"><h4>${head} <span class="dim">· ${list.length}</span></h4>${list.join('')}</div>` : '';
     c.innerHTML =
       `<div class="phase-label">🎁 COLLECTION</div>` +
-      `<div class="hint">Charms are offered by <b>stage</b> for now — a stand-in for unlocking them by play. ` +
-      `Deeper stages draw from a wider pool, so later dragons are met by a stronger mage.</div>` +
-      `<div class="coll">${rows}</div>` +
-      `<div class="coll-soon">🚧 <b>Not built yet:</b> unlocking charms by <b>runs played</b>, and the ` +
-      `🚫 <b>ban list</b> — one charm disabled per five unlocked, so you shape the pool without ` +
-      `pre-solving the run. Both wait on the real unlock system.</div>` +
+      xpBarHTML(ACCOUNT_XP) +
+      `<div class="hint">Every encounter you walk earns xp, win or lose. Each level opens one more ` +
+      `charm the 🎰 Wheel and 🏕️ Setting Out may offer you — <b>${starters.length + have.length} of ` +
+      `${starters.length + UNLOCKS.length}</b> so far.</div>` +
+      `<div class="coll">` +
+        block('yours from the start', starters.map(x => charmRow(x))) +
+        block('unlocked by play', have.map(u => charmRow(byId(u.id), u.level))) +
+        block('still ahead', want.map(u => charmRow(byId(u.id), u.level))) +
+      `</div>` +
+      `<div class="coll-soon">🚧 <b>Not built yet:</b> the 🚫 <b>ban list</b> — one charm disabled ` +
+      `per five unlocked, so you shape the pool without pre-solving the run.</div>` +
       `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
       `<button class="primary" onclick="showMenu()">← Back</button>`;
   } else if (S.phase === 'dev') {
@@ -8698,6 +8872,13 @@ function renderControls() {
       `</div></div>` +
       `<div class="dev-row"><span>🕯️ Candle</span><div>` +
         pick('candle', 'true', 'Lit', d.candle) + pick('candle', 'false', 'Out', !d.candle) +
+      `</div></div>` +
+      // ⭐ the charm pool the run will draw from. ⚠️ Applies immediately and persists — it is the
+      // real bar, not a pin, so a jump made here is the game a player at that level would get.
+      `<div class="dev-row"><span>⭐ Level</span><div>` +
+        [1, 4, 8, 12, LEVEL_CAP].map(n =>
+          `<button class="dev-pick${accountLevel() === n ? ' on' : ''}" onclick="devLevel(${n})">` +
+          `${n}${n === LEVEL_CAP ? ' (max)' : ''}</button>`).join('') +
       `</div></div>` +
       // 🛡️ one row per OPEN slot. ⚠️ A dev tool, and dev tools port last if ever — the real
       // picker is the Workshop, and this row is deleted the day it lands.
@@ -9502,6 +9683,8 @@ function renderLog() {
 // Reuses the normal turn loop (computeAction / resolve / reveal / soak); see 03_Content/Dragons.md.
 // ============================================================
 function beginFinalBattle() {
+  // ⭐ arriving at the lair pays whether or not you leave it — reaching the dragon IS the run
+  awardXP(XP_AWARD.lair);
   S.finalMode = true;
   S.finalPhase = 'lastmile';
   S.duelBeat = 0;

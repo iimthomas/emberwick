@@ -887,16 +887,25 @@ const RUNSIM = (() => {
     };
   }
 
+  // ⭐ THE POOL THE BOT PLAYS AGAINST, PINNED. Defaults to 1 — a fresh account — because that is
+  // the only level every player passes through. ⚠️ The stage curve is a BAND now: measure at
+  // SIM_LEVEL 1 and again at the cap and quote both, exactly as the old tier gate forced us to
+  // quote per stage. Quoting one number for "the mage at stage 2" is quoting half a game.
+  let SIM_LEVEL = 1;
+  function setLevel(lv) { SIM_LEVEL = Math.max(1, lv | 0); }
+
   function run(N) {
     const _r = window.render, _s = window.saveGame;
     window.render = () => {}; window.saveGame = () => {}; // stub DOM/storage for speed
     let on, off;
+    const _xp = XP_LEVEL_FORCE; XP_LEVEL_FORCE = SIM_LEVEL;
     try { on = batch(true, N); off = batch(false, N); }
-    finally { window.render = _r; window.saveGame = _s; try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
+    finally { window.render = _r; window.saveGame = _s; XP_LEVEL_FORCE = _xp;
+              try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
   return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight,
-           setUnseenWeight, setBankWeight };
+           setUnseenWeight, setBankWeight, setLevel };
 })();
 
 function runSimulator() {

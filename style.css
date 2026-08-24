@@ -1006,6 +1006,26 @@ button.stage.locked .stage-shape { font-style: italic; }
   .tok { flex: 0 0 auto; min-width: 118px; }
 }
 
+/* ⭐ THE LEVEL BAR — one component, used by the run summary and the Collection.
+   ⚠️ Deliberately plain. It is a readout, not a celebration; the celebration is the named charm
+   next to it, and staging a level-up is the engine's job, not this prototype's. */
+.xp { margin: 10px 0; padding: 9px 11px; border-radius: 10px;
+  background: rgba(20,17,13,.55); border: 1px solid #453a2c; }
+.xp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.xp-top b { color: #f0d9a8; font-size: 15px; }
+.xp-num { font-size: 12px; color: #b9ae9a; font-variant-numeric: tabular-nums; }
+.xp-bar { height: 7px; margin: 6px 0 0; border-radius: 4px; overflow: hidden;
+  background: rgba(0,0,0,.45); border: 1px solid #3a3128; }
+.xp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c9a24a, #f0c060); }
+.xp-next { margin-top: 6px; font-size: 12px; color: #b9ae9a; }
+.xp-next b { color: #f0d9a8; }
+/* a charm the run just opened — the thing the level is actually for */
+.xp-got { display: inline-block; margin: 3px 4px 0 0; padding: 1px 7px; border-radius: 999px;
+  background: rgba(201,162,74,.18); border: 1px solid rgba(201,162,74,.5); color: #f0d9a8; }
+/* 🔒 a locked charm is dimmed but fully readable — a goal you cannot read is not a goal */
+.coll-row.is-locked { opacity: .55; }
+.coll-lock { margin-left: 6px; font-size: 11px; color: #c9a24a; white-space: nowrap; }
+
 /* 📋 WHAT YOU CARRY — objects in rows, not a prose run-on. Same chip language as the status bar,
    so a charm looks like a charm wherever you meet it. */
 .carry-panel { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.13); }
