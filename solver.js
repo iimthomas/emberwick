@@ -891,16 +891,24 @@ const RUNSIM = (() => {
   // the only level every player passes through. ⚠️ The stage curve is a BAND now: measure at
   // SIM_LEVEL 1 and again at the cap and quote both, exactly as the old tier gate forced us to
   // quote per stage. Quoting one number for "the mage at stage 2" is quoting half a game.
-  let SIM_LEVEL = 1;
-  function setLevel(lv) { SIM_LEVEL = Math.max(1, lv | 0); }
+  // ⚠️ BOTH BARS, or the pin is half a pin: class charms read the CLASS ladder, so pinning only
+  // the account level would leave the bot levelling its own class pool mid-sweep — the same
+  // "an instrument that progresses is not an instrument" bug, one bar over.
+  let SIM_LEVEL = 1, SIM_CLASS_LEVEL = 1;
+  function setLevel(lv, clsLv) {
+    SIM_LEVEL = Math.max(1, lv | 0);
+    SIM_CLASS_LEVEL = Math.max(1, (clsLv === undefined ? lv : clsLv) | 0);
+  }
 
   function run(N) {
     const _r = window.render, _s = window.saveGame;
     window.render = () => {}; window.saveGame = () => {}; // stub DOM/storage for speed
     let on, off;
-    const _xp = XP_LEVEL_FORCE; XP_LEVEL_FORCE = SIM_LEVEL;
+    const _xp = XP_LEVEL_FORCE, _cxp = CLASS_LEVEL_FORCE;
+    XP_LEVEL_FORCE = SIM_LEVEL; CLASS_LEVEL_FORCE = SIM_CLASS_LEVEL;
     try { on = batch(true, N); off = batch(false, N); }
-    finally { window.render = _r; window.saveGame = _s; XP_LEVEL_FORCE = _xp;
+    finally { window.render = _r; window.saveGame = _s;
+              XP_LEVEL_FORCE = _xp; CLASS_LEVEL_FORCE = _cxp;
               try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }

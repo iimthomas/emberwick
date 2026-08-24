@@ -3056,6 +3056,12 @@ function devLevel(n) {
   saveXP(ACCOUNT_XP);
   render();
 }
+// 🎭 and the class bar, separately — the whole point of the hybrid is that they move apart, so a
+// dev tool that only moved them together could not reproduce the state it exists to test.
+function devClassLevel(n) {
+  saveClassXP(CLASS.id, Math.max(0, (n - 1)) * CLASS_XP_PER_LEVEL);
+  render();
+}
 function devSet(k, v) {
   if (!S.dev) return;
   S.dev[k] = (k === 'stage') ? +v : (k === 'candle') ? (v === 'true' || v === true) : v;
@@ -3519,7 +3525,7 @@ function freshGame(stage) {
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
-    loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0,
+    loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -4023,34 +4029,46 @@ const POTIONS = [
 // 🔑 `kind` is here so the table can carry potions and events later without a second system —
 // [[Addiction_Loop]]'s meta-progression unlocks CONTENT, and a charm is only the first kind of it.
 const UNLOCKS = [
+  // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
   { level: 3,  kind: 'charm', id: 'lanternpace' },
-  { level: 4,  kind: 'charm', id: 'twinblades' },       // 🗡️
-  { level: 5,  kind: 'charm', id: 'tinderbox' },
-  { level: 6,  kind: 'charm', id: 'swiftwick' },
-  { level: 7,  kind: 'charm', id: 'secondflame' },      // ✦ the first that changes an arrangement
-  { level: 8,  kind: 'charm', id: 'ironsplit' },
-  { level: 9,  kind: 'charm', id: 'deepcut' },          // 🗡️
-  { level: 10, kind: 'charm', id: 'brightwick' },
-  { level: 11, kind: 'charm', id: 'coldiron' },         // ✦ the anti-pairing build
-  { level: 12, kind: 'charm', id: 'windreader' },
-  { level: 13, kind: 'charm', id: 'slowfoot' },
-  { level: 14, kind: 'charm', id: 'oathstone' },
-  { level: 15, kind: 'charm', id: 'secondnature' },     // 🗡️
-  { level: 16, kind: 'charm', id: 'threekind' },        // ✦
-  { level: 17, kind: 'charm', id: 'unspent' },          // the whole-run rethink
-  { level: 18, kind: 'charm', id: 'deadhand' },         // 🗡️
-  { level: 19, kind: 'charm', id: 'kindledarsenal' },   // ✦
+  { level: 4,  kind: 'charm', id: 'tinderbox' },
+  { level: 5,  kind: 'charm', id: 'swiftwick' },
+  { level: 6,  kind: 'charm', id: 'ironsplit' },
+  { level: 7,  kind: 'charm', id: 'brightwick' },
+  { level: 8,  kind: 'charm', id: 'windreader' },
+  { level: 9,  kind: 'charm', id: 'slowfoot' },
+  { level: 10, kind: 'charm', id: 'oathstone' },
+  { level: 11, kind: 'charm', id: 'unspent' },          // the whole-run rethink
+  // 🎭 THE CLASS LADDERS — read against that class's OWN level, so each is walked separately and
+  // every future class brings its own. ⚠️ Same legible→conditional ordering, in miniature.
+  { level: 2,  kind: 'charm', id: 'coldiron' },         // ✦ simplest: unattuned strikes +3
+  { level: 3,  kind: 'charm', id: 'secondflame' },      // ✦ the first that changes an arrangement
+  { level: 4,  kind: 'charm', id: 'kindledarsenal' },   // ✦
+  { level: 5,  kind: 'charm', id: 'threekind' },        // ✦ the payoff
+  { level: 2,  kind: 'charm', id: 'twinblades' },       // 🗡️
+  { level: 3,  kind: 'charm', id: 'deepcut' },          // 🗡️
+  { level: 4,  kind: 'charm', id: 'secondnature' },     // 🗡️
+  { level: 5,  kind: 'charm', id: 'deadhand' },         // 🗡️
 ];
 const UNLOCK_AT = {};
 for (const u of UNLOCKS) UNLOCK_AT[u.id] = u.level;
-const LEVEL_CAP = UNLOCKS.reduce((m, u) => Math.max(m, u.level), 1);
+// ⚠️ THE ACCOUNT CAP COUNTS GENERIC RUNGS ONLY. Class rungs are numbered 2-5 against a different
+// bar entirely, so folding them in would have capped the account ladder at 5 and frozen it there.
+const LEVEL_CAP = UNLOCKS.reduce((m, u) => {
+  const c = CHARMS.find(x => x.id === u.id);
+  return (c && !c.cls) ? Math.max(m, u.level) : m; }, 1);
 // 🐛 A TABLE THAT NAMES A CHARM THAT DOES NOT EXIST IS A LEVEL THAT UNLOCKS NOTHING, silently —
 // the player reaches it, the log says nothing, and the pool never grows. Fail at load instead.
 for (const u of UNLOCKS) {
   if (!CHARMS.some(c => c.id === u.id)) throw new Error('UNLOCKS names a charm that does not exist: ' + u.id);
 }
-const unlocksAt = lv => UNLOCKS.filter(u => u.level === lv);
+// ⚠️ A LEVEL NUMBER IS AMBIGUOUS NOW — level 2 exists on three ladders. Every reader must say
+// which one it means, or the account bar would promise you the mage's Cold Iron.
+const unlocksAt = (lv, cls) => UNLOCKS.filter(u => {
+  const c = CHARMS.find(x => x.id === u.id);
+  return u.level === lv && (c ? (c.cls || null) : null) === (cls || null);
+});
 const unlockName = u => (CHARMS.find(c => c.id === u.id) || {}).name || u.id;
 
 // ✅ AND HERE IS WHERE THE SIMULATION ENDS (2026-08-23). The gate above was `c.tier <= stageTier()`
@@ -4062,7 +4080,11 @@ const unlockName = u => (CHARMS.find(c => c.id === u.id) || {}).name || u.id;
 // carries all 23 into stage 1. **The stage curve is a BAND now, not a line** — measure it at
 // level 1 and at MAX_LEVEL and quote both, because neither one alone is the game.
 function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.dragon.stage) : 1; }
-function charmUnlocked(c) { return !UNLOCK_AT[c.id] || UNLOCK_AT[c.id] <= accountLevel(); }
+// 🔑 THE WHOLE HYBRID, IN ONE LINE: a charm unlocks on whichever bar owns the rule it names.
+function charmUnlocked(c) {
+  const at = UNLOCK_AT[c.id];
+  return !at || at <= (c.cls ? classLevel(c.cls) : accountLevel());
+}
 // 🔑 AN ELEMENT GATE IS A CLASS GATE IN DISGUISE (2026-08-18). Thomas, at the Wheel:
 // *"i have a charm for fire cards but im playing rogue"* - and 🔥 Emberheart can never once fire
 // for her, because every rogue card has `element: null`. Four charms are like this
@@ -6255,13 +6277,50 @@ let XP_PER_LEVEL = 60;                 // flat, and flat on purpose: *legible ma
 // ⚠️ ELITES MULTIPLY RATHER THAN ADD, so that losing an elite can never out-earn winning an
 // ordinary fight — an additive bonus would have made 💀 Loss (1+5) beat ◇ Complete (3).
 const XP_AWARD = { Complete: 3, Narrow: 2, Loss: 1, eliteMult: 2, lair: 8, dragon: 15, dragonStep: 5 };
-// 🔧 a sweep pins the level so a measurement is reproducible — see the band note in Balance_Log
+// 🎭 AND A SECOND BAR, ONE PER CLASS (2026-08-23, Thomas: *"class level makes sense for class charm
+// unlocks, or do we just lump everything into the main account level?"*).
+//
+// 🔑 THE RULE IS ALREADY PRINTED ON THE CHARM: **a charm unlocks on whichever bar owns the rule it
+// names.** A generic charm touches an engine rule → the account level. A class charm touches the
+// class's own rule → that class's level. No new field, no table of exceptions — `charmUnlocked()`
+// just asks `c.cls`. It is the [[Charm_Pools]] split test doing a second job for free.
+//
+// ⚠️ THIS REVERSES MY OWN CALL FROM ONE BUILD AGO, and the reversal is the honest part. I argued
+// one bar on the grounds that per-class XP makes the class you switch TO a thinner game than the
+// one you left. **I never measured it.** Measured: a veteran on a level-12 account picking up an
+// untouched class loses **2 charms** (mage 18→16, rogue 14→12). That is noise, not an argument.
+//
+// 🔑 AND THE CASE ONE BAR CANNOT HANDLE, WHICH I HAD NOT CONSIDERED AT ALL: with one bar, **every
+// class after the first arrives FULLY UNLOCKED.** Ship the Illusionist to a maxed account and all
+// six of her charms appear the instant she does — no arc, no on-ramp, a dump. With eight classes
+// planned and *"the other planned classes"* stated as priority #1, that is the whole roster's
+// progression deleted in advance. The hybrid gives every future class its own small ladder for
+// free: **+1 class = ×N content** applies to the meta layer too, but only if the meta layer is
+// per class.
+//
+// ⚠️ THE CLASS LADDER IS AN ON-RAMP, NOT A GRIND — 4 rungs at a cheaper 50 xp, so it opens over
+// about five runs of that class. A new class should feel like it is blooming; starving it for
+// twenty runs would re-create the exact switching penalty the measurement just cleared.
+const CLASS_XP_KEY = cls => 'emberwick-xp-' + cls + '-1' + KEY_NS;
+let CLASS_XP_PER_LEVEL = 50;
+// 🔧 a sweep pins BOTH levels so a measurement is reproducible — see the band note in Balance_Log
 let XP_LEVEL_FORCE = 0;
+let CLASS_LEVEL_FORCE = 0;
 function loadXP() { try { const n = parseInt(localStorage.getItem(XP_KEY), 10); return n > 0 ? n : 0; } catch (e) { return 0; } }
 function saveXP(n) { try { localStorage.setItem(XP_KEY, String(n)); } catch (e) {} }
 // ⚠️ CACHED, not read per call — `charmUnlocked()` runs once per Wheel offer and RUNSIM rolls
 // thousands of them. The cache is refreshed at the one place the number can change.
 let ACCOUNT_XP = loadXP();
+// ⚠️ CACHED PER CLASS for the same reason the account bar is: `charmUnlocked()` runs once per Wheel
+// offer, and the Collection asks it for every charm of every class on one render.
+const CLASS_XP = {};
+function loadClassXP(cls) {
+  if (cls in CLASS_XP) return CLASS_XP[cls];
+  let n = 0;
+  try { const v = parseInt(localStorage.getItem(CLASS_XP_KEY(cls)), 10); if (v > 0) n = v; } catch (e) {}
+  return (CLASS_XP[cls] = n);
+}
+function saveClassXP(cls, n) { CLASS_XP[cls] = n; try { localStorage.setItem(CLASS_XP_KEY(cls), String(n)); } catch (e) {} }
 // ⚠️ CLAMPED AT THE CAP, and that is a design call not a tidy-up: a bar that keeps filling and
 // resetting while unlocking NOTHING is precisely the empty progress bar this system was built to
 // avoid. The number stops where the content stops.
@@ -6269,6 +6328,19 @@ let ACCOUNT_XP = loadXP();
 // already earned are simply revealed. Nobody is ever punished for having played early.
 const levelFor = xp => Math.min(LEVEL_CAP, 1 + Math.floor(xp / XP_PER_LEVEL));
 function accountLevel() { return XP_LEVEL_FORCE || levelFor(ACCOUNT_XP); }
+// each class's ladder is only as tall as its own rungs — a bar must never outlast its content
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW, AND DELIBERATELY. A top-level `const` in a vm
+// script is lexical, so it never lands on the headless sandbox and every probe that needs it has
+// to be remembered in the EXPORTS list. A function declaration lands there by itself. **That is
+// the third time in two builds this binding rule has cost something** — prefer the declaration for
+// anything an instrument might reasonably want to ask.
+function classCap(cls) {
+  return UNLOCKS.reduce((m, u) => {
+    const c = CHARMS.find(x => x.id === u.id);
+    return (c && c.cls === cls) ? Math.max(m, u.level) : m; }, 1);
+}
+function classLevelFor(cls, xp) { return Math.min(classCap(cls), 1 + Math.floor(xp / CLASS_XP_PER_LEVEL)); }
+function classLevel(cls) { return CLASS_LEVEL_FORCE || classLevelFor(cls, loadClassXP(cls)); }
 function awardXP(n) { if (n > 0 && S) S.xpRun = (S.xpRun || 0) + n; }
 
 // 📦 THE STASH — everything that survives a run. Its own key, like the ladder and the grades.
@@ -6394,9 +6466,13 @@ function bankRun(won) {
   // measurement* — run 1 played a 9-charm pool and run 200 a 23-charm one, and the average would
   // have described a game nobody plays. **An instrument that PROGRESSES is not an instrument.**
   // ⚠️ It would also have written the bot's XP into the player's own bar in the browser.
-  if (XP_LEVEL_FORCE) return;
+  // ⚠️ BOTH BARS BANK HERE, at the one site a run pays out. A second payout site is how the
+  // finale froze the Emberwake; a second bar is twice the chance of making that mistake again.
+  S.clsXpBefore = loadClassXP(CLASS.id);
+  if (XP_LEVEL_FORCE || CLASS_LEVEL_FORCE) return;   // a pinned bar is not a real account
   ACCOUNT_XP += (S.xpRun || 0);
   saveXP(ACCOUNT_XP);
+  saveClassXP(CLASS.id, S.clsXpBefore + (S.xpRun || 0));
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -7738,28 +7814,42 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // is only worth anything if you can SEE that it paid, in the same breath as being told you died.
 // ⭐ ONE BAR, DRAWN IN ONE PLACE. The summary and the Collection show the same thing, so they ask
 // the same function — the `computeAction()` rule applied to a display: two copies drift.
-function xpBarHTML(xp, note) {
-  const lv = levelFor(xp), into = xp % XP_PER_LEVEL, pct = Math.round(100 * into / XP_PER_LEVEL);
-  const capped = lv >= LEVEL_CAP;
-  const next = capped ? '' : (() => { const up = unlocksAt(lv + 1);
-    return up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`; })();
-  return `<div class="xp"><div class="xp-top"><b>⭐ Level ${lv}</b>` +
-    `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${XP_PER_LEVEL} xp`}</span></div>` +
+// ⚠️ ONE COMPONENT, TWO LADDERS — `cls` picks which. Writing a second bar function is how the two
+// would drift, and this screen's whole job is that the two bars read as the same KIND of thing.
+function xpBarHTML(cls, note) {
+  const xp = cls ? loadClassXP(cls) : ACCOUNT_XP;
+  const per = cls ? CLASS_XP_PER_LEVEL : XP_PER_LEVEL;
+  const cap = cls ? classCap(cls) : LEVEL_CAP;
+  const lv = cls ? classLevelFor(cls, xp) : levelFor(xp);
+  const into = xp % per, pct = Math.round(100 * into / per);
+  const capped = lv >= cap;
+  const up = capped ? [] : unlocksAt(lv + 1, cls);
+  const next = capped ? '' : (up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`);
+  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls}` : 'Level';
+  return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top"><b>${cls ? '🎭' : '⭐'} ${name} ${lv}</b>` +
+    `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${per} xp`}</span></div>` +
     `<div class="xp-bar"><i style="width:${capped ? 100 : pct}%"></i></div>` +
     (note || next ? `<div class="xp-next">${note || next}</div>` : '') + `</div>`;
 }
 // 🔑 THE LEVEL-UP IS THE MOMENT, so it is NAMED. A run that ends "+47 xp" is a number; one that
 // ends "Cold Iron unlocked" is a reason to start another. ⚠️ Reads the span the run crossed, not
 // just the final level — a very good run can cross two.
+// 🔑 THE CLASS BAR IS SHOWN FIRST, because it is the one tied to what you just played — the run
+// was a mage run, so the mage's ladder is the closer story.
 function xpGainedHTML() {
-  const before = S.xpBefore || 0, gained = S.xpRun || 0, after = before + gained;
+  const gained = S.xpRun || 0;
   if (!gained) return '';
-  const got = [];
-  for (let lv = levelFor(before) + 1; lv <= levelFor(after); lv++)
-    for (const u of unlocksAt(lv)) got.push(`<span class="xp-got">🔓 ${unlockName(u)}</span>`);
-  return xpBarHTML(after, got.length
-    ? `<b>+${gained} xp</b> · ${got.join(' ')}`
-    : `<b>+${gained} xp</b>`);
+  const opened = (before, cls) => {
+    const per = cls ? CLASS_XP_PER_LEVEL : XP_PER_LEVEL, out = [];
+    const at = x => cls ? classLevelFor(cls, x) : levelFor(x);
+    for (let lv = at(before) + 1; lv <= at(before + gained); lv++)
+      for (const u of unlocksAt(lv, cls)) out.push(`<span class="xp-got">🔓 ${unlockName(u)}</span>`);
+    return out;
+  };
+  const cls = CLASS.id;
+  const c = opened(S.clsXpBefore || 0, cls), a = opened(S.xpBefore || 0, null);
+  return xpBarHTML(cls, `<b>+${gained} xp</b>${c.length ? ' · ' + c.join(' ') : ''}`) +
+         xpBarHTML(null, `<b>+${gained} xp</b>${a.length ? ' · ' + a.join(' ') : ''}`);
 }
 
 function haulHTML() {
@@ -8830,27 +8920,32 @@ function renderControls() {
     // 🔑 IT IS A LADDER NOW, NOT A TIER LIST — and it reads top-down as what you HAVE, then what
     // is next, then what is far off. ⚠️ A locked charm shows its full text on purpose: a goal you
     // cannot read is not a goal, and this is the screen whose whole job is to be wanted.
-    const lv = accountLevel();
-    const charmRow = (x, at) => `<div class="coll-row${at && at > lv ? ' is-locked' : ''}">` +
-      `<b>${x.name}</b>${x.cls ? `<span class="coll-tag">${x.cls}</span>` : ''}` +
-      (at && at > lv ? `<span class="coll-lock">⭐ ${at}</span>` : '') +
-      `<span class="coll-text">${x.text}</span></div>`;
-    const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
-    const have = UNLOCKS.filter(u => u.level <= lv), want = UNLOCKS.filter(u => u.level > lv);
+    // 🔑 THE SCREEN IS SPLIT BY LADDER, because that IS the rule and a shelf that hides its own
+    // rule teaches nothing. You can see at a glance that generic charms come from playing at all
+    // and a class's charms come from playing HER.
     const byId = id => CHARMS.find(x => x.id === id);
+    const charmRow = (x, at, open) => `<div class="coll-row${at && !open ? ' is-locked' : ''}">` +
+      `<b>${x.name}</b>` + (at && !open ? `<span class="coll-lock">${x.cls ? '🎭' : '⭐'} ${at}</span>` : '') +
+      `<span class="coll-text">${x.text}</span></div>`;
+    const rungs = cls => UNLOCKS.filter(u => (byId(u.id).cls || null) === (cls || null))
+      .map(u => charmRow(byId(u.id), u.level, u.level <= (cls ? classLevel(cls) : accountLevel())));
+    const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
+    const owned = CHARMS.filter(x => !x.curse && charmUnlocked(x)).length;
     const block = (head, list) => list.length
       ? `<div class="coll-tier"><h4>${head} <span class="dim">· ${list.length}</span></h4>${list.join('')}</div>` : '';
     c.innerHTML =
       `<div class="phase-label">🎁 COLLECTION</div>` +
-      xpBarHTML(ACCOUNT_XP) +
-      `<div class="hint">Every encounter you walk earns xp, win or lose. Each level opens one more ` +
-      `charm the 🎰 Wheel and 🏕️ Setting Out may offer you — <b>${starters.length + have.length} of ` +
-      `${starters.length + UNLOCKS.length}</b> so far.</div>` +
+      `<div class="hint">Every encounter you walk earns xp, win or lose — on <b>both</b> bars. ` +
+      `⭐ your account level opens the charms any class can use; 🎭 a class level opens that ` +
+      `class's own. <b>${owned} of ${CHARMS.filter(x => !x.curse).length}</b> open so far.</div>` +
+      xpBarHTML(null) +
       `<div class="coll">` +
         block('yours from the start', starters.map(x => charmRow(x))) +
-        block('unlocked by play', have.map(u => charmRow(byId(u.id), u.level))) +
-        block('still ahead', want.map(u => charmRow(byId(u.id), u.level))) +
+        block('⭐ by playing at all', rungs(null)) +
       `</div>` +
+      Object.keys(CLASSES).filter(k => rungs(k).length).map(k =>
+        xpBarHTML(k) + `<div class="coll">${block('🎭 by playing ' + ((CLASSES[k] && CLASSES[k].name) || k), rungs(k))}</div>`
+      ).join('') +
       `<div class="coll-soon">🚧 <b>Not built yet:</b> the 🚫 <b>ban list</b> — one charm disabled ` +
       `per five unlocked, so you shape the pool without pre-solving the run.</div>` +
       `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
@@ -8875,10 +8970,15 @@ function renderControls() {
       `</div></div>` +
       // ⭐ the charm pool the run will draw from. ⚠️ Applies immediately and persists — it is the
       // real bar, not a pin, so a jump made here is the game a player at that level would get.
-      `<div class="dev-row"><span>⭐ Level</span><div>` +
-        [1, 4, 8, 12, LEVEL_CAP].map(n =>
+      `<div class="dev-row"><span>⭐ Account</span><div>` +
+        [1, 3, 6, 9, LEVEL_CAP].map(n =>
           `<button class="dev-pick${accountLevel() === n ? ' on' : ''}" onclick="devLevel(${n})">` +
           `${n}${n === LEVEL_CAP ? ' (max)' : ''}</button>`).join('') +
+      `</div></div>` +
+      `<div class="dev-row"><span>🎭 ${CLASS.name}</span><div>` +
+        Array.from({ length: classCap(CLASS.id) }, (_, i) => i + 1).map(n =>
+          `<button class="dev-pick${classLevel(CLASS.id) === n ? ' on' : ''}" onclick="devClassLevel(${n})">` +
+          `${n}${n === classCap(CLASS.id) ? ' (max)' : ''}</button>`).join('') +
       `</div></div>` +
       // 🛡️ one row per OPEN slot. ⚠️ A dev tool, and dev tools port last if ever — the real
       // picker is the Workshop, and this row is deleted the day it lands.
@@ -8935,7 +9035,12 @@ function renderControls() {
           const cls = CLASSES[id], t = cls && cls.trait, open = classUnlocked(id);
           return `<button class="class-pick${picked === id ? ' on' : ''}${open ? '' : ' locked'}"` +
             (open ? ` onclick="pickClass('${id}')"` : ' disabled') + `>` +
-            `<b>${name}</b><span class="class-line">${line}</span>` +
+            `<b>${name}</b>` +
+            // 🎭 HER OWN LADDER, ON HER OWN CARD. The picker is where you choose who to play, so it
+            // is the one screen where "how far along am I with her" is the deciding fact.
+            (open && classCap(id) > 1
+              ? `<span class="class-lv">🎭 ${classLevel(id)}<i>/${classCap(id)}</i></span>` : '') +
+            `<span class="class-line">${line}</span>` +
             (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> ${t.text}</span>` : '') +
             (open ? '' : `<span class="class-trait dim">🔒 fell a dragon to unlock her</span>`) +
             `</button>`;

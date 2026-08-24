@@ -1022,6 +1022,14 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* a charm the run just opened — the thing the level is actually for */
 .xp-got { display: inline-block; margin: 3px 4px 0 0; padding: 1px 7px; border-radius: 999px;
   background: rgba(201,162,74,.18); border: 1px solid rgba(201,162,74,.5); color: #f0d9a8; }
+/* 🎭 the class's own ladder, worn on her card in the picker */
+.class-lv { position: absolute; top: 10px; right: 12px; font-size: 12px; color: #f0d9a8;
+  font-variant-numeric: tabular-nums; }
+.class-lv i { font-style: normal; opacity: .55; }
+.class-pick { position: relative; }
+/* the class bar reads as the same KIND of thing as the account bar, one shade warmer */
+.xp.is-cls .xp-bar i { background: linear-gradient(90deg, #7fb0c4, #a9d8ea); }
+
 /* 🔒 a locked charm is dimmed but fully readable — a goal you cannot read is not a goal */
 .coll-row.is-locked { opacity: .55; }
 .coll-lock { margin-left: 6px; font-size: 11px; color: #c9a24a; white-space: nowrap; }
