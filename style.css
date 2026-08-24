@@ -945,13 +945,25 @@ button.stage.locked .stage-shape { font-style: italic; }
   border: 1px solid rgba(201,162,74,.34);
   background: radial-gradient(120% 90% at 50% 20%, #2a221a 0%, #17140f 70%, #100e0a 100%);
   display: flex; align-items: center; justify-content: center; }
+/* 🔑 THE PICTURE IS VISIBLE BY DEFAULT AND THE EMBLEM SITS BEHIND IT (fixed 2026-08-23).
+   The old version faded in on a `has-art` class added by the img's `onload` — and a CACHED image
+   may never fire onload, so the art downloaded fine and sat at opacity 0 with the emblem over it.
+   It worked on the first load and broke on every revisit.
+   ⚠️ The fallback is a matter of STACKING now, not of a class that has to be applied: a missing
+   file removes itself via `onerror` and the emblem is simply revealed. The fade is a CSS animation
+   on the element itself, so it plays on load without anything having to notice. */
+/* ⚠️ NO FADE. I tried a CSS keyframe here and it stuck at opacity 0 — computed style said the
+   animation was defined, filled `both` and `running`, and it still never reached its end state.
+   🔑 I stopped chasing it, and that is the correct call rather than a shrug: **a fade-in on a
+   portrait is PRESENTATION**, which is the one category the standing rule says not to build in
+   this prototype — it is exactly what the engine is for. Two failed attempts at fading this
+   picture in (an `onload` class, then a keyframe) is two more than it was ever worth.
+   The picture is simply visible. */
 .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  object-position: top center; opacity: 0; transition: opacity .35s ease; }
-.hero-art.has-art .hero-img { opacity: 1; }
-.hero-art.has-art .hero-fallback { display: none; }
+  object-position: top center; z-index: 1; }
 /* the emblem stands in until there is a picture — deliberately large and quiet */
-.hero-fallback { font-size: 92px; opacity: .18; line-height: 1; }
-.hero-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 11px;
+.hero-fallback { font-size: 92px; opacity: .18; line-height: 1; z-index: 0; }
+.hero-cap { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 26px 14px 11px;
   display: flex; flex-direction: column; gap: 1px; text-align: left;
   background: linear-gradient(to top, rgba(8,7,6,.92), rgba(8,7,6,.55) 55%, transparent); }
 .hero-cap b { font-size: 17px; color: #f0d9a8; letter-spacing: .02em; }

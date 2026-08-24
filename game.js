@@ -8778,8 +8778,19 @@ function renderControls() {
             // ⚠️ .jpg, not .png. Key art has a solid dark ground and needs no alpha, and the PNG
             // was 2.2 MB against 197 KB for a JPEG at q90 — eleven times the weight for a channel
             // nothing uses. The FOE plates stay PNG because their transparency is the whole point.
+            //
+            // 🐛 NO `onload` GATE HERE, AND THAT IS THE FIX. It used to add a `has-art` class that
+            // CSS faded the picture in with — and A CACHED IMAGE MAY NEVER FIRE `onload`, because
+            // it can already be complete by the time the handler is attached. Result: the art was
+            // fully downloaded, sitting at opacity 0, with the emblem showing over it. It worked
+            // the first time and broke on every revisit, which is the worst way for a bug to
+            // behave. (Same family as the 2026-08-12 scene flicker: a fade keyed to element
+            // creation is a lie the moment anything re-renders.)
+            // 🔑 THE PICTURE IS VISIBLE BY DEFAULT AND THE EMBLEM SITS BEHIND IT. A missing file
+            // still removes itself via `onerror`, so the emblem shows through exactly as before —
+            // the fallback is now a matter of STACKING, not of a class that has to be applied.
             `<img class="hero-img" alt="" src="art/classes/${picked}.jpg?v=${BUILD}" ` +
-              `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()">` +
+              `onerror="this.remove()">` +
             `<div class="hero-fallback">${t ? t.icon : '✦'}</div>` +
             `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
             `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +

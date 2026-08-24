@@ -1,0 +1,4 @@
+# 🖼️ generation takes are working files — the picked one is installed as art/classes/<class>.jpg.
+# Six 2K PNGs per round is ~30 MB and none of it ships; keeping them out of the repo keeps the
+# GitHub Pages deploy small. They stay on disk locally as the reference/model sheets.
+art/classes/takes/
