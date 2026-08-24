@@ -1853,6 +1853,12 @@ const TUTORIAL = {
       { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 3, xp: 5 },
       { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
+      // 🗺️ FLOOR 6's PAIR, added 2026-08-23 with the tutorial map. The fork needs a ⚔️ fight AND
+      // a 👣 journey on every floor, so region 2 holds SIX in strict fight/journey order —
+      // `tutorialMap()` slices them in twos and the order IS the pairing. ⚠️ Add here in pairs or
+      // a floor will offer two of the same kind and the fork stops teaching what it exists to teach.
+      { type: 'fight',   name: 'Ashback',     hp: 11, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
+      { type: 'journey', name: 'The Guttering Stair', mp: 9, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
   ],
   // 📖 THE OPENING BRIEF — you read these before the first card is dealt. Thomas asked for a
@@ -1956,22 +1962,38 @@ const TUTORIAL = {
       point: '#encounter-panel .enc-stats span:nth-child(3)',
       text: '⏳ <b>Time Penalty</b> is what arriving late costs — cards burned off the top of your deck. On a journey you lose <b>time</b>, not blood.' },
 
-    { id: 'slots', when: () => S.turn === 1 && isAssignPhase(),
+    { id: 'slots', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '#slots-panel',
       text: 'Your four cards sit under four labels — <b>position is the role</b>. Tap two cards to swap them, or tap a card then tap a label.' },
-    { id: 'spent', when: () => S.turn === 1 && isAssignPhase(),
+    { id: 'spent', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Spell',
       text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
-    { id: 'arsenal', when: () => S.turn === 1 && isAssignPhase(),
+    { id: 'arsenal', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Reserve',
       text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
             'It is the only slot that works the same way for every class, so it is the one anchor that never moves.' },
     // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
     // decides whether banking is informed or a bet, and nothing had ever named it.
-    { id: 'candle', when: () => isAssignPhase() && S.candle && !!nextEncounter(),
-      point: '.candle',
-      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its defence. ' +
-            'Plan two encounters, not one.' },
+    // 🗺️ THE MAP ITSELF — the first screen of every run, and it had no lesson because until
+    // today the tutorial had no map. ⚠️ FIRST IN THE LIST, because it is the first thing you see.
+    // 🔑 The tutorial's map is a SPINE then a FORK: region 1 gives one road so you learn what a node
+    // is, region 2 gives two so you learn that the choice is yours. **Teach the noun, then the verb.**
+    { id: 'map', when: () => S.phase === 'map',
+      point: '.mp',
+      text: '🗺️ This is the road ahead, and you climb it from the bottom. Each stop is one encounter — ' +
+            '◇ the road, ❓ an event, 🕯️ a hearth. Tap a stop you can reach to take it. ' +
+            'Further up the road <b>forks</b>, and then <b>which problem you face is your choice</b>.' },
+    // 🕯️ REWRITTEN FOR THE MAP (2026-08-23). The old lesson said *"you can see what comes
+    // after this — its HP, its speed"*, which was true of the QUEUE. `nextEncounter()` returns null
+    // whenever a map exists — its own comment says so — so with the tutorial map this lesson could
+    // never fire, and if it had, it would have described a system that no longer chooses anything.
+    // 🔑 **When a system stops driving something, find every reader that still trusts it** — including
+    // the ones that only teach.
+    { id: 'candle', when: () => S.phase === 'map' && S.candle,
+      point: '.mp-peek, .mp',
+      text: '🕯️ Your candle is <b>lit</b>, so you can read the roads before you take one — what waits ' +
+            'there and what it will ask of you. Only a <b>Complete</b> keeps it burning; a narrow win, a loss ' +
+            'or nightfall snuffs it. <b>Then you choose blind.</b>' },
     { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
       point: '.candle',
       text: '🕯️ It went out. Only a <b>Complete</b> keeps it lit — a Narrow or a loss snuffs it, and you travel blind until you come through one cleanly. ' +
@@ -3616,7 +3638,7 @@ function freshGame(stage) {
   scheduleRegionEvent();   // 🏕️ legacy: kept for the tutorial, which does not use the map
   // 🗺️ THE MAP IS THE RUN. ⚠️ Not for the tutorial - stage 0 is deterministic by design, and
   // a route is the one thing a scripted lesson cannot script.
-  S.map = S.tutorial ? null : generateMap();
+  S.map = S.tutorial ? tutorialMap() : generateMap();
   // ⚠️ ON A MAP RUN THE FIRST HAND IS DEALT WHEN YOU SET OFF, NOT BEFORE. This is the exact case
   // Thomas hit: *"i just started a new game, i see my whole hand, and i see all 3 encounters."*
   // Turn 1 is the one route you take with NO Arsenal, so it is the purest version of the choice -
@@ -4381,6 +4403,66 @@ function eliteVersion(e) {
 // time is worse than no icon, because it is trusted.
 function mapNode(f, c) { return { f, c, type: 'normal', kind: 'fight', next: [], enc: null, done: false }; }
 
+// 🎓 THE TUTORIAL'S MAP (2026-08-23, Thomas: *"yeah do a tutorial map, with authored encounters"*).
+//
+// 🔴 THE GAP IT CLOSES: stage 0 was a linear list of eight encounters while every real run OPENS on
+// the map screen. A new player was taught a structure the game no longer has, then met the first
+// decision of every run with no preparation. The map landed six days after the last tutorial audit
+// and nothing connected the two.
+//
+// 🔑 THE TENSION, AND HOW IT IS RESOLVED: the tutorial is deterministic **on purpose** — fixed
+// seed, authored deck order, authored encounter order — so lessons fire in a planned sequence. A
+// map introduces choice, which breaks that. So the map is built in two halves:
+//   • **Region 1 (floors 0-3) is a SPINE.** One node per floor, no choice. You learn that a node is
+//     a thing you tap and that the road runs upward — and the authored teaching order is exact.
+//     ⚠️ This deliberately breaks the real map's *"the first floor must be a choice"* rule. That
+//     rule exists so a RUN opens on a decision; the tutorial's first floor exists so a PLAYER
+//     learns what a node is. **Teach the noun before the verb.**
+//   • **Region 2 (floors 4-6) is a FORK.** Two nodes a floor, and they are always a ⚔️ fight and a
+//     👣 journey — the clearest possible statement of what the map is for: *you choose which kind
+//     of problem to take.* Both branches rejoin, so no lesson can be missed by routing.
+//   • **Floor 7 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
+//     also teaches the hearth, previously untaught anywhere.
+//
+// ⚠️ NO `rnd()` ANYWHERE IN HERE. The tutorial's determinism is the thing that makes its lessons
+// fire in order; a shuffled tutorial map would quietly reintroduce the problem this solves.
+function tutorialMap() {
+  const R = TUTORIAL.regions;
+  const spine = R[0].encounters;          // 4, one per floor, no choice
+  const fork  = R[1].encounters;          // 8, a fight and a journey per floor
+  const floors = [];
+  const C = 2;                            // the tutorial map is two columns wide
+  for (let f = 0; f < 8; f++) floors.push(new Array(C).fill(null));
+  const put = (f, c, enc, type) => {
+    const n = mapNode(f, c);
+    n.enc = enc || null;
+    n.type = type || 'normal';
+    n.kind = enc && enc.type === 'journey' ? 'journey' : 'fight';
+    floors[f][c] = n;
+    return n;
+  };
+  // — the spine, column 0, each pointing at the next
+  for (let f = 0; f < 4; f++) {
+    const n = put(f, 0, spine[f]);
+    n.next = [f === 3 ? 0 : 0];           // floor 3 leads into the fork's left node
+  }
+  floors[3][0].next = [0, 1];             // the first real choice on the map
+  // — the fork: three floors, a fight on the left and a journey on the right
+  for (let f = 4; f < 7; f++) {
+    const pair = fork.slice((f - 4) * 2, (f - 4) * 2 + 2);
+    const fightEnc = pair.find(e => e.type === 'fight') || pair[0];
+    const roadEnc  = pair.find(e => e.type === 'journey') || pair[1];
+    const a = put(f, 0, fightEnc), b = put(f, 1, roadEnc);
+    // ⚠️ both nodes on a floor lead to BOTH nodes above, so the branches rejoin every floor and
+    // no path can miss a kind of encounter. A tutorial must not let routing hide a lesson.
+    const up = f === 6 ? [0] : [0, 1];
+    a.next = up.slice(); b.next = up.slice();
+  }
+  // — the hearth below the lair, exactly as a real map ends
+  put(7, 0, null, 'hearth');
+  return { floors, pos: null, taken: [] };
+}
+
 function generateMap() {
   const floors = [];
   for (let f = 0; f < MAP_FLOORS; f++) floors.push(new Array(MAP_COLS).fill(null));
@@ -4490,18 +4572,32 @@ function generateMap() {
 
 // 🗺️ which nodes you may move to right now: floor 0 if you have not started, else the
 // current node's `next` on the floor above.
+// 🗺️ HOW TALL IS *THIS* MAP. ⚠️ The three readers below asked the global `MAP_FLOORS`, which is
+// fine while every map is 16 floors and wrong the moment one is not — the tutorial's is 8, and a
+// map whose top the game cannot recognise is a run that never ends.
+// 🔑 EXACTLY THE BUG JUST FIXED IN solver.js ONE COMMIT AGO (`REGIONS.length` where `RUN().length`
+// was meant), in the same shape: **an object carries the fact, and a reader asks the global
+// instead.** The general form is worth stating once: *if the thing in your hand knows, do not ask
+// the room.*
+const mapFloors = m => (m && m.floors ? m.floors.length : MAP_FLOORS);
 function mapChoices(m) {
   if (!m) return [];
   if (!m.pos) return m.floors[0].filter(Boolean);
   const { f, c } = m.pos;
-  if (f >= MAP_FLOORS - 1) return [];
+  if (f >= mapFloors(m) - 1) return [];
   const here = m.floors[f][c];
   return (here ? here.next : []).map(x => m.floors[f + 1][x]).filter(Boolean);
 }
 
 // 🗺️ the region band a floor belongs to (1-based), so encounter pools and hardship density
 // still come from the road's own regions.
-function bandOf(f) { return Math.min(4, Math.floor(f / MAP_BAND) + 1); }
+// ⚠️ Derived from the ROAD's own region count and the map's own height, so an 8-floor tutorial
+// over 2 regions bands correctly (4 floors each) without a branch.
+function bandOf(f) {
+  const regions = RUN().length;
+  const band = Math.max(1, Math.round(mapFloors(S && S.map) / regions));
+  return Math.min(regions, Math.floor(f / band) + 1);
+}
 
 // ⚠️ EVENT NODES USE ❓, NOT ✦ (2026-08-18). Thomas: *"place on the road should be called an
 // event, and with a ? symbol instead of the diamond, too similar with encounter."*
@@ -7204,7 +7300,7 @@ function backToMap() {
   // already paid and permanent - the cards you LOST at Lv1 are gone, so the deck you reshuffle is
   // thinner every time, which is the deck-as-health pressure doing its job without a cliff.
   const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
-  const atTop = m.pos && m.pos.f >= MAP_FLOORS - 1;
+  const atTop = m.pos && m.pos.f >= mapFloors(m) - 1;
   if (atTop) {
     log(`The road runs out. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
     S.phase = 'summary';
@@ -8209,8 +8305,8 @@ function drawMapEdges() {
   };
   const here = S.map.pos;
   const parts = [];
-  for (let f = 0; f < MAP_FLOORS - 1; f++) {
-    for (let c = 0; c < MAP_COLS; c++) {
+  for (let f = 0; f < mapFloors(S.map) - 1; f++) {
+    for (let c = 0; c < S.map.floors[f].length; c++) {
       const n = S.map.floors[f][c]; if (!n) continue;
       const a = centre(f, c); if (!a) continue;
       for (const nc of n.next) {
@@ -8295,6 +8391,9 @@ function render() {
     // which is why a hard crash read as *"clicking does nothing"* instead of as a crash.
     // ⚠️ The error is NOT swallowed; it still propagates. This only guarantees the UI ends in a
     // consistent state on the way out.
+    // 🎓 BEFORE applyModal(), which RELOCATES the panel's markup into the centred dialog —
+    // inject afterwards and the row lands in an element that has just been emptied.
+    injectLesson($('controls-panel'));
     applyModal();
     animateXPBars();
   }
@@ -8748,10 +8847,13 @@ function mapHTML() {
   const m = S.map; if (!m) return '';
   const reach = mapChoices(m).map(n => n.f + ',' + n.c);
   const rows = [];
-  for (let f = MAP_FLOORS - 1; f >= 0; f--) {
+  // ⚠️ THE MAP'S OWN HEIGHT AND WIDTH, never the globals. The tutorial's map is 8x2 while
+  // MAP_FLOORS/MAP_COLS say 16x5 — reading the globals walked off the end of every row and threw
+  // before a single node was drawn. **Third reader of this same mistake in one session.**
+  for (let f = mapFloors(m) - 1; f >= 0; f--) {
     const band = bandOf(f);
     const cells = [];
-    for (let c = 0; c < MAP_COLS; c++) {
+    for (let c = 0; c < m.floors[f].length; c++) {
       const n = m.floors[f][c];
       if (!n) { cells.push('<span class="mp-gap"></span>'); continue; }
       const key = f + ',' + c;
@@ -8781,7 +8883,7 @@ function mapHTML() {
     // row of the lower band reading downward: floors 11/7/3. ⚠️ And never above the top row.
     const bandStart = f % MAP_BAND === MAP_BAND - 1 && f !== MAP_FLOORS - 1;
     rows.push(`<div class="mp-row${bandStart ? ' mp-band' : ''}">` +
-      `<span class="mp-f">${f === MAP_FLOORS - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
+      `<span class="mp-f">${f === mapFloors(m) - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
   }
   // 🗺️ THE LINES ARE THE MAP. Without them this is a grid of icons where the game decides
   // where you may go for reasons you cannot see - Thomas, pointing at an unreachable neighbour:
@@ -9490,6 +9592,42 @@ function renderControls() {
         : `<button class="primary" onclick="nextRegion()">Enter ${RUN()[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
           `<button onclick="showStages()">Restart from scratch</button>`);
   }
+
+  // 🎓 THE LESSON ROW BELONGS TO EVERY PHASE, NOT JUST `assign` (fixed 2026-08-23).
+  //
+  // 🔴 IT WAS BUILT IN EXACTLY ONE BRANCH while **nine lessons are gated on other phases** —
+  // 🗺️ map, 🕯️ candle, 🦴 carve, soak, stack, wheel, charm, ⭐ levels and event. Every one
+  // of them passed `nextLesson()` and **never reached the screen**, because whatever was rendering
+  // at that moment did not draw a lesson row at all.
+  //
+  // 🔑 THIS IS *"A RULE THAT FIRES WITHOUT APPEARING"* — the same shape as the Guard reveal, the
+  // multi-hit card face and the Momentum split. And my own tutorial audit walked straight past it,
+  // because **it asked the RULE (does `nextLesson()` return something) and never asked the SCREEN.**
+  // An audit that checks the model and not the view finds exactly the bugs it was built to find,
+  // and no others.
+  //
+  // ⚠️ NOT CALLED HERE — see render(). This function has SEVEN early returns (map, hearth,
+  // eliteboon, mendpick, hearthpick, fork, and assign-without-an-encounter), and every one of them
+  // is a phase with a lesson. An injection at the bottom reaches none of them.
+  // 🔑 The fix belongs one level up, for the same reason applyModal() lives in render()'s
+  // `finally`: **a step that must happen for every phase cannot live inside a function that
+  // returns early for half of them.**
+}
+
+// 🎓 put the lesson under the phase label of whatever screen is showing.
+// ⚠️ Skips the shell (menu / Collection / Workshop): those exist outside a run, and a tutorial
+// tip on the main menu would be pointing at nothing.
+function injectLesson(c) {
+  if (!c || isShell() || (S && S.lessonsOff)) return;
+  if (c.querySelector && c.querySelector('.lesson-row')) return;   // the assign branch built its own
+  const L = nextLesson();
+  if (!L) return;
+  const row = `<div class="lesson-row"><span>🎓 ${L.text}</span>` +
+    `<span class="lesson-btns"><button class="primary" onclick="learned('${L.id}')">got it</button>` +
+    `<button onclick="S.lessonsOff=true;render()">hide tips</button></span></div>`;
+  const label = c.querySelector && c.querySelector('.phase-label');
+  if (label && label.insertAdjacentHTML) label.insertAdjacentHTML('afterend', row);
+  else c.innerHTML = row + c.innerHTML;
 }
 
 // hint shown under each zone label

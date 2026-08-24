@@ -449,9 +449,16 @@ const RUNSIM = (() => {
   // 🗺️ best route from each reachable node to the top, by dynamic programming up the floors.
   // Returns the immediate step that begins the best route.
   function mapRoute(m, opts) {
+    // ⚠️ THE MAP'S OWN HEIGHT AND WIDTH, never the globals — the tutorial's map is 8×2 while
+    // MAP_FLOORS/MAP_COLS say 16×5, and `F[f][c]` on a floor that does not exist throws before the
+    // bot has routed a single node. **Fourth reader of this same mistake today** (solver's
+    // `REGIONS.length`, the map render's two, and now this).
+    // 🔑 THE RULE, STATED ONCE PROPERLY: **if the object in your hand knows its own size, never
+    // ask the global.** Every one of these was invisible until something stopped being the default
+    // shape — which is exactly when a hardcoded default is most expensive.
     const F = m.floors, best = {};
-    for (let f = MAP_FLOORS - 1; f >= 0; f--) {
-      for (let c = 0; c < MAP_COLS; c++) {
+    for (let f = F.length - 1; f >= 0; f--) {
+      for (let c = 0; c < F[f].length; c++) {
         const n = F[f][c]; if (!n) continue;
         let onward = 0;
         for (const nc of n.next) {
