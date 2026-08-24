@@ -1853,12 +1853,6 @@ const TUTORIAL = {
       { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 3, xp: 5 },
       { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
-      // 🗺️ FLOOR 6's PAIR, added 2026-08-23 with the tutorial map. The fork needs a ⚔️ fight AND
-      // a 👣 journey on every floor, so region 2 holds SIX in strict fight/journey order —
-      // `tutorialMap()` slices them in twos and the order IS the pairing. ⚠️ Add here in pairs or
-      // a floor will offer two of the same kind and the fork stops teaching what it exists to teach.
-      { type: 'fight',   name: 'Ashback',     hp: 11, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
-      { type: 'journey', name: 'The Guttering Stair', mp: 9, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
   ],
   // 📖 THE OPENING BRIEF — you read these before the first card is dealt. Thomas asked for a
@@ -4418,21 +4412,32 @@ function mapNode(f, c) { return { f, c, type: 'normal', kind: 'fight', next: [],
 //     ⚠️ This deliberately breaks the real map's *"the first floor must be a choice"* rule. That
 //     rule exists so a RUN opens on a decision; the tutorial's first floor exists so a PLAYER
 //     learns what a node is. **Teach the noun before the verb.**
-//   • **Region 2 (floors 4-6) is a FORK.** Two nodes a floor, and they are always a ⚔️ fight and a
-//     👣 journey — the clearest possible statement of what the map is for: *you choose which kind
-//     of problem to take.* Both branches rejoin, so no lesson can be missed by routing.
-//   • **Floor 7 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
+//   • **Region 2 (floors 4-5) is a FORK.** Two nodes a floor, always a ⚔️ fight and a 👣 journey —
+//     the clearest possible statement of what the map is for: *you choose which kind of problem to
+//     take.* Both branches rejoin, so no lesson can be missed by routing.
+//   • **Floor 6 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
 //     also teaches the hearth, previously untaught anywhere.
+//
+// 🖼️ THE FORK IS EXACTLY TWO FLOORS BECAUSE THAT IS WHAT THE ART COVERS. A three-floor fork
+// needs six encounters in region 2 and there are four; the first cut of this map invented two
+// (⚔️ Ashback, 👣 The Guttering Stair) and **silently broke the tutorial's 100% art coverage** —
+// on the one screen every player sees first, in the build about to go to friends.
+// 🔑 `foeArt()` returning nothing on a miss is correct (*art never blocks design*) and is exactly
+// why the hole was invisible from the code. **Content authored without art is content that looks
+// broken and reads as finished.** `dev/art-check.js` exists now so this cannot recur quietly.
+// ✅ Shrinking the fork was the better fix than commissioning two pictures: no new content, the
+// coverage stays complete, and a two-floor fork still means **you genuinely skip half of region 2**,
+// which is what makes the choice real and gives the 🕯️ candle something worth reading.
 //
 // ⚠️ NO `rnd()` ANYWHERE IN HERE. The tutorial's determinism is the thing that makes its lessons
 // fire in order; a shuffled tutorial map would quietly reintroduce the problem this solves.
 function tutorialMap() {
   const R = TUTORIAL.regions;
-  const spine = R[0].encounters;          // 4, one per floor, no choice
-  const fork  = R[1].encounters;          // 8, a fight and a journey per floor
+  const spine = R[0].encounters;          // 4 — one per floor, no choice
+  const fork  = R[1].encounters;          // 4 — a fight and a journey on each of two floors
   const floors = [];
   const C = 2;                            // the tutorial map is two columns wide
-  for (let f = 0; f < 8; f++) floors.push(new Array(C).fill(null));
+  for (let f = 0; f < 7; f++) floors.push(new Array(C).fill(null));
   const put = (f, c, enc, type) => {
     const n = mapNode(f, c);
     n.enc = enc || null;
@@ -4441,25 +4446,21 @@ function tutorialMap() {
     floors[f][c] = n;
     return n;
   };
-  // — the spine, column 0, each pointing at the next
-  for (let f = 0; f < 4; f++) {
-    const n = put(f, 0, spine[f]);
-    n.next = [f === 3 ? 0 : 0];           // floor 3 leads into the fork's left node
-  }
+  // — the spine: floors 0-3, column 0, each pointing at the next
+  for (let f = 0; f < 4; f++) put(f, 0, spine[f]).next = [0];
   floors[3][0].next = [0, 1];             // the first real choice on the map
-  // — the fork: three floors, a fight on the left and a journey on the right
-  for (let f = 4; f < 7; f++) {
+  // — the fork: two floors, a fight on the left and a journey on the right
+  for (let f = 4; f < 6; f++) {
     const pair = fork.slice((f - 4) * 2, (f - 4) * 2 + 2);
-    const fightEnc = pair.find(e => e.type === 'fight') || pair[0];
-    const roadEnc  = pair.find(e => e.type === 'journey') || pair[1];
-    const a = put(f, 0, fightEnc), b = put(f, 1, roadEnc);
-    // ⚠️ both nodes on a floor lead to BOTH nodes above, so the branches rejoin every floor and
-    // no path can miss a kind of encounter. A tutorial must not let routing hide a lesson.
-    const up = f === 6 ? [0] : [0, 1];
+    const a = put(f, 0, pair.find(e => e.type === 'fight')  || pair[0]);
+    const b = put(f, 1, pair.find(e => e.type === 'journey') || pair[1]);
+    // ⚠️ both nodes lead to BOTH nodes above, so the branches rejoin every floor and no path can
+    // miss a kind of encounter. A tutorial must not let routing hide a lesson.
+    const up = f === 5 ? [0] : [0, 1];
     a.next = up.slice(); b.next = up.slice();
   }
   // — the hearth below the lair, exactly as a real map ends
-  put(7, 0, null, 'hearth');
+  put(6, 0, null, 'hearth');
   return { floors, pos: null, taken: [] };
 }
 
