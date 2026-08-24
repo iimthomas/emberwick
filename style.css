@@ -1030,6 +1030,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* the class bar reads as the same KIND of thing as the account bar, one shade warmer */
 .xp.is-cls .xp-bar i { background: linear-gradient(90deg, #7fb0c4, #a9d8ea); }
 
+/* a rung that is not a charm — an armour slot reads as a different KIND of reward */
+.coll-row.is-boon b { color: #a9d8ea; }
+
 /* 🔒 a locked charm is dimmed but fully readable — a goal you cannot read is not a goal */
 .coll-row.is-locked { opacity: .55; }
 .coll-lock { margin-left: 6px; font-size: 11px; color: #c9a24a; white-space: nowrap; }

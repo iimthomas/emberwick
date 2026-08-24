@@ -3010,11 +3010,19 @@ function pieceCardHTML(d, st, equipped) {
     (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
     `<div class="wk-foot">${foot}</div></div>`;
 }
+// 🛡️ the Workshop used to say "two more to earn" unconditionally, which was wrong the moment one
+// of them was earned. It reads the ladder now — *never state a rule about an object without
+// naming the object*, applied to a promise.
+function nextSlotNote() {
+  const next = UNLOCKS.filter(u => u.kind === 'slot' && u.level > accountLevel())
+                      .sort((a, b) => a.level - b.level)[0];
+  return next ? `${next.label.toLowerCase()} at ⭐ ${next.level}` : 'all earned';
+}
 function workshopHTML() {
   const st = loadStash(), worn = loadoutIds();
-  const slots = Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => worn[i] || null);
+  const slots = Array.from({ length: armourSlotsOpen() }, (_, i) => worn[i] || null);
   let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ WHAT YOU WALK IN WEARING` +
-    `<span class="dim"> · ${ARMOUR_SLOTS_OPEN} slots${ARMOUR_SLOTS_OPEN < 4 ? ' — two more to earn' : ''}</span></div>` +
+    `<span class="dim"> · ${armourSlotsOpen()} slots${armourSlotsOpen() < 4 ? ` · ${nextSlotNote()}` : ''}</span></div>` +
     `<div class="wk-slots">` + slots.map(id => {
       if (!id) return `<div class="wk-slot is-empty">empty</div>`;
       const d = armourDef(id);
@@ -3164,8 +3172,8 @@ function devJump() {
   S.dev = d;
   // 🛡️ an explicit dev loadout REPLACES the granted one; leaving every slot 'empty' is how you
   // measure the bare game, which is the state the ladder is tuned at.
-  if (Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => d['arm' + i]).some(Boolean)) {
-    S.armour = Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) => d['arm' + i])
+  if (Array.from({ length: armourSlotsOpen() }, (_, i) => d['arm' + i]).some(Boolean)) {
+    S.armour = Array.from({ length: armourSlotsOpen() }, (_, i) => d['arm' + i])
       .filter(id => id && armourDef(id)).map(id => newArmour(id));
   }
   devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
@@ -4040,6 +4048,17 @@ const UNLOCKS = [
   { level: 9,  kind: 'charm', id: 'slowfoot' },
   { level: 10, kind: 'charm', id: 'oathstone' },
   { level: 11, kind: 'charm', id: 'unspent' },          // the whole-run rethink
+  // 🛡️ AND THE ACCOUNT BAR GIVES SOMETHING THAT IS NOT A CHARM (2026-08-23, Thomas: *"feels like
+  // the account level should give something else as well?"*).
+  // 🔑 ARMOUR SLOTS WERE ALREADY WAITING FOR THIS. `workshopHTML()` has printed *"two more to
+  // earn"* since the day it shipped and there was no way to earn them — the reward existed, the
+  // mechanism did not. **A screen that advertises a thing the game cannot do is a promise.**
+  // 🔑 And it is the right thing for THIS bar specifically: a loadout is account-wide by nature,
+  // it is *what you can BRING*, which is exactly what the account ladder means — leaving the
+  // class ladder to be *what she can DO*. Two bars that hand out the same kind of thing look
+  // like one bar cut in half; two bars that answer different questions read instantly.
+  { level: 3,  kind: 'slot', label: 'A third armour slot' },
+  { level: 6,  kind: 'slot', label: 'A fourth armour slot' },
   // 🎭 THE CLASS LADDERS — read against that class's OWN level, so each is walked separately and
   // every future class brings its own. ⚠️ Same legible→conditional ordering, in miniature.
   { level: 2,  kind: 'charm', id: 'coldiron' },         // ✦ simplest: unattuned strikes +3
@@ -4055,21 +4074,25 @@ const UNLOCK_AT = {};
 for (const u of UNLOCKS) UNLOCK_AT[u.id] = u.level;
 // ⚠️ THE ACCOUNT CAP COUNTS GENERIC RUNGS ONLY. Class rungs are numbered 2-5 against a different
 // bar entirely, so folding them in would have capped the account ladder at 5 and frozen it there.
-const LEVEL_CAP = UNLOCKS.reduce((m, u) => {
-  const c = CHARMS.find(x => x.id === u.id);
-  return (c && !c.cls) ? Math.max(m, u.level) : m; }, 1);
+const LEVEL_CAP = UNLOCKS.reduce((m, u) => !unlockCls(u) ? Math.max(m, u.level) : m, 1);
 // 🐛 A TABLE THAT NAMES A CHARM THAT DOES NOT EXIST IS A LEVEL THAT UNLOCKS NOTHING, silently —
 // the player reaches it, the log says nothing, and the pool never grows. Fail at load instead.
 for (const u of UNLOCKS) {
-  if (!CHARMS.some(c => c.id === u.id)) throw new Error('UNLOCKS names a charm that does not exist: ' + u.id);
+  if (u.kind === 'charm' && !CHARMS.some(c => c.id === u.id))
+    throw new Error('UNLOCKS names a charm that does not exist: ' + u.id);
+  if (u.kind !== 'charm' && !u.label)
+    throw new Error('a non-charm unlock needs a label, or the bar promises nothing: level ' + u.level);
 }
 // ⚠️ A LEVEL NUMBER IS AMBIGUOUS NOW — level 2 exists on three ladders. Every reader must say
 // which one it means, or the account bar would promise you the mage's Cold Iron.
-const unlocksAt = (lv, cls) => UNLOCKS.filter(u => {
-  const c = CHARMS.find(x => x.id === u.id);
-  return u.level === lv && (c ? (c.cls || null) : null) === (cls || null);
-});
-const unlockName = u => (CHARMS.find(c => c.id === u.id) || {}).name || u.id;
+function unlocksAt(lv, cls) { return UNLOCKS.filter(u => u.level === lv && unlockCls(u) === (cls || null)); }
+function unlockName(u) { return u.label || (CHARMS.find(c => c.id === u.id) || {}).name || u.id; }
+// which ladder a row belongs to: a class charm to that class, everything else to the account.
+// ⚠️ A `function` DECLARATION, and this one is not a preference — `LEVEL_CAP` calls it at LOAD
+// time from further up the file, and a `const` arrow would sit in the temporal dead zone and
+// throw before the game ever booted. **Fourth time in three builds that the const/let vs function
+// binding rule has cost something.** If a helper is used by anything evaluated at load, declare it.
+function unlockCls(u) { const c = u.id && CHARMS.find(x => x.id === u.id); return (c && c.cls) || null; }
 
 // ✅ AND HERE IS WHERE THE SIMULATION ENDS (2026-08-23). The gate above was `c.tier <= stageTier()`
 // — the stand-in. It now reads the account level, which is what that note always said it was
@@ -5784,7 +5807,20 @@ const ARMOUR_SLOTS = {
 // moves the duel by +2. Wearing four is a bigger TEACHING surface at almost no power.
 // ✅ Slot count remains available as a progression later — it is just not one today, and pretending
 // otherwise cost nothing but honesty.
+// 🛡️ THE CEILING, not the current count — a tunable so a sweep can still force all four open.
 let ARMOUR_SLOTS_OPEN = 4;
+// 🔑 HOW MANY YOU ACTUALLY WEAR, derived from the account ladder. Two from the first second (a
+// system nobody can use is a system nobody learns), the third and fourth earned.
+// ⚠️ Deliberately EARLY (⭐3 and ⭐6 of 11) — the point is that the loadout grows, not that it is
+// withheld. Both are reached inside about eight runs.
+// ⚠️ AND IT MAKES THE FRESH ACCOUNT SLIGHTLY HARDER, which is the direction asked for: *"i want it
+// tougher now, with meta progression stuff helping make it a bit easier"* later. **Meta progression
+// that only ever adds, from a start that already has everything, is not progression — it is a
+// difficulty ramp pointing down.** You cannot feel a slot open if you were never without it.
+function armourSlotsOpen() {
+  const earned = UNLOCKS.filter(u => u.kind === 'slot' && u.level <= accountLevel()).length;
+  return Math.min(ARMOUR_SLOTS_OPEN, 2 + earned);
+}
 
 // 🔑 A PIECE HAS ONE NUMBER, AND TWO KINDS (Thomas, 2026-08-23):
 //   *"worn 2, blocks for 2, and then doesn't block for anything anymore."*
@@ -5941,7 +5977,7 @@ function breakMat(id) {
 // between runs and survives them, which is the whole point of a loadout.
 function loadoutIds() {
   const st = loadStash();
-  return (st.loadout || []).filter(id => armourDef(id) && armourFitsClass(armourDef(id)) && st.owned.includes(id)).slice(0, ARMOUR_SLOTS_OPEN);
+  return (st.loadout || []).filter(id => armourDef(id) && armourFitsClass(armourDef(id)) && st.owned.includes(id)).slice(0, armourSlotsOpen());
 }
 // ⚠️ ONE PIECE PER SLOT. Equipping a Chest piece replaces the Chest piece you had, never the
 // Head one — the four zones are the whole reason the system has zones.
@@ -6326,7 +6362,7 @@ function saveClassXP(cls, n) { CLASS_XP[cls] = n; try { localStorage.setItem(CLA
 // avoid. The number stops where the content stops.
 // 🔑 And the XP is not thrown away — it keeps banking. Add charms, the cap rises, and the levels
 // already earned are simply revealed. Nobody is ever punished for having played early.
-const levelFor = xp => Math.min(LEVEL_CAP, 1 + Math.floor(xp / XP_PER_LEVEL));
+function levelFor(xp) { return Math.min(LEVEL_CAP, 1 + Math.floor(xp / XP_PER_LEVEL)); }
 function accountLevel() { return XP_LEVEL_FORCE || levelFor(ACCOUNT_XP); }
 // each class's ladder is only as tall as its own rungs — a bar must never outlast its content
 // ⚠️ A `function` DECLARATION, NOT A `const` ARROW, AND DELIBERATELY. A top-level `const` in a vm
@@ -6334,11 +6370,7 @@ function accountLevel() { return XP_LEVEL_FORCE || levelFor(ACCOUNT_XP); }
 // to be remembered in the EXPORTS list. A function declaration lands there by itself. **That is
 // the third time in two builds this binding rule has cost something** — prefer the declaration for
 // anything an instrument might reasonably want to ask.
-function classCap(cls) {
-  return UNLOCKS.reduce((m, u) => {
-    const c = CHARMS.find(x => x.id === u.id);
-    return (c && c.cls === cls) ? Math.max(m, u.level) : m; }, 1);
-}
+function classCap(cls) { return UNLOCKS.reduce((m, u) => unlockCls(u) === cls ? Math.max(m, u.level) : m, 1); }
 function classLevelFor(cls, xp) { return Math.min(classCap(cls), 1 + Math.floor(xp / CLASS_XP_PER_LEVEL)); }
 function classLevel(cls) { return CLASS_LEVEL_FORCE || classLevelFor(cls, loadClassXP(cls)); }
 function awardXP(n) { if (n > 0 && S) S.xpRun = (S.xpRun || 0) + n; }
@@ -7825,7 +7857,14 @@ function xpBarHTML(cls, note) {
   const capped = lv >= cap;
   const up = capped ? [] : unlocksAt(lv + 1, cls);
   const next = capped ? '' : (up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`);
-  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls}` : 'Level';
+  // 🔑 IT IS CALLED MASTERY, NOT A SECOND "LEVEL" (2026-08-23, Thomas: *"character level could be
+  // called mastery instead"*). **Two bars both called Level ARE the confusion** — they invite
+  // *"which level am I?"*, which has no answer. Two bars with different nouns stop being two of
+  // the same thing and become two different things, which is what they always were:
+  //   ⭐ Level   — how much of the GAME is open to you   (what you can BRING)
+  //   🎭 Mastery — how well you know HER                 (what she can DO)
+  // *Level* only ever described the first one. Naming was doing damage for free.
+  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls} Mastery` : 'Level';
   return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top"><b>${cls ? '🎭' : '⭐'} ${name} ${lv}</b>` +
     `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${per} xp`}</span></div>` +
     `<div class="xp-bar"><i style="width:${capped ? 100 : pct}%"></i></div>` +
@@ -8153,7 +8192,7 @@ function renderArmourRail() {
   for (const a of (S.armour || [])) {
     const d = armourDef(a.id); if (d) worn[d.slot] = a;
   }
-  const openSlots = ARMOUR_SLOTS_OPEN;
+  const openSlots = armourSlotsOpen();
   let i = 0;
   el.className = 'has-rail';
   el.innerHTML = RAIL_ORDER.map(slot => {
@@ -8927,17 +8966,26 @@ function renderControls() {
     const charmRow = (x, at, open) => `<div class="coll-row${at && !open ? ' is-locked' : ''}">` +
       `<b>${x.name}</b>` + (at && !open ? `<span class="coll-lock">${x.cls ? '🎭' : '⭐'} ${at}</span>` : '') +
       `<span class="coll-text">${x.text}</span></div>`;
-    const rungs = cls => UNLOCKS.filter(u => (byId(u.id).cls || null) === (cls || null))
-      .map(u => charmRow(byId(u.id), u.level, u.level <= (cls ? classLevel(cls) : accountLevel())));
+    // ⚠️ A ROW MAY NOT BE A CHARM ANY MORE. `byId(u.id).cls` threw on the slot rungs the moment
+    // they were added — the list had silently assumed its own contents for exactly one build.
+    const rungs = cls => UNLOCKS.filter(u => unlockCls(u) === (cls || null)).map(u => {
+      const open = u.level <= (cls ? classLevel(cls) : accountLevel());
+      if (u.kind !== 'charm') return `<div class="coll-row is-boon${open ? '' : ' is-locked'}">` +
+        `<b>🛡️ ${u.label}</b>` + (open ? '' : `<span class="coll-lock">⭐ ${u.level}</span>`) +
+        `<span class="coll-text">One more piece of armour in your loadout.</span></div>`;
+      return charmRow(byId(u.id), u.level, open);
+    });
     const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
     const owned = CHARMS.filter(x => !x.curse && charmUnlocked(x)).length;
     const block = (head, list) => list.length
       ? `<div class="coll-tier"><h4>${head} <span class="dim">· ${list.length}</span></h4>${list.join('')}</div>` : '';
     c.innerHTML =
       `<div class="phase-label">🎁 COLLECTION</div>` +
-      `<div class="hint">Every encounter you walk earns xp, win or lose — on <b>both</b> bars. ` +
-      `⭐ your account level opens the charms any class can use; 🎭 a class level opens that ` +
-      `class's own. <b>${owned} of ${CHARMS.filter(x => !x.curse).length}</b> open so far.</div>` +
+      // 🔑 THE SPLIT, IN THE PLAYER'S WORDS. Two bars only earn their keep if you can say in one
+      // line what each is FOR — if the answer is "the same thing but smaller", it is one bar.
+      `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
+      `⭐ <b>Level</b> is what you can <b>bring</b> — armour slots, and the charms any class can use.<br>` +
+      `🎭 <b>Mastery</b> is what she can <b>do</b> — that class's own charms, earned by playing her.</div>` +
       xpBarHTML(null) +
       `<div class="coll">` +
         block('yours from the start', starters.map(x => charmRow(x))) +
@@ -8982,7 +9030,7 @@ function renderControls() {
       `</div></div>` +
       // 🛡️ one row per OPEN slot. ⚠️ A dev tool, and dev tools port last if ever — the real
       // picker is the Workshop, and this row is deleted the day it lands.
-      Array.from({ length: ARMOUR_SLOTS_OPEN }, (_, i) =>
+      Array.from({ length: armourSlotsOpen() }, (_, i) =>
         `<div class="dev-row"><span>🛡️ Slot ${i + 1}</span><div>` +
         pick('arm' + i, '', 'empty', !d['arm' + i]) +
         ARMOUR.map(x => pick('arm' + i, x.id, `${ARMOUR_SLOTS[x.slot].icon} ${x.name}`, d['arm' + i] === x.id)).join('') +
