@@ -1043,6 +1043,13 @@ button.stage.locked .stage-shape { font-style: italic; }
 .runend-stats .g-bad b { color: #d99a8a; }
 .runend-lost { margin: 8px 2px 0; font-size: 12px; color: #d99a8a; }
 
+/* 🗺️ the door this run opened — the loudest thing on a victory screen */
+.runend-open { margin: 14px 0 4px; padding: 11px 12px; border-radius: 11px;
+  display: flex; flex-direction: column; gap: 3px;
+  background: rgba(127,200,230,.10); border: 1px solid rgba(127,200,230,.42); }
+.runend-open b { color: #a9d8ea; font-size: 15px; }
+.runend-open span { font-size: 12px; color: #b9ae9a; }
+
 /* ⭐ the xp block — the run's other reward, given its own frame above the loot */
 .endxp { margin: 14px 0 4px; padding: 10px 11px 2px; border-radius: 11px;
   background: rgba(201,162,74,.07); border: 1px solid rgba(201,162,74,.28); }

@@ -3540,6 +3540,7 @@ function freshGame(stage) {
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
     loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
+    stageOpened: null,               // 🗺️ set by victory() when this run unlocked the next stage
     // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
     // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
     // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
@@ -7489,14 +7490,35 @@ function startEvent() {
   log(def.flavor);
   render();
 }
+// 🚧 WHY AN EVENT OPTION IS CLOSED TO YOU — or null if it is open. **One predicate, three
+// callers**: the buttons grey themselves with it, `eventChoose()` refuses with it, and the bot
+// picks with it.
+//
+// 🔴 IT EXISTED IN TWO PLACES AND THE BOT HAD NEITHER (found 2026-08-23 while checking the end
+// screen listed every material). `renderControls` computed availability inline to grey a button,
+// `eventChoose` re-checked only the card half, and `solver.js` just called `eventChoose(0)`.
+// On ⏳ The Toll of Thorns option 0 needs a card above Lv1 — so with an all-Lv1 hand the bot
+// chose it, could not complete it, cancelled, chose it again, and **spun until the turn guard
+// killed the run**. Measured at **1 run in 25**, and a stalled run banks NOTHING: no materials,
+// no xp, no grade. Every number quoted from a batch has been ~4% garbage.
+// 🔑 THE RULE THIS EARNS, and it is the arrangement-search lesson one screen over: **a predicate
+// the UI uses to DISABLE something is a rule, and the bot must ask the same one.** A button the
+// player cannot press must be a button the bot cannot choose — otherwise the instrument is playing
+// a game with different legal moves.
+function eventOptionBlocked(o) {
+  if (!o) return 'no such choice';
+  if (o.when && !o.when()) return o.whenNote ? o.whenNote() : 'you cannot afford this';
+  if (o.need === 'card' && !eventPickable(o).length)
+    return S.hand.length ? 'no card in hand can take this' : 'no cards in hand';
+  return null;
+}
 function eventChoose(i) {
   const opt = currentEventDef().options[i];
-  // never ask for a card you cannot possibly give - the player would be stuck on a picker with
+  // never ask for something you cannot possibly give — the player would be stuck on a picker with
   // nothing to pick and only a "back" button to explain it
-  if (opt.need === 'card' && !eventPickable(opt).length) {
-    log(S.hand.length
-      ? `Nothing in your hand can take that — that road is closed to you.`
-      : `You have no cards in hand to offer — that road is closed to you.`, 'bad');
+  const shut = eventOptionBlocked(opt);
+  if (shut) {
+    log(`${shut.charAt(0).toUpperCase()}${shut.slice(1)} — that road is closed to you.`, 'bad');
     render();
     return;
   }
@@ -7996,6 +8018,12 @@ function runEndHTML(won) {
         `<span class="${lost ? 'g-bad' : ''}"><b>${lost}</b> destroyed</span>` +
       `</div>` +
       (lost ? `<p class="runend-lost">Gone for good: ${S.trashed.map(c => c.def.name).join(' · ')}</p>` : '') +
+      // 🗺️ the door this run opened — above the xp and the loot, because it is the biggest of the
+      // three and the only one that changes what you can do NEXT.
+      (won && S.stageOpened ? (S.stageOpened === 'all'
+        ? `<div class="runend-open"><b>🪜 Every stage stands open</b><span>take whichever you like</span></div>`
+        : `<div class="runend-open"><b>🗺️ Stage ${S.stageOpened.stage} — the ${S.stageOpened.name} — is open to you</b>` +
+          `<span>${S.stageOpened.brief}</span></div>`) : '') +
       runXPHTML() +
       haulHTML() +
     `</div>` +
@@ -8995,10 +9023,9 @@ function renderControls() {
       // for a whole EVENT (a pool filter); it is wrong for one option on a screen you are reading.
       body = `<div class="event-flavor">${def.flavor}</div>` +
         `<div class="event-opts">` + def.options.map((o, i) => {
-          let why = null;
-          if (o.when && !o.when()) why = o.whenNote ? o.whenNote() : 'you cannot afford this';
-          else if (o.need === 'card' && !eventPickable(o).length)
-            why = S.hand.length ? 'no card in hand can take this' : 'no cards in hand';
+          // ⚠️ ASKS THE SAME FUNCTION THE RULE USES. This block held its own copy of the test,
+          // which is how the bot came to be allowed a move the button had greyed out.
+          const why = eventOptionBlocked(o);
           return `<button onclick="eventChoose(${i})"${why ? ` disabled title="${why}"` : ''}>${o.label}` +
             (why ? `<span class="opt-why">${why}</span>` : '') + `</button>`;
         }).join('') + `</div>`;
@@ -10403,8 +10430,16 @@ function victory() {
   recordGrade(S.dragon.stage, gradeRun(true), true);
   const next = dragonForStage(S.dragon.stage + 1);
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
-  if (next && S.dragon.stage > was) log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
-  else if (!next) log(`🪜 Every stage stands open — take whichever you like.`, 'good result');
+  // 🗺️ AND THE SCREEN HAS TO SAY IT, not just the log. Clearing a stage OPENS THE NEXT ONE, which
+  // is the largest thing a victory gives you — larger than any material — and it was living in a
+  // scrolling side panel while the summary listed bone shards.
+  // 🔑 Same rule the field row and the status chips were built on: **if it changed, it belongs on
+  // screen.** A reward announced only in the log is a reward most players never read.
+  if (next && S.dragon.stage > was) {
+    S.stageOpened = next;
+    log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
+  }
+  else if (!next) { S.stageOpened = 'all'; log(`🪜 Every stage stands open — take whichever you like.`, 'good result'); }
   // 🐉 the hunt's prize, and the run's pay. ⚠️ Both go through the same helpers the road uses,
   // so a dragon is not a special case — it is an encounter with a better table.
   bankDrops(rollDrops({ dragon: true, name: S.dragon.name, type: 'fight' }, 'Complete'));

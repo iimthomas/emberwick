@@ -830,7 +830,20 @@ const RUNSIM = (() => {
             eventPickCard(t.id);
           }
         }
-        else eventChoose(0);
+        // ⚠️ THE FIRST OPTION THE BOT CAN ACTUALLY COMPLETE, not simply the first one.
+        // `eventChoose(0)` stalled the whole run on any event whose first option was gated —
+        // ⏳ The Toll of Thorns with an all-Lv1 hand, measured at 1 run in 25, and a stalled run
+        // banks nothing at all. 🔑 It asks the ENGINE's own predicate rather than re-deriving
+        // eligibility here; a second copy is what caused this.
+        else {
+          const opts = currentEventDef().options;
+          let pick = -1;
+          for (let n = 0; n < opts.length; n++) if (!eventOptionBlocked(opts[n])) { pick = n; break; }
+          // ⚠️ every event must keep at least one ungated option, or this breaks out loudly
+          // rather than spinning — a stall that reports nothing is worse than a stall that does.
+          if (pick < 0) { m.stuck = (m.stuck || 0) + 1; break; }
+          eventChoose(pick);
+        }
       }
       // 🏕️ SETTING OUT — the opening class-charm pick. ⚠️ Every new PHASE must be taught to
       // this loop or autoRun silently breaks out and reports garbage (it happened with 'wheel').
