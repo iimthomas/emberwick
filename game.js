@@ -1883,12 +1883,12 @@ const TUTORIAL = {
             'Each creature also has a <b>defence</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
     { title: '👣 A journey asks for distance',
       body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
-            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. You do not bleed; you lose the cards you were about to draw. <i>(Only if your deck is already empty does it become damage.)</i><br><br>' +
-            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number the dark catches you: the card in your <b>ARSENAL</b> is discarded, and your 🕯️ candle goes out.<br><br>' +
+            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. These are cards you have not drawn yet, so they cost you no levels. <i>(If your deck is already empty it becomes damage instead.)</i><br><br>' +
+            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.<br><br>' +
             'So a fight punishes you in <b>blood</b> and a journey punishes you in <b>cards and time</b>.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it.<br><br>' +
-            '• Each card you blunt <b>drops one level</b> and soaks its printed <b>🛡️ armour</b>.<br>' +
+      body: 'There is no health bar. Damage is paid with your cards: you pick cards to <b>soak</b> it.<br><br>' +
+            '• A card soaks its printed <b>🛡️</b> number, and <b>drops one level</b>.<br>' +
             '• A card showing <b>🛡️ —</b> cannot soak at all.<br>' +
             '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
             '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
@@ -1920,8 +1920,8 @@ const TUTORIAL = {
             'Win and it never touches you on the way in; lose and it <b>bites first for its ⚔️</b>, even if your blow then kills it.' },
     { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⚔️ <b>Atk</b> is what it does to you — once if it strikes first, and again if you fail to Complete. ' +
-            'You pay that in <b>cards</b>, so a small number is not a small thing.' },
+      text: '⚔️ <b>Atk</b> is what it does to you: once if it strikes first, and again if you fail to Complete. ' +
+            'You pay it in <b>cards</b>.' },
     { id: 'f-shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
       point: '#encounter-panel .enc-stats span:nth-child(4)',
       text: 'Its <b>defence</b> is how it protects itself. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
@@ -1931,17 +1931,16 @@ const TUTORIAL = {
     // never said a word about it — four pieces on screen, from turn one, unexplained.
     // 🔑 Placed straight after ⚔️ Atk on purpose: that lesson ends *"you pay that in CARDS"*, and
     // this is the answer to it. **Teach the cost, then the thing that absorbs the cost.**
-    { id: 'armour', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
+    { id: 'equipment', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
       point: '#armour-rail .eq',
-      text: '🛡️ This is your <b>armour</b> — chosen before the run, never part of your deck. ' +
-            'Each piece <b>blocks once</b>, and blocking is the only thing that takes a hit <i>instead of</i> your cards. ' +
-            'Then it is <b>spent for the run</b>. It is the one health you have that costs you nothing to lose.' },
+      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. ' +
+            'Each piece <b>blocks one hit</b>, then it is <b>spent for the rest of the run</b>. ' +
+            'A blocked hit costs you <b>no cards</b>.' },
     // 🦴 the carve. Fires the moment loot exists, which in stage 0 is the first fight you win.
     { id: 'carve', when: () => S.phase === 'reveal' && Object.keys(S.loot || {}).length > 0,
       point: '.haul, .pv-carve',
-      text: '🦴 Beasts leave <b>parts</b> behind, and parts are the only thing that survives a run — ' +
-            'win or lose. You spend them at the <b>⚒️ Workshop</b> between runs, forging the armour you walk in wearing. ' +
-            '<b>A run that ends badly still pays.</b>' },
+      text: '🦴 Beasts leave <b>parts</b> behind. Parts survive the run, win or lose. ' +
+            'You spend them at the <b>⚒️ Workshop</b> to forge <b>equipment</b> for your next run.' },
     { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(5)',
       text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
@@ -1951,7 +1950,7 @@ const TUTORIAL = {
       text: '👣 A journey wants <b>distance</b>, not damage — the same cards, read a different way. Beat its <b>MP</b> to arrive; reach half and you get there late.' },
     { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '🌙 <b>Nightfall</b> races your <b>Catalyst</b>. If its Initiative is lower than this, the dark catches you and takes the card in your <b>Arsenal</b>.' },
+      text: '🌙 <b>Nightfall</b> races your <b>Catalyst</b>. If its Initiative is lower than this, you lose the card in your <b>Arsenal</b> and your candle goes out.' },
     { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
       text: '⏳ <b>Time Penalty</b> is what arriving late costs — cards burned off the top of your deck. On a journey you lose <b>time</b>, not blood.' },
@@ -1965,7 +1964,7 @@ const TUTORIAL = {
     { id: 'arsenal', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Reserve',
       text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
-            'It is the only slot that works the same way for every class, so it is the one anchor that never moves.' },
+            'Choose it for the hand you want next turn, not for this one.' },
     // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
     // decides whether banking is informed or a bet, and nothing had ever named it.
     // 🗺️ THE MAP ITSELF — the first screen of every run, and it had no lesson because until
@@ -1997,7 +1996,8 @@ const TUTORIAL = {
       text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
-      text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
+      text: '✦ <b>Attuned.</b> Your Catalyst is also your <b>Initiative</b>, and the card that matches is rarely the fastest one. ' +
+            'One Catalyst, two jobs: pick the one this encounter needs.' },
     // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
     { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
@@ -2014,7 +2014,7 @@ const TUTORIAL = {
             '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
-      text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
+      text: 'Tap a card to <b>soak</b>. It absorbs its printed <b>🛡️</b> number and drops one level. Cover the whole hit or the run ends. <b>Your deck is your health.</b>' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
       text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
@@ -2028,7 +2028,7 @@ const TUTORIAL = {
             '<b>Deciding between the two IS the shop</b>, so spend knowing you cannot have both.' },
     { id: 'charm', when: () => S.phase === 'wheel' && S.wheel && (S.wheel.offers || []).some(o => o && o.kind === 'charm'),
       point: '#controls-panel',
-      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b> rather than a number — so it can make a different arrangement correct. ' +
+      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b>, not just a number. ' +
             'Everything you are carrying is shown in the bar at the top, always.' },
     { id: 'potion', when: () => (S.potions || []).length > 0,
       point: '.kit-row',
@@ -2047,7 +2047,7 @@ const TUTORIAL = {
             'An option you cannot afford says so instead of hiding.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
-      text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
+      text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Soak it below Lv4 and the verb is gone.' },
     // ✦ the rainbow hand is now taught as a PROBLEM, not as a thing the game fixes for you
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
@@ -2415,9 +2415,9 @@ function shapeText(e) {
 // ============================================================
 const CHARMS = [
   { id: 'emberheart', tier: 1,  name: 'Emberheart',      rarity: 'common', cost: 5,
-    text: '🔥 Fire cards gain +1 armor',            mods: { armor: 1, el: 'Fire' } },
+    text: '🔥 Fire cards gain +1 armour',            mods: { armor: 1, el: 'Fire' } },
   { id: 'tideglass', tier: 1,   name: 'Tideglass Bead',   rarity: 'common', cost: 5,
-    text: '💧 Water cards gain +1 armor',           mods: { armor: 1, el: 'Water' } },
+    text: '💧 Water cards gain +1 armour',           mods: { armor: 1, el: 'Water' } },
   { id: 'stormpin', tier: 1,    name: 'Storm Pin',        rarity: 'common', cost: 6,
     text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
   { id: 'nightveil', tier: 1,   name: 'Nightveil',        rarity: 'common', cost: 6,
@@ -2456,7 +2456,7 @@ const CHARMS = [
   { id: 'brightwick', tier: 3,  name: 'Brightwick',       rarity: 'rare', cost: 14,
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
   { id: 'oathstone', tier: 3,   name: 'Oathstone',        rarity: 'rare', cost: 14,
-    text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
+    text: '🛡️ All cards gain +1 armour',              mods: { armor: 1 } },
 
   // ☠️ CURSES — charms with negative mods. Never sold on the Wheel; you take one as the PRICE of
   // something in an Event. The engine already sums mods, so a negative charm needs no new
@@ -3083,7 +3083,7 @@ function nextSlotNote() { return ''; }
 function workshopHTML() {
   const st = loadStash(), worn = loadoutIds();
   const slots = Array.from({ length: armourSlotsOpen() }, (_, i) => worn[i] || null);
-  let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ WHAT YOU WALK IN WEARING` +
+  let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ YOUR EQUIPMENT` +
     `<span class="dim"> · ${armourSlotsOpen()} slots</span></div>` +
     `<div class="wk-slots">` + slots.map(id => {
       if (!id) return `<div class="wk-slot is-empty">empty</div>`;
@@ -9116,7 +9116,7 @@ function renderControls() {
       // and the journey's `element`. Vocabulary fixed too: "Trashed" was retired for the plain
       // statement of what actually happens.
       `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
-      `. Tap a card to blunt it — it soaks its 🛡️ armour value. ` +
+      `. Tap a card to soak with — it absorbs its 🛡️ number and drops a level. ` +
       `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
     } else if (S.phase === 'setout') {
     // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
@@ -10012,7 +10012,7 @@ function cardHTML(card) {
     if (real.level >= MAX_LEVEL) {
       action = `<div class="card-action muted">already at Lv${MAX_LEVEL}</div>`;
     } else if (S.downgraded.has(real.id)) {
-      action = `<div class="card-action muted">blunted this turn — can't sharpen</div>`;
+      action = `<div class="card-action muted">soaked this turn — cannot sharpen</div>`;
     } else {
       const cost = eff(real).cost;
       const ok = cost <= S.coins;
