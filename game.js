@@ -3010,19 +3010,15 @@ function pieceCardHTML(d, st, equipped) {
     (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
     `<div class="wk-foot">${foot}</div></div>`;
 }
-// 🛡️ the Workshop used to say "two more to earn" unconditionally, which was wrong the moment one
-// of them was earned. It reads the ladder now — *never state a rule about an object without
-// naming the object*, applied to a promise.
-function nextSlotNote() {
-  const next = UNLOCKS.filter(u => u.kind === 'slot' && u.level > accountLevel())
-                      .sort((a, b) => a.level - b.level)[0];
-  return next ? `${next.label.toLowerCase()} at ⭐ ${next.level}` : 'all earned';
-}
+// 🛡️ ⚠️ NOTHING EARNS SLOTS ANY MORE, so nothing may claim they can be earned. The old string said
+// *"two more to earn"* whenever the count was under 4 and there was no way to earn them — that is
+// the promise this file keeps warning about, and the honest version of it is silence.
+function nextSlotNote() { return ''; }
 function workshopHTML() {
   const st = loadStash(), worn = loadoutIds();
   const slots = Array.from({ length: armourSlotsOpen() }, (_, i) => worn[i] || null);
   let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ WHAT YOU WALK IN WEARING` +
-    `<span class="dim"> · ${armourSlotsOpen()} slots${armourSlotsOpen() < 4 ? ` · ${nextSlotNote()}` : ''}</span></div>` +
+    `<span class="dim"> · ${armourSlotsOpen()} slots</span></div>` +
     `<div class="wk-slots">` + slots.map(id => {
       if (!id) return `<div class="wk-slot is-empty">empty</div>`;
       const d = armourDef(id);
@@ -4048,17 +4044,17 @@ const UNLOCKS = [
   { level: 9,  kind: 'charm', id: 'slowfoot' },
   { level: 10, kind: 'charm', id: 'oathstone' },
   { level: 11, kind: 'charm', id: 'unspent' },          // the whole-run rethink
-  // 🛡️ AND THE ACCOUNT BAR GIVES SOMETHING THAT IS NOT A CHARM (2026-08-23, Thomas: *"feels like
-  // the account level should give something else as well?"*).
-  // 🔑 ARMOUR SLOTS WERE ALREADY WAITING FOR THIS. `workshopHTML()` has printed *"two more to
-  // earn"* since the day it shipped and there was no way to earn them — the reward existed, the
-  // mechanism did not. **A screen that advertises a thing the game cannot do is a promise.**
-  // 🔑 And it is the right thing for THIS bar specifically: a loadout is account-wide by nature,
-  // it is *what you can BRING*, which is exactly what the account ladder means — leaving the
-  // class ladder to be *what she can DO*. Two bars that hand out the same kind of thing look
-  // like one bar cut in half; two bars that answer different questions read instantly.
-  { level: 3,  kind: 'slot', label: 'A third armour slot' },
-  { level: 6,  kind: 'slot', label: 'A fourth armour slot' },
+  // ❌ ARMOUR SLOTS ARE NOT ON THIS LADDER (Thomas, 2026-08-23: *"i don't want to gate armor slots
+  // in account level"*). They were, for one build; the argument was that `workshopHTML()` had
+  // advertised *"two more to earn"* since it shipped, so the reward already existed.
+  // 🔑 THAT ARGUMENT ANSWERED THE WRONG QUESTION. It showed a slot gate was *available*, not that
+  // it was *right* — and armour is the one system in the game that is deliberately paid for in
+  // MATERIALS, hunted from specific creatures. Putting a second, unrelated gate in front of it
+  // makes the Workshop's own currency mean less: you could hold the parts, forge the piece, and
+  // still not be allowed to wear it. **Two gates on one system is one gate too many, and the one
+  // that has to go is the one that is not the system's own.**
+  // ⚠️ The `kind` field stays — the table is still meant to carry things that are not charms. See
+  // the account-ladder options in [[Charm_Pools]]; characters are the agreed next one.
   // 🎭 THE CLASS LADDERS — read against that class's OWN level, so each is walked separately and
   // every future class brings its own. ⚠️ Same legible→conditional ordering, in miniature.
   { level: 2,  kind: 'charm', id: 'coldiron' },         // ✦ simplest: unattuned strikes +3
@@ -5807,20 +5803,12 @@ const ARMOUR_SLOTS = {
 // moves the duel by +2. Wearing four is a bigger TEACHING surface at almost no power.
 // ✅ Slot count remains available as a progression later — it is just not one today, and pretending
 // otherwise cost nothing but honesty.
-// 🛡️ THE CEILING, not the current count — a tunable so a sweep can still force all four open.
 let ARMOUR_SLOTS_OPEN = 4;
-// 🔑 HOW MANY YOU ACTUALLY WEAR, derived from the account ladder. Two from the first second (a
-// system nobody can use is a system nobody learns), the third and fourth earned.
-// ⚠️ Deliberately EARLY (⭐3 and ⭐6 of 11) — the point is that the loadout grows, not that it is
-// withheld. Both are reached inside about eight runs.
-// ⚠️ AND IT MAKES THE FRESH ACCOUNT SLIGHTLY HARDER, which is the direction asked for: *"i want it
-// tougher now, with meta progression stuff helping make it a bit easier"* later. **Meta progression
-// that only ever adds, from a start that already has everything, is not progression — it is a
-// difficulty ramp pointing down.** You cannot feel a slot open if you were never without it.
-function armourSlotsOpen() {
-  const earned = UNLOCKS.filter(u => u.kind === 'slot' && u.level <= accountLevel()).length;
-  return Math.min(ARMOUR_SLOTS_OPEN, 2 + earned);
-}
+// 🛡️ HOW MANY PIECES YOU WEAR. ⚠️ Kept as a function even though it now just reads the constant,
+// because every call site was already converted and a slot count is exactly the sort of thing that
+// wants a rule again later — but if it does, that rule belongs to the WORKSHOP and its materials,
+// not to the account ladder (Thomas, 2026-08-23).
+function armourSlotsOpen() { return ARMOUR_SLOTS_OPEN; }
 
 // 🔑 A PIECE HAS ONE NUMBER, AND TWO KINDS (Thomas, 2026-08-23):
 //   *"worn 2, blocks for 2, and then doesn't block for anything anymore."*
@@ -8970,9 +8958,11 @@ function renderControls() {
     // they were added — the list had silently assumed its own contents for exactly one build.
     const rungs = cls => UNLOCKS.filter(u => unlockCls(u) === (cls || null)).map(u => {
       const open = u.level <= (cls ? classLevel(cls) : accountLevel());
+      // a rung that is not a charm draws from its own label — nothing uses this today, and it
+      // stays because the table is meant to carry more than charms (characters next).
       if (u.kind !== 'charm') return `<div class="coll-row is-boon${open ? '' : ' is-locked'}">` +
-        `<b>🛡️ ${u.label}</b>` + (open ? '' : `<span class="coll-lock">⭐ ${u.level}</span>`) +
-        `<span class="coll-text">One more piece of armour in your loadout.</span></div>`;
+        `<b>${u.label}</b>` + (open ? '' : `<span class="coll-lock">⭐ ${u.level}</span>`) +
+        `<span class="coll-text">${u.note || ''}</span></div>`;
       return charmRow(byId(u.id), u.level, open);
     });
     const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
@@ -8984,7 +8974,7 @@ function renderControls() {
       // 🔑 THE SPLIT, IN THE PLAYER'S WORDS. Two bars only earn their keep if you can say in one
       // line what each is FOR — if the answer is "the same thing but smaller", it is one bar.
       `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
-      `⭐ <b>Level</b> is what you can <b>bring</b> — armour slots, and the charms any class can use.<br>` +
+      `⭐ <b>Level</b> is the charms <b>any</b> class can use.<br>` +
       `🎭 <b>Mastery</b> is what she can <b>do</b> — that class's own charms, earned by playing her.</div>` +
       xpBarHTML(null) +
       `<div class="coll">` +
