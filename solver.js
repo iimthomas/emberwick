@@ -855,7 +855,15 @@ const RUNSIM = (() => {
       else if (p === 'summary') {
         const lv = allCards().map(c => c.level);
         m.regionAvg.push(mean(lv)); m.regionMax.push(Math.max(...lv));
-        if (S.region >= REGIONS.length) beginFinalBattle(); // enter the Dragon Duel
+        // 🐛 `RUN().length`, NOT `REGIONS.length` (fixed 2026-08-23). `RUN()` exists precisely so
+        // *"the tutorial is a dataset rather than a branch"* — it returns the tutorial's 2 regions or
+        // the real 4. This line asked the global, so in stage 0 the bot waited for region 4 on a road
+        // that stops at 2 and **looped until the 800-iteration guard killed the run**.
+        // 🔑 THE TUTORIAL HAS THEREFORE NEVER BEEN BOT-PLAYABLE — which is why the one screen every
+        // new player meets first is the one screen the instrument has never audited.
+        // ⚠️ A second reader of a fact that already has an accessor is the same drift as a second
+        // copy of the arrangement search. **If there is a RUN(), nothing may read REGIONS directly.**
+        if (S.region >= RUN().length) beginFinalBattle(); // enter the Dragon Duel
         else nextRegion();
       }
       else if (p === 'victory') { m.win = true; break; }

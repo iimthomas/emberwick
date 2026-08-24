@@ -1926,6 +1926,22 @@ const TUTORIAL = {
       point: '#encounter-panel .enc-stats span:nth-child(4)',
       text: 'Its <b>defence</b> is how it protects itself. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
             '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The defence decides what your turn should be.' },
+    // 🛡️ EQUIPMENT (2026-08-23, Thomas: *"we need to teach the equipment(armor) stuff"*).
+    // 🔴 The tutorial has dealt you the full Adventurer's set since the day armour shipped and
+    // never said a word about it — four pieces on screen, from turn one, unexplained.
+    // 🔑 Placed straight after ⚔️ Atk on purpose: that lesson ends *"you pay that in CARDS"*, and
+    // this is the answer to it. **Teach the cost, then the thing that absorbs the cost.**
+    { id: 'armour', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
+      point: '#armour-rail .eq',
+      text: '🛡️ This is your <b>armour</b> — chosen before the run, never part of your deck. ' +
+            'Each piece <b>blocks once</b>, and blocking is the only thing that takes a hit <i>instead of</i> your cards. ' +
+            'Then it is <b>spent for the run</b>. It is the one health you have that costs you nothing to lose.' },
+    // 🦴 the carve. Fires the moment loot exists, which in stage 0 is the first fight you win.
+    { id: 'carve', when: () => S.phase === 'reveal' && Object.keys(S.loot || {}).length > 0,
+      point: '.haul, .pv-carve',
+      text: '🦴 Beasts leave <b>parts</b> behind, and parts are the only thing that survives a run — ' +
+            'win or lose. You spend them at the <b>⚒️ Workshop</b> between runs, forging the armour you walk in wearing. ' +
+            '<b>A run that ends badly still pays.</b>' },
     { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(5)',
       text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
@@ -2023,6 +2039,15 @@ const TUTORIAL = {
     // ⚠️ WRITTEN WRONG ONCE (2026-08-12) — the first draft described the press-your-luck "stir band"
     // approach, which was CUT and replaced by this ordinary journey. It was copied out of CLAUDE.md,
     // which still documented the cut version. The lesson must describe LAST_MILE, not the history.
+    // ⭐ THE TWO BARS. Every encounter feeds them, win or lose, and nothing on screen said so.
+    // ⚠️ Fires at the WHEEL rather than the end screen, because the end screen is the one moment a
+    // new player is definitely reading — and a lesson that appears there competes with the grade,
+    // the haul and two moving bars for attention. Teach it while it is still quiet.
+    { id: 'levels', when: () => S.phase === 'wheel' && (S.xpRun || 0) > 0,
+      point: '#status .chip, #controls-panel',
+      text: '⭐ Every encounter you walk earns <b>xp</b> — a clean win pays most, a loss still pays. ' +
+            'It fills two bars: your <b>account level</b>, which opens charms any class can use, and ' +
+            '<b>this character\'s level</b>, which opens hers alone. You will see both when the run ends.' },
     { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
       point: '#encounter-panel',
       text: '⚔️ <b>The Last Mile</b> — one journey between you and the lair, and it <b>costs you nothing</b>: no Nightfall, no Time Penalty, no hardship, nothing kept. ' +
