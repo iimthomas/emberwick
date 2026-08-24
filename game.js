@@ -8719,13 +8719,18 @@ function renderControls() {
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
     c.innerHTML =
+      // ✍️ NO DESIGNER TALK ON A SCREEN THE PLAYER READS (2026-08-23, Thomas: *"no talk about
+      // questions or shapes or any of that please"*).
+      // 🔑 "Each stage is a different QUESTION, not simply a bigger number" and "the same dragon is
+      // a different PROBLEM" are things WE say to each other about why the game is built this way.
+      // They are the design's justification, not the player's information — and a menu is not the
+      // place to argue for the design. **The stages are a list; the list says what it is.**
+      // ⚠️ Same rule as the hardship rewrite: a rules string states the rule and nothing else.
+      // Flavour belongs where it is read once, and a menu is read every single session.
       `<div class="phase-label">🗺️ THE STAGES</div>` +
-      `<div class="summary"><p>Each stage is a different <b>question</b>, not simply a bigger number. ` +
-      `Beat one and the next opens — but every stage you have cleared stays open, so you can always go back.</p></div>` +
       (() => { const w = wallSummary();
-        return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} stages graded` +
-          (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') +
-          `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
+        return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} graded` +
+          (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') + `</div>`; })() +
       // 🗡️ WHO ARE YOU TAKING? Sits ABOVE the stages because it changes what every one of them
       // means — the same dragon is a different problem to a different class, which is the whole
       // economy: +1 class = ×N content.
@@ -8799,13 +8804,12 @@ function renderControls() {
         // 🖼️ ART LEFT, ROSTER RIGHT — the classic character-select layout, and the panel was already
         // 1180px wide while the portrait sat at 313. Stacking them wasted two thirds of the screen
         // on empty margin and made the art small, which is the one thing it must not be.
-        return `<div class="wall-line">🎭 <b>Who walks the road?</b><span class="dim"> — the same dragon is a different problem</span></div>` +
+        return `<div class="wall-line">🎭 <b>Character</b></div>` +
           `<div class="picker-split">` + hero + `<div class="picker-list">` +
           `<div class="class-row">` +
           row('mage', '✦ The Mage', 'elements agree — pair a Catalyst to your Spell') +
           row('rogue', '🗡️ The Rogue', 'cards pay for cards — feed one to afford your Strike') +
           `</div>` +
-          `<div class="wall-line dim">…and the road ahead</div>` +
           `<div class="class-row is-soon">` +
           soon('🎲', 'The Berserker', 'risk — you know the faces, not the roll') +
           soon('🎭', 'The Illusionist', 'summoning — your buffs and your armour are the same things') +
