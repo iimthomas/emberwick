@@ -8819,8 +8819,20 @@ function renderControls() {
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           `</div>` +
           `<div class="class-row is-soon">` +
-          soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
+          // ⚠️ THIS LIST WAS BUILT FROM Class_System's SOURCE-OF-POWER TABLE AND THEREFORE MISSED
+          // THREE CLASSES THAT LIVE IN THEIR OWN DOCS (found by Thomas, 2026-08-23):
+          // 🪙 The Merchant, and 🏗️ Engineer / 🧱 Mason from Euro_Classes.
+          // 🔑 Same shape as the art sweep that skipped stage 0 because it was driven off `REGIONS`:
+          // **when a list is built from one collection, check what is not in that collection.**
+          // ❌ Euro_Classes' third seed, the 🪵 Forager, is deliberately NOT here — the doc itself
+          // flags it as the weakest fit, "the re-skin the axis exists to prevent", because the
+          // Merchant already claims *a resource you hold and spend*. A roster is a promise, and
+          // there is no sense advertising the one class we have already argued against.
           soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
+          soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
+          soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
+          soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
+          soon('🧱', 'The Mason', 'A stoneworker whose work stays standing from one fight to the next.') +
           soon('🛡️', 'The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
           soon('⚖️', 'The Paladin', 'A sworn knight who declares the outcome before the fight.') +
