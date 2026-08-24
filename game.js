@@ -7855,14 +7855,18 @@ function xpBarHTML(cls, note) {
   const capped = lv >= cap;
   const up = capped ? [] : unlocksAt(lv + 1, cls);
   const next = capped ? '' : (up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`);
-  // 🔑 IT IS CALLED MASTERY, NOT A SECOND "LEVEL" (2026-08-23, Thomas: *"character level could be
-  // called mastery instead"*). **Two bars both called Level ARE the confusion** — they invite
-  // *"which level am I?"*, which has no answer. Two bars with different nouns stop being two of
-  // the same thing and become two different things, which is what they always were:
-  //   ⭐ Level   — how much of the GAME is open to you   (what you can BRING)
-  //   🎭 Mastery — how well you know HER                 (what she can DO)
-  // *Level* only ever described the first one. Naming was doing damage for free.
-  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls} Mastery` : 'Level';
+  // ⚠️ BOTH BARS SAY "LEVEL" AGAIN — REVERTED 2026-08-23 (Thomas: *"lets just change mastery back
+  // to level. might be too confusing being a different word"*), reversing his own suggestion of a
+  // few hours earlier and mine of implementing it.
+  // 🔑 AND THE REVERT IS CHEAP NOW FOR A REASON WORTH KEEPING: the rename was doing disambiguation
+  // work that **the two-screen split now does better**. When both bars sat on one page, only the
+  // noun told you they were different things. Now ⭐ Level lives on the account page and 🎭 Mage
+  // Level lives on hers, so the SCREEN says which one you are looking at and the word is free to
+  // be the plain, expected one.
+  // 🔑 **A word invented to carry structure can be retired once the structure carries itself.**
+  // ⚠️ The bars are still two different things and the hint text still says so in one line each —
+  // that is the part that must never be dropped, whatever the noun is.
+  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls} Level` : 'Level';
   return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top"><b>${cls ? '🎭' : '⭐'} ${name} ${lv}</b>` +
     `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${per} xp`}</span></div>` +
     `<div class="xp-bar"><i style="width:${capped ? 100 : pct}%"></i></div>` +
@@ -9007,7 +9011,7 @@ function renderControls() {
             (open ? '' : `<span class="dim">🔒 fell a dragon to unlock her</span>`) +
           `</div></div>` +
         xpBarHTML(k) +
-        `<div class="hint">🎭 <b>Mastery</b> rises only on runs you play as her. It opens the ` +
+        `<div class="hint">🎭 Her <b>level</b> rises only on runs you play as her. It opens the ` +
         `charms that name <b>her own rule</b> — nobody else can use them. You hold ${tally(k)}.</div>` +
         `<div class="coll">` +
           block('hers from the start', starters(k).map(x => charmRow(x))) +
@@ -9022,7 +9026,7 @@ function renderControls() {
         `<div class="phase-label">🎁 COLLECTION</div>` +
         `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
         `⭐ <b>Level</b> opens the charms <b>any</b> class can use.<br>` +
-        `🎭 <b>Mastery</b> opens what <b>she</b> can do — tap a character to see hers.</div>` +
+        `🎭 A <b>character's level</b> opens what <b>she</b> can do — tap a character to see hers.</div>` +
         xpBarHTML(null) +
         `<div class="coll-cast">` + pickable.map(k => {
           const cls = CLASSES[k], t = cls && cls.trait, shut = !classUnlocked(k);

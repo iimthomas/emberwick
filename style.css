@@ -1551,6 +1551,18 @@ body.shell #controls-panel .phase-label {
 }
 /* ⚠️ the inner wrappers were capped for the narrow column and would have kept it narrow */
 body.shell .stash { max-width: none; }
+/* 🗂️ THE COLLECTION BOX HOLDS ITS SIZE (2026-08-23, Thomas: *"when you click on a character, lets
+   not have it collapse the box, lets keep the box the same size"*).
+   🔑 The account page is ALREADY at the 92vh ceiling and scrolls inside it; a character page is
+   ~150px shorter, so tapping a character shrank the panel under your finger and the whole screen
+   jumped. **A container that resizes to its contents turns navigation into motion** — you lose your
+   place between two views that are meant to read as the same shelf.
+   ✅ Pinning min to the same 92vh the max already uses makes it one fixed box, so moving between
+   the two pages changes only what is INSIDE it. Safe with the `* { box-sizing: border-box }` reset
+   at the top of this file — min and max measure the same edges, so they cannot fight.
+   ⚠️ Scoped to the Collection on purpose. The menu and the Stash are content-sized and short, and
+   a 92vh box around four buttons is a different bug. */
+body.phase-collection #controls-panel { min-height: 92vh; }
 @media (max-width: 700px) {
   body.shell #controls-panel { width: 100%; margin: 0; max-height: none;
     border: 0; border-radius: 0; box-shadow: none; padding: 14px 12px 18px; }
