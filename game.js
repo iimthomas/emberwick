@@ -7846,7 +7846,9 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // the same function — the `computeAction()` rule applied to a display: two copies drift.
 // ⚠️ ONE COMPONENT, TWO LADDERS — `cls` picks which. Writing a second bar function is how the two
 // would drift, and this screen's whole job is that the two bars read as the same KIND of thing.
-function xpBarHTML(cls, note) {
+// `from` (optional) is where the bar STARTS. Given one, the bar renders at the old position and
+// carries the target in data-* for animateXPBars() to walk. Without one it just draws the truth.
+function xpBarHTML(cls, note, from) {
   const xp = cls ? loadClassXP(cls) : ACCOUNT_XP;
   const per = cls ? CLASS_XP_PER_LEVEL : XP_PER_LEVEL;
   const cap = cls ? classCap(cls) : LEVEL_CAP;
@@ -7867,17 +7869,81 @@ function xpBarHTML(cls, note) {
   // ⚠️ The bars are still two different things and the hint text still says so in one line each —
   // that is the part that must never be dropped, whatever the noun is.
   const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls} Level` : 'Level';
-  return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top"><b>${cls ? '🎭' : '⭐'} ${name} ${lv}</b>` +
+  const end = capped ? 100 : pct;
+  // 🎞️ THE ONE PIECE OF PRESENTATION THIS PROTOTYPE BUILDS ON PURPOSE, and the exception is
+  // narrow enough to state: **here the movement IS the information.** A number (+47 xp) tells you
+  // the amount; a bar travelling from where you started to where you ended tells you *how much of
+  // a level that was*, which is the only question anyone asks at the end of a run. That is
+  // *legible math always* in the one place a still frame cannot say it.
+  // ⚠️ It is not a licence for juice generally — the portrait fade was correctly deleted twice.
+  // The test that separates them: **does it carry a fact you could not read otherwise?**
+  const anim = (from === undefined || from === xp) ? '' : (() => {
+    const fLv = cls ? classLevelFor(cls, from) : levelFor(from);
+    const fPct = (fLv >= cap) ? 100 : Math.round(100 * (from % per) / per);
+    return ` data-from="${fPct}" data-to="${end}" data-rolls="${Math.max(0, lv - fLv)}" data-lv="${fLv}"`;
+  })();
+  const startLv = anim ? (cls ? classLevelFor(cls, from) : levelFor(from)) : lv;
+  const startPct = anim ? Number(anim.match(/data-from="(\d+)"/)[1]) : end;
+  return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top">` +
+    `<b><span class="xp-lv">${cls ? '🎭' : '⭐'} ${name} ${startLv}</span></b>` +
     `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${per} xp`}</span></div>` +
-    `<div class="xp-bar"><i style="width:${capped ? 100 : pct}%"></i></div>` +
+    `<div class="xp-bar"${anim}><i style="width:${startPct}%"></i></div>` +
     (note || next ? `<div class="xp-next">${note || next}</div>` : '') + `</div>`;
+}
+
+// 🎞️ WALK EVERY BAR THAT DECLARED A JOURNEY. A level-up is `data-rolls` fills to 100 followed by a
+// snap back to 0 — **the roll-over is the whole point**, because a bar that merely jumps to 30%
+// while the number quietly changes never shows you that you crossed anything.
+// ⚠️ prefers-reduced-motion jumps straight to the end. The file already honours it elsewhere.
+// ⚠️ Called from render()'s `finally`, so it runs even if a panel threw — same reasoning as
+// applyModal(): a half-drawn screen must not also be a half-animated one.
+function animateXPBars() {
+  const bars = document.querySelectorAll('.xp-bar[data-to]');
+  if (!bars.length) return;
+  let still = false;
+  try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  bars.forEach(bar => {
+    const fill = bar.querySelector('i'), to = +bar.dataset.to;
+    const rolls = +bar.dataset.rolls || 0;
+    const label = bar.parentNode.querySelector('.xp-lv');
+    let lv = +bar.dataset.lv;
+    bar.removeAttribute('data-to');                 // fire once, never on a re-render
+    if (still) { fill.style.width = to + '%'; if (label) label.textContent = label.textContent.replace(/\d+$/, lv + rolls); return; }
+    const bump = () => { if (label) label.textContent = label.textContent.replace(/\d+$/, ++lv); };
+    const steps = [];
+    for (let i = 0; i < rolls; i++) steps.push(100);
+    steps.push(to);
+    let i = 0;
+    // 🐛 setTimeout, NOT requestAnimationFrame — and this is a correctness fix, not a style one.
+    // **rAF DOES NOT FIRE IN A HIDDEN TAB.** Scheduled on rAF, a run finished on a backgrounded tab
+    // would leave the bar frozen at where it STARTED and the label showing the OLD level — the
+    // screen would be quietly lying about your progress until the next render.
+    // 🔑 AN ANIMATION MAY NEVER BE THE ONLY THING THAT WRITES THE TRUTH. setTimeout is throttled in
+    // a background tab but it still runs, so the last step always lands.
+    const next = () => {
+      if (i >= steps.length) return;
+      const v = steps[i++];
+      fill.style.width = v + '%';
+      setTimeout(() => {
+        if (v === 100 && i < steps.length) {
+          bump();
+          fill.style.transition = 'none'; fill.style.width = '0%';
+          // one tick with the transition off, so the snap back to empty is not itself animated
+          setTimeout(() => { fill.style.transition = ''; setTimeout(next, 30); }, 30);
+        } else next();
+      }, 620);
+    };
+    setTimeout(next, 40);   // one beat at the start position, so there is something to travel from
+  });
 }
 // 🔑 THE LEVEL-UP IS THE MOMENT, so it is NAMED. A run that ends "+47 xp" is a number; one that
 // ends "Cold Iron unlocked" is a reason to start another. ⚠️ Reads the span the run crossed, not
 // just the final level — a very good run can cross two.
 // 🔑 THE CLASS BAR IS SHOWN FIRST, because it is the one tied to what you just played — the run
 // was a mage run, so the mage's ladder is the closer story.
-function xpGainedHTML() {
+// ⚠️ IT IS ITS OWN BLOCK ON THE END SCREEN NOW, not a footnote inside 🧰 CARRIED OUT. The xp is
+// the run's other reward and it was rendering below a list of bone shards.
+function xpGainedHTML(animate) {
   const gained = S.xpRun || 0;
   if (!gained) return '';
   const opened = (before, cls) => {
@@ -7889,16 +7955,72 @@ function xpGainedHTML() {
   };
   const cls = CLASS.id;
   const c = opened(S.clsXpBefore || 0, cls), a = opened(S.xpBefore || 0, null);
-  return xpBarHTML(cls, `<b>+${gained} xp</b>${c.length ? ' · ' + c.join(' ') : ''}`) +
-         xpBarHTML(null, `<b>+${gained} xp</b>${a.length ? ' · ' + a.join(' ') : ''}`);
+  const cFrom = animate ? (S.clsXpBefore || 0) : undefined;
+  const aFrom = animate ? (S.xpBefore || 0) : undefined;
+  return xpBarHTML(cls, `<b>+${gained} xp</b>${c.length ? ' · ' + c.join(' ') : ''}`, cFrom) +
+         xpBarHTML(null, `<b>+${gained} xp</b>${a.length ? ' · ' + a.join(' ') : ''}`, aFrom);
+}
+// 🏁 THE END OF A RUN — ONE SCREEN, TWO ENDINGS (2026-08-23, Thomas: *"lets make sure we got a cool
+// like summary screen. have a nice window at the end, our grade and all those stats"*).
+//
+// 🔑 VICTORY AND DEFEAT WERE TWO SEPARATE BLOCKS OF MARKUP THAT HAPPENED TO AGREE. They are one
+// function now, because the only real difference between them is the headline and one paragraph —
+// and two copies of a screen drift exactly the way two copies of the arrangement search did. The
+// win got a card table the loss never had, and the loss got a reason-you-died line the win never
+// needed; both are `won ? … : …` here instead of two files' worth of divergence.
+//
+// 🔑 AND THE ORDER IS THE ARGUMENT: **verdict → what it cost you → what you take away.**
+//   ① the grade      — the judgement, and the biggest thing on screen
+//   ② the run        — turns, outcomes, what your deck lost
+//   ③ ⭐ the xp       — the bars, moving
+//   ④ 🧰 the haul     — materials, which are the OTHER thing you carry out
+//   ⑤ ⚒️ the door     — the Workshop, because *the instant you see the haul is the instant you
+//                       want to spend it* (Hades and Monster Hunter both put the meta screen
+//                       directly in the death flow, for this reason).
+// ⚠️ The xp block sits ABOVE the haul deliberately: materials are a shopping list, the bars are
+// the reward. The old screen had the bars underneath a list of bone shards.
+function runEndHTML(won) {
+  const survivors = [...S.hand, ...S.deck, ...S.discard];
+  const r = S.results;
+  const lost = S.trashed.length;
+  return `<div class="phase-label">${won ? `🏆 THE ${S.dragon.name.toUpperCase()} FALLS` : '💀 DEFEAT'}</div>` +
+    `<div class="runend">` +
+      gradeHTML(gradeRun(won), won) +
+      (won ? '' : `<p class="runend-why">${S.defeatMsg}</p>`) +
+      `<div class="runend-stats">` +
+        `<span><b>${S.turn}</b> turns</span>` +
+        `<span class="g-good"><b>${r.Complete}</b> clean</span>` +
+        `<span><b>${r.Narrow}</b> narrow</span>` +
+        `<span class="g-bad"><b>${r.Loss}</b> lost</span>` +
+        `<span><b>${survivors.length}</b> cards left</span>` +
+        `<span class="${lost ? 'g-bad' : ''}"><b>${lost}</b> destroyed</span>` +
+      `</div>` +
+      (lost ? `<p class="runend-lost">Gone for good: ${S.trashed.map(c => c.def.name).join(' · ')}</p>` : '') +
+      runXPHTML() +
+      haulHTML() +
+    `</div>` +
+    // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either becomes
+    // a player or closes the tab, and it used to end on the same generic stage picker a returning
+    // player gets. A picker is a question; what someone just taught needs is the NEXT THING, named.
+    // ⚠️ Not in the tutorial — that ending has one job and a second button is a question where a
+    // direction belongs.
+    ((won && S.tutorial) ? tutorialHandoffHTML()
+      : `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
+        `<button onclick="showStages()">🗺️ ${won ? 'Choose your next stage' : 'Choose a stage'}</button>`);
+}
+
+// 🏁 the end-of-run xp block: a heading and the two bars, so it reads as a reward and not as an
+// appendix to the loot list.
+function runXPHTML() {
+  const inner = xpGainedHTML(true);
+  return inner ? `<div class="endxp"><div class="endxp-lab">⭐ WHAT THE ROAD TAUGHT YOU</div>${inner}</div>` : '';
 }
 
 function haulHTML() {
   const ids = Object.keys(S.loot || {});
-  // ⚠️ NO EARLY RETURN ANY MORE. It used to bail when nothing was carved — and XP is earned on
-  // every encounter, so the one run that most needs to be told it still paid (a bad one, which
-  // carves nothing) was the exact run that showed nothing at all.
-  if (!ids.length && !(S.xpRun > 0)) return '';
+  // ⚠️ The xp block is separate now (runXPHTML), so this may bail again when nothing was carved —
+  // a bad run still gets told it paid, just in its own block rather than inside the loot list.
+  if (!ids.length) return '';
   const rows = ids.map(id => {
     const m = matDef(id); if (!m) return '';
     return `<span class="haul-mat">${m.icon} ${m.name} <b>×${S.loot[id]}</b></span>`;
@@ -7907,7 +8029,7 @@ function haulHTML() {
     `<div class="haul-gold">${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'} walked` +
       `${S.phase === 'victory' ? ' · and the beast felled' : ''}</div>` +
     (rows ? `<div class="haul-mats">${rows}</div>` : `<div class="haul-none">nothing carved</div>`) +
-    `<div class="haul-note">it is in your 📦 Stash</div>` + xpGainedHTML() + `</div>`;
+    `<div class="haul-note">it is in your 📦 Stash</div></div>`;
 }
 
 const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop'];
@@ -8058,6 +8180,7 @@ function render() {
     // ⚠️ The error is NOT swallowed; it still propagates. This only guarantees the UI ends in a
     // consistent state on the way out.
     applyModal();
+    animateXPBars();
   }
   pointAtLesson();
 }
@@ -8886,20 +9009,7 @@ function renderControls() {
     // the fifth time this exact shape has bitten in one day.
     c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">The road gives you a moment. Nothing here costs you a card.</div>` + body;
   } else if (S.phase === 'defeat') {
-    const survivors = [...S.hand, ...S.deck, ...S.discard];
-    c.innerHTML =
-      `<div class="phase-label">💀 DEFEAT</div>` +
-      gradeHTML(gradeRun(false), false) +
-      haulHTML() +
-      `<div class="summary"><p>${S.defeatMsg}</p>` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
-      // 🔑 THE LOOP HAS TO CLOSE HERE. You have just been told what you carried out, and this
-      // was the moment the game sent you straight back out with no way to spend it — the Workshop
-      // was only reachable from the main menu. Hades and Monster Hunter both put the meta screen
-      // directly in the death flow, and for the same reason: *the instant you see the haul is the
-      // instant you want to use it.*
-      `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
-      `<button onclick="showStages()">🗺️ Choose a stage</button>`;
+    c.innerHTML = runEndHTML(false);
   } else if (S.phase === 'intro') {
     const i = Math.min(S.introPage || 0, TUTORIAL.intro.length - 1), pg = TUTORIAL.intro[i];
     const last = i === TUTORIAL.intro.length - 1;
@@ -9245,28 +9355,7 @@ function renderControls() {
       }).join('') +
       `<button class="dev-open" onclick="showMenu()">← Menu</button>`;
   } else if (S.phase === 'victory') {
-    const survivors = [...S.hand, ...S.deck, ...S.discard];
-    const score = survivors.reduce((t, c) => t + c.level, 0);
-    c.innerHTML =
-      `<div class="phase-label">🏆 THE ${S.dragon.name.toUpperCase()} FALLS — VICTORY</div>` +
-      gradeHTML(gradeRun(true), true) +
-      haulHTML() +
-      `<div class="summary">` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
-      `<table><tr><th>Card</th><th>Level</th></tr>` +
-      survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
-      `</table></div>` +
-      // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either
-      // becomes a player or closes the tab, and it used to end on the same generic stage picker a
-      // returning player gets. A picker is a question; what someone who has just been taught needs
-      // is the NEXT THING, named. So the tutorial's victory screen points at stage 1 by name, with
-      // the one demand it makes — the same briefing language the run itself uses.
-      // 🔑 same reason as the defeat screen: the instant you see the haul is the instant you
-      // want to spend it. ⚠️ Not in the tutorial — that ending has one job, which is naming the
-      // next thing, and a second button is a question where a direction belongs.
-      (S.tutorial ? tutorialHandoffHTML()
-        : `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
-          `<button onclick="showStages()">🗺️ Choose your next stage</button>`);
+    c.innerHTML = runEndHTML(true);
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);

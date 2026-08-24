@@ -1030,6 +1030,32 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* the class bar reads as the same KIND of thing as the account bar, one shade warmer */
 .xp.is-cls .xp-bar i { background: linear-gradient(90deg, #7fb0c4, #a9d8ea); }
 
+/* 🏁 THE END OF A RUN. One card, read top to bottom: the verdict, what it cost, what you take
+   away. The block exists so the four pieces read as ONE window instead of four stacked panels. */
+.runend { margin: 4px 0 14px; padding: 14px 14px 4px; border-radius: 14px;
+  background: rgba(20,17,13,.5); border: 1px solid #453a2c; }
+.runend-why { margin: 8px 2px 0; color: #d9b0a0; font-size: 13px; }
+/* the run in one line of numbers. tabular so the digits sit still between runs */
+.runend-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 2px 0;
+  font-size: 12px; color: #b9ae9a; font-variant-numeric: tabular-nums; }
+.runend-stats b { color: #e8dcc8; font-size: 15px; margin-right: 3px; }
+.runend-stats .g-good b { color: #9fd6a0; }
+.runend-stats .g-bad b { color: #d99a8a; }
+.runend-lost { margin: 8px 2px 0; font-size: 12px; color: #d99a8a; }
+
+/* ⭐ the xp block — the run's other reward, given its own frame above the loot */
+.endxp { margin: 14px 0 4px; padding: 10px 11px 2px; border-radius: 11px;
+  background: rgba(201,162,74,.07); border: 1px solid rgba(201,162,74,.28); }
+.endxp-lab { font-size: 11px; letter-spacing: .10em; color: #c9a24a; margin-bottom: 4px; }
+.endxp .xp { margin: 6px 0; background: rgba(12,10,8,.5); }
+
+/* 🎞️ THE FILL. The ONE animation in the prototype, and it earns its place because the
+   movement is the information: how much of a level did that run buy?
+   ⚠️ `width` is the animated property on purpose — a transform-based bar would need a wrapper
+   and a counter-transform, and this is a 7px strip, not a hero moment. */
+.xp-bar i { transition: width .6s cubic-bezier(.25,.8,.35,1); }
+@media (prefers-reduced-motion: reduce) { .xp-bar i { transition: none; } }
+
 /* 🎭 THE CAST — the roster as a shelf of doors, on the Collection's account page.
    ⚠️ auto-fill, not a fixed column count: the same lesson the locked-class roster paid for one
    build ago — this list only ever grows, and a hard column count has to be re-picked every time. */
