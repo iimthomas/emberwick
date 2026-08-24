@@ -1030,6 +1030,36 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* the class bar reads as the same KIND of thing as the account bar, one shade warmer */
 .xp.is-cls .xp-bar i { background: linear-gradient(90deg, #7fb0c4, #a9d8ea); }
 
+/* 🎭 THE CAST — the roster as a shelf of doors, on the Collection's account page.
+   ⚠️ auto-fill, not a fixed column count: the same lesson the locked-class roster paid for one
+   build ago — this list only ever grows, and a hard column count has to be re-picked every time. */
+.coll-cast { display: grid; gap: 8px; margin: 12px 0;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cast { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 12px 10px; border-radius: 10px; cursor: pointer; text-align: center;
+  background: rgba(20,17,13,.55); border: 1px solid #453a2c; color: #e8dcc8; font: inherit; }
+.cast:hover { background: rgba(201,162,74,.14); border-color: #c9a24a; }
+.cast.locked { opacity: .6; border-style: dashed; }
+.cast-em { font-size: 26px; line-height: 1; }
+.cast b { color: #f0d9a8; font-size: 14px; }
+.cast-lv { font-size: 12px; color: #a9d8ea; font-variant-numeric: tabular-nums; }
+.cast-lv i { font-style: normal; opacity: .55; }
+.cast-n { font-size: 11px; color: #b9ae9a; }
+.cast-lock { font-size: 11px; color: #b9ae9a; }
+
+/* 🖼️ the character page's banner. The portrait is a WIDE CROP here, not the tall 3:4 plate the
+   picker uses — this screen is a list of charms and a full standing figure would push the actual
+   content off the fold. Same art file, different job. */
+.coll-hero { position: relative; display: flex; align-items: flex-end; min-height: 128px;
+  margin: 10px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(201,162,74,.34);
+  background: radial-gradient(120% 140% at 50% 10%, #2a221a 0%, #17140f 70%, #100e0a 100%); }
+.coll-hero img { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 50% 22%; z-index: 0; }
+.coll-hero-txt { position: relative; z-index: 1; width: 100%; padding: 22px 12px 10px;
+  display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #b9ae9a;
+  background: linear-gradient(to top, rgba(8,7,6,.94), rgba(8,7,6,.6) 60%, transparent); }
+.coll-hero-txt b { color: #f0d9a8; font-size: 14px; }
+
 /* a rung that is not a charm — an armour slot reads as a different KIND of reward */
 .coll-row.is-boon b { color: #a9d8ea; }
 

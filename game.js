@@ -3284,7 +3284,17 @@ function showMenu() {
   render();
 }
 function resumeRun() { if (loadGame()) render(); else showStages(); }
-function showCollection() { S = S || {}; S.phase = 'collection'; S.encounter = null; render(); }
+// 🎁 no argument = the account page; a class id = that character's page.
+// ⚠️ `collClass` must be CLEARED on the way in, or arriving from the menu would drop you back on
+// whichever character you were last looking at — a screen that remembers a sub-state you did not
+// choose is the same class of bug as a stale filter.
+function showCollection(cls) {
+  S = S || {};
+  S.phase = 'collection';
+  S.collClass = (cls && CLASSES[cls]) ? cls : null;
+  S.encounter = null;
+  render();
+}
 
 // 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
 // so picking one is the same act as choosing which problem you want to solve tonight.
@@ -8941,53 +8951,97 @@ function renderControls() {
   } else if (S.phase === 'stash') {
     c.innerHTML = stashHTML();
   } else if (S.phase === 'collection') {
-    // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
-    // the only meta fact the player currently has — and says plainly that unlocking and banning
-    // are not built yet, rather than showing a button that lies.
-    // 🔑 IT IS A LADDER NOW, NOT A TIER LIST — and it reads top-down as what you HAVE, then what
-    // is next, then what is far off. ⚠️ A locked charm shows its full text on purpose: a goal you
-    // cannot read is not a goal, and this is the screen whose whole job is to be wanted.
-    // 🔑 THE SCREEN IS SPLIT BY LADDER, because that IS the rule and a shelf that hides its own
-    // rule teaches nothing. You can see at a glance that generic charms come from playing at all
-    // and a class's charms come from playing HER.
+    // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — and says
+    // plainly what is not built yet, rather than showing a button that lies.
+    //
+    // 🗂️ TWO SCREENS, NOT ONE SCROLL (2026-08-23, Thomas: *"lets have it show our account level and
+    // exp bar, generic charms we have unlocked. and then be able to click on our characters, which
+    // leads to a page where it shows our character level and exp bar, and charms we have unlocked
+    // for that character"*).
+    // 🔑 IT IS THE SAME SPLIT THE RULE ALREADY MAKES. One screen was showing three bars and four
+    // lists stacked, which reads as *"a lot of charms"* rather than as **two ladders that mean
+    // different things** — the very confusion renaming Mastery was meant to end. A screen per bar
+    // states the rule by its shape: ⭐ what is open to everyone here, 🎭 what is open to HER there.
+    // ⚠️ `S.collClass` is a SUB-STATE, not a new phase, deliberately — a new shell phase has to be
+    // remembered in SHELL_PHASES or it crashes before a run exists, and that has bitten once.
+    //
+    // ⚠️ LOCKED THINGS ARE SHOWN, WITH THEIR LEVEL (Thomas: *"probably so players know what to
+    // grind for"* — and he is right). It is this file's own rule: **a goal you cannot see is not a
+    // goal**, and a locked charm shows its FULL text because *a goal you cannot read* is not one
+    // either. This is the screen whose entire job is to be wanted.
+    // ⚠️ It does NOT contradict the map's *"printing every demand is complete optimizable data"* —
+    // that is about tactical information inside a run, which a player could solve against. A grind
+    // target is the opposite: it is only worth anything if you can see it.
     const byId = id => CHARMS.find(x => x.id === id);
     const charmRow = (x, at, open) => `<div class="coll-row${at && !open ? ' is-locked' : ''}">` +
       `<b>${x.name}</b>` + (at && !open ? `<span class="coll-lock">${x.cls ? '🎭' : '⭐'} ${at}</span>` : '') +
       `<span class="coll-text">${x.text}</span></div>`;
-    // ⚠️ A ROW MAY NOT BE A CHARM ANY MORE. `byId(u.id).cls` threw on the slot rungs the moment
-    // they were added — the list had silently assumed its own contents for exactly one build.
+    // ⚠️ A ROW MAY NOT BE A CHARM. `byId(u.id).cls` threw on the slot rungs the moment they were
+    // added — the list had silently assumed its own contents for exactly one build.
     const rungs = cls => UNLOCKS.filter(u => unlockCls(u) === (cls || null)).map(u => {
       const open = u.level <= (cls ? classLevel(cls) : accountLevel());
-      // a rung that is not a charm draws from its own label — nothing uses this today, and it
-      // stays because the table is meant to carry more than charms (characters next).
       if (u.kind !== 'charm') return `<div class="coll-row is-boon${open ? '' : ' is-locked'}">` +
         `<b>${u.label}</b>` + (open ? '' : `<span class="coll-lock">⭐ ${u.level}</span>`) +
         `<span class="coll-text">${u.note || ''}</span></div>`;
       return charmRow(byId(u.id), u.level, open);
     });
-    const starters = CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id]);
-    const owned = CHARMS.filter(x => !x.curse && charmUnlocked(x)).length;
+    const starters = cls => CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id] && (x.cls || null) === (cls || null));
     const block = (head, list) => list.length
       ? `<div class="coll-tier"><h4>${head} <span class="dim">· ${list.length}</span></h4>${list.join('')}</div>` : '';
-    c.innerHTML =
-      `<div class="phase-label">🎁 COLLECTION</div>` +
-      // 🔑 THE SPLIT, IN THE PLAYER'S WORDS. Two bars only earn their keep if you can say in one
-      // line what each is FOR — if the answer is "the same thing but smaller", it is one bar.
-      `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
-      `⭐ <b>Level</b> is the charms <b>any</b> class can use.<br>` +
-      `🎭 <b>Mastery</b> is what she can <b>do</b> — that class's own charms, earned by playing her.</div>` +
-      xpBarHTML(null) +
-      `<div class="coll">` +
-        block('yours from the start', starters.map(x => charmRow(x))) +
-        block('⭐ by playing at all', rungs(null)) +
-      `</div>` +
-      Object.keys(CLASSES).filter(k => rungs(k).length).map(k =>
-        xpBarHTML(k) + `<div class="coll">${block('🎭 by playing ' + ((CLASSES[k] && CLASSES[k].name) || k), rungs(k))}</div>`
-      ).join('') +
-      `<div class="coll-soon">🚧 <b>Not built yet:</b> the 🚫 <b>ban list</b> — one charm disabled ` +
-      `per five unlocked, so you shape the pool without pre-solving the run.</div>` +
-      `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
-      `<button class="primary" onclick="showMenu()">← Back</button>`;
+    // how many of a ladder you hold — the one number that says "keep going"
+    const tally = cls => {
+      const all = CHARMS.filter(x => !x.curse && (x.cls || null) === (cls || null));
+      return `<b>${all.filter(charmUnlocked).length}</b> of ${all.length}`;
+    };
+
+    if (S.collClass) {
+      // ── 🎭 A CHARACTER'S PAGE ────────────────────────────────────────────────
+      const k = S.collClass, cls = CLASSES[k], t = cls && cls.trait;
+      const open = classUnlocked(k);
+      c.innerHTML =
+        `<div class="phase-label">🎭 ${(cls && cls.name) || k}</div>` +
+        // 🖼️ same contract as everywhere else: found by NAME, and a miss removes itself
+        `<div class="coll-hero"><img alt="" src="art/classes/${k}.jpg?v=${BUILD}" onerror="this.remove()">` +
+          `<div class="coll-hero-txt">` +
+            (t ? `<b>${t.icon} ${t.name}</b><span>${t.text}</span>` : '') +
+            (open ? '' : `<span class="dim">🔒 fell a dragon to unlock her</span>`) +
+          `</div></div>` +
+        xpBarHTML(k) +
+        `<div class="hint">🎭 <b>Mastery</b> rises only on runs you play as her. It opens the ` +
+        `charms that name <b>her own rule</b> — nobody else can use them. You hold ${tally(k)}.</div>` +
+        `<div class="coll">` +
+          block('hers from the start', starters(k).map(x => charmRow(x))) +
+          block('earned by playing her', rungs(k)) +
+        `</div>` +
+        `<button class="primary" onclick="showCollection()">← Collection</button>`;
+    } else {
+      // ── ⭐ THE ACCOUNT PAGE ──────────────────────────────────────────────────
+      // 🎭 the roster reads as a shelf of characters, and every one of them is a door.
+      const pickable = Object.keys(CLASSES).filter(k => rungs(k).length || starters(k).length);
+      c.innerHTML =
+        `<div class="phase-label">🎁 COLLECTION</div>` +
+        `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
+        `⭐ <b>Level</b> opens the charms <b>any</b> class can use.<br>` +
+        `🎭 <b>Mastery</b> opens what <b>she</b> can do — tap a character to see hers.</div>` +
+        xpBarHTML(null) +
+        `<div class="coll-cast">` + pickable.map(k => {
+          const cls = CLASSES[k], t = cls && cls.trait, shut = !classUnlocked(k);
+          return `<button class="cast${shut ? ' locked' : ''}" onclick="showCollection('${k}')">` +
+            `<span class="cast-em">${(cls && cls.mark) || '✦'}</span>` +
+            `<b>${(cls && cls.name) || k}</b>` +
+            `<span class="cast-lv">🎭 ${classLevel(k)}<i>/${classCap(k)}</i></span>` +
+            `<span class="cast-n">${tally(k)} charms</span>` +
+            (shut ? `<span class="cast-lock">🔒 locked</span>` : '') + `</button>`;
+        }).join('') + `</div>` +
+        `<div class="coll">` +
+          block('yours from the start', starters(null).map(x => charmRow(x))) +
+          block('⭐ earned by playing at all', rungs(null)) +
+        `</div>` +
+        `<div class="coll-soon">🚧 <b>Not built yet:</b> the 🚫 <b>ban list</b> — one charm disabled ` +
+        `per five unlocked, so you shape the pool without pre-solving the run.</div>` +
+        `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
+        `<button class="primary" onclick="showMenu()">← Back</button>`;
+    }
   } else if (S.phase === 'dev') {
     const d = S.dev;
     const dragon = DRAGONS.find(x => x.stage === d.stage) || DRAGONS[0];
@@ -9129,7 +9183,7 @@ function renderControls() {
             // the fallback is now a matter of STACKING, not of a class that has to be applied.
             `<img class="hero-img" alt="" src="art/classes/${picked}.jpg?v=${BUILD}" ` +
               `onerror="this.remove()">` +
-            `<div class="hero-fallback">${t ? t.icon : '✦'}</div>` +
+            `<div class="hero-fallback">${(CLASSES[picked] && CLASSES[picked].mark) || '✦'}</div>` +
             `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
             `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +
           `</div>`;
