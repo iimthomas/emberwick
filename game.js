@@ -8815,17 +8815,17 @@ function renderControls() {
         return `<div class="wall-line">🎭 <b>Character</b></div>` +
           `<div class="picker-split">` + hero + `<div class="picker-list">` +
           `<div class="class-row">` +
-          row('mage', '✦ The Mage', 'She knows which flame answers which.') +
-          row('rogue', '🗡️ The Rogue', 'One blade pays for the next.') +
+          row('mage', '✦ The Mage', 'A travelling spellcaster who draws her power from the elements.') +
+          row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           `</div>` +
           `<div class="class-row is-soon">` +
-          soon('🎲', 'The Berserker', 'Swing first. Count the cost after.') +
-          soon('🎭', 'The Illusionist', 'Never alone, and none of them real.') +
-          soon('🛡️', 'The Guardian', 'Strike the wall. The wall strikes back.') +
-          soon('🏹', 'The Ranger', 'Knows what comes next. Dealt it that way.') +
-          soon('⚖️', 'The Paladin', 'Says it aloud, then makes it true.') +
-          soon('🕯️', 'The Warlock', 'Every power has a price. Paid up front.') +
-          soon('⚔️', 'The Knight', 'How you stand decides how you swing.') +
+          soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
+          soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
+          soon('🛡️', 'The Guardian', 'A heavy defender who turns every blow back on its owner.') +
+          soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
+          soon('⚖️', 'The Paladin', 'A sworn knight who declares the outcome before the fight.') +
+          soon('🕯️', 'The Warlock', 'A dark caster who trades away what cannot be replaced.') +
+          soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
           `</div></div></div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
