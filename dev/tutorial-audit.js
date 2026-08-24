@@ -52,8 +52,22 @@ H.seed(1);
 // new player meets first is the one screen the instrument has never touched.
 // ⚠️ Redirected by wrapping the global rather than forking autoRun's loop: a forked run loop drifts
 // (that is why measure.js hooks RUNSIM instead of copying it), and this is one line, restored after.
+// 🔴 AND WALK THE PLAYER'S DOOR, NOT THE BOT'S. `autoRun()` calls `freshGame(0)` and goes
+// straight to the map — it never reads the 5-page brief. A player does, and `introNext()`'s exit
+// used to hardcode `S.phase = 'assign'`, dropping them into a turn with **no encounter** on a map
+// run. The audit reported the tutorial healthy for two builds because it entered somewhere else.
+// ⚠️ **An audit that does not walk the player's entry path has not audited the entry path.**
 const realFresh = B.freshGame;
-B.freshGame = () => realFresh(0);
+B.freshGame = () => {
+  realFresh(0);
+  const s = S();
+  if (s.phase === 'intro' || (B.TUTORIAL.intro || []).length) {
+    s.phase = 'intro'; s.introPage = 0;
+    for (let i = 0; i <= (B.TUTORIAL.intro || []).length; i++) B.introNext(1);
+  }
+  if (s.phase === 'assign' && !s.encounter)
+    console.log('	🔴 THE BRIEF LANDS ON A TURN WITH NO ENCOUNTER');
+};
 // ⚠️ SAMPLE ON EVERY RENDER, not at the four RUNSIM hooks. Those only fire during `assign`, so a
 // lesson whose when() is only true in `soak`, `stack`, `wheel` or `reveal` is never even LOOKED at
 // — and the probe would report it as "never fires" when it fires fine.

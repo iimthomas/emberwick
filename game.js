@@ -3410,9 +3410,31 @@ function startStage(n, confirmed) {
   // past; this one does not, so scroll to the question.
   if (S.phase === 'setout') { const el = $('controls-panel'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); }
 }
+// 🔴 THE BRIEF USED TO END ON `S.phase = 'assign'` (fixed 2026-08-23, Thomas: *"tutorial still
+// broken i think, i think the map isn't showing up or something"* — with a screenshot reading
+// **NO ENCOUNTER · This turn has no encounter, which should not happen**).
+// That line was correct while the tutorial was a linear queue: `freshGame()` had already dealt an
+// encounter, so jumping straight to `assign` landed on it. **The tutorial has a map now**, and a
+// map hands out encounters only when you take a node — so the brief dropped the player into a turn
+// with nothing in front of them.
+//
+// 🔑 THIRD TIME TODAY FOR ONE LESSON: **when you replace the thing that generated content, find
+// every reader that still trusts the old shape.** The solver's `REGIONS.length`, the map render's
+// `MAP_FLOORS`, and now the brief's exit — all three assumed a world that had moved.
+//
+// 🔴 AND THE AUDIT COULD NOT HAVE CAUGHT IT, WHICH IS THE MORE IMPORTANT HALF: `RUNSIM.autoRun()`
+// calls `freshGame(0)` and goes straight to `backToMap()`. **The bot never reads the brief.** So the
+// instrument entered the run through a different door than the player, tested that door, and
+// reported the tutorial healthy while the player's door opened onto a broken screen.
+// ⚠️ **An audit that does not walk the player's entry path has not audited the entry path.**
+// `dev/tutorial-audit.js` now steps through the brief first.
 function introNext(d) {
   S.introPage = Math.max(0, (S.introPage || 0) + d);
-  if (S.introPage >= TUTORIAL.intro.length) { S.introPage = 0; S.phase = 'assign'; }
+  if (S.introPage < TUTORIAL.intro.length) { render(); return; }
+  S.introPage = 0;
+  // ✅ hand off to the same function every node return uses, so there is ONE place that decides
+  // where a run resumes — map if there is a map, the old linear path if there is not.
+  backToMap();
   render();
 }
 
