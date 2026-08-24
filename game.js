@@ -4412,10 +4412,12 @@ function mapNode(f, c) { return { f, c, type: 'normal', kind: 'fight', next: [],
 //     ⚠️ This deliberately breaks the real map's *"the first floor must be a choice"* rule. That
 //     rule exists so a RUN opens on a decision; the tutorial's first floor exists so a PLAYER
 //     learns what a node is. **Teach the noun before the verb.**
-//   • **Region 2 (floors 4-5) is a FORK.** Two nodes a floor, always a ⚔️ fight and a 👣 journey —
+//   • **Floor 4 is an ❓ EVENT** — a single node, taught where a screen full of reading lands best:
+//     after the turn is understood, before the map asks its first question.
+//   • **The FORK (floors 5-6).** Two nodes a floor, always a ⚔️ fight and a 👣 journey —
 //     the clearest possible statement of what the map is for: *you choose which kind of problem to
 //     take.* Both branches rejoin, so no lesson can be missed by routing.
-//   • **Floor 6 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
+//   • **Floor 7 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
 //     also teaches the hearth, previously untaught anywhere.
 //
 // 🖼️ THE FORK IS EXACTLY TWO FLOORS BECAUSE THAT IS WHAT THE ART COVERS. A three-floor fork
@@ -4437,7 +4439,7 @@ function tutorialMap() {
   const fork  = R[1].encounters;          // 4 — a fight and a journey on each of two floors
   const floors = [];
   const C = 2;                            // the tutorial map is two columns wide
-  for (let f = 0; f < 7; f++) floors.push(new Array(C).fill(null));
+  for (let f = 0; f < 8; f++) floors.push(new Array(C).fill(null));
   const put = (f, c, enc, type) => {
     const n = mapNode(f, c);
     n.enc = enc || null;
@@ -4448,19 +4450,29 @@ function tutorialMap() {
   };
   // — the spine: floors 0-3, column 0, each pointing at the next
   for (let f = 0; f < 4; f++) put(f, 0, spine[f]).next = [0];
-  floors[3][0].next = [0, 1];             // the first real choice on the map
+  // — ❓ AN EVENT, floor 4, single node (2026-08-23).
+  // 🔴 THE FIRST CUT OF THIS MAP HAD NO EVENT NODE AT ALL, and that was a REGRESSION, not a known
+  // gap: the old linear tutorial fired events, and the 2026-08-12 audit is on record saying so
+  // (*"the tutorial reaches the Wheel… fires an event, hands you a curse"*). Replacing the queue
+  // with a map I built out of `normal` and `hearth` nodes silently deleted both — and the ❓ event
+  // and ⚠️ curse lessons went with them.
+  // 🔑 **WHEN YOU REPLACE THE THING THAT GENERATED CONTENT, ENUMERATE WHAT IT USED TO GENERATE.**
+  // I checked that the lessons still fired and not that the road still contained what they teach.
+  // ⚠️ It sits AFTER the spine and BEFORE the fork on purpose: an event is a screen full of reading,
+  // and it lands better once the turn is understood and before the map asks its first question.
+  put(4, 0, null, 'event').next = [0, 1];
   // — the fork: two floors, a fight on the left and a journey on the right
-  for (let f = 4; f < 6; f++) {
-    const pair = fork.slice((f - 4) * 2, (f - 4) * 2 + 2);
+  for (let f = 5; f < 7; f++) {
+    const pair = fork.slice((f - 5) * 2, (f - 5) * 2 + 2);
     const a = put(f, 0, pair.find(e => e.type === 'fight')  || pair[0]);
     const b = put(f, 1, pair.find(e => e.type === 'journey') || pair[1]);
     // ⚠️ both nodes lead to BOTH nodes above, so the branches rejoin every floor and no path can
     // miss a kind of encounter. A tutorial must not let routing hide a lesson.
-    const up = f === 5 ? [0] : [0, 1];
+    const up = f === 6 ? [0] : [0, 1];
     a.next = up.slice(); b.next = up.slice();
   }
   // — the hearth below the lair, exactly as a real map ends
-  put(6, 0, null, 'hearth');
+  put(7, 0, null, 'hearth');
   return { floors, pos: null, taken: [] };
 }
 
