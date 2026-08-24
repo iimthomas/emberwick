@@ -83,6 +83,13 @@ sandbox.self = sandbox;
 // n=200 that is not noise, but there IS an exact answer to "did the same seed play the same run?"
 let _seed = 1;
 const seed = n => { _seed = (n >>> 0) || 1; };
+// 🎯 THE RNG POSITION, READ AND WRITTEN. A probe that snapshots mid-run must restore WHERE IN
+// THE STREAM the run was, not just the game state — `seed()` rewinds to the beginning, and a replay
+// that starts the stream over plays a different game from the same board.
+// 🔑 Found by a fidelity test: 4 of 12 restore-and-continue replays diverged from the original,
+// and the clone was not at fault. **State and randomness are two halves of one snapshot.**
+const getRng = () => _seed;
+const setRng = v => { _seed = v | 0; };
 sandbox.Math = Object.create(Math);
 sandbox.Math.random = function () {
   _seed |= 0; _seed = (_seed + 0x6D2B79F5) | 0;
@@ -105,6 +112,11 @@ const epilogue = NL + ';' + NL +
   EXPORTS.map(n => 'try { globalThis.' + n + ' = ' + n + '; } catch (e) {}').join(NL) + NL +
   // S is reassigned every run, so it must be exported as a GETTER, never a copied reference.
   'globalThis.getS = function () { return S; };' + NL +
+  // ⚠️ A SETTER TOO, so a probe can RESTORE a snapshot and let autoRun replay from it rather
+  // than forking the run loop. `S` is a top-level `let` and therefore lexical — it cannot be
+  // assigned from outside the sandbox any other way, which is the same binding rule that has
+  // cost this project something in four separate builds.
+  'globalThis.setS = function (v) { S = v; return S; };' + NL +
   // ⚠️ SWEEP TUNABLES IN PLACE — never by patching game.js on disk.
   // 🐛 A sweep that writes a patched game.js and restores it in a `finally` LEAVES THE GAME
   // PATCHED if the process is killed (a timeout, a ^C). That happened: game.js was found holding
@@ -122,6 +134,8 @@ vm.runInContext(game + NL + ';' + NL + solver + epilogue, sandbox, { filename: '
 
 const useClass = name => sandbox.setClass(name === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
 module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS(),
+  setS: v => sandbox.setS(v),
+  getRng, setRng,
   setTunable: (k, v) => sandbox.setTunable(k, v), getTunable: k => sandbox.getTunable(k) };
 
 // ---- CLI ----------------------------------------------------------------
