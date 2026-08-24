@@ -1378,7 +1378,32 @@ const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST fo
 // each**. A blade gained +6 a level against the mage's best card at +3 - exactly double.
 // Swept on the realistic-deck test: value 4 → gap +3.2 · **value 3 → gap +0.9** · value 2 → −1.1.
 // ✅ PAID_STEP stays at 2 - the wider paid gap was asked for and is not the thing that was wrong.
-let SPIKE_STEP_VALUE = 3;   // 🗡️ the rogue's power dial — `let` so a sweep can move it
+// 🗡️ 3 → 2 (2026-08-23). Thomas: *"rogue should do less damage, combined with momentum,
+// rogue is a bit overtuned i think."*
+// 🔑 THE REPORT WAS ABOUT DAMAGE AND I SPENT THREE SWEEPS CHASING WIN RATE. On win rate she is
+// only over at stages 1 and 4; on DAMAGE he is plainly right — her duel blow is **17-18 against the
+// mage's 12-13**, roughly 40% harder for a nearly identical win rate. That is exactly what makes a
+// class feel overtuned in the hand while the win column looks fine. **Answer the report that was
+// given, not the one the instrument finds easiest to measure.**
+// ✅ This is PARITY, not a nerf: her blades grew **+3 a level** against the mage's **+2**, and 2
+// puts the two classes on the same growth curve. It also lands where he said it lands — on a
+// LEVELLED rogue, not a fresh one. Second Fang goes 4/7/10/13 → 4/6/8/10.
+// 📏 Same seeds, ⭐6/🎭3, n=320: rogue 74/31/21/43 → **51/20/8/19** against a mage of
+// 50/15/16/25 on those same seeds — +24/+16/+5/+18 becomes +1/+5/−8/−6.
+// ⚠️ Cost: she drops BELOW the mage at stages 3 and 4. Watch stage 3 especially.
+// ❌ 2.5 was measured and does nothing (69/28/15/40) — the rounding eats it. It is 2 or it is
+// nothing.
+// ❌ ● MOMENTUM IS UNTOUCHED, deliberately. Cap 3→2 took ten points off stage 2 where she is
+// already under target, and the full-meter SPLIT was chosen precisely because it is damage-neutral
+// — it makes her hit twice rather than harder. Cutting it removes the interesting half and leaves
+// the numbers.
+// ❌ AND FATHOMDREAD'S HP WAS TRIED AND REJECTED: +10 moved the rogue 43→29 and the mage
+// 26→11, leaving the gap at 17→18. 🔑 **A DRAGON IS CLASS-BLIND, SO IT CAN NEVER CLOSE A CLASS
+// GAP** — which this file already said under the class-gap section, and I proposed it anyway.
+// ⚠️ STILL A DEAD DIAL FOR SWEEPS: the `const SPIKE_STEP` below copies this at load, before
+// ROGUE_DEFS is generated from that copy, so `setTunable` cannot move it. Changing the literal here
+// works; a runtime sweep does not.
+let SPIKE_STEP_VALUE = 2;   // 🗡️ the rogue's power dial
 const SPIKE_STEP = { value: SPIKE_STEP_VALUE, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
