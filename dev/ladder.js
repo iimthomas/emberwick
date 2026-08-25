@@ -6,11 +6,23 @@
 'use strict';
 const { sandbox, seed, useClass, getS, setTunable } = require('./headless.js');
 const N = +(process.argv[2] || 320);
-process.argv.slice(3).forEach(a => {
+process.argv.slice(3).filter(a => !a.startsWith('LV=')).forEach(a => {
   const [k, v] = a.split('=');
   setTunable(k, v.startsWith('{') ? JSON.parse(v) : Number(v));
 });
 const TARGET = [40, 35, 30, 20];
+// 🔴 PIN THE BARS, OR THE SWEEP LEVELS ITSELF UP INSIDE THE MEASUREMENT (found 2026-08-24).
+// RUNSIM.run() applies SIM_LEVEL for exactly this reason - but this tool calls autoRun() directly,
+// which bypasses it, so `bankRun()` banked xp every run and `accountLevel()` read **15** by the
+// end of a 240-run sweep. Every ladder number taken since the xp ladder shipped is a blend of a
+// fresh account and a maxed one, weighted by how far into the batch each run happened to fall.
+// 🔑 THE GUARD EXISTED AND LIVED IN THE ENTRY POINT NOBODY USES - the same shape as *a rule the
+// engine enforces only at the UI is a rule the instrument cannot see*. A guard belongs where the
+// work happens, not where the tidiest caller happens to be.
+// ⚠️ Pinned to ★6/🎭3 by default so this agrees with every other probe in dev/; pass LV=n.
+const LV = (process.argv.slice(3).find(a => a.startsWith('LV=')) || 'LV=6').slice(3) | 0;
+setTunable('XP_LEVEL_FORCE', LV);
+setTunable('CLASS_LEVEL_FORCE', Math.max(1, Math.min(5, Math.ceil(LV / 2))));
 
 function run(cls, w) {
   sandbox.setBankWeight(w);
@@ -30,7 +42,7 @@ function run(cls, w) {
     beats: (st[k].beats/st[k].n).toFixed(1) } : null);
 }
 const mageOff = run('mage', 0), mage = run('mage', 1.0), rogue = run('rogue', 0);
-console.log(`n=${N}/class · COIN_MULT ${sandbox.getTunable('COIN_MULT')} · BANK_MULT ${sandbox.getTunable('BANK_MULT')} · ` +
+console.log(`n=${N}/class · ⭐${sandbox.getTunable("XP_LEVEL_FORCE")}/🎭${sandbox.getTunable("CLASS_LEVEL_FORCE")} · COIN_MULT ${sandbox.getTunable('COIN_MULT')} · BANK_MULT ${sandbox.getTunable('BANK_MULT')} · ` +
             `PAID ${sandbox.getTunable('PAID_STEP')} · HP+ ${JSON.stringify(sandbox.getTunable('DRAGON_HP_ADD'))}`);
 console.log('stage  TARGET   mage(channels)  mage(never)   rogue      road C%  m/r     beats m/r');
 for (let i = 0; i < 4; i++) {

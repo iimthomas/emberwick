@@ -1044,7 +1044,10 @@ const MAGE = {
   // how many blows this card lands as the Spell — the mage never splits.
   hitsOf(c) { return c.def.hits || 1; },
   // what gets added to EACH blow rather than divided across them — see `added` in computeAction.
-  perHitBonus() { return (S.potionFx ? S.potionFx.value : 0); },
+  // ⚠️ `card` is the Spell being drawn, because 🗡️ Keen Edge reads ITS level. 💨 Slow
+  // Strength is deliberately absent: it depends on Initiative, which the face cannot know - the
+  // same precedent as the rogue's blade verb, whose bonus depends on the fuel card.
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
   craft: {
     label: 'attuned', gate: 'attune',
     avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
@@ -1598,8 +1601,8 @@ const ROGUE = {
   },
   // ● pips land on every blow, like a potion does. ⚠️ The blade VERB bonus is not shown here —
   // it depends on the fuel card, which the face cannot know; the reveal still states it.
-  perHitBonus() {
-    return (S.potionFx ? S.potionFx.value : 0)
+  perHitBonus(card) {
+    return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card)
          + (MOMENTUM_FULL === 'convert' && (S.momentum||0) >= MOMENTUM_CAP ? 0 : (S.momentum || 0) * MOMENTUM_VALUE);
   },
   craft: {
@@ -2532,6 +2535,61 @@ const RULE_CHARMS = [
   { id: 'slowfoot', tier: 3, name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
+  // ============================================================
+  // 🎁 THE ANTI-SYNERGY SET (2026-08-24). Thomas: *"i like anti synergy idea. we need more
+  // build variety. thats a big missing thing. runs should hopefully feel different from each
+  // other. but right now they feel pretty much the same."*
+  // 🔑 THE RULE THEY ARE BUILT ON: charms must not all ADD, or a build is only ever *take the
+  // biggest*. These come in OPPOSING PAIRS, so which two you hold decides what a good turn even
+  // looks like - and holding both halves of a pair is deliberately close to worthless.
+  //   ⚖️ Even Keel  <->  🗡️ Keen Edge   - a FLAT deck against a SHARPENED one
+  //   🧱 Ironbound  <->  💔 Glass Heart - KEEP every card against SPEND them for power
+  // ⚠️ ALL SIX ARE GENERIC (no `cls`), which is the better investment: +1 class = xN refresh,
+  // and the ENGINE owns nearly every rule while the mage owns exactly one. Each names something
+  // PRINTED - a value, a level, the 🃏 Standing - never an element or an archetype.
+  // ============================================================
+  { id: 'evenkeel', tier: 2, name: 'Even Keel', rarity: 'uncommon', cost: 10, rule: true,
+    text: '⚖️ If no two cards in hand differ by more than <b>2</b> in value, your strike is <b>+3</b>',
+    why: 'pays you for the flat hand - and sharpening is what breaks it' },
+  { id: 'keenedge', tier: 2, name: 'Keen Edge', rarity: 'uncommon', cost: 10, rule: true,
+    text: '🗡️ Your Spell strikes <b>+2 for every level above Lv2</b>',
+    why: 'the opposite bet to Even Keel - sharpen one card and lean on it' },
+  { id: 'ironbound', tier: 3, name: 'Ironbound', rarity: 'rare', cost: 12, rule: true,
+    text: '🧱 A card that soaks never drops below <b>Lv2</b>',
+    why: 'the deck can be bruised but never blunted, and never lost' },
+  // 💔 GLASS HEART WAS CUT ON THE DAY IT WAS WRITTEN (2026-08-24). It was meant to be
+  // Ironbound's opposite - *spend the deck for power* - and it was measured three times in three
+  // shapes, all of which came back three times stronger than the best charm in the game:
+  //   +6, cost = the soaking card is DESTROYED        -> **+39.9 road Complete**
+  //   +3, cost = the soaking card loses TWO levels    -> **+27.7**
+  //   +5, cost = your sharpest card dulls each encounter (unconditional) -> **+34.2**
+  // 🔑 THE LAW THIS EARNED, WHICH IS WORTH MORE THAN THE CHARM: **A FLAT, UNCONDITIONAL STRIKE
+  // BONUS IS WORTH ROUGHLY +7 ROAD COMPLETE PER POINT.** Every healthy charm in this game is
+  // CONDITIONAL - Cold Iron +3 when unattuned reads +12.6, Even Keel +3 on a flat hand reads +9.1 -
+  // because the condition is what stops it applying on the turns that were already won.
+  // ⚠️ AND NO COST COULD BUY IT BACK. Thirteen deck levels a run - 40% of the starting deck -
+  // did not offset five points of strike, because levels are paid at the LAIR while the bonus is
+  // collected on every one of ~13 encounters. **A cost denominated in a late resource cannot price
+  // a benefit collected early.**
+  // ✅ So the template for any future charm is: *a bonus, PLUS the condition that makes it a
+  // decision*. A charm with no condition is not a charm, it is a difficulty setting.
+  { id: 'bloodied', tier: 2, name: 'Bloodied', rarity: 'uncommon', cost: 10, rule: true,
+    text: '🃏 While your deck is <b>below par</b>, your strike is <b>+3</b>',
+    why: 'the 🃏 Standing stops being a warning and becomes a resource' },
+  // 🛡️ BRACE WAS CUT THE DAY IT WAS WRITTEN (2026-08-24) - *one card may soak more than once
+  // in the same encounter*. Two independent reasons, either of which was enough:
+  //  1. **It measured +4.1 road Complete and MINUS 23 stage win.** It buys the road with the lair:
+  //     you drive one card into the ground and arrive with fewer deck levels, which is the single
+  //     strongest predictor of the duel. ⚠️ That is the ✦ Held Ember shape - *a charm you should
+  //     regret buying* - and the bot makes it worse, because a one-encounter scorer collects the
+  //     road benefit and cannot see the bill.
+  //  2. 🔴 **IT MADE 🧱 IRONBOUND INFINITE.** Ironbound keyed off `S.downgraded.size === 1`, and
+  //     `Set.add` of an id already present leaves the size at 1 - so with both charms held, EVERY
+  //     soak for the whole encounter was free, forever.
+  // 🔑 THE LESSON IS THE SECOND ONE: **a charm that removes a UNIQUENESS constraint silently
+  // rewrites every rule that was counting on it.** `S.downgraded` was doing two jobs - *which cards
+  // have soaked* and *how many times has this happened* - and Brace only meant to change the first.
+  // Ironbound is stateless now for exactly that reason.
   // ---- MAGE: the one rule this class owns is PAIRING ----
   { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, cls: 'mage',
     text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
@@ -2689,6 +2747,30 @@ function charmMod(key, el) {
     if (c.mods.el && c.mods.el !== el) continue;   // element-gated, and an element is PRINTED
     t += c.mods[key];
   }
+  return t;
+}
+
+// 🎁 THE RULE CHARMS THAT ADD TO A STRIKE, IN ONE PLACE, CALLED FROM BOTH VALUE BRANCHES.
+// 🔑 Extracted on the FIRST day it had two callers rather than the fourth - the arrangement
+// search reached FOUR copies before anyone pulled it out, and every copy after the first had
+// silently missed a rule.
+// ⚠️ ENGINE-ONLY BY CONSTRUCTION: it reads a card's LEVEL and VALUE and the 🃏 Standing, all
+// printed and class-blind. It must never learn an element or an archetype.
+function charmStrike(spell) {
+  let t = 0;
+  // ⚖️ EVEN KEEL - the flat hand, normally the BAD hand, becomes the plan.
+  // 🔑 Its anti-synergy is with the upgrade economy itself: every level you buy widens the
+  // spread that switches it off, so holding it makes SHARPENING a decision instead of a default.
+  if (hasCharm('evenkeel') && S.hand && S.hand.length > 1) {
+    const vals = S.hand.map(c => eff(c).value);
+    if (Math.max(...vals) - Math.min(...vals) <= 2) t += 3;   // ⚠️ 5 measured +14.7 road C
+  }
+  // 🗡️ KEEN EDGE - the exact opposite bet. Holding both is nearly worthless, which is the point.
+  if (hasCharm('keenedge') && spell) t += 2 * Math.max(0, spell.level - 2);
+  // 🃏 BLOODIED - a comeback rule, and the first thing in the game that READS the Standing.
+  // ⚠️ The chip stays a DISPLAY everywhere else; this reads the same two terms it prints, it
+  // does not make the chip an input to anything the chip itself reports.
+  if (hasCharm('bloodied') && S.dragon && S.dragon.par && deckLevels() < S.dragon.par) t += 3;
   return t;
 }
 
@@ -4168,6 +4250,18 @@ const UNLOCKS = [
   { level: 9,  kind: 'charm', id: 'slowfoot' },
   { level: 10, kind: 'charm', id: 'oathstone' },
   { level: 11, kind: 'charm', id: 'unspent' },          // the whole-run rethink
+  // 🎁 THE ANTI-SYNERGY SET TAKES THE TOP THREE RUNGS (2026-08-24), which is exactly the job
+  // this bar was given: *the shelf where content we have not built yet lands*. 🔴 ALL FOUR ARE ON THE BAR, AND THE
+  // FIRST CUT PUT ⚖️ Even Keel and 🗡️ Keen Edge IN THE STARTER POOL to teach the idea early.
+  // That was worth **+19/+15/+13/+15 on the ladder at ★1** - because the ladder measures a fresh
+  // account, so those two were the ONLY new charms it could ever see, landing in a generic starter
+  // pool of nine. 🔑 **A STARTER IS NOT A GENTLER VERSION OF A REWARD - IT IS A DIFFICULTY
+  // SETTING FOR THE ON-RAMP**, and stage 1 is the one rung that is already tuned.
+  // ⚠️ The teaching argument was real and lost to a measurement, which is the right order.
+  { level: 12, kind: 'charm', id: 'bloodied' },
+  { level: 13, kind: 'charm', id: 'ironbound' },
+  { level: 14, kind: 'charm', id: 'evenkeel' },
+  { level: 15, kind: 'charm', id: 'keenedge' },
   // ❌ ARMOUR SLOTS ARE NOT ON THIS LADDER (Thomas, 2026-08-23: *"i don't want to gate armor slots
   // in account level"*). They were, for one build; the argument was that `workshopHTML()` had
   // advertised *"two more to earn"* since it shipped, so the reward already existed.
@@ -5449,7 +5543,20 @@ function computeAction(reserve) {
     // card's OWN value is what a multi-hit strike divides, and every bonus lands on each blow.
     // ⚠️ It is an ENGINE rule, not a rogue one: 🗡️ Sparkstrike gets it too.
     const added = (S.potionFx ? S.potionFx.value : 0) + (S.armourStrike || 0)   // 🧪 Emberdraught · 🧤 Cinderfist
-                  + (a.rogue ? (a.rogue.bonus || 0) : 0);           // ● pips + the blade verb
+                  + (a.rogue ? (a.rogue.bonus || 0) : 0)            // ● pips + the blade verb
+                  // 🎁 CHARM STRIKE BONUSES BELONG HERE, NOT AFTER THE MULTIPLICATION.
+                  // 🔴 They shipped an hour earlier as `value += charmStrike(...)` AFTER `hits` had
+                  // already been applied, so a multi-hit strike got them ONCE instead of on every
+                  // blow - worth **half** to a rogue and full to a mage, which read as a class
+                  // balance fact in the ladder and was a bug in my own arithmetic.
+                  // 🔑 Thomas's rule is explicit: *"if a card does 8x2, any added damage like a +4
+                  // potion, will make it 12x2."* `added` IS that channel; anything that is "added
+                  // damage" goes in it and nothing goes anywhere else.
+                  // ⚠️ 💨 SLOW STRENGTH MOVED TOO, and it had the same bug from the day it
+                  // shipped - it is listed under the same rule and was simply never revisited when
+                  // multi-hit arrived. `initLost` is computed ~17 lines above, so it fits here.
+                  + charmStrike(spell)
+                  + (initLost && hasCharm('slowfoot') ? 4 : 0);
     const base = pileVal + added;
     const withBoost = base + boostEff;
     // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
@@ -5574,7 +5681,6 @@ function computeAction(reserve) {
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
     // this makes LOSING it a legitimate plan, which is a whole second answer to 🛡️ Armour and
     // rescues hands whose only fast card is the one they need in the Spell.
-    if (initLost && hasCharm('slowfoot')) value += 4;
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
@@ -5620,7 +5726,10 @@ function computeAction(reserve) {
   const strideCards = JOURNEY_MODE === 'distance'
     ? [cardById(S.assign.Element), cardById(S.assign.Boost)].filter(Boolean) : [];
   const stride = strideCards.reduce((t, c) => t + eff(c).value, 0);
-  const value = withBoost + reserveBonus + stride;
+  // 🎁 the same four charms pay on a journey. 🔑 THEY MUST, OR THEY ARE HALF A CHARM: journeys
+  // are about half of all encounters, and a rule whose TEXT names no encounter type but whose CODE
+  // does is exactly the shape of the Slow Strength limitation directly above.
+  const value = withBoost + reserveBonus + stride + charmStrike(spell);
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
   const pace = elemInit + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
@@ -6804,6 +6913,19 @@ function startSoak() {
 
 function downgrade(card, why) {
   S.downgraded.add(card.id);
+  // 🧱 IRONBOUND - the deck can be bruised, never blunted.
+  // ⚠️ TWO EARLIER VERSIONS FAILED AND BOTH ARE INSTRUCTIVE. *Never destroyed* measured **+0.7
+  // road C**, i.e. inert: only a **Lv1** card is destroyed and a run destroys ~3.6 cards, so the
+  // rule named a real event that almost never happens. 🔑 **A charm must name something FREQUENT
+  // as well as something PRINTED** - the second half of that bar had never been written down.
+  // Then *the first soak each encounter is free* keyed off `S.downgraded.size`, which 🛡️ Brace
+  // silently broke - see the cut note on Brace. **This version holds no state at all**, which is
+  // also why it cannot be broken by a charm written next year.
+  // ✅ And it is denominated in LEVELS, the resource that actually predicts the duel.
+  if (hasCharm('ironbound') && card.level <= 2) {
+    log(`${card.def.name} takes the blow — 🧱 <b>Ironbound</b> holds it at Lv${card.level}`, 'good');
+    return;
+  }
   if (card.level <= 1) {
     S.hand = S.hand.filter(c => c.id !== card.id);
     S.trashed.push(card);
@@ -10152,7 +10274,7 @@ function cardHTML(card) {
   // any added damage like a +4 potion, will make it 12x2."* That is a statement about what the
   // CARD READS, so showing 8x2 while the maths does 12x2 would be the same bug as 🧱 Guard having
   // no reveal line — a rule that fires without appearing, for the fourth time today.
-  const perAdd = (isStrike && SPLIT_ADDS_PER_HIT && CLASS.perHitBonus) ? CLASS.perHitBonus() : 0;
+  const perAdd = (isStrike && SPLIT_ADDS_PER_HIT && CLASS.perHitBonus) ? CLASS.perHitBonus(card) : 0;
   const per = n => nHits > 1 ? `${Math.floor(n / nHits) + perAdd}<span class="v-x">×${nHits}</span>` : `${n + perAdd}`;
   const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
     (CLASS.pairs

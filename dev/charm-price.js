@@ -33,7 +33,8 @@ function measure(force) {
   return { C: 100 * res.Complete / enc, win: 100 * wins / (runs || 1) };
 }
 const base = measure(null);
-const list = B.CHARMS.filter(c => !c.curse && (!c.cls || c.cls === CLS));
+const ONLY = (process.argv[4]||"").split(",").filter(Boolean);
+const list = B.CHARMS.filter(c => !c.curse && (!c.cls || c.cls === CLS) && (!ONLY.length || ONLY.includes(c.id)));
 console.log(`\n\u{1F381} WHAT EACH CHARM IS WORTH — ${CLS}, ${RUNS} runs a row, same seeds`);
 console.log(`   baseline: road C ${base.C.toFixed(0)}% · stage win ${base.win.toFixed(0)}%`);
 console.log(`   ⚠️ Δ road C% is the sound column; Δ win is directional at this n.\n`);
