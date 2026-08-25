@@ -9868,24 +9868,28 @@ function renderControls() {
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           `</div>` +
           `<div class="class-row is-soon">` +
-          // ⚠️ THIS LIST WAS BUILT FROM Class_System's SOURCE-OF-POWER TABLE AND THEREFORE MISSED
-          // THREE CLASSES THAT LIVE IN THEIR OWN DOCS (found by Thomas, 2026-08-23):
-          // 🪙 The Merchant, and 🏗️ Engineer / 🧱 Mason from Euro_Classes.
-          // 🔑 Same shape as the art sweep that skipped stage 0 because it was driven off `REGIONS`:
-          // **when a list is built from one collection, check what is not in that collection.**
-          // ❌ Euro_Classes' third seed, the 🪵 Forager, is deliberately NOT here — the doc itself
-          // flags it as the weakest fit, "the re-skin the axis exists to prevent", because the
-          // Merchant already claims *a resource you hold and spend*. A roster is a promise, and
-          // there is no sense advertising the one class we have already argued against.
+          // 🔑 **TEN VISIBLE, AND THAT IS THE POINT** (Thomas, 2026-08-25). A roster is a promise,
+          // and a promise gets less credible the longer it runs — twelve names with two playable
+          // reads as a wish list, ten with two playable reads as a plan.
+          // ❌ CUT 2026-08-25, PARKED NOT KILLED: ⚖️ the Paladin (declaration) and 🕯️ the Warlock
+          // (sacrifice). Their source-of-power entries stay in [[Class_System]] — **the roster is a
+          // shipping list, the axis table is a design space, and they are allowed to differ.**
+          // ❌ 🧱 THE MASON IS GONE OUTRIGHT (Thomas: *"i don't know how the mason got into the
+          // classes"*). Fair — I added it off Euro_Classes two days ago, and it never passed the
+          // roster's own bar: *"a stoneworker whose work stays standing"* is 🏗️ the Engineer's
+          // constructions with a different noun. 🔑 A class must fill slots ①②③ differently, and
+          // if you cannot say how in one line each it is a re-skin. **Finding a name in a design
+          // doc is not the same as that name having earned a slot.**
+          // ❌ Euro_Classes' 🪵 Forager stays out for the same reason it always did — the doc calls
+          // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
+          // resource you hold and spend*.
           soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
+          soon('⚗️', 'The Alchemist', 'A brewer who makes her own answers before she needs them.') +
           soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
-          soon('🧱', 'The Mason', 'A stoneworker whose work stays standing from one fight to the next.') +
           soon('🛡️', 'The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
-          soon('⚖️', 'The Paladin', 'A sworn knight who declares the outcome before the fight.') +
-          soon('🕯️', 'The Warlock', 'A dark caster who trades away what cannot be replaced.') +
           soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
           `</div></div></div>`;
       })() +
