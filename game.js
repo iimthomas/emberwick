@@ -8599,7 +8599,18 @@ const MAP_PHASES_NEEDING_MAP = ['map', 'hearth', 'hearthpick', 'mendpick', 'elit
 // Wheel, all in the same frame.
 // ⚠️ It is safe here for the reason the panel is top-anchored in the first place: the reveal
 // animates the SLOT ROW (`beatFx`), and the modal never covers the hand.
-const MODAL_PHASES = ['reveal', 'wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
+// 🐛 'victory' AND 'defeat' WERE MISSING (Thomas, 2026-08-25: *"the summary is still in the
+// corner, i wanted to take up the middle, kinda like how the map does it"*). `runEndHTML()` is a
+// full-page document - the grade, the run in numbers, both xp bars, the haul, the Workshop - and it
+// was rendering into `#controls-panel` at its normal size in the bottom-right corner, on a scene
+// with nothing left in it. 🔑 THE BIGGEST SCREEN IN THE GAME WAS IN THE SMALLEST BOX.
+// ⚠️ 'summary' was on this list and the end screen is NOT the summary - a phase whose NAME sounds
+// like another phase is how a list like this gets a hole in it.
+const MODAL_PHASES = ['reveal', 'wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'victory', 'defeat'];
+// 🔑 THE ONE PLACE THE HAND DOES NOT NEED PROTECTING. Every other modal is top-anchored so it
+// can never cover the cards, because pickers live ON them - but the run is OVER here and there is
+// nothing to read underneath. These get the whole layer.
+const END_PHASES = ['victory', 'defeat'];
 function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
 
 // 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
@@ -8676,7 +8687,10 @@ function sizeModal(panel) {
   // using its top overshot by exactly that padding and the panel overlapped the hand by 2px.
   panel.style.maxHeight = '';
   const top = panel.getBoundingClientRect().top;
-  const handTop = slots.getBoundingClientRect().top;
+  // 🏁 an end screen measures to the bottom of the layer instead of the top of the hand.
+  const handTop = END_PHASES.includes(S.phase)
+    ? layer.getBoundingClientRect().bottom
+    : slots.getBoundingClientRect().top;
   // ⚠️ the hand can sit ABOVE the layer's top on a stacked phone layout mid-scroll; never go
   // negative, and never shrink below something readable.
   const avail = Math.round(handTop - top - 14);
