@@ -638,7 +638,18 @@ const RUNSIM = (() => {
     // dragons are a LADDER now, so a random draw would under-sample the hard rungs. Round-robin
     // every rung so perDragon is an even read on all four.
     rungCursor = (rungCursor % DRAGONS.length) + 1;
-    freshGame(rungCursor);
+    // 🔴 WALK THE PLAYER'S ENTRY PATH (fixed 2026-08-24). This called `freshGame()` directly,
+    // which lands on the MAP - so 🏕️ SETTING OUT, which `startStage()` opens, was never reached.
+    // Measured: rollSetout 0 times and pickSetout 0 times across five runs. **The first screen of
+    // every run has been invisible to the instrument since it shipped on 2026-08-05**, and the
+    // 'setout' branch below has never once executed.
+    // 🔑 THIRD TIME FOR THIS EXACT SHAPE: the tutorial brief (`introNext`), the ✦ Arsenal the bot
+    // never carried, and now the opening pick. **A phase that only the real entry path creates is
+    // invisible to a bot that starts further in** - and it always looks like the phase is fine,
+    // because nothing errors. ⚠️ *An audit that does not walk the player's entry path has not
+    // audited it* was written for the tutorial; it is a rule about every entry point.
+    // ⚠️ startStage() calls render(), which RUNSIM.run() stubs; it is a no-op here either way.
+    if (typeof startStage === 'function') startStage(rungCursor); else freshGame(rungCursor);
     const m = { turns: 0, firstL4: null, events: 0, regionAvg: [], regionMax: [],
                 win: null, dragon: null, duelBeats: 0, approachClean: false, dragonHPleft: null };
     let g = 0;
@@ -856,7 +867,13 @@ const RUNSIM = (() => {
       // this loop or autoRun silently breaks out and reports garbage (it happened with 'wheel').
       // Bot policy: take the first offer. It cannot price a rule-change across a whole run, so the
       // CHOICE is meaningless to it — what these runs measure is that each charm is survivable.
-      else if (p === 'setout') { const o = (S.setout || [])[0]; if (o) pickSetout(o); else break; }
+      // 🏕️ SETTING OUT now offers one from each BUCKET, so the offers are objects and the
+      // bot has to name one. ⚠️ It takes the FIRST, which is always the 🎁 rule bucket - a
+      // deliberate, stated bias, because a one-encounter scorer cannot price coins, potions or
+      // materials against a rule and would otherwise choose by accident. 🔑 So the bot measures
+      // ONE column of this screen; the spread between the three is a question for a player, and
+      // any bot number quoted about it is a number about the charm option alone.
+      else if (p === 'setout') { const o = (S.setout || [])[0]; if (o) pickSetout(o.k); else break; }
       // ⚔️ THE LAST MILE is an ordinary journey turn — the 'assign' branch above already plays it,
       // which is the whole point of Thomas's design: no new phase for the bot OR the player to learn.
       else if (p === 'summary') {

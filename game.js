@@ -906,6 +906,11 @@ function snuffCandle(why) {
   if (!S.candle) return;
   // 🧪 Tallow Stub — one turn's insurance on the thing the whole road pays for
   if (S.potionFx && S.potionFx.keepCandle) { log(`🕯️ The tallow holds — your candle survives ${why}.`, 'good'); return; }
+  // 🏕️ A Steady Flame — the same insurance, taken at the door instead of bought.
+  // ⚠️ It is SPENT here rather than checked, and it is on the status bar until then: *any
+  // persistent modifier must be on screen every turn*, and a one-shot that vanishes silently is
+  // the Mirror Fen bug in miniature - you would never learn whether it fired.
+  if (S.candleGrace > 0) { S.candleGrace--; log(`🕯️ <b>A Steady Flame</b> holds — your candle survives ${why}.`, 'good'); return; }
   S.candle = false;
   log(`🕯️ Your candle gutters out — ${why}. You cannot see what is coming.`, 'bad');
 }
@@ -2878,7 +2883,7 @@ function saveGame(key) {
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
@@ -2959,7 +2964,14 @@ function loadGame(key) {
     // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
     // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
     // **Any new phase that can exist without an encounter belongs in this list.**
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
+    // 🐛 'setout' WAS MISSING AND A RUN SAVED ON IT COULD NEVER BE RELOADED - since the phase
+    // shipped on 2026-08-05. It has no encounter yet (the map opens after you choose), so it fell
+    // through the "no encounter and not stable" guard and `loadGame` returned false - which is
+    // **indistinguishable from "no save yet"**, so it presented as a run that quietly vanished.
+    // 🔑 IT SURFACED THE HOUR THE BOT WAS TAUGHT TO WALK THE ENTRY PATH, because safety-audit
+    // can only round-trip a situation the bot can reach. **An audit's coverage is bounded by the
+    // instrument's reach, and that boundary is invisible from inside the audit.**
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'setout'];
     // ⚠️ A SAVE WRITTEN BEFORE THE MAP WAS SERIALIZED CANNOT BE RESUMED. Builds 287-308 stored a
     // map phase with no map; loading one produces a run standing on nothing. Refuse it here so the
     // menu reports a broken save instead of resuming into a dead screen.
@@ -3004,7 +3016,12 @@ function loadGame(key) {
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
-      duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
+      duelStamina0: d.duelStamina0 || 0, candleGrace: d.candleGrace || 0,
+      // ⚠️ SETTING OUT'S OFFERS CHANGED SHAPE (2026-08-24): they used to be bare charm-id
+      // STRINGS and are now objects. A save taken on that one screen would otherwise resolve to
+      // three dead buttons. 🔑 Re-rolling is the right repair rather than a SAVE_VERSION bump,
+      // because the screen has no state worth preserving — nothing has been chosen yet.
+      setout: Array.isArray(d.setout) && d.setout.every(o => o && typeof o === 'object') ? d.setout : null,
       contract: d.contract || null,
       potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
       upgradePick: null,
@@ -3573,10 +3590,18 @@ function charmForClass(c) {
 }
 function classCharmPool() { return CHARMS.filter(c => c.cls === CLASS.id && !c.curse && charmUnlocked(c)); }
 function rollSetout() {
-  const pool = classCharmPool().slice();
   const offers = [];
-  while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
-  return offers.map(c => c.id);
+  for (const b of SETOUT_BUCKETS) {
+    // ⚠️ A BUCKET THAT CAN PRODUCE NOTHING MUST BE ALLOWED TO PRODUCE NOTHING, not crash and
+    // not silently skip the screen. 🔑 The first charm-tiering left stage 1 with ZERO mage charms
+    // and SILENTLY SKIPPED this entire phase, because the phase only starts if the list is
+    // non-empty - a pool filter deleted a whole screen. Every `pick` may return null; the shuffle
+    // walks the bucket until one yields.
+    const cands = SETOUT.filter(o => o.bucket === b);
+    for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
+    for (const c of cands) { const o = c.pick(); if (o) { offers.push({ k: c.id, ...o }); break; } }
+  }
+  return offers;
 }
 // 💀 THE ELITE BOON — beat a dangerous thing, take one of three charms.
 // 🔑 THIS IS WHAT MAKES AN ELITE A DECISION RATHER THAN A TAX. Coins are the reward every node
@@ -3608,10 +3633,104 @@ function pickBoon(id) {
   backToMap();
 }
 
+// 🏕️ SETTING OUT - three offers, ONE FROM EACH BUCKET (2026-08-24).
+// Thomas: *"in slay the spire, the starting item, its a selection from starting with extra gold,
+// potion, or quest or charm... i don't want players to always pick the same thing every new run,
+// or maybe they cancel out and re do a run just to potentially get something they want."*
+//
+// 🔑 THOSE TWO WORRIES ARE OPPOSITE FAILURE MODES OF ONE DIAL, AND THE FIX SOLVES BOTH AT ONCE:
+//   • *always picks the same* happens when the offers are too ALIKE - it used to draw three
+//     CLASS CHARMS, three of one kind, so one was simply better and the screen read itself.
+//   • *rerolls for a good one* happens when the offers differ too much in VALUE - a jackpot is
+//     a thing worth farming for.
+// ✅ **VARY THE KIND, NOT THE SIZE.** Different kinds are incomparable, so you choose by what
+// THIS run wants; similar weight means there is nothing to reroll toward. That is also the same
+// bar the Wheel's shelf and the 💀 elite boon are held to: *if one offer is strictly better than
+// another, the player did not choose, they read.*
+//
+// ⚠️ DECLARATIVE ON PURPOSE - `pick`/`name`/`text`/`apply`, the same shape as EVENTS and POTIONS,
+// so the port rewrites a lookup table rather than prose.
+// ⚠️ AND THE ROLL IS PER BUCKET, NEVER GLOBAL: a global draw of 3 from 8 would hand you two
+// charms and no fuel about a third of the time, which is the old screen again by accident.
+const SETOUT = [
+  // 🎁 A RULE - the run's direction, and the only bucket that is pure power
+  { id: 'classcharm', bucket: 'rule',
+    pick: () => { const p = classCharmPool().filter(c => !S.charms.includes(c.id));
+                  return p.length ? { c: rand(p).id } : null; },
+    name: o => charmById(o.c).name, text: o => charmById(o.c).text,
+    why: () => 'your class rule, chosen at the door',
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${charmById(o.c).text}`; } },
+  { id: 'genericcharm', bucket: 'rule',
+    pick: () => { const p = CHARMS.filter(c => !c.curse && !c.cls && charmUnlocked(c) &&
+                    charmFitsClass(c) && !S.charms.includes(c.id));
+                  return p.length ? { c: rand(p).id } : null; },
+    name: o => charmById(o.c).name, text: o => charmById(o.c).text,
+    why: () => 'a rule of the road, not of your craft',
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${charmById(o.c).text}`; } },
+  // 🪙 FUEL - spendable, and the bucket that decides how the first shop goes
+  { id: 'purse', bucket: 'fuel', pick: () => ({}),
+    name: () => 'A Full Purse', text: () => 'Start with <b>12 coins</b>',
+    why: () => 'the first Wheel is the one you can never afford',
+    apply() { S.coins += 12; return `🪙 Twelve coins, and the first Wheel is suddenly a shop.`; } },
+  { id: 'kit', bucket: 'fuel', pick: () => ({}),
+    name: () => 'A Packed Kit', text: () => 'Start with <b>two potions</b>',
+    why: () => 'two turns, somewhere, go the way you wanted',
+    apply() { const a = evRandomPotion(false), b = evRandomPotion(false); return `🧪 ${a} · ${b}`; } },
+  { id: 'wellkept', bucket: 'fuel', pick: () => ({}),
+    name: () => 'Well-Kept', text: () => '<b>Two cards</b> begin at <b>Lv3</b>',
+    why: () => 'three levels you did not have to buy',
+    apply() {
+      // ⚠️ THE THREE BIGGEST, NOT A PICKER. A card-picker here would be a phase, and a phase
+      // before the first card is dealt is a screen between the player and the game. 🔑 It is also
+      // the LEVELLING = SHARPENING rule applied honestly: a level makes a card more itself, so
+      // sharpening what is already biggest is what a player would have done anyway.
+      const all = [...S.hand, ...S.deck, ...S.discard].sort((a, b) => eff(b).value - eff(a).value);
+      // ⚠️ TWO, NOT THREE. At three it measured **+7.1 road Complete** against a field running
+      // -1.8 to +3.4 - the jackpot this whole screen was rebuilt to avoid. 🔑 No surprise in
+      // hindsight: the economy is on record as *very sensitive to upgrade cost*, so free levels
+      // are the most concentrated thing that can be handed out at turn zero.
+      const got = all.slice(0, 2);
+      for (const c of got) if (c.level < MAX_LEVEL) c.level++;
+      return `⭐ ${got.map(c => c.def.name).join(', ')} come out of the workshop sharper.`; } },
+  // 🗺️ THE ROAD - neither power nor money. 🔑 The bucket that makes the choice INCOMPARABLE,
+  // and the only place the META layer pays you before turn one.
+  { id: 'steadyflame', bucket: 'road', pick: () => ({}),
+    name: () => 'A Steady Flame', text: () => 'Your 🕯️ candle survives your first <b>Narrow</b>',
+    why: () => 'one scrape that does not cost you the road ahead',
+    apply() { S.candleGrace = 1; return `🕯️ The wick is a good one — the first scrape will not snuff it.`; } },
+  { id: 'earlywork', bucket: 'road', pick: () => { const c = rollFreeContract(); return c ? { c } : null; },
+    name: () => 'Early Work', text: o => `📜 ${contractById(o.c).name} — ${contractById(o.c).text}, and it pays <b>double</b>`,
+    why: () => 'a goal you did not have to buy',
+    apply(o) { const c = contractById(o.c);
+      S.contract = { id: o.c, n: 0, left: contractWindow(c), x2: true };
+      return `📜 <b>${c.name}</b> — ${c.text} within <b>${contractWindow(c)}</b> encounters. Keep it and it pays 🪙 ${c.reward * 2}.`; } },
+  { id: 'headstart', bucket: 'road', pick: () => ({}),
+    name: () => 'A Head Start', text: () => '<b>3 🦴 Bone Shards</b> toward the Workshop',
+    why: () => 'the only offer that outlives the run',
+    apply() { S.loot = S.loot || {}; S.loot.shard = (S.loot.shard || 0) + 3;
+      return `🦴 Three bone shards, already in the pack — they come home whatever happens.`; } },
+];
+const SETOUT_BUCKETS = ['rule', 'fuel', 'road'];
+// ⚠️ REUSES THE RARITY TINTS AS BUCKET TINTS, so the three offers read as three KINDS at a
+// glance rather than three paragraphs. It is the one place colour carries the whole design.
+const SETOUT_RARITY = { rule: 'rare', fuel: 'common', road: 'uncommon' };
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW. A top-level const is LEXICAL: it never
+// lands on the headless sandbox, so no instrument can ask for it, and it hoists into a temporal
+// dead zone for anything evaluated above it. This binding rule has cost this project a load-time
+// crash and three silent no-op probes; it is not a style preference.
+function setoutById(id) { return SETOUT.find(o => o.id === id) || null; }
+
+// 📜 a contract for the Early Work offer, using the same eligibility the Wheel uses
+function rollFreeContract() {
+  const fits = CONTRACTS.filter(x => !x.tier || x.tier <= stageTier());
+  return fits.length ? rand(fits).id : null;
+}
+
 function pickSetout(id) {
-  if (!S.setout || !S.setout.includes(id)) return;
-  const c = charmById(id); if (!c) return;
-  S.charms.push(id);
+  const off = (S.setout || []).find(o => o.k === id);
+  if (!off) return;
+  const def = setoutById(id); if (!def) return;
+  log(def.apply(off), 'good');
   S.setout = null;
   // 🛤️ HAND THE RUN BACK TO THE FORK, NOT TO A TURN THAT HAS NO ENCOUNTER (fixed 2026-08-18).
   // 🐛 `freshGame` runs nextTurn, which now OPENS A FORK - phase 'fork', S.encounter still null.
@@ -3626,7 +3745,11 @@ function pickSetout(id) {
   // REVISIT EVERY TIME YOU ADD ONE.
   S.phase = S.map ? 'map' : ((S.fork && S.fork.length) ? 'fork' : 'assign');
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
-  log(`🏕️ You set out carrying <b>${c.name}</b> — ${c.text}`, 'good');
+  // 🐛 THIS LINE STILL NAMED `c`, THE CHARM THE OLD SCREEN ALWAYS HANDED YOU. With three
+  // KINDS of offer there is no charm to name, and the handoff threw `c is not defined` — which
+  // presented, exactly as this function's own comment predicted a year of bugs ago, as *clicking
+  // the offer does nothing*. 🔑 The offer now describes ITSELF: `apply()` returns its own line and
+  // pickSetout logs it above, so a new offer can never fall out of step with the sentence.
   if (S.encounter) logChallenge();
   saveGame();
   render();
@@ -3749,6 +3872,7 @@ function freshGame(stage) {
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
+    candleGrace: 0,     // 🏕️ A Steady Flame — scrapes this many Narrows survive
     stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
@@ -4114,7 +4238,10 @@ function contractTick(r) {
   if (c.track === 'flawless')   hit = r.outcome === 'Complete' && !r.initLost && hurt === 0;
   if (hit) S.contract.n++;
   if (S.contract.n >= c.need) {
-    S.coins += c.reward;
+    // 🏕️ Early Work doubles it. ⚠️ Read off the CONTRACT OBJECT, not a separate flag on S —
+    // one contract is live at a time and it already travels with the run, so the multiplier
+    // travels with the thing it multiplies and cannot be left behind by a save.
+    S.coins += c.reward * (S.contract && S.contract.x2 ? 2 : 1);
     log(`📜 <b>${c.name}</b> — kept. 🪙 +${c.reward} (you now hold ${S.coins}).`, 'good result');
     S.contract = null;
     return;
@@ -9332,7 +9459,7 @@ function renderControls() {
     } else if (S.phase === 'setout') {
     // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
     // three RULES, so all three rules are on screen in full, with what each one is FOR underneath.
-    const offers = (S.setout || []).map(id => charmById(id)).filter(Boolean);
+    const offers = (S.setout || []).map(o => ({ o, d: setoutById(o.k) })).filter(x => x.d);
     c.innerHTML =
       `<div class="phase-label">SETTING OUT</div>` +
       `<div class="setout">` +
@@ -9340,9 +9467,9 @@ function renderControls() {
       `Four regions of road, and then <b>${S.dragon.name}</b> at the end of them — ` +
       `everything you will have out there, you are carrying now.</p>` +
       `<p class="setout-ask">One last thing goes in the pack.</p>` +
-      offers.map(o => `<button class="setout-offer r-${o.rarity}" onclick="pickSetout('${o.id}')">` +
-        `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
-        (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
+      offers.map(({ o, d }) => `<button class="setout-offer r-${SETOUT_RARITY[d.bucket]}" onclick="pickSetout('${d.id}')">` +
+        `<b>${d.name(o)}</b><span class="setout-text">${d.text(o)}</span>` +
+        `<span class="setout-why">${d.why(o)}</span></button>`).join('') +
       `</div>`;
   } else if (S.phase === 'upgrade') {
     const can = S.hand.filter(c => upgradable(c));
