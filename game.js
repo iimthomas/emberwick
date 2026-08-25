@@ -3219,7 +3219,11 @@ function workshopHTML() {
       .slice().sort((x, y) => RARITY_ORDER.indexOf(x.rarity || 'common') - RARITY_ORDER.indexOf(y.rarity || 'common'));
     if (!list.length) continue;
     body += `<div class="stash-tier">${ARMOUR_SLOTS[slot].icon} ${ARMOUR_SLOTS[slot].label}` +
-      `<span class="stash-tally">${ARMOUR_SLOTS[slot].job}</span></div>` +
+      // ⚠️ WAS THE SLOT'S THEME (*"what you can see"*); that was a design heuristic and is not
+      // shown any more - see ARMOUR_SLOTS. 🔑 Replaced with a COUNT rather than deleted, because
+      // this chip is the only per-zone progress the screen shows and an empty span is a hole where
+      // a fact should be: **a heading that stops making a promise should start stating a number.**
+      `<span class="stash-tally">${list.filter(d => st.owned.includes(d.id)).length}/${list.length}</span></div>` +
       `<div class="wk-grid">` + list.map(d => pieceCardHTML(d, st, worn.includes(d.id))).join('') + `</div>`;
   }
   return `<div class="phase-label">⚒️ THE WORKSHOP</div>` +
@@ -6304,11 +6308,24 @@ function finishResolve() {
 // 📦 PORT: `onBlock` is a STRING KEY dispatched by one named helper, deliberately NOT an arrow
 // function — this table is pure data and can move to data/*.json whole. Keep it that way.
 // ============================================================
+// ⚠️ THE PER-SLOT `job` LINE IS GONE FROM THE SCREEN (Thomas, 2026-08-25: *"lets remove the
+// text about, what you can see, what you can take. lets keep that hidden from players. lets not
+// limit our gear to it, lets use it as a guideline but not 100%"*).
+// 🔑 IT WAS A DESIGN NOTE WEARING A UI LABEL. *Head = what you can see* is an authoring heuristic
+// that kept the four zones from collapsing into four copies of "+block" - useful to write against,
+// and **a promise the moment it is printed.** Printed, it says every Head piece is about
+// information, so the first Head piece that is not reads as a mistake rather than as variety.
+// 🔑 SAME FAULT AS THE `arch` CHARM GATE, WHICH WAS DELETED FOR IT: FORCE/SPARK/FLOW/WARD is an
+// authoring tool printed nowhere, and the moment a rule NAMED it, the rule was doing invisible
+// arithmetic. Here it is the inverse - the heuristic was VISIBLE and therefore binding. Either way
+// the rule is the same: **an authoring heuristic and a player-facing promise are different
+// objects, and one must never be shipped as the other.**
+// ✅ The themes survive as a guideline in the comments over ARMOUR, where they belong.
 const ARMOUR_SLOTS = {
-  Head:  { icon: '🪖', label: 'Head',  job: 'what you can see' },
-  Chest: { icon: '🥋', label: 'Chest', job: 'what you can take' },
-  Arms:  { icon: '🧤', label: 'Arms',  job: 'what you strike for' },
-  Legs:  { icon: '👢', label: 'Legs',  job: 'how fast you move' },
+  Head:  { icon: '🪖', label: 'Head' },
+  Chest: { icon: '🥋', label: 'Chest' },
+  Arms:  { icon: '🧤', label: 'Arms' },
+  Legs:  { icon: '👢', label: 'Legs' },
 };
 // how many slots you may fill. ⚠️ Thomas's call 2026-08-23: START AT TWO, earn the other two.
 // ⚠️ 2 → 4 (2026-08-23). This REVERSES the earlier *"let the armor start off with 2"*, and the
@@ -6373,18 +6390,24 @@ const ARMOUR = [
   { id: 'a_tunic',  slot: 'Chest', name: "Adventurer's Tunic",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'a_gloves', slot: 'Arms',  name: "Adventurer's Gloves", block: 1, brk: 'shatter', rarity: 'common', starter: true },
   { id: 'a_pants',  slot: 'Legs',  name: "Adventurer's Pants",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
-  // 🕶️ HEAD — information. The candle's slot.
+  // ⚠️ THE ZONE THEMES BELOW ARE A GUIDELINE, NOT A RULE (Thomas, 2026-08-25: *"lets use it as a
+  // guideline but not 100%"*). They exist so four zones do not collapse into four copies of
+  // "+block", and they are the first thing to try when writing a new piece — but a piece that
+  // wants to break its zone is allowed to, and that is why the theme is no longer PRINTED.
+  // 🔑 A guideline you can depart from is a design tool; the same sentence on screen is a promise
+  // the next piece has to keep.
+  // 🕶️ HEAD — usually information. The candle's slot.
   { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'relight', text: 'When it blocks, relight your candle.' },
   { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
-  // 🧥 CHEST — what you can afford to lose.
+  // 🧥 CHEST — usually what you can afford to lose.
   { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
   // 🟠 the one piece that measured as a different category of power, now labelled as one
   { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn', rarity: 'legendary',
     every: 'encounter', text: 'It blocks again every encounter.' },
-  // 🧤 ARMS — the blow.
+  // 🧤 ARMS — usually the blow.
   { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
   { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
