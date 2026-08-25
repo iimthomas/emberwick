@@ -52,6 +52,28 @@ const MAX_LEVEL = 4;
 // **naive=optimal FELL, 73% → 66%.** Playing your biggest card is now right LESS often, because the
 // element match is worth more relative to raw size. The turn got slightly less solved, not more.
 let ATTUNE_BONUS = 2;
+// ✦ LOOSE WEAVE's divisor. 2 (a half) → 3 (a third), 2026-08-24. Thomas: *"loose weave might be a
+// bit too good... not having to fully attune, and just using the boost card gives a lot of good
+// damage."* Measured: the charm took attune availability from **59% → 96%** and 46% of all attunes
+// became freebies, and it is worth **+5.0 road Complete** at 10 coins.
+// 🔑 THE FAULT IS TEXTURE, NOT POWER. Priced against all 23 charms it ranks FIFTH — ✦ Cold Iron
+// (+11.6) at the same rarity and the same 10 coins is more than twice as strong. What makes this
+// one felt is that it is the only charm that switches off the mage's SIGNATURE DECISION: pairing
+// stops being a question 96% of the time.
+// ⚠️ AND IT HAD NO COST. `looseOnly()` returns false whenever the Catalyst really matches, so a
+// genuine pair still pays FULL — the charm can never make a turn worse. It is a FLOOR, not the
+// trade its `why` line claimed ("ceiling traded for consistency"). A third keeps the floor and
+// stops the freebie rivalling the real thing: **+5.0 → +2.0 road Complete**.
+// ❌ DO NOT "FIX" THIS BY RAISING ATTUNE_BONUS. A loose attune is a FRACTION of that same
+// bonus, so raising it buffs the freebie too — and attune obligation already measures **76%**
+// against a design band of 35-50%.
+// ❌ AND DO NOT MAKE EVERY ATTUNE HALF WHILE HELD (the "honest trade" the why-line implied):
+// measured **-3 road C / -15 stage win**, i.e. strictly worse than not owning it. 🔑 A PRINTED
+// COST CAN BE HONEST AND STILL BE A TRAP; this charm is usable precisely because it only ever adds.
+let LOOSE_CUT = 3;
+// 🔑 THE DISPLAYS READ THE DIAL. Three separate strings said "half" — a hand-written fraction in
+// three places is three chances to disagree with the maths the next time the number moves.
+function looseWord() { return LOOSE_CUT === 2 ? 'half' : LOOSE_CUT === 3 ? 'a third' : `1/${LOOSE_CUT}`; }
 // ⚡ how much PAYING is worth to the rogue: value + (paid + PAID_STEP × levels invested).
 // ⚠️ THE STEP EXISTS BECAUSE THE FLAT VERSION SHRANK. Thomas: *"i think attuned and unattuned
 // number gap needs to be a bit wider, feels like im pretty happy with unattuned damage, i need to
@@ -967,8 +989,9 @@ function mageStrike(spell, attuned, elem, boostC) {
   // (all four elements, no pair possible) something you wanted. Anti-synergy with every other mage
   // charm by construction, which is exactly what makes choosing it a build rather than a pickup.
   if (!attuned) return st.value + (hasCharm('coldiron') ? 3 : 0);
-  // ✦ LOOSE WEAVE: an unmatched pair attunes for only half the bonus
-  let v = looseOnly() ? st.value + Math.floor((st.attuned - st.value) / 2) : st.attuned;
+  // ✦ LOOSE WEAVE: an unmatched pair attunes for only a THIRD of the bonus (was a half,
+  // 2026-08-24). ⚙️ LOOSE_CUT is the dial — 2 restores the old half.
+  let v = looseOnly() ? st.value + Math.floor((st.attuned - st.value) / LOOSE_CUT) : st.attuned;
   // ✦ THREE OF A KIND: pair attunes, three RESONATES. Requires a genuine match by construction -
   // if all three share an element then the Catalyst matches the Spell, so it can never stack with
   // a Loose Weave freebie.
@@ -2514,8 +2537,8 @@ const RULE_CHARMS = [
     text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
     why: 'pair attunes, three resonates' },
   { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, cls: 'mage',
-    text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>half</b> the bonus',
-    why: 'ceiling traded for consistency' },
+    text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>a third</b> of the bonus',
+    why: 'no hand is ever dead' },
   { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, cls: 'mage',
     text: '✦ Your <b>Surge</b> can attune the Spell too — freeing the Catalyst to be pure speed',
     why: 'the Catalyst stops serving two masters' },
@@ -9757,7 +9780,7 @@ function attunedLineText(r, spell, verb) {
   const rest = r.base - cv - (r.attApplied || 0) - (r.added || 0);
   if (rest) parts.push(`${rest > 0 ? '+' : '−'} ${Math.abs(rest)}`);
   const sums = `${verb} ${parts.join(' ')} = ${r.base}`;
-  if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives half → ${sums}`;
+  if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives ${looseWord()} → ${sums}`;
   return `✦ ATTUNED — ${nm} is ${src ? elOf(src) : r.spellEl} like ${spell.def.name} → ${sums}`;
 }
 // 🔑 THE SLOT HINT IS THE MOST-READ TEXT IN THE GAME — it is the one line under each label that
@@ -9778,7 +9801,7 @@ function zoneHint(zone) {
       // ⚠️ the Catalyst may no longer be the thing that attuned — say who did
       const src = attunerCard(), here = cardById(S.assign.Element);
       if (!attunedNow()) return `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
-      if (looseOnly()) return `✦ ATTUNED loosely — half bonus · Initiative`;
+      if (looseOnly()) return `✦ ATTUNED loosely — ${looseWord()} bonus · Initiative`;
       if (src && here && src !== here) return `Initiative — your Surge attuned the Spell`;
       return `✦ ATTUNED — ${elOf(sp)} matches · Initiative`;
     }
@@ -10137,7 +10160,7 @@ function cardHTML(card) {
       // full attuned value even while Loose Weave was halving it — so the card promised 13 and the
       // charm quietly delivered 10, which is precisely the misread above.
       ? `<span class="v-att${attLive ? ' att-live' : ''}${looseLive ? ' is-loose' : ''}" title="${looseLive
-            ? 'half the bonus — your Catalyst does not share its element (✦ Loose Weave)'
+            ? looseWord() + ' of the bonus — your Catalyst does not share its element (✦ Loose Weave)'
             : 'its value when the Catalyst shares its element'}">✦${per(looseLive
             ? v.value + Math.floor((attV - v.value) / 2) : attV)}</span>`
       // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
