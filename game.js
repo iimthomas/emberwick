@@ -3480,8 +3480,10 @@ function rollSetout() {
 // exist at all.
 // ⚠️ Drawn from the FULL pool (class charms and generic both, tier-gated as ever), so the elite
 // is the best charm source in the run and the risk is priced.
-// ⚠️ COMPLETE ONLY. Surviving on a Narrow pays the coins and nothing else - the prize is for
-// beating the thing, which is also what stops "take every elite" being free upside.
+// ⚠️ SURVIVING IS THE BAR - the gate lives in finishResolve() and this comment used to state
+// the OPPOSITE of the code for weeks. 🔑 A NOTE THAT CONTRADICTS THE RULE IT SITS ON IS WORSE
+// THAN NO NOTE: it is the version that gets quoted. Complete-only was measured twice and is dead
+// both times - see the gate itself for the numbers.
 function boonPool() {
   return CHARMS.filter(c => !c.curse && charmUnlocked(c) &&
     (!c.cls || c.cls === CLASS.id) && !S.charms.includes(c.id) && charmFitsClass(c));
@@ -5863,6 +5865,12 @@ function finishResolve() {
     // ⚠️ SURVIVING IT IS THE BAR, NOT A CLEAN KILL. Complete-only was measured first and the
     // boon fired **0.18 times a run** for the rogue and **0.05** for the mage - a reward almost
     // nobody ever sees is not a reason to route anywhere.
+    // 🔴 RE-MEASURED 2026-08-24 AND THE REASON IS STRONGER THAN "RARE": AT ×2.0 HP A CLEAN
+    // ELITE KILL IS ARITHMETICALLY OUT OF REACH - Complete fires on **1% (mage) / 3% (rogue)** of
+    // elites against 51%/36% on an ordinary fight, so Complete-only would pay **0.02-0.03 charms a
+    // run**, one every forty runs. 🔑 THAT IS THE 🧱 GUARD 2 SHAPE AGAIN: a gate on an outcome
+    // the maths forbids is not a hard gate, it is a dead one. If a clean kill should ever mean
+    // something, the lever is ELITE_HP (×1.4 puts Complete at 9-16%), NOT this line.
     // 🔑 THE PRICE OF AN ELITE IS THE DAMAGE, NOT A PERFECT RESULT. You walked into the dangerous
     // thing and came out; a Loss means it beat you and pays nothing.
     if (here && here.type === 'elite' && r.outcome !== 'Loss') S.boonOwed = true;
@@ -7316,7 +7324,7 @@ function finishTurn() {
 function backToMap() {
   const m = S.map;
   if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
-  // 💀 a dangerous thing beaten CLEANLY gives up a charm. ⚠️ Paid HERE, at the one place every
+  // 💀 a dangerous thing you WALKED AWAY FROM gives up a charm (Complete or Narrow). ⚠️ Paid HERE, at the one place every
   // node returns through, rather than in the encounter branch - a boon owed after a soak or an
   // event would otherwise be stepped over.
   if (S.boonOwed) {
