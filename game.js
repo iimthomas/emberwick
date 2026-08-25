@@ -3480,10 +3480,10 @@ function rollSetout() {
 // exist at all.
 // ⚠️ Drawn from the FULL pool (class charms and generic both, tier-gated as ever), so the elite
 // is the best charm source in the run and the risk is priced.
-// ⚠️ SURVIVING IS THE BAR - the gate lives in finishResolve() and this comment used to state
-// the OPPOSITE of the code for weeks. 🔑 A NOTE THAT CONTRADICTS THE RULE IT SITS ON IS WORSE
-// THAN NO NOTE: it is the version that gets quoted. Complete-only was measured twice and is dead
-// both times - see the gate itself for the numbers.
+// ⚠️ THE KILL IS THE BAR (2026-08-24) — the gate lives in finishResolve(), and so does the
+// reasoning. Walking away pays the coins and the materials; only a Complete pays a charm.
+// 🔑 This comment stated the OPPOSITE of the code for weeks. A NOTE THAT CONTRADICTS THE RULE IT
+// SITS ON IS WORSE THAN NO NOTE: it is the version that gets quoted.
 function boonPool() {
   return CHARMS.filter(c => !c.curse && charmUnlocked(c) &&
     (!c.cls || c.cls === CLASS.id) && !S.charms.includes(c.id) && charmFitsClass(c));
@@ -4396,10 +4396,28 @@ let MAP_STARTS = 3;             // 🗺️ roads leaving the gate, always this m
 // reward channel and the whole coin economy is being re-measured anyway.
 // 💀 AN ELITE HAS TO BE WORTH AVOIDING (Thomas: *"i think we should make something hard for
 // the elites, and have better rewards for going against an elite node"*).
-// ⚠️ At ×1.5 HP and +2 atk it was a slightly bigger creature - a detour with no dread in it.
+// ⚠️ At ×1.5 HP and +2 atk it was a slightly bigger creature — a detour with no dread in it.
 // The reward is the 💀 BOON below, so the danger has to justify a real prize.
-// ⚠️ `let` - tuning constants, and the sweep sets them (a const throws in the harness).
-let ELITE_HP = 2.0, ELITE_ATK = 4, ELITE_COIN = 2.5;
+// 🔴 ELITE_HP 2.0 → 1.15 (2026-08-24). ×2.0 put the KILL past any four-card hand — you beat an
+// elite 1-3% of the time and lost it 54-65%, so the node had NO WIN STATE and the charm had to be
+// paid for merely surviving. 🔑 THE AXES WERE THE WRONG WAY ROUND: an elite was HARD TO BEAT and
+// CHEAP TO SURVIVE. It wants to be BEATABLE and EXPENSIVE. ⚠️ **ELITE_ATK IS DELIBERATELY
+// UNTOUCHED** — the average hit an elite lands measured 9.5–10.6 (mage) at every HP setting from
+// ×2.0 down to ×1.0, because Complete is your damage vs its HP while the hit is its atk.
+// **Lowering HP does not make an elite safer, only winnable.**
+// ⚠️ `let` — tuning constants, and the sweep sets them (a const throws in the harness).
+// 🔴 AND ELITE_ATK +4 → +8 IN THE SAME COMMIT, WHICH IS THE OTHER HALF OF ONE DESIGN, NOT A
+// SECOND CHANGE. ⚠️ **Damage only lands on a Narrow or a Loss**, so dropping HP did not just make
+// the kill reachable — it turned ~30% of elite encounters from *"took a big hit"* into *"took
+// nothing"*, and the ladder rose +10 (mage) / +14 (rogue) on the same seeds. 🔑 I HAD MEASURED
+// THE SIZE OF THE HIT AND CONCLUDED ABOUT THE COST: the per-hit figure held at 9.5-10.6 across
+// every HP setting, but the number of hits collapsed. *A hit size is not a bill.*
+// ✅ +8 buys the difficulty back where the design wants it — an elite hits **14.5 against an
+// ordinary creature's 5.8** (mage), 2.5×, which is the dread stated in the one number a player
+// watches. ⚠️ FALLBACK: if elites read as muggings rather than as fights, ELITE_ATK goes back to 4
+// and the run is simply ~10 points easier. Do NOT answer that by raising HP again — that is the
+// change that deletes the win state.
+let ELITE_HP = 1.15, ELITE_ATK = 8, ELITE_COIN = 2.5;
 // 🐉 one place that makes an elite, so the map's preview and the fight itself cannot disagree.
 function eliteVersion(e) {
   if (!e) return e;
@@ -5862,18 +5880,22 @@ function finishResolve() {
   // 💀 remember a clean elite kill; backToMap() pays it
   if (S.map && S.map.pos) {
     const here = S.map.floors[S.map.pos.f][S.map.pos.c];
-    // ⚠️ SURVIVING IT IS THE BAR, NOT A CLEAN KILL. Complete-only was measured first and the
-    // boon fired **0.18 times a run** for the rogue and **0.05** for the mage - a reward almost
-    // nobody ever sees is not a reason to route anywhere.
-    // 🔴 RE-MEASURED 2026-08-24 AND THE REASON IS STRONGER THAN "RARE": AT ×2.0 HP A CLEAN
-    // ELITE KILL IS ARITHMETICALLY OUT OF REACH - Complete fires on **1% (mage) / 3% (rogue)** of
-    // elites against 51%/36% on an ordinary fight, so Complete-only would pay **0.02-0.03 charms a
-    // run**, one every forty runs. 🔑 THAT IS THE 🧱 GUARD 2 SHAPE AGAIN: a gate on an outcome
-    // the maths forbids is not a hard gate, it is a dead one. If a clean kill should ever mean
-    // something, the lever is ELITE_HP (×1.4 puts Complete at 9-16%), NOT this line.
-    // 🔑 THE PRICE OF AN ELITE IS THE DAMAGE, NOT A PERFECT RESULT. You walked into the dangerous
-    // thing and came out; a Loss means it beat you and pays nothing.
-    if (here && here.type === 'elite' && r.outcome !== 'Loss') S.boonOwed = true;
+    // 💀 YOU HAVE TO KILL IT (Thomas 2026-08-24: *"getting a charm for not killing it just
+    // feels a bit weird, and easy?"*). A Narrow is `value >= half` — you WOUNDED it and walked
+    // away — and yet the boon screen said *"the dangerous thing is dead"* and the log line said
+    // *"off the thing you killed"*. 🔑 THE PRIZE TEXT WAS ASSERTING A KILL THAT DID NOT HAPPEN.
+    // ⚠️ This gate was tried twice before and failed BOTH times for the same reason — at ELITE_HP
+    // ×2.0 a kill fires on 1% (mage) / 3% (rogue) of elites, so it paid 0.02 charms a run, one
+    // every forty. 🔑 THE FAULT WAS NEVER THE GATE, IT WAS THAT THE KILL WAS ARITHMETICALLY OUT OF
+    // REACH — the 🧱 GUARD 2 shape, a rule gated on an outcome the maths forbids. ELITE_HP came
+    // down to ×1.15 in the same commit, which is what makes this line honest rather than dead.
+    // 🔑 AND THE TWO DIALS ARE INDEPENDENT: **HP decides whether you can WIN, ATK decides what it
+    // COSTS.** ELITE_ATK is untouched at +4, so an elite hits exactly as hard as it always did —
+    // measured 9.5–10.6 a hit for the mage at EVERY HP setting from ×2.0 to ×1.0. The dread did
+    // not move; only the win state appeared.
+    // 🔑 THE PRICE OF AN ELITE IS STILL THE DAMAGE. Walking away pays the coins and the materials
+    // (see rollDrops) — it is the CHARM that now costs a kill.
+    if (here && here.type === 'elite' && r.outcome === 'Complete') S.boonOwed = true;
   }
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
@@ -6685,11 +6707,13 @@ function rollDrops(e, outcome) {
     const mat = SHAPE_MAT[sh];
     if (mat && rnd() < (clean ? DROP_RATE.shape : DROP_RATE.narrowShape)) add(mat, 1);
   }
-  // 💀 SURVIVING an elite is the achievement, not beating it cleanly. Measured: elites turn up
-  // 0.6 times a run and a CLEAN win against one is rare enough that gating Prime Sinew on Complete
-  // dropped it exactly zero times in twelve runs. ⚠️ An accidental ultra-rare is worse than a
-  // designed one — it makes a recipe that names it uncraftable without anyone deciding that.
-  // 🔑 It matches the reward already there: the elite charm is paid for SURVIVING one.
+  // 💀 MATERIALS ARE THE SURVIVAL TIER, THE CHARM IS THE KILL TIER (2026-08-24). These stay on
+  // survival deliberately: gating Prime Sinew on Complete dropped it exactly zero times in twelve
+  // runs, and ⚠️ an accidental ultra-rare is worse than a designed one — it makes a recipe that
+  // names it uncraftable without anyone deciding that.
+  // 🔑 SO AN ELITE PAYS TWICE AND THE TIERS SAY DIFFERENT THINGS: **you walked away** → the coins
+  // (×2.5) and the materials · **you killed it** → one of three charms. That is the two-tier reward
+  // the survive-gate was flattening into one.
   if (e.elite) { add('sinew', 1); add('shard', 1); }
   return bag;
 }
@@ -7324,7 +7348,7 @@ function finishTurn() {
 function backToMap() {
   const m = S.map;
   if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
-  // 💀 a dangerous thing you WALKED AWAY FROM gives up a charm (Complete or Narrow). ⚠️ Paid HERE, at the one place every
+  // 💀 a dangerous thing you KILLED gives up a charm. ⚠️ Paid HERE, at the one place every
   // node returns through, rather than in the encounter branch - a boon owed after a soak or an
   // event would otherwise be stepped over.
   if (S.boonOwed) {
