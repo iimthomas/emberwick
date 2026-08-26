@@ -106,7 +106,7 @@ vm.createContext(sandbox);
 // 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
 const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE',
                  'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MATERIALS', 'CREATURE_INDEX', 'ARMOUR', 'ARMOUR_SLOTS', 'RECIPE', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD',
-                 'SETOUT', 'SETOUT_BUCKETS', 'CONTRACTS', 'UNLOCKS', 'UNLOCK_AT', 'LEVEL_CAP', 'XP_AWARD', 'XP_KEY', 'TUTORIAL', 'CLASSES', 'ARMOUR_SLOTS'];
+                 'SETOUT', 'SETOUT_BUCKETS', 'CONTRACTS', 'CLASS_KEY', 'UNLOCKS', 'UNLOCK_AT', 'LEVEL_CAP', 'XP_AWARD', 'XP_KEY', 'TUTORIAL', 'CLASSES', 'ARMOUR_SLOTS'];
 // the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;
 // ⚠️ it must be `let` in game.js or the assignment throws.
 const TUNABLES = ['ATTUNE_BONUS', 'LOOSE_CUT', 'PAID_STEP', 'BANK_MULT', 'FOE_ATK_MULT', 'MOMENTUM_CAP', 'MOMENTUM_STEP', 'MOMENTUM_BREAK', 'MOMENTUM_VALUE', 'MOMENTUM_FULL', 'SPLIT_ADDS_PER_HIT', 'TIME_PENALTY_MULT', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
@@ -136,7 +136,24 @@ const epilogue = NL + ';' + NL +
     ' default: throw new Error("unknown tunable: " + k); } };' + NL;
 vm.runInContext(game + NL + ';' + NL + solver + epilogue, sandbox, { filename: 'emberwick-headless.js' });
 
-const useClass = name => sandbox.setClass(name === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
+// 🔴 IT MUST WRITE THE PICKER'S CHOICE TOO, NOT JUST setClass (fixed 2026-08-25).
+// `RUNSIM.autoRun()` was taught to walk the player's entry path via `startStage()`, and
+// startStage re-reads the class from `pickedClassId()` - so from that change onward **every bot
+// run was the MAGE regardless of useClass**, silently. The tell was a rogue row coming back
+// BIT-IDENTICAL to the mage's.
+// 🔑 THE LESSON IS THE ONE THE ENTRY-PATH FIX ITSELF TAUGHT, POINTING BACK AT ME: walking the
+// real entry path means inheriting what that path READS. startStage reads localStorage; the
+// harness has to write it, exactly as a player choosing a class would.
+const useClass = name => {
+  const id = name === 'rogue' ? 'rogue' : 'mage';
+  // ⚠️ Writing CLASS_KEY is not enough: `pickedClassId()` also asks `classUnlocked()`, and the
+  // rogue is gated behind CLEARING A STAGE - which a headless sandbox has no record of, so it
+  // silently fell back to the mage. Overriding the reader is the honest instrument fix: the bot
+  // is not pretending to have earned her, it is being told which class to measure.
+  sandbox.pickedClassId = () => id;
+  try { sandbox.localStorage.setItem(sandbox.CLASS_KEY, id); } catch (e) {}
+  return sandbox.setClass(id === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
+};
 module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS(),
   setS: v => sandbox.setS(v),
   getRng, setRng,
