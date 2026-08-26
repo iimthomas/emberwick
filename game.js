@@ -52,6 +52,24 @@ const MAX_LEVEL = 4;
 // **naive=optimal FELL, 73% → 66%.** Playing your biggest card is now right LESS often, because the
 // element match is worth more relative to raw size. The turn got slightly less solved, not more.
 let ATTUNE_BONUS = 2;
+// 🎯 GRANTED MULTI-HIT (2026-08-25, Thomas: *"we should add potions and charms and equipment
+// that can give an attack multihit"*).
+// 🔑 IT BELONGS TO THE ENGINE, NOT A CLASS. `hits` is an engine concept - the shapes read it
+// (🧱 Guard halves your first N HITS, 🛡️ Armour subtracts from EACH) - so potions, charms and
+// equipment may all grant it and every class inherits it for free.
+// 🔑 AND IT IS THE PUREST LATERAL EFFECT IN THE GAME: a multi-hit card DIVIDES its own value,
+// so +1 hit adds **no damage at all**. It changes the SHAPE of the blow - strictly better into
+// 🧱 Guard, strictly worse into 🛡️ Armour. *Lateral power, not vertical*, by construction rather
+// than by tuning. ⚠️ Which also means it needs no downside written on it: **the downside is the
+// hand where you meet Armour.**
+function extraHits(isStrike) {
+  if (!isStrike) return 0;
+  let n = 0;
+  if (S.potionFx && S.potionFx.hits) n += S.potionFx.hits;      // 🧪 Splitting Draught
+  if (S.splitPending) n += S.splitPending;                      // 🛡️ Twinned Bracers, on its block
+  if (hasCharm('forkedstrike') && foeHas(S.encounter, 'guard')) n += 1;   // 🎁 Forked Strike
+  return n;
+}
 // ✦ LOOSE WEAVE's divisor. 2 (a half) → 3 (a third), 2026-08-24. Thomas: *"loose weave might be a
 // bit too good... not having to fully attune, and just using the boost card gives a lot of good
 // damage."* Measured: the charm took attune availability from **59% → 96%** and 46% of all attunes
@@ -1047,7 +1065,10 @@ const MAGE = {
   // what its power IS. This used to live in the engine as a bare element check, which credited
   // the rogue with phantom chances every turn — see the note at the craft tracker.
   // how many blows this card lands as the Spell — the mage never splits.
-  hitsOf(c) { return c.def.hits || 1; },
+  // ⚠️ compose() used to compute hits INLINE and this only fed the card face - two readings of
+  // one fact, which is how 🃏 the card printed `◆8` while the maths did `◆12×2`. It is the single
+  // source now: compose() asks this, so the face and the resolution cannot disagree.
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
   // what gets added to EACH blow rather than divided across them — see `added` in computeAction.
   // ⚠️ `card` is the Spell being drawn, because 🗡️ Keen Edge reads ITS level. 💨 Slow
   // Strength is deliberately absent: it depends on Initiative, which the face cannot know - the
@@ -1108,7 +1129,7 @@ const MAGE = {
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
       boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
-      hits: spell.def.hits || 1,   // ⚡ a forking card prints its own
+      hits: CLASS.hitsOf(spell, true),   // ⚡ a forking card prints its own; grants add to it
       attuned, attBonus: st.attuned - st.value,
       // 🔑 THE BONUS ACTUALLY APPLIED, not the one on the card. ✦ Loose Weave halves it, and the
       // reveal was printing the FULL bonus regardless — see attunedLineText.
@@ -1602,7 +1623,7 @@ const ROGUE = {
   // the resolution cannot disagree.
   hitsOf(c, isStrike) {
     const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
-    return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0);
+    return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0) + extraHits(isStrike);
   },
   // ● pips land on every blow, like a potion does. ⚠️ The blade VERB bonus is not shown here —
   // it depends on the fuel card, which the face cannot know; the reveal still states it.
@@ -1672,7 +1693,7 @@ const ROGUE = {
     // 🔑 A COMMENT THAT DESCRIBES A SYSTEM IS NOT THE SYSTEM - same fault as `defs: null`.
     // ● A FULL METER SPLITS THE STRIKE — see MOMENTUM_FULL.
     const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
-    const hits = (strike.def.hits || 1) + (atFull ? 1 : 0);   // ⚠️ her card is `strike`, not `spell`
+    const hits = CLASS.hitsOf(strike, true);   // ⚠️ her card is `strike`, not `spell`
     return {
       value: Math.max(0, dmg + (duelFx().value || 0)
         + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
@@ -2578,6 +2599,20 @@ const RULE_CHARMS = [
   // a benefit collected early.**
   // ✅ So the template for any future charm is: *a bonus, PLUS the condition that makes it a
   // decision*. A charm with no condition is not a charm, it is a difficulty setting.
+  // 🎯 FORKED STRIKE. 🔴 IT FIRST SHIPPED AS *"after you Complete, your next strike splits"* AND
+  // MEASURED **+0.4 road C / -3 win** - inert, and slightly a liability.
+  // 🔑 THE LESSON, WHICH APPLIES TO ALL THREE OF THESE ITEMS: **A LATERAL EFFECT MUST BE
+  // OPTIONAL, OR IT IS A COIN FLIP YOU DID NOT CALL.** A damage bonus can be unconditional because
+  // more is always better; splitting a blow is a SHAPE change that is strictly worse into
+  // 🛡️ Armour, so forcing it on you is a liability roughly as often as it is a gift.
+  // ✅ So it is pointed at the shape it answers instead. 🧪 The POTION keeps the unconditional
+  // version because **you choose the turn** - that is the same effect made optional by its
+  // delivery, which is the whole distinction.
+  // ✅ AND IT FILLS A RECORDED HOLE: charms answer 🌀 Evasion (Windreader) and 🛡️ Armour
+  // (Ironsplitter), and **🧱 Guard had none**. Narrow by design, exactly as those two are.
+  { id: 'forkedstrike', tier: 3, name: 'Forked Strike', rarity: 'rare', cost: 12, rule: true,
+    text: '🎯 Against 🧱 <b>Guard</b>, your strike <b>splits in two</b>',
+    why: 'the first charm that answers a breakable pool' },
   { id: 'bloodied', tier: 2, name: 'Bloodied', rarity: 'uncommon', cost: 10, rule: true,
     text: '🃏 While your deck is <b>below par</b>, your strike is <b>+3</b>',
     why: 'the 🃏 Standing stops being a warning and becomes a resource' },
@@ -2886,6 +2921,7 @@ function saveGame(key) {
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
+      splitPending: S.splitPending || 0, splitPendingNext: S.splitPendingNext || 0,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
@@ -3015,6 +3051,7 @@ function loadGame(key) {
       runBanked: !!d.runBanked,
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
+      splitPending: d.splitPending || 0, splitPendingNext: d.splitPendingNext || 0,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
       duelStamina0: d.duelStamina0 || 0, candleGrace: d.candleGrace || 0,
       // ⚠️ SETTING OUT'S OFFERS CHANGED SHAPE (2026-08-24): they used to be bare charm-id
@@ -3859,6 +3896,7 @@ function freshGame(stage) {
     // curve the measurement assumed. What you wear now comes from the Workshop.
     armour: loadoutIds().map(id => newArmour(id)),
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
+    splitPending: 0, splitPendingNext: 0,   // 🎯 granted multi-hit, this turn / next turn
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
     loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
@@ -4296,6 +4334,16 @@ const POTIONS = [
     text: '🛡️ every card <b>soaks +3</b> when used' },
   { id: 'clarity', name: 'Draught of Clarity', cost: 5, rarity: 'uncommon',
     text: '🕯️ <b>relight your candle</b> — see the road ahead again' },
+  // 🎯 THE ONE-TURN VERSION OF MULTI-HIT, and the cheapest teacher of it. ⚠️ Deliberately
+  // priced as a mid uncommon rather than a banger: it adds **no damage** (a multi-hit strike
+  // divides its own value), so its whole value is meeting 🧱 Guard with it in your kit. Against
+  // 🛡️ Armour it is actively bad, which is the downside already written into the maths.
+  { id: 'splitting', name: 'Splitting Draught', cost: 8, rarity: 'uncommon',
+    // ⚠️ IT DOES NOT SAY *"same total"*, WHICH WAS THE FIRST DRAFT AND WAS A LIE. Measured against
+    // 🛡️ Armour 1: unsplit 12, split 10 - armour is subtracted from EVERY blow, and an odd value
+    // loses one more to rounding. 🔑 That is the mechanic working as designed, so the text must
+    // state the RULE rather than a comforting summary of it. *A rules string states the rule.*
+    text: '🎯 your strike <b>splits in two</b> this turn — better into 🧱 <b>Guard</b>, worse into 🛡️ <b>Armour</b>' },
   { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
     text: '✨ <b>restore a card a level</b> — undo what the road took',
     can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
@@ -4527,6 +4575,9 @@ function applyPotion(p, card) {
   if (p.id === 'haste')    { fx.init += 5;  log(`🧪 ${p.name} — 💨 +5 Initiative this turn.`, 'good'); }
   if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
   if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
+  // 🎯 SPLITTING DRAUGHT - the one-turn version of the whole idea, and the cheapest teacher of
+  // it: you drink it, watch ◆12 become ◆6×2, and learn what multi-hit is for in one encounter.
+  if (p.id === 'splitting'){ fx.hits = (fx.hits || 0) + 1; log(`🧪 ${p.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
   if (p.id === 'clarity')  { lightCandle('the draught clears your sight'); }
   if (p.id === 'nightglass'){ fx.noNight = true; log(`🧪 ${p.name} — 🌙 the dark cannot catch you this journey.`, 'good'); }
   if (p.id === 'breath')   { fx.unspent = true; log(`🧪 ${p.name} — ✦ your Spell survives this casting.`, 'good'); }
@@ -6412,6 +6463,10 @@ const ARMOUR = [
     onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
   { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
     uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
+  // 🎯 The third home for granted multi-hit. ⚠️ On the ARMS zone because that is *usually the
+  // blow* - a guideline, not a rule, and this one keeps it.
+  { id: 'twinned', slot: 'Arms',  name: 'Twinned Bracers',    block: 2, brk: 'shatter', rarity: 'rare',
+    onBlock: 'split', text: 'When it blocks, your next strike splits in two — better into 🧱 Guard, worse into 🛡️ Armour.' },
   // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
   // own power source into the strike — which is exactly what that zone is for.
   // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
@@ -6457,6 +6512,10 @@ const RECIPE = {
   sandals:  { mats: { shard: 14, quill: 2 } },
   // 🩹 worn — the hunt. Each names ONE great beast, so each is a reason to go somewhere.
   circlet:  { mats: { shard: 20, quill: 3, 'p:Stormcrown Roc': 1 } },
+  // 🎯 a rare ARMS piece needs a rare hunt. ⚠️ Priced beside the other rares rather than cheap:
+  // granting a hit is the only `onBlock` in the game that changes the SHAPE of a blow instead of
+  // its size, and shape is the scarcer thing.
+  twinned:  { mats: { shard: 20, slag: 3 } },
   cuirass:  { mats: { shard: 24, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
   greaves:  { mats: { shard: 20, hide: 1, 'p:Scarp Ram': 1 } },
   wraps:    { mats: { shard: 18, sinew: 2, 'p:Cinderjaw': 1 } },
@@ -6555,6 +6614,7 @@ function applyArmourBlock(key, d) {
   if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
   else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — gain 3 coins. (you now hold ${S.coins})`, 'good'); }
   else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike gets +4.`, 'good'); }
+  else if (key === 'split')  { S.splitPendingNext = (S.splitPendingNext || 0) + 1; log(`🛡️ ${d.name} — 🎯 your next strike SPLITS IN TWO.`, 'good'); }
   else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + 5; log(`🛡️ ${d.name} — your next turn gets +5 Initiative.`, 'good'); }
   else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — your next turn gets +3 Initiative.`, 'good'); }
 }
@@ -7455,6 +7515,11 @@ function tickMomentum(damage, r) {
 function rollTurnTokens() {
   S.armourTwin = false;   // 🔥 a doubled channel lasts exactly the turn you broke the band on
   S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
+  // 🎯 🛡️ Twinned Bracers - the same pending→active rollover, on the same line, deliberately.
+  // ⚠️ A per-turn token has to be rolled where EVERY turn loop reaches, and this project has lost
+  // two mechanics to being reset in only one of the three (🔥 the Emberwake and ● Momentum both
+  // froze for an entire finale). Putting it beside the effect it copies is how it stays found.
+  S.splitPending = S.splitPendingNext || 0; S.splitPendingNext = 0;
   // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
   // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
   for (const a of (S.armour || [])) {
