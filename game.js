@@ -2921,7 +2921,7 @@ function saveGame(key) {
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
-      splitPending: S.splitPending || 0, splitPendingNext: S.splitPendingNext || 0,
+      splitPending: S.splitPending || 0,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
@@ -3051,7 +3051,7 @@ function loadGame(key) {
       runBanked: !!d.runBanked,
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
-      splitPending: d.splitPending || 0, splitPendingNext: d.splitPendingNext || 0,
+      splitPending: d.splitPending || 0,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
       duelStamina0: d.duelStamina0 || 0, candleGrace: d.candleGrace || 0,
       // ⚠️ SETTING OUT'S OFFERS CHANGED SHAPE (2026-08-24): they used to be bare charm-id
@@ -3896,7 +3896,7 @@ function freshGame(stage) {
     // curve the measurement assumed. What you wear now comes from the Workshop.
     armour: loadoutIds().map(id => newArmour(id)),
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
-    splitPending: 0, splitPendingNext: 0,   // 🎯 granted multi-hit, this turn / next turn
+    splitPending: 0,   // 🎯 granted multi-hit, cleared every turn like potionFx
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
     loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
@@ -6465,8 +6465,17 @@ const ARMOUR = [
     uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
   // 🎯 The third home for granted multi-hit. ⚠️ On the ARMS zone because that is *usually the
   // blow* - a guideline, not a rule, and this one keeps it.
-  { id: 'twinned', slot: 'Arms',  name: 'Twinned Bracers',    block: 2, brk: 'shatter', rarity: 'rare',
-    onBlock: 'split', text: 'When it blocks, your next strike splits in two — better into 🧱 Guard, worse into 🛡️ Armour.' },
+  // 🔴 IT SHIPPED AS `onBlock` AND THOMAS KILLED IT THE SAME HOUR: *"you get it on your next
+  // strike if you block? you wouldn't ever know."* He is right, and it is sharper than my own note
+  // that the timing was merely unchosen. 🔑 **THE SPLIT WOULD HAVE LANDED ON A DIFFERENT TURN FROM
+  // THE ONE THAT EARNED IT** - you cannot plan around a bonus you did not ask for, arriving after
+  // the decision it was supposed to inform. An `onBlock` that pays THIS turn (relight, +4 strike)
+  // is a reward; one that pays NEXT turn is a surprise, and a surprise fights *legible math always*.
+  // ✅ An active use fixes it completely, and it is the same fix the potion already embodies:
+  // **a lateral effect must be OPTIONAL, and the cheapest way to make it optional is to let the
+  // player press it.** Modelled on 🔥 Emberfist Wraps, the piece directly above.
+  { id: 'twinned', slot: 'Arms',  name: 'Twinned Bracers',    block: 0, brk: 'worn', rarity: 'rare',
+    uses: 1, use: 'split', text: 'Once a run: your strike splits in two this turn — better into 🧱 Guard, worse into 🛡️ Armour.' },
   // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
   // own power source into the strike — which is exactly what that zone is for.
   // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
@@ -6588,8 +6597,16 @@ function unequipPiece(id) {
 }
 
 const armourDef = id => ARMOUR.find(a => a.id === id) || null;
-const newArmour = id => ({ id, wear: (armourDef(id).block > 0 ? 1 : 0),
-                           uses: armourDef(id).uses || 0, charge: 0 });
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW (2026-08-25). A top-level const is LEXICAL:
+// it never lands on the headless sandbox, so no instrument can build a piece to test one.
+// 🔑 That binding rule has now cost five probes in a single day — including one that reported a
+// variant as BIT-IDENTICAL to baseline, because overriding a const arrow is a silent no-op and
+// a silent no-op looks exactly like "no effect". **Prefer a function declaration for anything
+// an instrument might reasonably want to call.**
+function newArmour(id) {
+  return { id, wear: (armourDef(id).block > 0 ? 1 : 0),
+           uses: armourDef(id).uses || 0, charge: 0 };
+}
 // 🎭 A CLASS PIECE IS ONLY WEARABLE BY ITS CLASS. ⚠️ Checked at the point of WEARING, not only in
 // the Workshop, because the loadout is stored between runs and you can change class between them.
 const armourFitsClass = d => !d || !d.cls || d.cls === CLASS.id;
@@ -6614,7 +6631,6 @@ function applyArmourBlock(key, d) {
   if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
   else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — gain 3 coins. (you now hold ${S.coins})`, 'good'); }
   else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike gets +4.`, 'good'); }
-  else if (key === 'split')  { S.splitPendingNext = (S.splitPendingNext || 0) + 1; log(`🛡️ ${d.name} — 🎯 your next strike SPLITS IN TWO.`, 'good'); }
   else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + 5; log(`🛡️ ${d.name} — your next turn gets +5 Initiative.`, 'good'); }
   else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — your next turn gets +3 Initiative.`, 'good'); }
 }
@@ -6647,6 +6663,8 @@ function applyArmourUse(key, d, opt) {
   // 🔥 mage — what you channel this turn is doubled. ⚠️ Read by bankValueOf(), so it lands on the
   // Surge row, the reveal line and the Emberwake alike; a flag consumed anywhere else would show
   // one number and pay another.
+  // 🎯 spent on the turn you choose - the whole reason this stopped being an `onBlock`.
+  else if (key === 'split') { S.splitPending = (S.splitPending || 0) + 1; log(`🛡️ ${d.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
   else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — what you channel this turn is DOUBLED.`, 'good'); }
   // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
   // legendary-sized effect without being a number.
@@ -7515,11 +7533,12 @@ function tickMomentum(damage, r) {
 function rollTurnTokens() {
   S.armourTwin = false;   // 🔥 a doubled channel lasts exactly the turn you broke the band on
   S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
-  // 🎯 🛡️ Twinned Bracers - the same pending→active rollover, on the same line, deliberately.
-  // ⚠️ A per-turn token has to be rolled where EVERY turn loop reaches, and this project has lost
-  // two mechanics to being reset in only one of the three (🔥 the Emberwake and ● Momentum both
-  // froze for an entire finale). Putting it beside the effect it copies is how it stays found.
-  S.splitPending = S.splitPendingNext || 0; S.splitPendingNext = 0;
+  // 🎯 granted multi-hit is a THIS-TURN token now (🛡️ Twinned Bracers is an active use, not an
+  // `onBlock`), so it is cleared here rather than rolled forward.
+  // ⚠️ A per-turn token must be cleared where EVERY turn loop reaches - this project has lost two
+  // mechanics to being reset in only one of the three (🔥 the Emberwake and ● Momentum both froze
+  // for an entire finale). Beside the effect it copies is how it stays found.
+  S.splitPending = 0;
   // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
   // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
   for (const a of (S.armour || [])) {
