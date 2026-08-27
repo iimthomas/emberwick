@@ -2045,8 +2045,7 @@ const TUTORIAL = {
       text: '🎁 A <b>charm</b> lasts the whole run and changes a rule rather than a number. Everything you carry is listed in the bar at the top.' },
     { id: 'potion', when: () => (S.potions || []).length > 0,
       point: '.kit-row',
-      text: '🧪 A <b>potion</b> is one use, spent on a turn you choose, and lasts that turn only. You can carry 3. Hold one for a turn that needs it.' + POTION_CAP + '. ' +
-            'It buys you a single turn where the arrangement you wanted is legal — so hold it for the turn that needs it.' },
+      text: '🧪 A <b>potion</b> is one use, spent on a turn you choose, and lasts that turn only. You can carry ' + POTION_CAP + '. Hold one for a turn that needs it.' },
     // ⚠️ CURSES ARE A DIFFERENT LESSON FROM CHARMS. They arrive without being bought, and the whole
     // point of `carried()` is that a run-long penalty must be on screen every turn — so the lesson's
     // job is to send you to the status bar, not to explain the individual curse.
@@ -3870,7 +3869,7 @@ function freshGame(stage) {
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
     candleGrace: 0,     // 🏕️ A Steady Flame — scrapes this many Narrows survive
-    stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 },
+    stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0, perfect: 0, perfectChances: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
     delayed: 0,            // ⏳ shop stops still owed to a Time Penalty — no sharpening while > 0
@@ -5915,6 +5914,44 @@ function computeAction(reserve) {
 }
 
 // ---------- Phase 2/3: resolve action, queue penalties ----------
+// ✦ PERFECT KILL — you Completed, and no SMALLER card in your hand would also have done it.
+// 🔑 NOT exact-lethal: hitting HP precisely with four cards is mostly luck, and **a reward you
+// cannot aim for is a slot machine**. *Spend no more than you needed* is checkable, aimable, and
+// states in ENGINE terms — a rogue earns one off a chain exactly as a mage earns one off a card.
+// ⚠️ CONTESTED IS THE HALF THAT MATTERS. Measured over 1,992 Completes, **64% were already
+// perfect by accident**, because only one card could ever have got there. A reward that fires by
+// default is not an achievement, so the prize needs BOTH: yours was the smallest sufficient card
+// AND another card would also have done it — i.e. you actually chose.
+// ⚠️ IT SWAPS `S.assign` AND PUTS IT BACK, which is the *instrument that perturbs what it
+// measures* trap. So: synchronous, never renders in between, restores in a `finally`, and runs
+// ONCE per encounter from resolve() — in computeAction() it would re-run on every repaint for a
+// fact that cannot change mid-turn.
+function perfectKillInfo(outcome) {
+  const none = { perfect: false, contested: false };
+  if (outcome !== 'Complete' || !S.hand) return none;
+  const a = S.assign, curId = a.Spell, cur = cardById(curId);
+  if (!cur) return none;
+  const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
+  const curVal = eff(cur).value;
+  let smallerWorks = false, anyOtherWorks = false;
+  for (const c of S.hand) {
+    if (c.id === curId) continue;
+    const zone = ZONES.find(z => a[z] === c.id);
+    if (!zone || zone === 'Spell') continue;
+    const prevSpell = a.Spell;
+    try {
+      a.Spell = c.id; a[zone] = prevSpell;
+      const alt = computeAction(cardById(a.Reserve));
+      if (alt && alt.outcome === 'Complete') {
+        anyOtherWorks = true;
+        if (eff(c).value < curVal) smallerWorks = true;
+      }
+    } catch (err) { /* an illegal arrangement is simply not an alternative */ }
+    finally { a[zone] = c.id; a.Spell = prevSpell; }
+  }
+  return { perfect: !smallerWorks, contested: anyOtherWorks };
+}
+
 function resolve() {
   if (!rolesValid()) return;
   const e = S.encounter;
@@ -5927,6 +5964,10 @@ function resolve() {
   const boostVal = boostC ? eff(boostC).boost : 0;
 
   const r = computeAction(reserve);
+  // ✦ computed here, once, while the hand is still seated exactly as it was played
+  const pk = perfectKillInfo(r.outcome);
+  r.perfect = pk.perfect && pk.contested;   // the PRIZE needs both
+  r.perfectChance = pk.contested;           // ...and this is the grade's denominator
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
@@ -6030,7 +6071,7 @@ function resolve() {
   // ⚠️ Rolled HERE rather than in finishResolve() so the beat can show it. finishResolve() then
   // banks what was rolled instead of rolling again — two rolls would have shown you one haul and
   // given you another.
-  r.drops = rollDrops(S.encounter, r.outcome);
+  r.drops = rollDrops(S.encounter, r.outcome, r.perfect);
   if (Object.keys(r.drops).length) {
     beats[beats.length - 1].final = false;
     beats.push({ carveBeat: true, final: true, lines: [] });
@@ -6118,6 +6159,8 @@ function beatDisplayHTML(beat, isNew) {
   if (beat.outcomeBeat) {
     const subs = [];
     subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
+    // ✦ named where the verdict is, because it IS part of the verdict
+    if (r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
     const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
     if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmg}</div>`);
     if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
@@ -6132,11 +6175,19 @@ function beatDisplayHTML(beat, isNew) {
     // was not one, and the warm box around it competed with the verdict beside it.
     // 🔑 IT IS A LIST OF THINGS YOU GAINED, so it renders as chips on the verdict row instead.
     const ids = Object.keys(r.drops || {});
-    return `<div class="pv-gain pv-carve${pop}">` +
-      `<span class="pv-gain-label">\u{1F9F0} carved</span>` +
+    // 🦴 ITS OWN SECTION, NOT A TAG ON THE VERDICT ROW (Thomas, 2026-08-26: *"it should be its
+    // own section, formatted cleanly and nicely, maybe it should be called like Drops"*).
+    // ⚠️ It has now been wrong twice in one day for the same reason: it was a stat column, then it
+    // was a chip beside the outcome pill — both times **wedged into a row that was about something
+    // else**. 🔑 What you WON and what it COST you are two different statements, and putting them on
+    // one line asks the reader to separate them. A heading does that for free.
+    // ✅ And it is called DROPS: *carved* is flavour, and this is a list of things you now own.
+    return `<div class="pv-drops${pop}">` +
+      `<div class="pv-drops-head">\u{1F9B4} DROPS</div>` +
+      `<div class="pv-drops-list">` +
       ids.map(id => `<span class="mat-chip">${matDef(id).icon} ${matDef(id).name}` +
         `${r.drops[id] > 1 ? `<b>\u00d7${r.drops[id]}</b>` : ''}</span>`).join('') +
-      `</div>`;
+      `</div></div>`;
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
     `<div class="pv-label">${beat.label} ${beat.vs}</div>` +
@@ -6172,6 +6223,13 @@ function finishResolve() {
   }
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
+  // ✦ the run's tally. `perfectChances` is the denominator: encounters where more than one card
+  // would have Completed — i.e. where being economical was a DECISION, not the only line.
+  if (r.perfectChance) S.stats.perfectChances = (S.stats.perfectChances || 0) + 1;
+  if (r.perfect) {
+    S.stats.perfect = (S.stats.perfect || 0) + 1;
+    log(`✦ <b>PERFECT KILL</b> — no smaller card would have done it. The part is certain.`, 'good');
+  }
   S.lastOutcome = r.outcome;
   if (S.finalMode && S.finalPhase === 'lastmile') { S.lastMileOutcome = r.outcome; S.lastMileApproach = r.lastMile; }
   S.lastAttuned = !!r.enhUsed;
@@ -6996,7 +7054,7 @@ function seedStarter(st) {
 // 🦴 WHAT THIS ENCOUNTER DROPPED. Returns a { matId: qty } bag; the caller banks it.
 // ⚠️ PURE-ISH BY DESIGN — it reads the encounter and rolls, and touches no screen. The rules layer
 // stays detachable, which is the whole insurance policy for the Godot port.
-function rollDrops(e, outcome) {
+function rollDrops(e, outcome, perfect) {
   const bag = {};
   if (!e) return bag;
   const add = (id, n) => { if (n > 0) bag[id] = (bag[id] || 0) + n; };
@@ -7024,7 +7082,22 @@ function rollDrops(e, outcome) {
   const shapes = shapesOf(e) || [];
   for (const sh of shapes) {
     const mat = SHAPE_MAT[sh];
-    if (mat && rnd() < (clean ? DROP_RATE.shape : DROP_RATE.narrowShape)) add(mat, 1);
+    // ✦ A PERFECT KILL DOES NOT ADD A DROP — IT GUARANTEES ONE. The shape part rolls at 60% on a
+    // clean win; kill with nothing to spare and the roll becomes a certainty.
+    // 🔑 WHY THIS IS THE RIGHT REWARD: it prints no new currency, so it cannot move the Workshop
+    // economy the way a bonus material would — and **it removes a die roll by playing precisely**,
+    // which is what this game is about. Nothing else here lets skill delete randomness.
+    // ⚠️ Self-limiting: only shaped creatures, only a Complete, at most +0.4 over the base rate.
+    // 🔴 THE ROLL ALWAYS HAPPENS, EVEN WHEN THE GUARANTEE MAKES IT IRRELEVANT. Short-circuiting
+    // it (`(clean && perfect) || rnd() < rate`) SKIPS an `rnd()` call, which shifts the random
+    // stream for the whole rest of the run — so a same-seed A/B of this feature compared two
+    // different games and came back at **-0.3 materials**, an impossibility.
+    // 🔑 AN EFFECT THAT CHANGES AN OUTCOME MUST NOT CHANGE THE RANDOM STREAM. Same lesson as the
+    // snapshot work (*state AND rng position*), and it is correctness before it is instrumentation:
+    // in a game whose identity is deterministic and measurable, a rule that silently re-seeds
+    // everything downstream is a bug even when nobody is measuring.
+    const rolled = rnd() < (clean ? DROP_RATE.shape : DROP_RATE.narrowShape);
+    if (mat && ((clean && perfect) || rolled)) add(mat, 1);
   }
   // 💀 MATERIALS ARE THE SURVIVAL TIER, THE CHARM IS THE KILL TIER (2026-08-24). These stay on
   // survival deliberately: gating Prime Sinew on Complete dropped it exactly zero times in twelve
@@ -9509,14 +9582,17 @@ function renderControls() {
       // along. The arithmetic goes on top as a sequence; the verdict and what you gained get their
       // own row underneath, separated by a rule. *Hierarchy is legibility, not decoration.*
       (() => {
+        // 🔑 THREE ZONES: the working → the verdict → what you got. Each answers a different
+        // question, so each gets its own band rather than sharing a row.
         const shown = S.beats.slice(0, S.beatIndex + 1);
-        const isVerdict = b => b.outcomeBeat || b.carveBeat;
         const cell = (b) => beatDisplayHTML(b, b === S.beats[S.beatIndex]);
-        const work = shown.filter(b => !isVerdict(b)).map(cell).join('');
-        const verdict = shown.filter(isVerdict).map(cell).join('');
+        const work = shown.filter(b => !b.outcomeBeat && !b.carveBeat).map(cell).join('');
+        const verdict = shown.filter(b => b.outcomeBeat).map(cell).join('');
+        const drops = shown.filter(b => b.carveBeat).map(cell).join('');
         return `<div class="preview-bar beat-bar" onclick="advanceBeat()" title="click to continue">` +
           `<div class="pv-work">${work}</div>` +
           (verdict ? `<div class="pv-verdict">${verdict}</div>` : '') +
+          (drops ? drops : '') +
           `</div>`;
       })() +
       (beat.final

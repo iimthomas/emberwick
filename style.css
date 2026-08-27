@@ -227,6 +227,14 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .event-opts, .event-picks { display: flex; flex-direction: column; gap: 6px; align-items: stretch; margin: 6px 0; }
 .event-picks { flex-flow: row wrap; }
 .event-opts button { text-align: left; }
+/* 🕯️ THE OPTION NOTE WAS AN UNSTYLED INLINE SPAN, so it ran straight into the label:
+   "Take the lightyour candle is already lit". `.opt-why` had no rule anywhere.
+   🔑 A <span> with no style is not a neutral default, it is glued text. Same treatment as
+   .setout-text, which had the same job and got it right. */
+/* ⚠️ NOT flex-column on the button: the leading emoji is a bare text node, and in a flex
+   container every text node becomes its own anonymous item — which put the icon on a line of its
+   own, three lines per option. A block on the NOTE is all that was needed. */
+.opt-why { display: block; margin-top: 3px; font-size: 11.5px; color: #8a8577; font-weight: 400; line-height: 1.35; }
 .event-picks button { flex: 0 0 auto; }
 
 /* ---------- the Dragon Duel finale ---------- */
@@ -886,9 +894,14 @@ button.stage.locked .stage-shape { font-style: italic; }
 .pv-result { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pv-result-subs { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 
-/* 🧰 what you gained — chips, because that is what materials are: a list of things, not a stat. */
-.pv-gain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pv-gain-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #f0a86a; }
+/* 🦴 DROPS — its own band under the verdict, with a heading.
+   ⚠️ This was wrong twice in one day: first a stat column (an emoji in the number slot), then a
+   chip tagged onto the verdict row. Both times it was wedged into a row that was about something
+   else. 🔑 What you WON and what it COST you are two different statements; a heading separates
+   them for free. */
+.pv-drops { border-top: 1px solid #2b313c; padding-top: 10px; margin-top: 10px; }
+.pv-drops-head { font-size: 10px; letter-spacing: 1.5px; color: #f0a86a; margin-bottom: 7px; }
+.pv-drops-list { display: flex; gap: 8px; flex-wrap: wrap; }
 .mat-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11.5px; color: #f0c89a;
