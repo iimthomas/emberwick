@@ -1912,40 +1912,20 @@ const TUTORIAL = {
   // no in-play lesson can do because by then you are already in one.
   intro: [
     { title: 'You are a mage on the road',
-      body: 'There is a dragon at the end of the road, and you are what stands between it and everyone behind you.<br><br>' +
-            'You carry <b>sixteen cards</b> — the whole of your craft. You will hold <b>four at a time</b>, ' +
-            'and every turn you decide what those four are for.' },
+      body: 'A dragon waits at the end of the road. Your job is to reach it and kill it.<br><br>You carry <b>sixteen cards</b>. You hold <b>four at a time</b>, and each turn you decide what those four do.' },
     // ⚠️ REWRITTEN 2026-08-12 (Thomas: *"doesn't explain what it does. we gotta explain what things
     // do exactly"*). The old page said "fall short and you lose time" and "the dark catches you" —
     // both name a consequence without defining it, which is the one thing a brief exists to do.
     // 🔑 THE BAR: every stat must say what it SUBTRACTS FROM WHAT. If a sentence could be true of
     // three different rules, it is flavour, not a brief.
     { title: 'A turn is an arrangement',
-      body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
-            '<b>SPELL</b> — its number is what you deal. Afterwards it is <b>spent</b>: into the discard, and you will not see it again until the region ends.<br>' +
-            '<b>CATALYST</b> — its <b>💨 Initiative</b> races the enemy\'s. And if it shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger <b>✦</b> number on its face instead.<br>' +
-            '<b>SURGE</b> — its <b>➕</b> is added to your Spell. Or <b>bank</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br>' +
-            '<b>ARSENAL</b> — the one card you <b>keep</b> into the next hand. Your Catalyst and Surge slide back under your deck.' },
+      body: 'Your four cards sit under four labels. The position is the role. Swap cards to change it.<br><br><b>SPELL</b> — its number is what you deal. It is then spent: it goes to the discard and does not come back until the region ends.<br><br><b>CATALYST</b> — its 💨 Initiative races the enemy\'s. If it also shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger ✦ number on its face.<br><br><b>SURGE</b> — its ➕ is added to your Spell. Or channel it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br><br><b>ARSENAL</b> — the one card you keep for the next hand. Your Catalyst and Surge slide back under your deck.' },
     { title: '⚔️ A fight asks for damage',
-      body: 'Your <b>Spell</b> (plus your Surge) is your blow, measured against its <b>❤️ HP</b>:<br><br>' +
-            '• <b>Complete</b> — you meet or beat its HP. It never touches you.<br>' +
-            '• <b>Narrow</b> — you reach <b>half</b> its HP. You still get past it, but it <b>hits back for its ⚔️</b>.<br>' +
-            '• <b>Loss</b> — below half. It hits back and you gain nothing. <i>You still move on</i> — an encounter is never the end of your run.<br><br>' +
-            '<b>💨 And the race is separate.</b> If your Catalyst is slower than its 💨, it <b>bites first for its ⚔️</b> — even if your blow then kills it. Speed is not damage; it is whether you get hurt on the way in.<br><br>' +
-            'Each creature also has a <b>defence</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
+      body: 'Your Spell plus your Surge is your blow. Compare it to the creature\'s ❤️ HP:<br><br>• <b>Complete</b> — you meet or beat its HP. It does not touch you.<br>• <b>Narrow</b> — you reach half its HP. You get past it, but it hits you for its ⚔️.<br>• <b>Loss</b> — below half. It hits you and you gain nothing. You still move on; one encounter never ends the run.<br><br>💨 Initiative is separate from damage. If your Catalyst is slower than the creature\'s 💨, it strikes first for its ⚔️, even if your blow then kills it.<br><br>Each creature also has a defence. 🛡️ <b>Armour N</b> takes N off your blow, so it wants one big hit. 🌀 <b>Evasion</b> halves your blow unless you won Initiative, so it wants speed.' },
     { title: '👣 A journey asks for distance',
-      body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
-            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. These are cards you have not drawn yet, so they cost you no levels. <i>(If your deck is already empty it becomes damage instead.)</i><br><br>' +
-            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.<br><br>' +
-            'So a fight punishes you in <b>blood</b> and a journey punishes you in <b>cards and time</b>.' },
+      body: 'The same cards, measured differently. Your Spell is how far you get, compared to the road\'s <b>MP</b>. Complete, Narrow at half, Loss below.<br><br>⏳ <b>Time Penalty</b> — anything short of a Complete burns this many cards off the top of your deck into the discard. They are cards you have not drawn, so they cost you no levels. If your deck is empty it becomes damage instead.<br><br>🌙 <b>Nightfall</b> — your Catalyst\'s 💨 is your Pace. If your Pace is below this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. Damage is paid with your cards: you pick cards to <b>soak</b> it.<br><br>' +
-            '• A card soaks its printed <b>🛡️</b> number, and <b>drops one level</b>.<br>' +
-            '• A card showing <b>🛡️ —</b> cannot soak at all.<br>' +
-            '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
-            '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
-            'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
-            'You will lose runs. That is the game working — you learn the defences, unlock more, and come back.' },
+      body: 'There is no health bar. You pay damage with cards: you choose which cards soak it.<br><br>• A card soaks its printed 🛡️ number and drops one level.<br>• A card showing 🛡️ — cannot soak.<br>• A card already at Lv1 does not drop a level. It leaves your deck for the rest of the run.<br>• If your cards cannot cover the whole hit, the run ends.<br><br>So every fight costs you cards, and at the dragon you are racing its HP against how many cards you have left.<br><br>You will lose runs. You keep the materials and the xp, unlock more, and go again.' },
   ],
   // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
   // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
@@ -1963,21 +1943,17 @@ const TUTORIAL = {
     // read enemy → arrange cards → confirm.
     { id: 'f-hp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(1)',
-      text: '❤️ <b>HP</b> is what it takes to put it down. Deal that much and you <b>Complete</b> the fight. ' +
-            'Reach the <b>half</b> and it is a <b>Narrow</b> — you win through, but it still hits you back.' },
+      text: '❤️ <b>HP</b> is what it takes to put it down. Deal that much for a <b>Complete</b>. Deal <b>half</b> for a <b>Narrow</b> — you get past it, but it hits you back.' },
     { id: 'f-init', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
       // ⚠️ initLost is `e.init > init`, so a TIE WINS. "Has to beat" was wrong by one.
-      text: '💨 <b>Init</b> is what your <b>Catalyst</b> must <b>match or beat</b> — a tie goes to you. ' +
-            'Win and it never touches you on the way in; lose and it <b>bites first for its ⚔️</b>, even if your blow then kills it.' },
+      text: '💨 <b>Init</b> is what your Catalyst must match or beat. A tie goes to you. Lose it and the creature strikes first for its ⚔️, even if your blow then kills it.' },
     { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⚔️ <b>Atk</b> is what it does to you: once if it strikes first, and again if you fail to Complete. ' +
-            'You pay it in <b>cards</b>.' },
+      text: '⚔️ <b>Atk</b> is what it deals to you: once if it strikes first, and again if you fail to Complete. You pay it with cards.' },
     { id: 'f-shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
       point: '#encounter-panel .enc-stats span:nth-child(4)',
-      text: 'Its <b>defence</b> is how it protects itself. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
-            '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The defence decides what your turn should be.' },
+      text: 'Its defence changes what your blow is worth. 🛡️ <b>Armour N</b> takes N off every hit. 🌀 <b>Evasion</b> halves your hit unless you win Initiative.' },
     // 🛡️ EQUIPMENT (2026-08-23, Thomas: *"we need to teach the equipment(armor) stuff"*).
     // 🔴 The tutorial has dealt you the full Adventurer's set since the day armour shipped and
     // never said a word about it — four pieces on screen, from turn one, unexplained.
@@ -1985,38 +1961,34 @@ const TUTORIAL = {
     // this is the answer to it. **Teach the cost, then the thing that absorbs the cost.**
     { id: 'equipment', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
       point: '#armour-rail .eq',
-      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. ' +
-            'Each piece <b>blocks one hit</b>, then it is <b>spent for the rest of the run</b>. ' +
-            'A blocked hit costs you <b>no cards</b>.' },
+      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. Each piece blocks one hit, then it is spent for the rest of the run. A blocked hit costs you no cards.' },
     // 🦴 the carve. Fires the moment loot exists, which in stage 0 is the first fight you win.
     { id: 'carve', when: () => S.phase === 'reveal' && Object.keys(S.loot || {}).length > 0,
       point: '.haul, .pv-carve',
-      text: '🦴 Beasts leave <b>parts</b> behind. Parts survive the run, win or lose. ' +
-            'You spend them at the <b>⚒️ Workshop</b> to forge <b>equipment</b> for your next run.' },
+      text: '🦴 Creatures drop <b>materials</b>. You keep them whether you win or lose the run. Spend them at the ⚒️ Workshop to forge equipment for next time.' },
     { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(5)',
-      text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
+      text: '🪙 What it pays. Coins buy card levels and charms between encounters, and unspent coins carry over.' },
     // 👣 the journey panel asks a different question and gets its own walkthrough
     { id: 'j-mp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(1)',
-      text: '👣 A journey wants <b>distance</b>, not damage — the same cards, read a different way. Beat its <b>MP</b> to arrive; reach half and you get there late.' },
+      text: '👣 A journey measures distance instead of damage, using the same cards. Beat its MP to arrive. Reach half and you arrive late.' },
     { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '🌙 <b>Nightfall</b> races your <b>Catalyst</b>. If its Initiative is lower than this, you lose the card in your <b>Arsenal</b> and your candle goes out.' },
+      text: '🌙 Nightfall races your Catalyst\'s 💨. If yours is lower, you lose the card in your Arsenal and your candle goes out.' },
     { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⏳ <b>Time Penalty</b> is what arriving late costs — cards burned off the top of your deck. On a journey you lose <b>time</b>, not blood.' },
+      text: '⏳ Time Penalty is what arriving late costs: this many cards burned off the top of your deck.' },
 
     { id: 'slots', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '#slots-panel',
-      text: 'Your four cards sit under four labels — <b>position is the role</b>. Tap two cards to swap them, or tap a card then tap a label.' },
+      text: 'Your four cards sit under four labels. The position is the role. Tap two cards to swap them, or tap a card then tap a label.' },
     { id: 'spent', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Spell',
-      text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
+      text: 'The card under SPELL is your action, and it is spent for the rest of the region. Weigh that before you play your biggest card.' },
     { id: 'arsenal', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Reserve',
-      text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
-            'Choose it for the hand you want next turn, not for this one.' },
+      text: '✋ <b>ARSENAL</b> is the one card you keep for next turn. Everything else leaves your hand. Choose it for the hand you want next turn.' },
     // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
     // decides whether banking is informed or a bet, and nothing had ever named it.
     // 🗺️ THE MAP ITSELF — the first screen of every run, and it had no lesson because until
@@ -2025,9 +1997,7 @@ const TUTORIAL = {
     // is, region 2 gives two so you learn that the choice is yours. **Teach the noun, then the verb.**
     { id: 'map', when: () => S.phase === 'map',
       point: '.mp',
-      text: '🗺️ This is the road ahead, and you climb it from the bottom. Each stop is one encounter — ' +
-            '◇ the road, ❓ an event, 🕯️ a hearth. Tap a stop you can reach to take it. ' +
-            'Further up the road <b>forks</b>, and then <b>which problem you face is your choice</b>.' },
+      text: '🗺️ This is the road ahead. You move up it from the bottom. Each stop is one encounter: ◇ the road, ❓ an event, 🕯️ a hearth. Tap a stop you can reach to take it. Higher up the road forks, so you choose which problem to face.' },
     // 🕯️ REWRITTEN FOR THE MAP (2026-08-23). The old lesson said *"you can see what comes
     // after this — its HP, its speed"*, which was true of the QUEUE. `nextEncounter()` returns null
     // whenever a map exists — its own comment says so — so with the tutorial map this lesson could
@@ -2036,74 +2006,63 @@ const TUTORIAL = {
     // the ones that only teach.
     { id: 'candle', when: () => S.phase === 'map' && S.candle,
       point: '.mp-peek, .mp',
-      text: '🕯️ Your candle is <b>lit</b>, so you can read the roads before you take one — what waits ' +
-            'there and what it will ask of you. Only a <b>Complete</b> keeps it burning; a narrow win, a loss ' +
-            'or nightfall snuffs it. <b>Then you choose blind.</b>' },
+      text: '🕯️ Your <b>candle</b> is lit, so you can read a road before you take it — what waits there and what it asks for. Only a <b>Complete</b> keeps it lit. A Narrow, a loss or nightfall puts it out.' },
     { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
       point: '.candle',
-      text: '🕯️ It went out. Only a <b>Complete</b> keeps it lit — a Narrow or a loss snuffs it, and you travel blind until you come through one cleanly. ' +
-            '<b>That is what a Narrow really costs you.</b>' },
+      text: '🕯️ Your candle is out, so you cannot read the roads ahead. Come through an encounter with a <b>Complete</b> to light it again.' },
     { id: 'couldattune', when: () => isAssignPhase() && !attunedNow() && handHasPair(),
       point: () => { const id = pairPartnerId(); return id ? '.in-' + (zoneOf(id) || 'Spell') : null; },
-      text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
+      text: 'Two of your cards share an element. Put the matching one under CATALYST and your Spell attunes: it strikes for the bigger ✦ number on its face.' },
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
-      text: '✦ <b>Attuned.</b> Your Catalyst is also your <b>Initiative</b>, and the card that matches is rarely the fastest one. ' +
-            'One Catalyst, two jobs: pick the one this encounter needs.' },
+      text: '✦ <b>Attuned.</b> Your Catalyst sets your Initiative as well, and the matching card is rarely the fastest one. Pick whichever this encounter needs.' },
     // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
     { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> can fire now — or <b>⟳ channel</b> it: nothing this turn, but next turn you spend it as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b>. ' +
-            'The bigger the Surge you channel, the more it pays. 🕯️ Your candle shows you what is coming.' },
+      text: 'Your <b>SURGE</b> can fire now, or ⟳ <b>channel</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed. A bigger Surge channels for more.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
     // ⚠️ POINTS AT THE TOKEN (2026-08-21). It used to point at `.wake-row`, which no longer
     // exists — a lesson whose target is gone silently rings nothing at all.
     { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
       point: '#field .tok-wake',
-      text: '🔥 You are holding an <b>Emberwake</b>. <b>Tap it</b> to aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
-            '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
+      text: '🔥 You are holding an <b>Emberwake</b>. Tap it to aim it at your strike or your speed. 🛡️ Armour wants the bigger hit, 🌀 Evasion wants you to go first. Spend it this turn or lose it.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
-      text: 'Tap a card to <b>soak</b>. It absorbs its printed <b>🛡️</b> number and drops one level. Cover the whole hit or the run ends. <b>Your deck is your health.</b>' },
+      text: 'Tap a card to soak. It absorbs its printed 🛡️ number and drops one level. Cover the whole hit or the run ends. Your deck is your health.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
-      text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
+      text: '🃏 Reversed lets you send each returning card to the top of your deck (drawn next hand) or the bottom (much later). Without the charm they slide under in slot order.' },
     // ⚠️ STALE UNTIL 2026-08-12 — this said only "coins buy levels", which described the Wheel from
     // before sharpening was merged onto it. The screen now does BOTH, and the budget split between
     // them is the actual decision, so a lesson naming one half taught the wrong thing.
     { id: 'wheel', when: () => S.phase === 'wheel',
       point: '#controls-panel',
-      text: '🎰 <b>The Wheel.</b> One screen, one purse: <b>sharpen</b> your own cards, or <b>buy</b> what is on the shelf. ' +
-            'A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else. ' +
-            '<b>Deciding between the two IS the shop</b>, so spend knowing you cannot have both.' },
+      text: '🎰 <b>The Wheel.</b> One purse, two things to spend it on: sharpen your own cards, or buy from the shelf. A level raises a card\'s best stat and lowers its worst, so a sharpened card is strong in one slot and weak elsewhere. You cannot afford both, so choose.' },
     { id: 'charm', when: () => S.phase === 'wheel' && S.wheel && (S.wheel.offers || []).some(o => o && o.kind === 'charm'),
       point: '#controls-panel',
-      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b>, not just a number. ' +
-            'Everything you are carrying is shown in the bar at the top, always.' },
+      text: '🎁 A <b>charm</b> lasts the whole run and changes a rule rather than a number. Everything you carry is listed in the bar at the top.' },
     { id: 'potion', when: () => (S.potions || []).length > 0,
       point: '.kit-row',
-      text: '🧪 A <b>potion</b> is one use, spent on a turn <b>you</b> choose, and it lasts that turn only. You can carry ' + POTION_CAP + '. ' +
+      text: '🧪 A <b>potion</b> is one use, spent on a turn you choose, and lasts that turn only. You can carry 3. Hold one for a turn that needs it.' + POTION_CAP + '. ' +
             'It buys you a single turn where the arrangement you wanted is legal — so hold it for the turn that needs it.' },
     // ⚠️ CURSES ARE A DIFFERENT LESSON FROM CHARMS. They arrive without being bought, and the whole
     // point of `carried()` is that a run-long penalty must be on screen every turn — so the lesson's
     // job is to send you to the status bar, not to explain the individual curse.
     { id: 'curse', when: () => (S.charms || []).some(id => { const c = charmById(id); return c && c.curse; }),
       point: '#status-bar',
-      text: '⚠️ You picked up a <b>curse</b> — a charm that costs you instead of paying you. It sits in the same bar as your boons, ' +
-            'because a penalty you cannot see is one you cannot play around.' },
+      text: '⚠️ You picked up a <b>curse</b>: a charm that costs you instead of paying you. It sits in the same bar as your charms so you can see it every turn.' },
     { id: 'event', when: () => S.phase === 'event',
       point: '#controls-panel',
-      text: '📖 The road throws things at you between encounters. Read the options — some cost coins or a card, and one is usually just <b>walk on</b>. ' +
-            'An option you cannot afford says so instead of hiding.' },
+      text: '📖 <b>Events</b> happen between encounters. Read the options. Some cost coins or a card, and one is usually to walk on. An option you cannot afford says why.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
-      text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Soak it below Lv4 and the verb is gone.' },
+      text: '✦ A card at Lv4 gains a verb, and it only works in one slot. Move the card to that slot and the verb lights up. Soak the card below Lv4 and the verb is gone.' },
     // ✦ the rainbow hand is now taught as a PROBLEM, not as a thing the game fixes for you
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
-      text: 'All four elements, so <b>nothing can pair</b> — no Spell will attune this turn. Some hands simply cannot. Play the best plain line you have, and keep your best card for a hand that can.' },
+      text: 'All four elements, so no two cards pair and nothing can attune this turn. Play the best plain line you have.' },
     // ⚠️ WRITTEN WRONG ONCE (2026-08-12) — the first draft described the press-your-luck "stir band"
     // approach, which was CUT and replaced by this ordinary journey. It was copied out of CLAUDE.md,
     // which still documented the cut version. The lesson must describe LAST_MILE, not the history.
@@ -2113,17 +2072,13 @@ const TUTORIAL = {
     // the haul and two moving bars for attention. Teach it while it is still quiet.
     { id: 'levels', when: () => S.phase === 'wheel' && (S.xpRun || 0) > 0,
       point: '#status .chip, #controls-panel',
-      text: '⭐ Every encounter you walk earns <b>xp</b> — a clean win pays most, a loss still pays. ' +
-            'It fills two bars: your <b>account level</b>, which opens charms any class can use, and ' +
-            '<b>this character\'s level</b>, which opens hers alone. You will see both when the run ends.' },
+      text: '⭐ Every encounter earns <b>xp</b>. A clean win pays most, a loss still pays. It fills two bars: your <b>account level</b>, which opens charms any class can use, and this <b>character\'s level</b>, which opens hers. Both are shown when the run ends.' },
     { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
       point: '#encounter-panel',
-      text: '⚔️ <b>The Last Mile</b> — one journey between you and the lair, and it <b>costs you nothing</b>: no Nightfall, no Time Penalty, no hardship, nothing kept. ' +
-            'Everything is reshuffled for the duel afterwards, so this is the one turn in the game where you should <b>empty the tank</b>. ' +
-            'Arrive cleanly and the ' + '<b>dragon starts wounded</b>; scrape in and it starts a little wounded.' },
+      text: '⚔️ <b>The Last Mile</b> is one journey before the lair, and it costs you nothing: no Nightfall, no Time Penalty, no hardship. Every card is reshuffled for the duel afterwards, so play everything you have. Arrive with a <b>Complete</b> and the dragon starts wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
-      text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
+      text: 'The duel is a race between two numbers: its HP, and how many cards you have left. You lose when you run out of cards, so every card you soak with is stamina you do not get back.' },
   ],
 };
 // does the hand hold a same-element pair at all, and which card is the partner worth moving?
