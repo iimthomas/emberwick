@@ -926,6 +926,8 @@ function lightCandle(why) {
 }
 function snuffCandle(why) {
   if (!S.candle) return;
+  // 🕯️ Deepglass Crown — the legendary version of Farseer's Circlet, which only survives a Narrow.
+  if (hasArmourRule('everlit')) { log(`🛡️ <b>Deepglass Crown</b> — the flame does not gutter.`, 'good'); return; }
   // 🧪 Tallow Stub — one turn's insurance on the thing the whole road pays for
   if (S.potionFx && S.potionFx.keepCandle) { log(`🕯️ The tallow holds — your candle survives ${why}.`, 'good'); return; }
   // 🏕️ A Steady Flame — the same insurance, taken at the door instead of bought.
@@ -2879,7 +2881,7 @@ function saveGame(key) {
       wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
-      splitPending: S.splitPending || 0,
+      splitPending: S.splitPending || 0, armourWinInit: !!S.armourWinInit,
       armourPace: S.armourPace, armourPacePending: S.armourPacePending,
       delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
       cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
@@ -3009,7 +3011,7 @@ function loadGame(key) {
       runBanked: !!d.runBanked,
       armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
-      splitPending: d.splitPending || 0,
+      splitPending: d.splitPending || 0, armourWinInit: !!d.armourWinInit,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
       duelStamina0: d.duelStamina0 || 0, candleGrace: d.candleGrace || 0,
       // ⚠️ SETTING OUT'S OFFERS CHANGED SHAPE (2026-08-24): they used to be bare charm-id
@@ -3871,6 +3873,7 @@ function freshGame(stage) {
     armour: loadoutIds().map(id => newArmour(id)),
     armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
     splitPending: 0,   // 🎯 granted multi-hit, cleared every turn like potionFx
+    armourWinInit: false,   // 👢 Anvil Toad Boots, this turn only
     // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
     // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
     loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
@@ -4036,6 +4039,9 @@ function nextRegion() {
   S.hand = [];
   S.discard = [];
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
+  // 🕯️ Dawnwatch Cap — a fresh region, a fresh light. ⚠️ Placed at the REGION break rather than
+  // per encounter on purpose: relighting every turn would delete the candle's whole tension.
+  if (hasArmourRule('dawnlit') && !S.candle) lightCandle('Dawnwatch Cap catches the morning');
   S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
   // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
@@ -5677,11 +5683,16 @@ function computeAction(reserve) {
   if (e.type === 'fight') {
     // ✦ Lv4 CATALYST verbs shape the race itself
     const vS = a.vSpell, vE = a.vElem;
-    const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
+    // 🕯️ Gorsewarden's Hood — seeing it coming IS being ready for it. ⚠️ It couples two systems
+    // that never touched, which is the point: the candle stops being purely information.
+    const init = elemInit + (S.candle && hasArmourRule('farsight') ? 2 : 0);
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
     // 🗡️ Viper Strike arrives before they are ready — same answer as ✦ Outpace, different class
-    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
+    // 👢 Anvil Toad Boots — an active use, so it is spent on a turn YOU choose. (The Twinned
+    // Bracers lesson: a lateral effect must be optional, or it is a coin flip you did not call.)
+    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit) || S.armourWinInit)
+      ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -5888,7 +5899,13 @@ function computeAction(reserve) {
   const value = withBoost + reserveBonus + stride + charmStrike(spell);
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
-  const pace = elemInit + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
+  // 🌙 Lanternjaw Greaves — Pace reads your FASTEST card instead of your Catalyst.
+  // 🔑 THE BUILD-CHANGER OF THE NINE: the Catalyst currently serves two masters (Initiative and
+  // the pair), and Nightfall is a third claim on it. This removes that third claim, so the Catalyst
+  // is free to attune while the night is answered by whatever else you happen to be holding.
+  const fastest = hasArmourRule('swiftfoot')
+    ? Math.max(0, ...S.hand.map(c => eff(c).init)) : 0;
+  const pace = Math.max(elemInit, fastest) + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace && !(S.potionFx && S.potionFx.noNight);   // 🧪 Nightglass
   // Steep peril: the journey's MP grows by your Arsenal's Boost
@@ -5922,7 +5939,7 @@ function computeAction(reserve) {
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
-    : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
+    : nightCaught && reserve && !S.emberShield && !hasArmourRule('nightwise') ? 'caught by Nightfall' : null;
   return { ...classPayload, type: 'journey', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            // ⚠️ WHEN compose() GAINS A FIELD, CHECK THE PAYLOAD IN THE SAME EDIT - three separate
            // bugs this month came from a value being computed and then never reaching the reveal.
@@ -6513,6 +6530,45 @@ const ARMOUR = [
   // player press it.** Modelled on 🔥 Emberfist Wraps, the piece directly above.
   { id: 'twinned', slot: 'Arms',  name: 'Twinned Bracers',    block: 0, brk: 'worn', rarity: 'rare',
     uses: 1, use: 'split', text: 'Once a run: your strike splits in two this turn — better into 🧱 Guard, worse into 🛡️ Armour.' },
+
+  // ============================================================
+  // 🏹 NINE PIECES FOR THE NINE UNUSED QUARRIES (2026-08-27).
+  // 🔴 MEASURED: 7 of 16 quarries had a recipe. The other NINE dropped a signature part that
+  // **nothing in the game wanted** — it landed in the Stash and sat there forever. The quarry system
+  // exists to turn *"66 interchangeable stat blocks"* into *"50 fodder and 16 you remember"*, and
+  // nine of the sixteen were memorable creatures whose trophy was inert.
+  // ⚠️ AND ROAD 4 WAS THE THINNEST — one recipe of four, which is backwards: the hardest road had
+  // the least to earn from it. Three of these are Fathom quarries for exactly that reason.
+  // ⚠️ SLOTS WERE LOPSIDED TOO: Arms had 3 deep-hunt pieces, Head and Chest had 1 each. **Arms
+  // gets none of these**; Head, Chest and Legs get three apiece.
+  // 🔑 EVERY ONE CHANGES A RULE RATHER THAN A NUMBER — the charm pass measured rule-changers at the
+  // top of the value table and flat numbers at the bottom, and a hardcore TCG player reads filler
+  // instantly. ⚠️ And each names something the player can SEE: the candle, Initiative, a card's
+  // level, Nightfall, coins.
+
+  // 🕯️ HEAD — information
+  { id: 'dawncap',  slot: 'Head',  name: 'Dawnwatch Cap',      block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'dawnlit', text: 'Your 🕯️ candle is lit again at the start of every region.' },
+  { id: 'farhood',  slot: 'Head',  name: "Gorsewarden's Hood", block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'farsight', text: 'While your 🕯️ candle is lit, your 💨 Initiative is +2.' },
+  { id: 'deepglass', slot: 'Head', name: 'Deepglass Crown',    block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'everlit', text: 'Your 🕯️ candle never goes out.' },
+
+  // 🧥 CHEST — what you can afford to lose
+  { id: 'boarcoat', slot: 'Chest', name: 'Boarhide Coat',      block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'softfall', text: 'A <b>Lv1</b> card that blocks is not destroyed — it goes to your discard instead.' },
+  { id: 'oxharness', slot: 'Chest', name: "Fen Ox Harness",    block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'ledger', text: 'When a card is destroyed, gain 🪙 <b>8 coins</b>.' },
+  { id: 'siltplate', slot: 'Chest', name: 'Siltcrawler Plate', block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'tidewall', text: 'Damage is <b>1 less</b> for every card you have already blocked with this encounter.' },
+
+  // 👢 LEGS — speed
+  { id: 'toadboots', slot: 'Legs', name: 'Anvil Toad Boots',   block: 1, brk: 'worn', rarity: 'rare',
+    uses: 1, use: 'firstlight', text: 'Once a run: you <b>win Initiative</b> this turn, whatever it is.' },
+  { id: 'grindshin', slot: 'Legs', name: 'Grindtooth Shins',   block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'nightwise', text: '🌙 Nightfall no longer takes your <b>Arsenal</b>.' },
+  { id: 'lanterngreave', slot: 'Legs', name: 'Lanternjaw Greaves', block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'swiftfoot', text: '🌙 Your <b>Pace</b> uses your <b>fastest card</b>, not your Catalyst.' },
   // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
   // own power source into the strike — which is exactly what that zone is for.
   // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
@@ -6562,6 +6618,26 @@ const RECIPE = {
   // granting a hit is the only `onBlock` in the game that changes the SHAPE of a blow instead of
   // its size, and shape is the scarcer thing.
   twinned:  { mats: { shard: 20, slag: 3 } },
+  // ⚠️ ALL NINE ARE RARE OR LEGENDARY, AND THAT IS A RULE NOW: **if a piece is gated on a named
+  // creature, it IS a rare.** Three of these shipped as `uncommon` for about ten minutes, and the
+  // economy probe caught it immediately - an uncommon measured at **40 runs**, because a quarry
+  // gate is a rare's cost whatever the label says.
+  // 🔑 THE TIERS MEAN SOMETHING NOW: uncommon = shards and shape parts, countable and cheap;
+  // rare and legendary = one named creature, which is the thing you go hunting for. **The rarity
+  // label follows the gate rather than fighting it.**
+  // 🏹 the nine — costed against the MEASURED rates (8.7 shard, 1.4 quill, 0.6 slag, 0.6 sinew,
+  // 0.2 hide a run), so the shard half lands inside the target band and the quarry part is the
+  // thing you actually go looking for. ⚠️ Hide is the scarcest at 0.22 a run: never ask for more
+  // than 2 of it.
+  dawncap:   { mats: { shard: 14, 'p:Cairnstag': 1 } },
+  boarcoat:  { mats: { shard: 14, 'p:Ashen Boar': 1 } },
+  toadboots: { mats: { shard: 16, quill: 2, 'p:Anvil Toad': 1 } },
+  farhood:   { mats: { shard: 20, quill: 3, 'p:Gorse Lurcher': 1 } },
+  oxharness: { mats: { shard: 20, slag: 2, 'p:Fen Ox': 1 } },
+  grindshin: { mats: { shard: 20, hide: 1, 'p:Grindtooth': 1 } },
+  deepglass: { mats: { shard: 26, quill: 4, sinew: 2, 'p:Shoal Drifter': 1 } },
+  siltplate: { mats: { shard: 26, hide: 2, sinew: 2, 'p:Silt Crawler': 1 } },
+  lanterngreave: { mats: { shard: 26, quill: 4, sinew: 3, 'p:Lanternjaw': 1 } },
   cuirass:  { mats: { shard: 24, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
   greaves:  { mats: { shard: 20, hide: 1, 'p:Scarp Ram': 1 } },
   wraps:    { mats: { shard: 18, sinew: 2, 'p:Cinderjaw': 1 } },
@@ -6701,6 +6777,7 @@ function applyArmourUse(key, d, opt) {
   // Surge row, the reveal line and the Emberwake alike; a flag consumed anywhere else would show
   // one number and pay another.
   // 🎯 spent on the turn you choose - the whole reason this stopped being an `onBlock`.
+  else if (key === 'firstlight') { S.armourWinInit = true; log(`🛡️ ${d.name} — 💨 you take the initiative this turn, whatever it has.`, 'good'); }
   else if (key === 'split') { S.splitPending = (S.splitPending || 0) + 1; log(`🛡️ ${d.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
   else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — what you channel this turn is DOUBLED.`, 'good'); }
   // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
@@ -7207,8 +7284,21 @@ function downgrade(card, why) {
     return;
   }
   if (card.level <= 1) {
+    // 🧥 Boarhide Coat — a Lv1 card that blocks is not LOST, only spent. ⚠️ It still leaves your
+    // hand, so the encounter still costs you; what it does not do is take the card out of the run.
+    if (hasArmourRule('softfall')) {
+      S.hand = S.hand.filter(c => c.id !== card.id);
+      S.discard.push(card);
+      if (S.actionSetIds.includes(card.id)) S.actionSetIds = S.actionSetIds.filter(id => id !== card.id);
+      if (S.reserveId === card.id) S.reserveId = null;
+      log(`🛡️ <b>Boarhide Coat</b> — ${card.def.name} would have been lost; it goes to the discard instead.`, 'good');
+      return;
+    }
     S.hand = S.hand.filter(c => c.id !== card.id);
     S.trashed.push(card);
+    // 🧥 Fen Ox Harness — a destroyed card at least pays for itself. ⚠️ Coins die with the run, so
+    // this cannot compound into the meta layer; it buys you a charm on the way down.
+    if (hasArmourRule('ledger')) { S.coins += 8; log(`🛡️ <b>Fen Ox Harness</b> — 🪙 +8 coins for what you lost. (you hold ${S.coins})`, 'good'); }
     if (S.actionSetIds.includes(card.id)) S.actionSetIds = S.actionSetIds.filter(id => id !== card.id);
     if (S.reserveId === card.id) S.reserveId = null;
     log(`${card.def.name} was Lv1 → it LEAVES YOUR DECK for the rest of the run${why}`, 'bad');
@@ -7221,6 +7311,15 @@ function downgrade(card, why) {
 function soakWith(cardId) {
   const card = cardById(cardId);
   if (!card || S.downgraded.has(card.id) || S.damage <= 0) return;
+  // 🧥 Siltcrawler Plate — every card you have already fed makes the rest cheaper, so SPREADING
+  // the hit beats feeding one card. ⚠️ Deliberately the opposite of the designated-victim pattern
+  // the soak measurement found (best plate 5.8 vs an average hit of 4.6, WARD pays 74%).
+  if (hasArmourRule('tidewall') && S.downgraded.size > 0) {
+    const cut = Math.min(S.damage, S.downgraded.size);
+    S.damage -= cut;
+    log(`🛡️ <b>Siltcrawler Plate</b> — the blow spends itself: ${cut} less to block.`, 'good');
+    if (S.damage <= 0) { log(`All damage blocked.`); exitSoak(); return; }
+  }
   // ✦ Lv4 WARD verbs, all of them about KEEPING CARDS — the run-level currency
   const v = verbOf(card);
   const bulwark = v && v.name === 'Bulwark';             // soaks everything still coming
@@ -7591,6 +7690,7 @@ function rollTurnTokens() {
   // mechanics to being reset in only one of the three (🔥 the Emberwake and ● Momentum both froze
   // for an entire finale). Beside the effect it copies is how it stays found.
   S.splitPending = 0;
+  S.armourWinInit = false;   // 👢 Anvil Toad Boots — this turn only, like every other turn token
   // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
   // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
   for (const a of (S.armour || [])) {
