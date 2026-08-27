@@ -894,6 +894,10 @@ button.stage.locked .stage-shape { font-style: italic; }
 .pv-result { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pv-result-subs { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 
+/* 🏹 the hunt line on a recipe — where the quarry that gates it actually walks. */
+.wk-hunt { font-size: 11px; color: #9fc0d1; margin-top: 4px; line-height: 1.35; }
+.wk-hunt b { color: #cfe4ef; }
+
 /* 🦴 DROPS — its own band under the verdict, with a heading.
    ⚠️ This was wrong twice in one day: first a stat column (an emoji in the number slot), then a
    chip tagged onto the verdict row. Both times it was wedged into a row that was about something

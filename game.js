@@ -663,6 +663,10 @@ const ROAD_FATHOM = [
 ];
 
 const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH, 3: ROAD_FELLGRIND, 4: ROAD_FATHOM };
+// 🗺️ ⚠️ AT MODULE SCOPE BECAUSE TWO SCREENS NEED IT. It lived inside the Stash renderer as a
+// local; the Workshop's hunt line would have been a second copy, and this project has watched the
+// arrangement search reach FOUR copies before anyone extracted it. Extract at TWO.
+const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
 function roadFor(stage) { return ROADS[stage] || REGIONS; }
 
 const ROLES = ['Spell', 'Element', 'Boost'];
@@ -3115,7 +3119,6 @@ function stashHTML() {
   // 🏆 TROPHIES, GROUPED BY ROAD — and this is the bestiary in its first form. 🔑 Which road a
   // creature lives on is the ONE fact a hunt needs and the game never told you; the candle can
   // only say what is on the next node, which is no use for deciding where to GO.
-  const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
   {
     const list = Object.values(CREATURE_INDEX).filter(c => c.quarry)
       .sort((a, b) => a.road - b.road);
@@ -3176,7 +3179,24 @@ function pieceCardHTML(d, st, equipped) {
     const chk = craftCheck(d.id);
     const cost = Object.keys(r.mats).map(m =>
       `${matDef(m).icon} ${r.mats[m]} ${matDef(m).name}`).join(' · ');
-    foot = `<div class="wk-cost">${cost}</div>` + (chk.ok
+    // 🏹 WHERE THE QUARRY WALKS — measured 2026-08-27 ([[Drop_Economy]]).
+    // 🔴 THE SHARD COST BINDS ALMOST NOTHING: shards come in at 8.7 a run, so nine of twelve
+    // recipes are gated purely on **whether one named creature turned up**. Runs-to-forge measured
+    // 17 / 30 / 60 / 120 for the tail, and one piece went unseen across 120 runs.
+    // 🔑 AND `rollDrops` ALREADY CARRIES A COMMENT PROMISING THIS IS A "COUNTABLE PLAN" — the part
+    // is certain on a clean kill, but the ENCOUNTER was still a lottery, so nothing was countable.
+    // **Removing one of two stacked lotteries leaves a lottery.** This is the other half.
+    // ✅ It converts *"keep playing"* into *"three runs down the Fellgrind"* WITHOUT TOUCHING A
+    // SINGLE RATE — which is why it is the first lever rather than cheaper recipes.
+    // ⚠️ This is DIRECTION, not tactical data. It does not conflict with the map's *"printing every
+    // demand is complete optimizable data"* rule, which is about the roads you are choosing between
+    // right now; this is which land to set out on, decided before a card is dealt.
+    const hunts = Object.keys(r.mats).filter(m => m.startsWith('p:') && !(st.mats[m] > 0))
+      .map(m => {
+        const c = creatureByName(m.slice(2));
+        return c ? `<div class="wk-hunt">🏹 <b>${c.name}</b> — ${ROAD_NAME[c.road]} · ${c.region}</div>` : '';
+      }).join('');
+    foot = `<div class="wk-cost">${cost}</div>` + hunts + (chk.ok
       ? `<button class="wk-btn craft" onclick="craftPiece('${d.id}')">⚒️ Forge it</button>`
       : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`);
   }
