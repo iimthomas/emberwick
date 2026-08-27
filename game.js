@@ -6123,15 +6123,19 @@ function beatDisplayHTML(beat, isNew) {
     if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
-    return `<div class="pv-stat pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>${subs.join('')}</div>`;
+    return `<div class="pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>` +
+      `<div class="pv-result-subs">${subs.join('')}</div></div>`;
   }
   if (beat.carveBeat) {
+    // 🧰 THE CARVE IS NOT A STAT COLUMN. It used to render `<div class="pv-num">🧰</div>`, an
+    // EMOJI in the slot where every sibling beat shows a NUMBER — so the eye read it as a stat that
+    // was not one, and the warm box around it competed with the verdict beside it.
+    // 🔑 IT IS A LIST OF THINGS YOU GAINED, so it renders as chips on the verdict row instead.
     const ids = Object.keys(r.drops || {});
-    return `<div class="pv-stat pv-carve${pop}">` +
-      `<div class="pv-num good">\u{1F9F0}</div>` +
-      `<div class="pv-label">CARVED</div>` +
-      ids.map(id => `<div class="pv-sub good">${matDef(id).icon} ${matDef(id).name}` +
-        `${r.drops[id] > 1 ? ` <b>\u00d7${r.drops[id]}</b>` : ''}</div>`).join('') +
+    return `<div class="pv-gain pv-carve${pop}">` +
+      `<span class="pv-gain-label">\u{1F9F0} carved</span>` +
+      ids.map(id => `<span class="mat-chip">${matDef(id).icon} ${matDef(id).name}` +
+        `${r.drops[id] > 1 ? `<b>\u00d7${r.drops[id]}</b>` : ''}</span>`).join('') +
       `</div>`;
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
@@ -9500,9 +9504,21 @@ function renderControls() {
     const beat = S.beats[S.beatIndex];
     c.innerHTML =
       `<div class="phase-label">RESOLVING — ${S.beatIndex + 1} / ${S.beats.length}</div>` +
-      `<div class="preview-bar beat-bar" onclick="advanceBeat()" title="click to continue">` +
-      S.beats.slice(0, S.beatIndex + 1).map((b, i) => beatDisplayHTML(b, i === S.beatIndex)).join('') +
-      `</div>` +
+      // 🔑 TWO ZONES, NOT ONE FLAT ROW. Every beat used to be an equal box in a single wrapping
+      // flex line, so the VERDICT — the one thing you are waiting for — was just the third card
+      // along. The arithmetic goes on top as a sequence; the verdict and what you gained get their
+      // own row underneath, separated by a rule. *Hierarchy is legibility, not decoration.*
+      (() => {
+        const shown = S.beats.slice(0, S.beatIndex + 1);
+        const isVerdict = b => b.outcomeBeat || b.carveBeat;
+        const cell = (b) => beatDisplayHTML(b, b === S.beats[S.beatIndex]);
+        const work = shown.filter(b => !isVerdict(b)).map(cell).join('');
+        const verdict = shown.filter(isVerdict).map(cell).join('');
+        return `<div class="preview-bar beat-bar" onclick="advanceBeat()" title="click to continue">` +
+          `<div class="pv-work">${work}</div>` +
+          (verdict ? `<div class="pv-verdict">${verdict}</div>` : '') +
+          `</div>`;
+      })() +
       (beat.final
         ? `<button class="primary" onclick="advanceBeat()">Continue</button>`
         : `<div class="hint">click to hurry…</div>`);

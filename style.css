@@ -864,12 +864,38 @@ button.stage.locked .stage-shape { font-style: italic; }
 .tok-acts { display: flex; gap: 5px; margin-top: 6px; }
 .tok-act { flex: 1; font-size: 10.5px; padding: 4px 5px; border-color: #7fd8ff; color: #cfe9ff; }
 
-/* 🧰 THE CARVE — the last beat of the reveal. It reads warm and it reads as a REWARD, which is the
-   one beat in the sequence that is not arithmetic. ⚠️ Above the media queries. */
-.pv-carve { border-color: rgba(232,145,60,.55) !important;
-  background: linear-gradient(180deg, rgba(232,145,60,.15), rgba(232,145,60,.04)) !important; }
-.pv-carve .pv-num { font-size: 30px; }
-.pv-carve .pv-label { color: #f0a86a; }
+/* 🎬 THE RESOLVE PANEL — two zones, not one flat row (rebuilt 2026-08-26).
+   Thomas: *"i don't like the layout of this, make it nicer looking, the carve part also looks
+   weird."*  Three faults, all structural:
+     1. every beat was an equal box in one wrapping flex line, so the VERDICT — the thing you are
+        actually waiting for — was just the third card along;
+     2. 🧰 the carve rendered an EMOJI in `.pv-num`, the slot where every sibling shows a NUMBER,
+        so the eye read it as a stat that was not one;
+     3. its warm box sat beside the outcome pill, two highlighted objects competing when one of
+        them is a footnote.
+   🔑 Now: the arithmetic reads across the top as a sequence, and the verdict gets its own row
+   under a rule — the pill on the left, what you GAINED on the right, what it COST beneath.
+   ⚠️ Above the media queries. */
+.beat-bar { flex-direction: column; gap: 0; align-items: stretch; }
+.pv-work { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; padding: 2px 0 10px; }
+
+.pv-verdict {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  border-top: 1px solid #2b313c; padding-top: 10px;
+}
+.pv-result { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pv-result-subs { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+/* 🧰 what you gained — chips, because that is what materials are: a list of things, not a stat. */
+.pv-gain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pv-gain-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #f0a86a; }
+.mat-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: #f0c89a;
+  background: rgba(232,145,60,.12); border: 1px solid rgba(232,145,60,.42);
+  border-radius: 999px; padding: 3px 10px;
+}
+.mat-chip b { color: #ffd9a8; }
 
 /* ══ 🛡️ THE EQUIPMENT RAIL ══════════════════════════════════════════════════
    Flesh and Blood's own zone layout, copied because it is genuinely the right shape:
