@@ -1769,10 +1769,10 @@ const VERBS = {
   Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Channelling from here also gives +3 Initiative this turn.' },
   Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Channelling from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
-  Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
-  Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
-  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it soaks, you gain a 🔥 +2 Emberwake.' },
-  Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it soaks, it soaks ALL remaining damage.' },
+  Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it blocks each encounter, it loses no level.' },
+  Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It blocks 4 more than its armour.' },
+  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it blocks, you gain a 🔥 +2 Emberwake.' },
+  Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it blocks, it blocks ALL remaining damage.' },
 };
 // a card only has its verb at Lv4 — soften it and the verb is gone
 function verbOf(card) { return card && card.level >= MAX_LEVEL ? VERBS[card.def.name] || null : null; }
@@ -1925,7 +1925,7 @@ const TUTORIAL = {
     { title: '👣 A journey asks for distance',
       body: 'The same cards, measured differently. Your Spell is how far you get, compared to the road\'s <b>MP</b>. Complete, Narrow at half, Loss below.<br><br>⏳ <b>Time Penalty</b> — anything short of a Complete burns this many cards off the top of your deck into the discard. They are cards you have not drawn, so they cost you no levels. If your deck is empty it becomes damage instead.<br><br>🌙 <b>Nightfall</b> — your Catalyst\'s 💨 is your Pace. If your Pace is below this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. You pay damage with cards: you choose which cards soak it.<br><br>• A card soaks its printed 🛡️ number and drops one level.<br>• A card showing 🛡️ — cannot soak.<br>• A card already at Lv1 does not drop a level. It leaves your deck for the rest of the run.<br>• If your cards cannot cover the whole hit, the run ends.<br><br>So every fight costs you cards, and at the dragon you are racing its HP against how many cards you have left.<br><br>You will lose runs. You keep the materials and the xp, unlock more, and go again.' },
+      body: 'There is no health bar. You pay damage with cards: you choose which cards <b>block</b> it.<br><br>• A card blocks its printed 🛡️ number and drops one level.<br>• A card showing 🛡️ — cannot block.<br>• A card already at Lv1 does not drop a level. It leaves your deck for the rest of the run.<br>• If your cards cannot cover the whole hit, the run ends.<br><br>So every fight costs you cards, and at the dragon you are racing its HP against how many cards you have left.<br><br>You will lose runs. You keep the materials and the xp, unlock more, and go again.' },
   ],
   // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
   // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
@@ -1961,7 +1961,7 @@ const TUTORIAL = {
     // this is the answer to it. **Teach the cost, then the thing that absorbs the cost.**
     { id: 'equipment', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
       point: '#armour-rail .eq',
-      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. Each piece blocks one hit, then it is spent for the rest of the run. A blocked hit costs you no cards.' },
+      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. A piece blocks a hit the way a card does, but it costs you no cards — it is spent instead, for the rest of the run.' },
     // 🦴 the carve. Fires the moment loot exists, which in stage 0 is the first fight you win.
     { id: 'carve', when: () => S.phase === 'reveal' && Object.keys(S.loot || {}).length > 0,
       point: '.haul, .pv-carve',
@@ -2030,7 +2030,7 @@ const TUTORIAL = {
       text: '🔥 You are holding an <b>Emberwake</b>. Tap it to aim it at your strike or your speed. 🛡️ Armour wants the bigger hit, 🌀 Evasion wants you to go first. Spend it this turn or lose it.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
-      text: 'Tap a card to soak. It absorbs its printed 🛡️ number and drops one level. Cover the whole hit or the run ends. Your deck is your health.' },
+      text: 'Tap a card to <b>block</b>. It blocks its printed 🛡️ number and drops one level. Block the whole hit or the run ends. Your deck is your health.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
       text: '🃏 Reversed lets you send each returning card to the top of your deck (drawn next hand) or the bottom (much later). Without the charm they slide under in slot order.' },
@@ -2058,7 +2058,7 @@ const TUTORIAL = {
       text: '📖 <b>Events</b> happen between encounters. Read the options. Some cost coins or a card, and one is usually to walk on. An option you cannot afford says why.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
-      text: '✦ A card at Lv4 gains a verb, and it only works in one slot. Move the card to that slot and the verb lights up. Soak the card below Lv4 and the verb is gone.' },
+      text: '✦ A card at Lv4 gains a verb, and it only works in one slot. Move the card to that slot and the verb lights up. Block with the card below Lv4 and the verb is gone.' },
     // ✦ the rainbow hand is now taught as a PROBLEM, not as a thing the game fixes for you
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
@@ -2078,7 +2078,7 @@ const TUTORIAL = {
       text: '⚔️ <b>The Last Mile</b> is one journey before the lair, and it costs you nothing: no Nightfall, no Time Penalty, no hardship. Every card is reshuffled for the duel afterwards, so play everything you have. Arrive with a <b>Complete</b> and the dragon starts wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
-      text: 'The duel is a race between two numbers: its HP, and how many cards you have left. You lose when you run out of cards, so every card you soak with is stamina you do not get back.' },
+      text: 'The duel is a race between two numbers: its HP, and how many cards you have left. You lose when you run out of cards, so every card you block with is stamina you do not get back.' },
   ],
 };
 // does the hand hold a same-element pair at all, and which card is the partner worth moving?
@@ -2455,7 +2455,7 @@ const CHARMS = [
   { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
     text: '➕ Your Surge gives +1 more',            mods: { boost: 1 } },
   { id: 'wardstone', tier: 2,   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
-    text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
+    text: '🛡️ Every card blocks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse', tier: 1,   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
     text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
   // ❌ FOUR ARCHETYPE-GATED CHARMS WERE CUT HERE (2026-08-05, Thomas) — see the note above
@@ -2475,7 +2475,7 @@ const CHARMS = [
   { id: 'dampwick',    name: 'Damp Wick',        rarity: 'curse', curse: true, cost: 0,
     text: '➕ Your Surge gives −2',                  mods: { boost: -2 } },
   { id: 'thinplate',   name: 'Thin Plate',       rarity: 'curse', curse: true, cost: 0,
-    text: '🛡️ Every card soaks −1',                  mods: { soak: -1 } },
+    text: '🛡️ Every card blocks −1',                  mods: { soak: -1 } },
   { id: 'tithe',       name: 'The Tithe',        rarity: 'curse', curse: true, cost: 0,
     text: '🪙 −2 coins from every encounter',        mods: { coin: -2 } },
   { id: 'longshadow',  name: 'Long Shadow',      rarity: 'curse', curse: true, cost: 0,
@@ -2536,7 +2536,7 @@ const RULE_CHARMS = [
     text: '🗡️ Your Spell strikes <b>+2 for every level above Lv2</b>',
     why: 'the opposite bet to Even Keel - sharpen one card and lean on it' },
   { id: 'ironbound', tier: 3, name: 'Ironbound', rarity: 'rare', cost: 12, rule: true,
-    text: '🧱 A card that soaks never drops below <b>Lv2</b>',
+    text: '🧱 A card that blocks never drops below <b>Lv2</b>',
     why: 'the deck can be bruised but never blunted, and never lost' },
   // 💔 GLASS HEART WAS CUT ON THE DAY IT WAS WRITTEN (2026-08-24). It was meant to be
   // Ironbound's opposite - *spend the deck for power* - and it was measured three times in three
@@ -4273,7 +4273,7 @@ const POTIONS = [
   { id: 'broth',    name: 'Thin Broth',   cost: 2, rarity: 'common',
     text: '⚔️ <b>+2</b> to your action when used' },
   { id: 'grit',     name: 'Grit',         cost: 2, rarity: 'common',
-    text: '🛡️ every card <b>soaks +1</b> when used' },
+    text: '🛡️ every card <b>blocks +1</b> when used' },
   { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common',
     text: '➕ your <b>Surge gives +3</b> more when used' },
   { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
@@ -4286,7 +4286,7 @@ const POTIONS = [
   { id: 'ember',   name: 'Emberdraught',     cost: 7, rarity: 'common',
     text: '⚔️ <b>+6</b> to your action when used' },
   { id: 'ironskin',name: 'Ironskin Tonic',   cost: 6, rarity: 'common',
-    text: '🛡️ every card <b>soaks +3</b> when used' },
+    text: '🛡️ every card <b>blocks +3</b> when used' },
   { id: 'clarity', name: 'Draught of Clarity', cost: 5, rarity: 'uncommon',
     text: '🕯️ <b>relight your candle</b> — see the road ahead again' },
   // 🎯 THE ONE-TURN VERSION OF MULTI-HIT, and the cheapest teacher of it. ⚠️ Deliberately
@@ -4523,13 +4523,13 @@ function applyPotion(p, card) {
   const fx = S.potionFx;
   if (p.id === 'chalkwater'){ fx.init += 2;  log(`🧪 ${p.name} — 💨 +2 Initiative this turn.`, 'good'); }
   if (p.id === 'broth')    { fx.value += 2; log(`🧪 ${p.name} — ⚔️ +2 to your action this turn.`, 'good'); }
-  if (p.id === 'grit')     { fx.soak += 1;  log(`🧪 ${p.name} — 🛡️ every card soaks +1 this turn.`, 'good'); }
+  if (p.id === 'grit')     { fx.soak += 1;  log(`🧪 ${p.name} — 🛡️ every card blocks +1 this turn.`, 'good'); }
   if (p.id === 'bitterroot'){ fx.boost += 3; log(`🧪 ${p.name} — ➕ your Surge gives +3 more this turn.`, 'good'); }
   if (p.id === 'roaddust') { fx.pace += 3;  log(`🧪 ${p.name} — 🌙 +3 Pace against the dark.`, 'good'); }
   if (p.id === 'tallow')   { fx.keepCandle = true; log(`🧪 ${p.name} — 🕯️ your candle will hold, whatever happens.`, 'good'); }
   if (p.id === 'haste')    { fx.init += 5;  log(`🧪 ${p.name} — 💨 +5 Initiative this turn.`, 'good'); }
   if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
-  if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
+  if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card blocks +3 this turn.`, 'good'); }
   // 🎯 SPLITTING DRAUGHT - the one-turn version of the whole idea, and the cheapest teacher of
   // it: you drink it, watch ◆12 become ◆6×2, and learn what multi-hit is for in one encounter.
   if (p.id === 'splitting'){ fx.hits = (fx.hits || 0) + 1; log(`🧪 ${p.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
@@ -6119,7 +6119,7 @@ function beatDisplayHTML(beat, isNew) {
     const subs = [];
     subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
     const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
-    if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to soak: ${dmg}</div>`);
+    if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmg}</div>`);
     if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
@@ -6290,7 +6290,7 @@ function finishResolve() {
   // cards is a turn that touched you whatever the variable is called.
   tickMomentum(damage, r);
   S.damage = damage;
-  if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
+  if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
 }
 
@@ -6646,7 +6646,7 @@ function soakWithArmour(aid) {
       (d.brk === 'shatter' ? 'It shatters.' : 'It blocks nothing more this run.'), 'bad');
   if (d.onBlock) applyArmourBlock(d.onBlock, d);
   S.damage = Math.max(0, S.damage - blocked);
-  if (S.damage <= 0) { log(`All damage soaked.`); exitSoak(); return; }
+  if (S.damage <= 0) { log(`All damage blocked.`); exitSoak(); return; }
   log(`${S.damage} damage remaining.`, 'bad');
   const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
   if (maxSoak < S.damage) knockOut(); else render();
@@ -7134,12 +7134,12 @@ function soakWith(cardId) {
     S.downgraded.add(card.id);                            // spent for the encounter, but NOT blunted
     log(`✦ Emberguard — ${displayName(card)} takes ${soak} and holds its edge.`, 'good');
   } else {
-    downgrade(card, `, soaking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
+    downgrade(card, `, blocking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
   }
   if (v && v.name === 'Groundwire') { S.wakePending = (S.wakePending || 0) + 2; log(`✦ Groundwire — the blow earns you a 🔥 +2 Emberwake.`, 'good'); }
   S.damage = Math.max(0, S.damage - soak);
   if (S.damage <= 0) {
-    log(`All damage soaked.`);
+    log(`All damage blocked.`);
     exitSoak();
   } else {
     log(`${S.damage} damage remaining.`, 'bad');
@@ -7151,7 +7151,7 @@ function soakWith(cardId) {
 
 function knockOut() {
   // being knocked out mid-fight ENDS the fight — you're in no shape to keep swinging
-  log(`Cannot soak all the damage → KNOCKED OUT`, 'bad result');
+  log(`Cannot block all the damage → KNOCKED OUT`, 'bad result');
   // 🛡️ the armour goes with it. A knock-out that leaves a plate intact reads as the game
   // declining to use something you were wearing.
   for (const a of armourEligible()) { const d = armourDef(a.id); a.wear = 0; log(`🛡️ ${d.name} — spent in the knock-out.`, 'bad'); }
@@ -7657,7 +7657,7 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
 
   // Poison lands on the freshly drawn hand, before the next encounter
   if (S.poison > 0 && S.hand.length > 0) {
-    log(`Poison strikes the new hand: ${S.poison} damage to soak`, 'bad');
+    log(`Poison strikes the new hand: ${S.poison} damage to block`, 'bad');
     S.damage = S.poison;
     S.poison = 0;
     S.damageEl = null;
@@ -9084,7 +9084,7 @@ function standingText() {
   // and only pass judgement from region 4, where the numbers actually separate.
   const judge = S.finalMode || S.region >= 4;
   const cls = !judge ? '' : have >= par ? 'good' : have >= par - 4 ? '' : 'bad';
-  return `<span class="standing" title="Your deck's total card levels, against the total this dragon usually asks for by the lair. A target, not a prediction — measured over 2,000 runs. Levelling raises it; soaking lowers it.">` +
+  return `<span class="standing" title="Your deck's total card levels, against the total this dragon usually asks for by the lair. A target, not a prediction — measured over 2,000 runs. Levelling raises it; blocking lowers it.">` +
     `🃏 Deck <b class="${cls}">${have}</b> → <b>${par}</b> by the lair</span>`;
 }
 
@@ -9195,7 +9195,7 @@ function renderEncounter() {
       `<div class="enc-mod lastmile-deal">` +
         `<b>💨 How quietly you arrive</b> — whether it is ready for you.<br>` +
         `<b>Match its Initiative</b> and it never hears you — ${unseenPromise()}<br>` +
-        `<b>Below half</b> and it is already up: it takes the opening blow, <b>${Math.ceil(S.dragon.breath / 2)} damage</b>, and you soak it with your deck.` +
+        `<b>Below half</b> and it is already up: it takes the opening blow, <b>${Math.ceil(S.dragon.breath / 2)} damage</b>, and you block it with your deck.` +
       `</div>` +
       // ⚠️ THIS LINE USED TO SAY "NOTHING HERE COSTS YOU CARDS", FULL STOP, AND THAT IS NOW FALSE.
       // 🔑 The promise it was making is still kept, though, and it is worth keeping precisely:
@@ -9529,8 +9529,8 @@ function renderControls() {
       // damage's colour advertised a rule that isn't there, exactly like the creature's `atkEl`
       // and the journey's `element`. Vocabulary fixed too: "Trashed" was retired for the plain
       // statement of what actually happens.
-      `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
-      `. Tap a card to soak with — it absorbs its 🛡️ number and drops a level. ` +
+      `<div class="hint">Damage to block: <b style="color:#e08a7a">${S.damage}</b>` +
+      `. Tap a card to block with — it blocks its 🛡️ number and drops a level. ` +
       `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
     } else if (S.phase === 'setout') {
     // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
@@ -10406,7 +10406,7 @@ function cardHTML(card) {
   } else if (S.phase === 'soak') {
     if (!wasDowngraded) {
       const soak = soakValue(card);
-      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' ⚠️ Lv1: LEAVES YOUR DECK' : ''}</button></div>`;
+      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Block ${soak} — drops a level${card.level === 1 ? ' ⚠️ Lv1: LEAVES YOUR DECK' : ''}</button></div>`;
     } else {
       action = `<div class="card-action muted">already downgraded</div>`;
     }
@@ -10430,7 +10430,7 @@ function cardHTML(card) {
     if (real.level >= MAX_LEVEL) {
       action = `<div class="card-action muted">already at Lv${MAX_LEVEL}</div>`;
     } else if (S.downgraded.has(real.id)) {
-      action = `<div class="card-action muted">soaked this turn — cannot sharpen</div>`;
+      action = `<div class="card-action muted">blocked this turn — cannot sharpen</div>`;
     } else {
       const cost = eff(real).cost;
       const ok = cost <= S.coins;
@@ -10607,7 +10607,7 @@ function cardHTML(card) {
       : '') + `</div>` +
     `<div class="card-vals">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
-      `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
+      `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
     (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
     `<div class="card-row card-foot">` +
@@ -10779,7 +10779,7 @@ function shapeStateText() {
 }
 
 // 🃏 YOUR HALF OF THE RACE. The dragon's bar is its HP; this is yours — the cards you have left.
-// No reshuffle in a duel, so every card you soak with is stamina you never get back.
+// No reshuffle in a duel, so every card you block with is stamina you never get back.
 // 🐉 WHAT IT IS DOING NOW, AND WHAT IT WILL DO NEXT. The telegraph is the whole point — an attack
 // you can see coming is a problem, one that arrives unannounced is a dice roll.
 function telegraph() {
@@ -10796,7 +10796,7 @@ function staminaBar() {
   const pct = S.duelStamina0 ? Math.max(0, Math.round(100 * left / S.duelStamina0)) : 100;
   return `<div class="stamina"><div class="stamina-fill" style="width:${pct}%"></div>` +
     `<span class="stamina-label">🃏 your cards — ${left} / ${S.duelStamina0}</span></div>` +
-    `<div class="stamina-note">🔑 <b>You lose when your cards run out</b> — every card you soak with is stamina you never get back.</div>`;
+    `<div class="stamina-note">🔑 <b>You lose when your cards run out</b> — every card you block with is stamina you never get back.</div>`;
 }
 
 function startDuel() {
@@ -10957,7 +10957,7 @@ function finishDuel() {
   // ● the streak is judged on the RAW blow, before you soak it — same order as the road
   tickMomentum(dr.damage, rr);
   if (dr.damage <= 0) { log(`No counterstrike lands — press the assault.`); duelCleanupAndNext(); return; }
-  log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — soak it with your remaining cards.`, 'bad');
+  log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — block it with your remaining cards.`, 'bad');
   S.damage = dr.damage;
   S.damageEl = null;   // dead — see above; a dragon's breath has no colour the maths reads
   S.downgraded = new Set();
