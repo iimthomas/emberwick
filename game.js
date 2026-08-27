@@ -1923,7 +1923,7 @@ const TUTORIAL = {
     { title: '⚔️ A fight asks for damage',
       body: 'Your Spell plus your Surge is your blow. Compare it to the creature\'s ❤️ HP:<br><br>• <b>Complete</b> — you meet or beat its HP. It does not touch you.<br>• <b>Narrow</b> — you reach half its HP. You get past it, but it hits you for its ⚔️.<br>• <b>Loss</b> — below half. It hits you and you gain nothing. You still move on; one encounter never ends the run.<br><br>💨 Initiative is separate from damage. If your Catalyst is slower than the creature\'s 💨, it strikes first for its ⚔️, even if your blow then kills it.<br><br>Each creature also has a defence. 🛡️ <b>Armour N</b> takes N off your blow, so it wants one big hit. 🌀 <b>Evasion</b> halves your blow unless you won Initiative, so it wants speed.' },
     { title: '👣 A journey asks for distance',
-      body: 'The same cards, measured differently. Your Spell is how far you get, compared to the road\'s <b>MP</b>. Complete, Narrow at half, Loss below.<br><br>⏳ <b>Time Penalty</b> — anything short of a Complete burns this many cards off the top of your deck into the discard. They are cards you have not drawn, so they cost you no levels. If your deck is empty it becomes damage instead.<br><br>🌙 <b>Nightfall</b> — your Catalyst\'s 💨 is your Pace. If your Pace is below this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.' },
+      body: 'The same cards, measured differently. Your Spell is how far you get, compared to the road\'s <b>MP</b>. Complete, Narrow at half, Loss below.<br><br>⏳ <b>Time Penalty</b> — anything short of a Complete costs you time. You cannot <b>sharpen</b> your cards at the Wheel for this many encounters. A fight costs you cards; a journey costs you growth.<br><br>🌙 <b>Nightfall</b> — your Catalyst\'s 💨 is your Pace. If your Pace is below this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.' },
     { title: 'Your deck is your health',
       body: 'There is no health bar. You pay damage with cards: you choose which cards <b>block</b> it.<br><br>• A card blocks its printed 🛡️ number and drops one level.<br>• A card showing 🛡️ — cannot block.<br>• A card already at Lv1 does not drop a level. It leaves your deck for the rest of the run.<br>• If your cards cannot cover the whole hit, the run ends.<br><br>So every fight costs you cards, and at the dragon you are racing its HP against how many cards you have left.<br><br>You will lose runs. You keep the materials and the xp, unlock more, and go again.' },
   ],
@@ -1978,7 +1978,7 @@ const TUTORIAL = {
       text: '🌙 Nightfall races your Catalyst\'s 💨. If yours is lower, you lose the card in your Arsenal and your candle goes out.' },
     { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⏳ Time Penalty is what arriving late costs: this many cards burned off the top of your deck.' },
+      text: '⏳ <b>Time Penalty</b> is what arriving late costs. You cannot <b>sharpen</b> your cards for this many encounters. A fight costs you cards; a journey costs you growth.' },
 
     { id: 'slots', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '#slots-panel',
