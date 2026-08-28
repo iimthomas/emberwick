@@ -633,6 +633,45 @@ const RUNSIM = (() => {
   let HOOK = {};
   function setHook(h) { HOOK = h || {}; }
 
+  // 🛡️ THE BOT NEVER PRESSED AN ACTIVE PIECE (fixed 2026-08-27). `useArmour` appeared NOWHERE in
+  // this file, so 🔥 Emberfist Wraps, ✦ Emberwake Band, 🗡️ Fangcord, 🎯 Twinned Bracers and
+  // 👢 Anvil Toad Boots were all measured as PURE BLOCK LOSS — they carry block 0 or trade a
+  // starter's block for an effect the bot could not use.
+  // 🔑 SAME FAULT, FOURTH TIME: the ✦ Arsenal it never carried, the 🔥 Emberwake it could never
+  // bank, the class it silently reset. **Check the bot is ALLOWED to do a thing before reporting
+  // how often it does it** — and a piece scored at 0 by a bot that cannot press it is not weak,
+  // it is unmeasured.
+  // ⚠️ THE POLICY IS DELIBERATELY SIMPLE AND STATED: press an active only when it IMPROVES THIS
+  // ENCOUNTER'S OUTCOME. That makes every active measurable, and it is still a FLOOR — a human
+  // saving a once-a-run effect for the dragon is doing something this cannot model, exactly as
+  // with the Emberwake.
+  function useArmourActives() {
+    const rank = { Loss: 0, Narrow: 1, Complete: 2 };
+    let guard = 0;
+    for (;;) {
+      if (guard++ > 4) break;
+      const before = computeAction(cardById(S.assign.Reserve));
+      const now = before ? (rank[before.outcome] || 0) : 0;
+      let best = null;
+      for (const a of (S.armour || [])) {
+        const d = armourDef(a.id);
+        if (!d || !d.use || !armourReady(a)) continue;
+        const snap = { strike: S.armourStrike, pace: S.armourPace, split: S.splitPending,
+                       win: S.armourWinInit, twin: S.armourTwin, mo: S.momentum };
+        useArmour(a.id);
+        const after = computeAction(cardById(S.assign.Reserve));
+        const gain = after ? (rank[after.outcome] || 0) - now : -1;
+        // put it back unless it earned its place — armourReady() reads uses, so restore those too
+        if (gain > 0) { best = a.id; break; }
+        S.armourStrike = snap.strike; S.armourPace = snap.pace; S.splitPending = snap.split;
+        S.armourWinInit = snap.win; S.armourTwin = snap.twin; S.momentum = snap.mo;
+        if (d.charge) a.charge = 1; else a.uses++;
+        if (d.consume && !S.armour.includes(a)) S.armour.push(a);
+      }
+      if (!best) break;
+    }
+  }
+
   let rungCursor = 0;
   function autoRun(withEvents) {
     // dragons are a LADDER now, so a random draw would under-sample the hard rungs. Round-robin
@@ -659,7 +698,7 @@ const RUNSIM = (() => {
       if (HOOK.onLair && S.finalMode && S.finalPhase === 'duel' && !m._lair) { m._lair = true; HOOK.onLair(m); }
       if (p === 'assign') {
         if (S.finalMode && S.finalPhase === 'duel') { chooseBestDuel(); if (HOOK.onDuelAssign) HOOK.onDuelAssign(m); resolveDuel(); }
-        else { chooseBest(); if (HOOK.onAssign) HOOK.onAssign(m); resolve(); }
+        else { chooseBest(); useArmourActives(); if (HOOK.onAssign) HOOK.onAssign(m); resolve(); }
         m.turns++;
       }
       else if (p === 'reveal') advanceBeat();

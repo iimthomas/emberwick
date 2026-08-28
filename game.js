@@ -6562,6 +6562,22 @@ const ARMOUR = [
   { id: 'siltplate', slot: 'Chest', name: 'Siltcrawler Plate', block: 2, brk: 'worn', rarity: 'legendary',
     ongoing: 'tidewall', text: 'Damage is <b>1 less</b> for every card you have already blocked with this encounter.' },
 
+  // 🎭 CLASS GEAR — two per class, and NOT on Arms (2026-08-27).
+  // ⚠️ There were only TWO class pieces in the game, ✦ Emberwake Band and 🗡️ Fangcord, and both
+  // were Arms, both legendary, both once-a-run actives. So a class's identity showed up in exactly
+  // one slot, at the far end of the hunt, in the one form the bot could not even measure.
+  // 🔑 EACH OF THESE KEYS OFF THE CLASS'S OWN RULE rather than a generic stat — the mage's is
+  // pairing and 🔥 the Emberwake, the rogue's is ● Momentum. That is the class seam expressed in
+  // equipment: the ENGINE owns the slot, the CLASS owns what fills it.
+  { id: 'wakecowl',  slot: 'Chest', name: 'Emberwake Cowl',   block: 2, brk: 'worn', rarity: 'rare', cls: 'mage',
+    ongoing: 'wakeguard', text: '🔥 While you hold an Emberwake, every card <b>blocks +2</b>.' },
+  { id: 'slowwick',  slot: 'Legs',  name: 'Slowwick Treads',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'mage',
+    ongoing: 'wakekeep', text: '🔥 Your Emberwake <b>does not expire</b> — it keeps until you spend it.' },
+  { id: 'bloodcord', slot: 'Chest', name: 'Bloodcord Vest',   block: 2, brk: 'worn', rarity: 'rare', cls: 'rogue',
+    ongoing: 'bloodpip', text: '● The <b>first card you block with</b> each encounter gains you a <b>pip</b>.' },
+  { id: 'quietstep', slot: 'Legs',  name: 'Quietstep Boots',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'rogue',
+    ongoing: 'steadymo', text: '● A <b>Narrow</b> costs you <b>one pip</b> instead of breaking your Momentum.' },
+
   // 👢 LEGS — speed
   { id: 'toadboots', slot: 'Legs', name: 'Anvil Toad Boots',   block: 1, brk: 'worn', rarity: 'rare',
     uses: 1, use: 'firstlight', text: 'Once a run: you <b>win Initiative</b> this turn, whatever it is.' },
@@ -6629,6 +6645,12 @@ const RECIPE = {
   // 0.2 hide a run), so the shard half lands inside the target band and the quarry part is the
   // thing you actually go looking for. ⚠️ Hide is the scarcest at 0.22 a run: never ask for more
   // than 2 of it.
+  // 🎭 class gear — priced as its tier, and gated on shape parts rather than a quarry so a class
+  // can actually reach its own identity without waiting on one named creature.
+  wakecowl:  { mats: { shard: 18, slag: 3 } },
+  slowwick:  { mats: { shard: 24, quill: 3, sinew: 2 } },
+  bloodcord: { mats: { shard: 18, quill: 3 } },
+  quietstep: { mats: { shard: 24, slag: 3, sinew: 2 } },
   dawncap:   { mats: { shard: 14, 'p:Cairnstag': 1 } },
   boarcoat:  { mats: { shard: 14, 'p:Ashen Boar': 1 } },
   toadboots: { mats: { shard: 16, quill: 2, 'p:Anvil Toad': 1 } },
@@ -7254,7 +7276,9 @@ function soakValue(card) {
   if (armor <= 0) return 0;
   const v = verbOf(card);
   const frost = v && v.name === 'Frostbite' ? 4 : 0;      // ✦ Frostbite soaks well beyond its plate
-  return armor + frost + charmMod('soak', card.def.element) + (S.potionFx ? S.potionFx.soak : 0);   // 🧪 Ironskin
+  // 🔥 Emberwake Cowl — the token you were saving for the blow also braces you for one.
+  const wakeGuard = (hasArmourRule('wakeguard') && (S.wake || 0) > 0) ? 2 : 0;
+  return armor + frost + wakeGuard + charmMod('soak', card.def.element) + (S.potionFx ? S.potionFx.soak : 0);   // 🧪 Ironskin
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
@@ -7270,6 +7294,14 @@ function startSoak() {
 
 function downgrade(card, why) {
   S.downgraded.add(card.id);
+  // ● Bloodcord Vest — what the road takes off you feeds the streak.
+  // 🔴 ONCE PER ENCOUNTER. Per-block measured **+6.7 road C / +35 win**, because a run blocks
+  // several times an encounter and the meter simply never emptied. ⚠️ `S.downgraded` is already
+  // per-encounter state, so "first" costs no new field - the same trick 🧱 Ironbound uses.
+  if (hasArmourRule('bloodpip') && CLASS.id === 'rogue' && S.downgraded.size === 1) {
+    S.momentum = Math.min(MOMENTUM_CAP, (S.momentum || 0) + 1);
+    log(`🛡️ <b>Bloodcord Vest</b> — ● the blow feeds the streak (${S.momentum}/${MOMENTUM_CAP}).`, 'good');
+  }
   // 🧱 IRONBOUND - the deck can be bruised, never blunted.
   // ⚠️ TWO EARLIER VERSIONS FAILED AND BOTH ARE INSTRUCTIVE. *Never destroyed* measured **+0.7
   // road C**, i.e. inert: only a **Lv1** card is destroyed and a run destroys ~3.6 cards, so the
@@ -7660,11 +7692,21 @@ function tickMomentum(damage, r) {
   // own stated definition: *did this turn cost you cards?* Since Time Penalty stopped touching
   // the deck it costs GROWTH, not cards — so leaving it here would have been a rule outliving
   // the thing it was about. ⚠️ It is a buff to her; measured alongside the change, not assumed.
+  // ● Quietstep Boots — only a LOSS breaks the streak. 🔑 Aimed squarely at her measured problem:
+  // losing Initiative breaks it 0-3% of the time and FAILING TO COMPLETE does it 77-92%, so this
+  // is the one piece that touches the thing actually shortening her streaks.
+  // 🔴 SHIPPED AS FULL IMMUNITY AND MEASURED **+14.0 road C / +25 win** - four times the
+  // strongest generic piece, and a straight buff to the class already ahead at three stages.
+  // 🔑 A FLOOR, NOT AN OFF SWITCH - the same correction 🗡️ Second Nature already carries. Immunity
+  // to the thing that breaks a streak 77-92% of the time is not a piece of gear, it is a different
+  // class.
+  const softened = hasArmourRule('steadymo') && r.outcome !== 'Loss';
   const touched = damage >= MOMENTUM_BREAK;
   const before = S.momentum || 0;
   if (touched) {
     // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
-    S.momentum = hasCharm('secondnature') ? Math.min(before, 2) : 0;
+    S.momentum = softened ? Math.max(0, before - 1)
+      : hasCharm('secondnature') ? Math.min(before, 2) : 0;
     if (before > 0) log(`● Momentum broken — ${before} → ${S.momentum}`, 'bad');
   } else {
     // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
@@ -7704,6 +7746,13 @@ function rollTurnTokens() {
   S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
   if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
+  // 🔥 Slowwick Treads — it does not gutter. ⚠️ Hooked HERE, in rollTurnTokens(), which is the
+  // one function all three turn loops call: the Emberwake froze for an entire finale once because
+  // its rollover lived in endTurn() alone, and this piece would have inherited that bug exactly.
+  else if (S.wake > 0 && !S.wakeTarget && hasArmourRule('wakekeep')) {
+    S.wakePending = Math.max(S.wakePending || 0, S.wake);
+    log(`🛡️ <b>Slowwick Treads</b> — 🔥 your Emberwake holds.`, 'good');
+  }
   else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
   S.wakeDeep = verbLive('Wellspring', 'Boost') && banksNow();
   S.wake = S.wakePending || 0;

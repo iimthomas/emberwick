@@ -107,3 +107,38 @@ check('dawnlit . relit at the region break', () => {
 
 console.log('\n🏹 THE NINE — do the rules fire?\n');
 for (const [n, r] of results) console.log('  ' + (r === 'PASS' ? '✅' : '❌') + ' ' + n.padEnd(44) + r);
+
+// -- the four class pieces -------------------------------------------------
+H.useClass('mage'); H.seed(7); B.freshGame(1);
+check('wakeguard . +2 block while an Emberwake is held', () => {
+  const s = S(); s.armour = []; s.wake = 0;
+  // freshGame() may leave the hand empty depending on where the run stopped - take a card from
+  // wherever one is, rather than assuming hand[0]. An undefined card threw here first time.
+  const c = s.hand[0] || s.deck[0] || s.discard[0]; const a0 = B.soakValue(c);
+  wear('wakecowl'); s.wake = 5; const a1 = B.soakValue(c);
+  s.armour = []; s.wake = 0; return a1 === a0 + 2;
+});
+check('wakekeep . the Emberwake does not gutter', () => {
+  const s = S(); s.armour = []; s.wake = 6; s.wakeTarget = null; s.wakePending = 0;
+  B.rollTurnTokens(); const without = S().wake;
+  const t = S(); t.wake = 6; t.wakeTarget = null; t.wakePending = 0;
+  wear('slowwick'); B.rollTurnTokens(); const with_ = S().wake;
+  t.armour = []; return without === 0 && with_ === 6;
+});
+H.useClass('rogue'); H.seed(7); B.freshGame(1);
+check('bloodpip . a block feeds Momentum', () => {
+  const s = S(); s.armour = []; s.momentum = 0;
+  let c = s.hand.find(x => x.level > 1) || s.hand[0] || s.deck[0];
+  if (!s.hand.includes(c)) s.hand.push(c);
+  wear('bloodcord'); B.downgrade(c, ''); const got = s.momentum;
+  s.armour = []; s.momentum = 0; return got === 1;
+});
+check('steadymo . a Narrow no longer breaks the streak', () => {
+  const s = S(); s.armour = []; s.momentum = 3;
+  B.tickMomentum(9, { rogue: true, outcome: 'Narrow' }); const without = s.momentum;
+  s.momentum = 3; wear('quietstep');
+  B.tickMomentum(9, { rogue: true, outcome: 'Narrow' }); const with_ = s.momentum;
+  s.armour = []; return without === 0 && with_ === 3;
+});
+console.log('');
+for (const [n, r] of results.slice(-4)) console.log('  ' + (r === 'PASS' ? '✅' : '❌') + ' ' + n.padEnd(44) + r);
