@@ -2814,6 +2814,125 @@ const BUILD = (() => {
   catch (e) { return '?'; }
 })();
 
+// ============================================================
+// 📋 PATCH NOTES (2026-08-28) — Thomas: *"lets make a change list/patchnotes file, and update
+// it on every build release. that way i can share updates with playtesters on what got changed"*
+//
+// 🔑 IT LIVES IN `game.js` AND THAT IS THE WHOLE DESIGN DECISION. `cut-playtest.ps1` copies an
+// ALLOW-LIST of seven files, so a new `notes.js` or `PATCHNOTES.md` would have been **excluded by
+// default** and testers would have read release notes that stopped updating the day they were
+// written. The art folder was already missing from that list for two builds for exactly this
+// reason. **Put a thing testers must see inside a file that already ships.**
+// ✅ It also means no second script tag and no second cache-buster — the same argument that keeps
+// the dev menu on `?dev` instead of a second HTML page.
+//
+// 🔑 THIS IS A THIRD REGISTER AND MUST NOT BECOME A SECOND BALANCE LOG.
+//     [[Balance_Log]] — **why** a number moved, with the measurement. For us.
+//     INDEX          — **what happened when**, with the reasoning. For us.
+//     PATCH_NOTES    — **what changed for the PLAYER.** For them. No diagnosis, no percentages
+//                       from the bot, no vault vocabulary.
+// ⚠️ Thomas's own rule for rules text applies here word for word: *"i prefer like, easy to
+// understand, straight to the point. thats how all TCGs are."* One line per change, plain verbs.
+//
+// ⚠️ MARKUP: `<b>` only, like every other content string — Godot wants BBCode later and one
+// flavour of markup is the whole reason that conversion stays cheap.
+// ⚠️ `warn` is for the thing a tester CANNOT work out for themselves: a save that will not load,
+// a piece that changed price, progress that reset. A silent invalidation is the cruellest bug in a
+// playtest because it looks like the tester's fault.
+//
+// 🚨 ADD AN ENTRY EVERY TIME THE CACHE-BUSTER IS BUMPED. `notesCurrent()` checks the newest
+// entry against BUILD and the screen SAYS SO when they disagree, rather than showing the previous
+// build's notes as though they were this one's — the same honesty as the stale-save message.
+// ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
+// ============================================================
+const PATCH_NOTES = [
+  { build: 419, date: '2026-08-28', title: "What's new",
+    added: [
+      "📋 A <b>What's New</b> page — tap the build number at the bottom of the menu to read what changed in each release.",
+    ] },
+
+  { build: 418, date: '2026-08-28', title: 'Equipment upgrades',
+    added: [
+      '⚒️ <b>Equipment can be upgraded</b> at the Workshop, up to <b>+3</b>. Costs 🦴 Bone Shard and 🔩 Prime Sinew.',
+      '<b>+1</b> the piece blocks one more blow · <b>+2</b> its ability improves · <b>+3</b> it blocks one more point.',
+      'Each piece says what its next upgrade will give before you buy it.',
+    ],
+    changed: [
+      '🩹 A <b>worn</b> piece now really does keep blocking — it holds until it runs out, instead of stopping after one.',
+      'The starter Adventurer\'s set cannot be upgraded. Forge something first.',
+    ],
+    fixed: [
+      'A piece able to block twice could disappear after its first block.',
+    ] },
+
+  { build: 417, date: '2026-08-28', title: 'Every creature has a face',
+    added: [
+      '🖼️ Art for <b>all 64 creatures</b> in the game.',
+      '🗺️ Backdrops for every road of the <b>Stormreach</b> and the <b>Fellgrind</b>.',
+    ],
+    changed: [
+      'The Sunless Fathom\'s roads still show the plain road glow — those are next.',
+    ] },
+
+  { build: 416, date: '2026-08-27', title: 'Gear that belongs to a class',
+    added: [
+      '🎭 Four <b>class-only</b> pieces: 🔥 Emberwake Cowl and Slowwick Treads for the mage, ● Bloodcord Vest and Quietstep Boots for the rogue.',
+    ] },
+
+  { build: 415, date: '2026-08-27', title: 'Nine great beasts worth hunting',
+    added: [
+      '🏹 Nine new pieces, one for each great beast that had no recipe — so every named creature is now worth going after.',
+    ] },
+
+  { build: 412, date: '2026-08-26', title: 'The Perfect Kill',
+    added: [
+      '✦ Win an encounter with the <b>smallest blow that could have won it</b> and the creature\'s shape material is <b>guaranteed</b>, not rolled.',
+    ] },
+
+  { build: 407, date: '2026-08-26', title: 'Hitting twice',
+    added: [
+      '🧪 <b>Splitting Draught</b> — your strike splits in two this turn.',
+      '🎁 <b>Forked Strike</b> — an extra hit against 🧱 Guard.',
+      '🛡️ <b>Twinned Bracers</b> — once a run, split your strike on the turn you choose.',
+    ] },
+
+  { build: 402, date: '2026-08-25', title: 'Setting Out, rebuilt',
+    added: [
+      '🏕️ The choice before a run now offers <b>three different KINDS</b> of start — a rule, some fuel, or something for the road — instead of three charms.',
+    ] },
+
+  { build: 400, date: '2026-08-25', title: 'Elites, charms and the mage',
+    added: [
+      '🎁 Four new charms: <b>Even Keel</b>, <b>Keen Edge</b>, <b>Ironbound</b>, <b>Bloodied</b>.',
+    ],
+    changed: [
+      '💀 A <b>dangerous</b> foe is tougher, pays more, and only hands you a charm if you actually <b>Complete</b> it.',
+      '✦ <b>Loose Weave</b> gives a third of the attuned bonus rather than half.',
+    ] },
+
+  { build: 397, date: '2026-08-24', title: 'The Tutorial',
+    added: [
+      '📖 The tutorial has its own <b>map</b>, and teaches 🛡️ equipment, 🦴 carving and ⭐ levels.',
+    ],
+    changed: [
+      'Blunting a card is called <b>blocking</b> everywhere. Your loadout is called <b>equipment</b>.',
+    ] },
+
+  { build: 387, date: '2026-08-23', title: 'Damage matters',
+    changed: [
+      '⚔️ Creatures hit <b>harder</b>. Losing an encounter costs you more of your deck.',
+      '🗡️ The rogue\'s blades grow more slowly, so her blow is closer to the mage\'s.',
+    ] },
+];
+// 🚨 THE ENTRY AND THE BUILD NUMBER ARE ONE OBJECT. Bump the cache-buster without writing a
+// note and this returns false, the What's New screen says so in the player's own words, and the
+// console says so in ours. ⚠️ It WARNS rather than throwing: a missing note is a documentation
+// gap, and taking the game down over one would be worse than the gap.
+function notesCurrent() {
+  return !!PATCH_NOTES.length && String(PATCH_NOTES[0].build) === String(BUILD);
+}
+try { if (!notesCurrent()) console.warn(`📋 build ${BUILD} has no patch note — newest entry is ${PATCH_NOTES[0] && PATCH_NOTES[0].build}`); } catch (e) {}
+
 const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // BUG FOUND 2026-07-29: the writer said `v: 4` while the reader demanded `d.v !== 3`, so EVERY
 // load silently failed and every reload started a fresh run. One constant now, used by both - the
@@ -3514,6 +3633,38 @@ function hasSave() { return saveState() === 'ok'; }
 const DEV_ENABLED = (() => {
   try { return /(^|[?&])dev\b/.test(location.search); } catch (e) { return false; }
 })();
+// 📋 WHAT'S NEW. ⚠️ Reached from the build stamp rather than from a new menu button: the stamp
+// already names the build at the bottom of the menu, *"what changed in 418?"* is the question it
+// invites, and a menu item for something you read once per release would cost a row forever.
+function showNotes() {
+  S = S || {};
+  S.phase = 'notes';
+  S.encounter = null;
+  render();
+}
+function notesHTML() {
+  const sec = (label, rows) => (rows && rows.length)
+    ? `<div class="pn-sec"><div class="pn-lab">${label}</div>` +
+      rows.map(r => `<div class="pn-row">${r}</div>`).join('') + `</div>` : '';
+  const body = PATCH_NOTES.map((n, i) => {
+    return `<div class="pn-entry${i ? '' : ' is-latest'}">` +
+      `<div class="pn-head"><span class="pn-build">build ${n.build}</span>` +
+      `<b>${n.title}</b><span class="pn-date">${n.date}</span></div>` +
+      (n.warn ? `<div class="pn-warn">⚠️ ${n.warn}</div>` : '') +
+      sec('➕ added', n.added) + sec('♻️ changed', n.changed) + sec('🐛 fixed', n.fixed) +
+    `</div>`;
+  }).join('');
+  return `<div class="phase-label">📋 WHAT'S NEW</div>` +
+    `<div class="notes">` +
+    // ⚠️ IT SAYS SO RATHER THAN PRETENDING. Showing the previous build's notes under this build's
+    // number is the same lie as a Continue button that silently fails.
+    (notesCurrent() ? '' :
+      `<div class="pn-stale">⚠️ You are on <b>build ${BUILD}</b> and the notes below stop at ` +
+      `<b>build ${PATCH_NOTES[0].build}</b>. Anything newer is not written up yet.</div>`) +
+    body +
+    `<p class="dev-note">History before build 385 is not recorded.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
 function showMenu() {
   S = S || {};
   S.phase = 'menu';
@@ -9089,7 +9240,7 @@ function haulHTML() {
     `<div class="haul-note">it is in your 📦 Stash</div></div>`;
 }
 
-const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop'];
+const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop', 'notes'];
 const isShell = () => SHELL_PHASES.includes(S && S.phase);
 
 // 🚪 WHICH PHASES TAKE THE MIDDLE OF THE SCREEN. A phase belongs here when it is a DECISION
@@ -10153,9 +10304,12 @@ function renderControls() {
         `<span>jump straight to a dragon</span></button>` : '') +
       // 🏷️ the stamp. A playtester's bug report is worth far more when it names a build, and
       // the status bar's copy only appears once a run is underway — too late to read on a crash.
-      `<div class="menu-stamp">${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD}` +
-        `${CHANNEL === 'play' ? ' · <b>found a bug?</b> say what the build number was' : ''}</div>` +
+      `<div class="menu-stamp"><button class="pn-open" onclick="showNotes()">` +
+        `${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD} · 📋 what's new</button>` +
+        `${CHANNEL === 'play' ? '<div>· <b>found a bug?</b> say what the build number was</div>' : ''}</div>` +
       `</div>`;
+  } else if (S.phase === 'notes') {
+    c.innerHTML = notesHTML();
   } else if (S.phase === 'workshop') {
     c.innerHTML = workshopHTML();
   } else if (S.phase === 'stash') {

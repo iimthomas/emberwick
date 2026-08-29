@@ -1467,6 +1467,30 @@ button.stage.locked .stage-shape { font-style: italic; }
 .menu-stamp { margin-top: 16px; text-align: center; font-size: .72rem; letter-spacing: .07em;
   text-transform: uppercase; color: #6b6152; }
 .menu-stamp b { color: #c9a227; }
+/* the stamp is the door to the notes, so it has to LOOK tappable without becoming a menu row */
+.pn-open { background: none; border: 0; padding: 2px 6px; font: inherit; letter-spacing: inherit;
+  color: inherit; cursor: pointer; border-bottom: 1px dotted #6b5c3a; }
+.pn-open:hover { color: #e8c07a; border-bottom-color: #c9a227; }
+
+/* 📋 WHAT'S NEW. ⚠️ `.pn-row` and `.pn-lab` are `display: block` for the `.opt-why` reason: an
+   inline label beside inline text butts straight against it and reads as one run-on sentence. */
+.notes { display: flex; flex-direction: column; gap: 14px; }
+.pn-stale { border: 1px solid #7a4a2e; background: #241a12; border-radius: 6px;
+  padding: 8px 10px; font-size: 12px; color: #e8b98a; line-height: 1.5; }
+.pn-entry { border: 1px solid #2f2a22; border-radius: 8px; padding: 10px 12px; background: #191510; }
+.pn-entry.is-latest { border-color: #7a5a2e; background: #1e1811; }
+.pn-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.pn-head b { color: #ecdfc8; font-size: 13.5px; }
+.pn-build { font-size: 10px; letter-spacing: .06em; color: #ffd9a0; border: 1px solid #7a5a2e;
+  border-radius: 4px; padding: 1px 5px; }
+.pn-date { margin-left: auto; font-size: 10.5px; opacity: .5; }
+.pn-warn { font-size: 11.5px; color: #e8b98a; margin: 4px 0 6px; line-height: 1.5; }
+.pn-sec { margin-top: 6px; }
+.pn-lab { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  opacity: .55; margin-bottom: 3px; }
+.pn-row { display: block; font-size: 12px; line-height: 1.55; color: #cbbb9d; padding-left: 10px;
+  text-indent: -10px; }
+.pn-row b { color: #ecdfc8; }
 
 /* 📋 the fallback box, for when the clipboard says no */
 #report-box { position: fixed; inset: 0; z-index: 90; background: rgba(10,10,12,.82);
