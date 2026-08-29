@@ -898,6 +898,22 @@ button.stage.locked .stage-shape { font-style: italic; }
 .wk-hunt { font-size: 11px; color: #9fc0d1; margin-top: 4px; line-height: 1.35; }
 .wk-hunt b { color: #cfe4ef; }
 
+/* ⚒️ THE +N LADDER on a forged piece — a second block under the Wear button, ruled off from it,
+   because they are two different transactions and a run-on reads as one control.
+   ⚠️ `.wk-upnext` is `display: block` for the reason `.opt-why` had to be: an inline note beside
+   an inline label butts straight against it and you get "⚒️ +1turns aside one more blow". */
+.wk-up { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2f2a22; }
+.wk-up.dim { border-top-color: #262119; font-size: 10.5px; opacity: .55; }
+.wk-up.done { font-size: 11px; color: #e8c07a; }
+.wk-upnext { display: block; font-size: 11px; color: #d9c7a4; line-height: 1.4; margin-bottom: 5px; }
+.wk-upnext b { color: #ffd9a0; }
+/* the +N badge. It rides the NAME, in both places a piece is named — the Workshop card and the
+   in-run rail — so an upgraded piece is recognisable at a glance in the place you actually use it,
+   not only in the place you bought it. */
+.wk-plus, .eq-plus { font-size: 10px; color: #ffd9a0; border: 1px solid #7a5a2e;
+  border-radius: 4px; padding: 0 3px; vertical-align: middle; }
+.eq-plus { font-size: 9px; }
+
 /* 🦴 DROPS — its own band under the verdict, with a heading.
    ⚠️ This was wrong twice in one day: first a stat column (an emoji in the number slot), then a
    chip tagged onto the verdict row. Both times it was wedged into a row that was about something

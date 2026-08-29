@@ -3009,7 +3009,10 @@ function loadGame(key) {
       // resurrect as `undefined` and throw on armourBlock().
       loot: d.loot || {}, encountersDone: d.encountersDone || 0,
       runBanked: !!d.runBanked,
-      armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0 })),
+      // ⚠️ `up` defaults to 0, so a save written before the ladder existed loads as an UNUPGRADED
+      // run — which is correct: the run started before the upgrade was bought. No SAVE_VERSION bump
+      // is needed because nothing here can fail, and a bump would junk a save for no gain.
+      armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0, up: a.up || 0 })),
       armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
       splitPending: d.splitPending || 0, armourWinInit: !!d.armourWinInit,
       armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
@@ -3162,19 +3165,46 @@ function workshopLine() {
 function pieceCardHTML(d, st, equipped) {
   const owned = st.owned.includes(d.id);
   const rar = RARITY[d.rarity || 'common'];
+  // ⚒️ the +N ladder. ⚠️ Every figure below is read through upEffects() rather than printed from
+  // the def — *when a value gains a modifier, find every line that prints the unmodified one.*
+  const up = (st.up || {})[d.id] || 0, ue = upEffects(d, up);
+  const blockNow = d.block + ue.block, wearNow = blockNow > 0 ? 1 + ue.wear : 0;
   // 🎭 another class's gear is SHOWN, never hidden — you should be able to see what the rogue gets
   // before you unlock her, the same way the Collection states what is not built rather than
   // pretending it does not exist.
   const wrongClass = d.cls && d.cls !== CLASS.id;
   const r = RECIPE[d.id];
-  const kind = d.brk === 'worn' ? '🩹 worn — it stays' : '💥 shatters after one block';
+  // 🔑 the kind line states BOTH facts now, because the ladder separated them: how many blows it
+  // has (`wear`) and what becomes of it when they run out (`brk`).
+  const kind = (wearNow > 1 ? `blocks ${wearNow}× · ` : '') +
+    (d.brk === 'worn' ? '🩹 worn — it stays' :
+     wearNow > 1 ? '💥 then it shatters' : '💥 shatters after one block');
   let foot;
   if (wrongClass) {
     foot = `<span class="wk-none">${(CLASSES[d.cls] && CLASSES[d.cls].name) || d.cls} only</span>`;
   } else if (owned) {
-    foot = equipped
+    const wear = equipped
       ? `<button class="wk-btn on" onclick="unequipPiece('${d.id}')">✓ Worn — remove</button>`
       : `<button class="wk-btn" onclick="equipPiece('${d.id}')">Wear it</button>`;
+    // ⚒️ ⚠️ THE STARTER SET IS DELIBERATELY NOT ON THE LADDER. It is a teaching object with no
+    // ability, and letting it scale would remove the reason to hunt anything — and it says so
+    // rather than showing nothing, because *a heading that stops making a promise should state a
+    // fact instead.*
+    let ladder;
+    if (d.starter) {
+      ladder = `<div class="wk-up dim">⚒️ the starter set does not upgrade</div>`;
+    } else if (up >= ARMOUR_UP_MAX) {
+      ladder = `<div class="wk-up done">⚒️ fully upgraded · +${ARMOUR_UP_MAX}</div>`;
+    } else {
+      const chk = upCheck(d.id);
+      const cost = Object.keys(chk.cost || {}).map(m =>
+        `${matDef(m).icon} ${chk.cost[m]} ${matDef(m).name}`).join(' · ');
+      ladder = `<div class="wk-up"><div class="wk-upnext">⚒️ <b>+${chk.step}</b> — ` +
+        `${upGrantText(d, chk.step)}</div><div class="wk-cost">${cost}</div>` +
+        (chk.ok ? `<button class="wk-btn craft" onclick="upgradePiece('${d.id}')">⚒️ Upgrade</button>`
+                : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`) + `</div>`;
+    }
+    foot = wear + ladder;
   } else if (!r) {
     foot = `<span class="wk-none">${d.starter ? 'yours from the start' : 'no recipe yet'}</span>`;
   } else {
@@ -3205,8 +3235,8 @@ function pieceCardHTML(d, st, equipped) {
   return `<div class="wk-piece rar-${d.rarity || 'common'}${owned ? ' is-owned' : ''}` +
     `${equipped ? ' is-worn' : ''}${wrongClass ? ' is-locked' : ''}">` +
     `<div class="wk-top"><span class="wk-icon">${ARMOUR_SLOTS[d.slot].icon}</span>` +
-    `<span class="wk-name">${d.name}</span>` +
-    `<span class="wk-block">${d.block > 0 ? 'blocks ' + d.block : 'no block'}</span></div>` +
+    `<span class="wk-name">${d.name}${up ? ` <span class="wk-plus">+${up}</span>` : ''}</span>` +
+    `<span class="wk-block">${blockNow > 0 ? 'blocks ' + blockNow : 'no block'}</span></div>` +
     `<div class="wk-kind"><span class="wk-rar">${rar.icon} ${rar.label}</span> · ${kind}</div>` +
     (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
     `<div class="wk-foot">${foot}</div></div>`;
@@ -3223,8 +3253,10 @@ function workshopHTML() {
     `<div class="wk-slots">` + slots.map(id => {
       if (!id) return `<div class="wk-slot is-empty">empty</div>`;
       const d = armourDef(id);
-      return `<div class="wk-slot">${ARMOUR_SLOTS[d.slot].icon} <b>${d.name}</b>` +
-        `<span class="dim">blocks ${d.block}</span></div>`;
+      const u = (st.up || {})[id] || 0, e = upEffects(d, u);
+      return `<div class="wk-slot">${ARMOUR_SLOTS[d.slot].icon} <b>${d.name}` +
+        `${u ? ` <span class="wk-plus">+${u}</span>` : ''}</b>` +
+        `<span class="dim">blocks ${d.block + e.block}${1 + e.wear > 1 ? ` ×${1 + e.wear}` : ''}</span></div>`;
     }).join('') + `</div></div>`;
   for (const slot of Object.keys(ARMOUR_SLOTS)) {
     // ⚠️ sorted by rarity so a zone reads as a ladder rather than as the order I typed them in
@@ -6689,6 +6721,46 @@ function craftCheck(pieceId) {
   }
   return { ok: !missing.length, missing };
 }
+// ⚒️ WHAT THE NEXT STEP COSTS AND WHETHER YOU CAN PAY — shaped like craftCheck() on purpose:
+// it returns the SHORTFALL, because *"you need 2 more Prime Sinew"* is the difference between a
+// disabled button and a disabled button that teaches.
+function upCheck(pieceId) {
+  const d = armourDef(pieceId); const st = loadStash();
+  if (!d || d.starter) return { ok: false, missing: ['cannot be upgraded'], step: 0 };
+  if (!st.owned.includes(pieceId)) return { ok: false, missing: ['not forged'], step: 0 };
+  const step = ((st.up || {})[pieceId] || 0) + 1;
+  if (step > ARMOUR_UP_MAX) return { ok: false, missing: ['fully upgraded'], step: 0 };
+  const cost = ARMOUR_UP_COST[step - 1] || {};
+  const missing = [];
+  for (const m in cost) {
+    const have = st.mats[m] || 0;
+    if (have < cost[m]) missing.push(`${matDef(m).icon} ${cost[m] - have} more ${matDef(m).name}`);
+  }
+  return { ok: !missing.length, missing, step, cost };
+}
+function upgradePiece(pieceId) {
+  const chk = upCheck(pieceId); if (!chk.ok) return;
+  const st = loadStash();
+  for (const m in chk.cost) st.mats[m] -= chk.cost[m];
+  st.up = st.up || {}; st.up[pieceId] = chk.step;
+  saveStash(st);
+  render();
+}
+// ✍️ what a given step gives THIS piece, in words. 🔑 Derived from upEffects() rather than typed
+// out beside it, so the sentence cannot describe a rule the code does not apply.
+function upGrantText(d, step) {
+  const before = upEffects(d, step - 1), after = upEffects(d, step);
+  const parts = [];
+  if (after.wear > before.wear) parts.push(`turns aside <b>one more blow</b>`);
+  if (after.block > before.block) parts.push(`<b>+1 block</b>`);
+  if (after.uses > before.uses) parts.push(`<b>one more use</b>`);
+  if (after.charge < before.charge) parts.push(`<b>charges a beat sooner</b>`);
+  if (after.power > before.power) {
+    const key = ARMOUR_POWER[d.use] ? d.use : d.onBlock;
+    parts.push(`its ability grows to <b>${Math.ceil(ARMOUR_POWER[key] * after.power)}</b>`);
+  }
+  return parts.join(' · ') || 'nothing';
+}
 function craftPiece(pieceId) {
   const r = RECIPE[pieceId]; if (!r || !craftCheck(pieceId).ok) return;
   const st = loadStash();
@@ -6738,9 +6810,112 @@ const armourDef = id => ARMOUR.find(a => a.id === id) || null;
 // variant as BIT-IDENTICAL to baseline, because overriding a const arrow is a silent no-op and
 // a silent no-op looks exactly like "no effect". **Prefer a function declaration for anything
 // an instrument might reasonably want to call.**
+// ============================================================
+// ⚒️ THE +N LADDER (2026-08-28) — spec in `08_Ideas/Equipment_Upgrades.md`
+//
+// 🔴 AND THAT SPEC'S §5 WAS WRONG, IN A WAY WORTH KEEPING ON RECORD. It said step +1 is
+// `shatter → worn`, and it argued for building 🩹 worn as a DECAY — *blocks 3, then 2, then 1*
+// — on the strength of a comment that used to sit on armourBlock(). ⚠️ **That comment was a
+// leftover of a shape Thomas had ALREADY REJECTED** (2026-08-23: *"i had invented a second number
+// and it made the rule need a sentence… it needs one number"*), so it described an ABANDONED
+// rule, not an unbuilt one.
+// 🔑 **I TREATED AN UNKEPT PROMISE AS A SPECIFICATION** — the identical mistake as the armour
+// SLOT gate, where `workshopHTML()` had advertised *"two more to earn"* for months and I read an
+// available gate as a correct one. **The fix for a stale comment is to DELETE it.**
+//
+// 🔑 AND THE TWO THINGS WERE NEVER THE SAME FIELD:
+//     `brk`  — what happens when a piece RUNS OUT.  💥 shatter → gone · 🩹 worn → it stays.
+//     `wear` — HOW MANY BLOWS it turns aside.       Hardcoded to 1 since the day it was written.
+//   Decay conflated them. **The ladder raises `wear`; `brk` keeps meaning exactly what he said it
+//   means.** ✅ It is also the axis the measurement already picked: `dev/armour-axis.js` had ×2
+//   USES beating ×2 POINTS on every column, and uses is the only one that moves the number that
+//   was actually wrong — *pieces able to block at the lair*, on record at **0.03**.
+//
+// ✅ AND IT MAKES `shatter → worn` FALL OUT FOR FREE INSTEAD OF COSTING A STEP. A piece holding
+// two blows MUST survive the first, so it stays on the board until `wear` hits 0 and only then
+// does `brk` decide. Strictly better than the spec's +1, which would have done nothing at all for
+// an `onBlock`-only piece and nothing whatsoever for a piece with no ability — 🔑 *a ladder whose
+// first rung is worth nothing on some pieces is not a ladder.*
+//
+// ⚠️ THE CEILING FROM §3 SURVIVES, AND IT IS WHY THIS VERTICAL AXIS IS SAFE: four pieces × a small
+// integer of blows is still a HARD CAP on what one run can absorb. **A pool scales continuously; a
+// consumable scales to a cap.** ❌ **Never let an upgrade grant a REFRESH** — that is the health
+// bar Thomas rejected, arriving through the back door under a different word.
+// ============================================================
+let ARMOUR_UP_MAX = 3;
+// ⚠️ START EXPENSIVE, TUNE DOWN. Card levels are on record as *hypersensitive past 3/5/7* and
+// this economy as *very sensitive*. 🦴 shards run 8.7 a run and 🔩 Prime Sinew 0.60, so +3 on one
+// piece is ~15 runs and a fully upgraded set is a long horizon — which is the point: this is the
+// sink that stops materials meaning nothing the moment the set is forged.
+// 🔑 Sinew is in it deliberately: [[Drop_Economy]] measured that **the shard cost binds almost
+// nothing**, so a shard-only ladder would be a timer rather than a hunt.
+let ARMOUR_UP_COST = [{ shard: 20 }, { shard: 35, sinew: 2 }, { shard: 55, sinew: 4 }];
+// 🔬 THE INSTRUMENT'S PIN. RUNSIM builds its loadout from the PLAYER'S stash, so without this a
+// sweep measures whatever Thomas happens to have forged that week. ⚠️ -1 means "read the real
+// stash"; anything ≥0 pins every piece to that step. Same lesson as XP_LEVEL_FORCE: **an
+// instrument that reads the player's progress is not an instrument.**
+// ⚠️ PRE-EXISTING AND NOT FIXED HERE: which pieces the bot WEARS is still whatever is equipped.
+let ARMOUR_UP_FORCE = -1;
+
+// 💪 THE EFFECTS THAT CARRY A NUMBER, and therefore the only ones step +2 can grow. Everything
+// else is a RULE — and the standing bar is *an ability must change a rule, never add a number* —
+// so a rule piece takes durability instead.
+// ⚠️ These bases are ALSO what the helpers below apply, so there is ONE number per effect rather
+// than one in this table and a different one three functions away.
+const ARMOUR_POWER = { coins: 3, strike: 4, dash: 5, pace: 3, discharge: 6, burst: 8 };
+
+// 🔑 ONE DEFINITION OF WHAT A STEP GIVES, read by the runtime AND by the Workshop's own text, so
+// the two cannot drift — the same rule that makes the sharpen preview run the real `cardHTML()`.
+function upEffects(d, up) {
+  const e = { wear: 0, block: 0, uses: 0, charge: 0, power: 1 };
+  if (!d || !(up > 0) || d.starter) return e;
+  if (up >= 1) e.wear += 1;
+  if (up >= 2) {
+    // ✦ step 2 is THE ABILITY — but which knob that means depends on what the piece has, so the
+    // Workshop prints the answer per piece instead of making you guess. *A picker must never
+    // offer what it cannot act on.*
+    if (d.charge) e.charge -= 1;                                      // 🔋 it charges a beat sooner
+    else if (d.use && d.uses) e.uses += 1;                            // one more use
+    else if (ARMOUR_POWER[d.use] || ARMOUR_POWER[d.onBlock]) e.power = 1.5;
+    else e.wear += 1;                                                 // a pure rule piece has no number to grow
+  }
+  if (up >= 3) e.block += 1;
+  return e;
+}
+// ⚠️ A `function` DECLARATION, like every other armour helper — a top-level const arrow never
+// lands on the headless sandbox, and overriding one is a SILENT no-op that reads as "no effect".
+function armourUpOf(id) {
+  // ⚪ THE TEACHING SET IS CHECKED FIRST, BEFORE THE PIN. With the order reversed, a measurement
+  // sweep pinned the starter set too — and then it would be measuring a game that cannot exist,
+  // which is the whole failure mode the pin was added to prevent. (upEffects() zeroes a starter
+  // anyway, so nothing was mispriced; what leaked was a "+2" badge on the rail for a piece that
+  // has no ladder.)
+  const d = armourDef(id); if (!d || d.starter) return 0;
+  if (ARMOUR_UP_FORCE >= 0) return ARMOUR_UP_FORCE;
+  return (loadStash().up || {})[id] || 0;
+}
 function newArmour(id) {
-  return { id, wear: (armourDef(id).block > 0 ? 1 : 0),
-           uses: armourDef(id).uses || 0, charge: 0 };
+  const d = armourDef(id), up = armourUpOf(id), e = upEffects(d, up);
+  return { id, up, wear: (d.block + e.block > 0 ? 1 + e.wear : 0),
+           uses: Math.max(0, (d.uses || 0) + e.uses), charge: 0 };
+}
+// how many blows this piece can turn aside in total — the pip CAP on the rail, and what an
+// `every: 'encounter'` refresh restores it to.
+function armourMaxWear(a) {
+  const d = armourDef(a.id); if (!d) return 0;
+  const e = upEffects(d, a.up || 0);
+  return d.block + e.block > 0 ? 1 + e.wear : 0;
+}
+// 🔋 how many beats this piece needs to charge, after upgrades
+function armourCharge(a) {
+  const d = armourDef(a.id); if (!d || !d.charge) return 0;
+  return Math.max(1, d.charge + upEffects(d, a.up || 0).charge);
+}
+// 💪 a numeric effect's value for THIS piece
+function armourPow(key, a) {
+  const base = ARMOUR_POWER[key] || 0;
+  if (!a) return base;
+  return Math.ceil(base * upEffects(armourDef(a.id), a.up || 0).power);
 }
 // 🎭 A CLASS PIECE IS ONLY WEARABLE BY ITS CLASS. ⚠️ Checked at the point of WEARING, not only in
 // the Workshop, because the loadout is stored between runs and you can change class between them.
@@ -6748,10 +6923,16 @@ const armourFitsClass = d => !d || !d.cls || d.cls === CLASS.id;
 // 🔑 EVERY piece you brought, spent or not — a battered plate STAYS ON THE BOARD, because
 // blocking is only one of the things a piece does and you need to see why you have no plate left.
 const armourWorn = () => (S.armour || []);
-// what a piece turns aside RIGHT NOW. 'worn' decays: a Worn 3 Kilnplate blocks 4, then 3, then 2.
+// what a piece turns aside RIGHT NOW.
+// ⚠️ THE COMMENT THAT WAS HERE DESCRIBED A DECAY — *"'worn' decays: a Worn 3 Kilnplate blocks 4,
+// then 3, then 2"* — which was never built and was never going to be: it is a leftover of the
+// two-number shape Thomas rejected. It sat above the function that did not implement it for three
+// months and then got quoted into a spec as if it were a plan. **A note that contradicts the rule
+// it sits on is worse than no note, because it is the version that gets quoted.**
+// 🔑 A piece blocks its FULL value every time it blocks. `wear` is how many times it can.
 function armourBlock(a) {
   const d = armourDef(a.id); if (!d || a.wear <= 0) return 0;
-  return d.block;
+  return d.block + upEffects(d, a.up || 0).block;
 }
 function armourUsesLeft(a) { const d = armourDef(a.id); return d && d.use ? (a.uses || 0) : 0; }
 function armourEligible() { return armourWorn().filter(a => a.wear > 0 && armourBlock(a) > 0); }
@@ -6762,12 +6943,16 @@ function armourMaxSoak() { return armourEligible().reduce((t, a) => t + armourBl
 
 // 🔑 ONE NAMED HELPER, dispatched by a string key — see the port note above. Every ability in the
 // game that fires when a piece blocks passes through here and nowhere else.
-function applyArmourBlock(key, d) {
+// ⚠️ IT TAKES THE PIECE NOW, NOT ONLY ITS DEF — a +2 piece's numbers are bigger, and a helper
+// that could only see the def would print the printed value while paying the upgraded one.
+// *When a value gains a modifier, find every line that prints the unmodified one.*
+function applyArmourBlock(key, d, a) {
+  const n = armourPow(key, a);
   if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
-  else if (key === 'coins') { S.coins += 3; log(`🛡️ ${d.name} — gain 3 coins. (you now hold ${S.coins})`, 'good'); }
-  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + 4; log(`🛡️ ${d.name} — your next strike gets +4.`, 'good'); }
-  else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + 5; log(`🛡️ ${d.name} — your next turn gets +5 Initiative.`, 'good'); }
-  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + 3; log(`🛡️ ${d.name} — your next turn gets +3 Initiative.`, 'good'); }
+  else if (key === 'coins') { S.coins += n; log(`🛡️ ${d.name} — gain ${n} coins. (you now hold ${S.coins})`, 'good'); }
+  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + n; log(`🛡️ ${d.name} — your next strike gets +${n}.`, 'good'); }
+  else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + n; log(`🛡️ ${d.name} — your next turn gets +${n} Initiative.`, 'good'); }
+  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + n; log(`🛡️ ${d.name} — your next turn gets +${n} Initiative.`, 'good'); }
 }
 
 // 🛡️ THE OTHER HALF: A PIECE YOU USE RATHER THAN ONE THAT TAKES A HIT.
@@ -6776,24 +6961,25 @@ function applyArmourBlock(key, d) {
 // ⚠️ Charges are per RUN, not per turn. That is what keeps a 0-block piece from being a passive.
 function armourReady(a) {
   const d = armourDef(a.id); if (!d || !d.use) return false;
-  return d.charge ? (a.charge || 0) >= d.charge : armourUsesLeft(a) > 0;
+  return d.charge ? (a.charge || 0) >= armourCharge(a) : armourUsesLeft(a) > 0;
 }
 function useArmour(aid, opt) {
   const a = (S.armour || []).find(x => x.id === aid);
   if (!a || !isAssignPhase() || !armourReady(a)) return;
   const d = armourDef(a.id);
   if (d.charge) a.charge = 0; else a.uses--;
-  applyArmourUse(d.use, d, opt);
+  applyArmourUse(d.use, d, opt, a);
   // 🔨 "Break it" is literal — a consumed piece leaves the board, the way a shattered one does.
   if (d.consume) S.armour = S.armour.filter(x => x !== a);
   render();
 }
-function applyArmourUse(key, d, opt) {
+function applyArmourUse(key, d, opt, a) {
+  const n = armourPow(key, a);
   if (key === 'relight') lightCandle(`${d.name} shows you the road ahead`);
   // 🔋 the battery, spent where this encounter actually needs it
   else if (key === 'discharge') {
-    if (opt === 'init') { S.armourPace = (S.armourPace || 0) + 6; log(`🛡️ ${d.name} — you spend the mark on speed: +6 Initiative this turn.`, 'good'); }
-    else { S.armourStrike = (S.armourStrike || 0) + 6; log(`🛡️ ${d.name} — you spend the mark on the blow: +6 strike this turn.`, 'good'); }
+    if (opt === 'init') { S.armourPace = (S.armourPace || 0) + n; log(`🛡️ ${d.name} — you spend the mark on speed: +${n} Initiative this turn.`, 'good'); }
+    else { S.armourStrike = (S.armourStrike || 0) + n; log(`🛡️ ${d.name} — you spend the mark on the blow: +${n} strike this turn.`, 'good'); }
   }
   // 🔥 mage — what you channel this turn is doubled. ⚠️ Read by bankValueOf(), so it lands on the
   // Surge row, the reveal line and the Emberwake alike; a flag consumed anywhere else would show
@@ -6807,7 +6993,7 @@ function applyArmourUse(key, d, opt) {
   else if (key === 'quicken') { S.momentum = MOMENTUM_CAP; log(`🛡️ ${d.name} breaks — ● Momentum fills to ${MOMENTUM_CAP}.`, 'good'); }
   // ⚠️ LIVE THIS TURN, not pending — you tapped it during assign, so it must land on the strike
   // you are arranging right now. rollTurnTokens() wipes it at cleanup, which is exactly right.
-  else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + 8; log(`🛡️ ${d.name} — your strike gets +8 this turn.`, 'good'); }
+  else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + n; log(`🛡️ ${d.name} — your strike gets +${n} this turn.`, 'good'); }
 }
 
 // 🛡️ SOAK WITH A PIECE INSTEAD OF A CARD. ⚠️ INSTEAD, not before — that is the whole point.
@@ -6820,12 +7006,19 @@ function soakWithArmour(aid) {
   const d = armourDef(a.id); const blocked = armourBlock(a);
   if (!d || blocked <= 0) return;
   a.wear--;
+  // 🔴 FIXED 2026-08-28: this removed a shatter piece UNCONDITIONALLY, never asking whether
+  // `wear` had actually reached 0. It was harmless for exactly as long as `wear` was hardcoded to
+  // 1 — and the moment the +N ladder let a piece hold two blows, an upgraded shatter piece would
+  // have vanished with a block still on it. 🔑 **A latent bug is one that an unused field is
+  // hiding**, and the ladder's first act was to stop hiding this one.
+  const done = a.wear <= 0;
   // 💥 the basic piece is GONE from the board, not dimmed. 🩹 a worn one stays, because it is
   // still doing something — that is the whole difference between the two kinds.
-  if (d.brk === 'shatter') S.armour = S.armour.filter(x => x !== a);
+  if (done && d.brk === 'shatter') S.armour = S.armour.filter(x => x !== a);
   log(`🛡️ ${d.name} blocks ${blocked}. ` +
-      (d.brk === 'shatter' ? 'It shatters.' : 'It blocks nothing more this run.'), 'bad');
-  if (d.onBlock) applyArmourBlock(d.onBlock, d);
+      (!done ? `It holds — ${a.wear} more block${a.wear === 1 ? '' : 's'} left.`
+             : d.brk === 'shatter' ? 'It shatters.' : 'It blocks nothing more this run.'), 'bad');
+  if (d.onBlock) applyArmourBlock(d.onBlock, d, a);
   S.damage = Math.max(0, S.damage - blocked);
   if (S.damage <= 0) { log(`All damage blocked.`); exitSoak(); return; }
   log(`${S.damage} damage remaining.`, 'bad');
@@ -7130,11 +7323,14 @@ function loadStash() {
     // an empty loadout and a fresh run wore nothing — with no error anywhere.
     // 🔑 A whitelisting reader is the right shape (it is what keeps a corrupt stash from
     // crashing the menu), but it means ADDING A FIELD IS TWO EDITS, and the second one is silent.
+    // ⚒️ `up` is the +N ladder, { pieceId: step }. ⚠️ BOTH constructions below take it — this is
+    // the "adding a field is two edits, and the second one is silent" warning above, cashed in.
     return seedStarter({ mats: d.mats || {},
              owned: Array.isArray(d.owned) ? d.owned : [],
              loadout: Array.isArray(d.loadout) ? d.loadout : [],
+             up: (d.up && typeof d.up === 'object') ? d.up : {},
              seeded: !!d.seeded });
-  } catch (e) { return seedStarter({ mats: {}, owned: [], loadout: [], seeded: false }); }
+  } catch (e) { return seedStarter({ mats: {}, owned: [], loadout: [], up: {}, seeded: false }); }
 }
 function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
 // ⚪ THE STARTER SET IS A FLOOR, NOT A ONE-TIME GIFT (fixed 2026-08-23).
@@ -7737,11 +7933,13 @@ function rollTurnTokens() {
   // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
   for (const a of (S.armour || [])) {
     const d = armourDef(a.id);
-    if (d && d.every === 'encounter' && d.block > 0) a.wear = 1;
-    if (d && d.every === 'encounter' && d.uses) a.uses = d.uses;
+    // ⚠️ restores to the piece's OWN maximum, not to 1 — a refresh that reset an upgraded piece
+    // to the base figure would quietly make the +N ladder a DOWNGRADE on exactly these pieces.
+    if (d && d.every === 'encounter' && d.block > 0) a.wear = armourMaxWear(a);
+    if (d && d.every === 'encounter' && d.uses) a.uses = Math.max(0, d.uses + upEffects(d, a.up || 0).uses);
     // 🔋 a charge piece gains a mark. ⚠️ HERE rather than in one turn loop, for the build-339
     // reason: the finale is a third turn loop and would have skipped it entirely.
-    if (d && d.charge) a.charge = Math.min(d.charge, (a.charge || 0) + 1);
+    if (d && d.charge) a.charge = Math.min(armourCharge(a), (a.charge || 0) + 1);
   }
   S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
@@ -9206,19 +9404,24 @@ function renderArmourRail() {
     const charging = !!d.charge;
     const canBlock = S.phase === 'soak' && S.damage > 0 && a.wear > 0 && live > 0;
     const canUse = isAssignPhase() && armourReady(a);
-    const n = charging ? (a.charge || 0) : d.block > 0 ? a.wear : charges;
-    const cap = charging ? d.charge : d.block > 0 ? 1 : (d.uses || 0);
+    // ⚒️ every figure on the rail comes from the piece, never from its def — an upgraded piece
+    // that printed the base number would show one value and pay another, which is the display bug
+    // this project has now shipped four times.
+    const e = upEffects(d, a.up || 0), maxW = armourMaxWear(a), bv = d.block + e.block;
+    const n = charging ? (a.charge || 0) : maxW > 0 ? a.wear : charges;
+    const cap = charging ? armourCharge(a) : maxW > 0 ? maxW : Math.max(0, (d.uses || 0) + e.uses);
+    const dis = armourPow('discharge', a);
     const acts = (canUse && d.use === 'discharge')
-      ? `<div class="eq-acts"><button class="tok-act" onclick="useArmour('${a.id}','atk')">⚔️ +6</button>` +
-        `<button class="tok-act" onclick="useArmour('${a.id}','init')">💨 +6</button></div>` : '';
+      ? `<div class="eq-acts"><button class="tok-act" onclick="useArmour('${a.id}','atk')">⚔️ +${dis}</button>` +
+        `<button class="tok-act" onclick="useArmour('${a.id}','init')">💨 +${dis}</button></div>` : '';
     const tap = canBlock ? `soakWithArmour('${a.id}')` : (canUse && d.use !== 'discharge') ? `useArmour('${a.id}')` : null;
     return `<div class="eq eq-${slot.toLowerCase()} rar-${d.rarity || 'common'}` +
-      `${tap ? ' is-ready' : ''}${(d.block > 0 && a.wear <= 0 && !charging) ? ' is-spent' : ''}"` +
+      `${tap ? ' is-ready' : ''}${(bv > 0 && a.wear <= 0 && !charging) ? ' is-spent' : ''}"` +
       (tap ? ` onclick="${tap}" role="button" tabindex="0"` : '') +
       ` title="${stripTags(d.name + ' — ' + (d.text || 'no ability'))}">` +
       `<div class="eq-zone">${sl.label}</div>` +
-      `<div class="eq-name">${d.name}</div>` +
-      `<div class="eq-block">${d.block > 0 ? 'blocks <b>' + d.block + '</b>' : '<span class="dim">no block</span>'}</div>` +
+      `<div class="eq-name">${d.name}${(a.up || 0) ? ` <span class="eq-plus">+${a.up}</span>` : ''}</div>` +
+      `<div class="eq-block">${bv > 0 ? 'blocks <b>' + bv + '</b>' : '<span class="dim">no block</span>'}</div>` +
       (cap ? `<div class="eq-pips">${pips(n, cap)}</div>` : '') +
       (canBlock ? `<div class="eq-cue">tap to block</div>` : canUse && !acts ? `<div class="eq-cue">tap to use</div>` : '') +
       acts +

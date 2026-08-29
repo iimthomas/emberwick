@@ -106,12 +106,12 @@ vm.createContext(sandbox);
 // 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
 const EXPORTS = ['CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE',
                  'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MATERIALS', 'CREATURE_INDEX', 'ARMOUR', 'ARMOUR_SLOTS', 'RECIPE', 'MOMENTUM_CAP', 'WAKE_TARGETS', 'BUILD',
-                 'SETOUT', 'SETOUT_BUCKETS', 'CONTRACTS', 'CLASS_KEY', 'UNLOCKS', 'UNLOCK_AT', 'LEVEL_CAP', 'XP_AWARD', 'XP_KEY', 'TUTORIAL', 'CLASSES', 'ARMOUR_SLOTS'];
+                 'SETOUT', 'SETOUT_BUCKETS', 'CONTRACTS', 'ARMOUR_POWER', 'ARMOUR_UP_COST', 'ARMOUR_UP_MAX', 'CLASS_KEY', 'UNLOCKS', 'UNLOCK_AT', 'LEVEL_CAP', 'XP_AWARD', 'XP_KEY', 'TUTORIAL', 'CLASSES', 'ARMOUR_SLOTS'];
 // the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;
 // ⚠️ it must be `let` in game.js or the assignment throws.
 const TUNABLES = ['ATTUNE_BONUS', 'LOOSE_CUT', 'PAID_STEP', 'BANK_MULT', 'FOE_ATK_MULT', 'MOMENTUM_CAP', 'MOMENTUM_STEP', 'MOMENTUM_BREAK', 'MOMENTUM_VALUE', 'MOMENTUM_FULL', 'SPLIT_ADDS_PER_HIT', 'TIME_PENALTY_MULT', 'ELITE_HP', 'ELITE_ATK', 'ELITE_COIN',
                   'COIN_MULT', 'DRAGON_HP_ADD', 'ARMOUR_SLOTS_OPEN', 'RELENTLESS_STEP', 'JOURNEY_MP_MULT', 'FORK_ENABLED', 'WHEEL_PER_ENCOUNTER',
-                  'XP_PER_LEVEL', 'XP_LEVEL_FORCE', 'CLASS_XP_PER_LEVEL', 'CLASS_LEVEL_FORCE'];
+                  'XP_PER_LEVEL', 'XP_LEVEL_FORCE', 'ARMOUR_UP_FORCE', 'ARMOUR_UP_MAX', 'CLASS_XP_PER_LEVEL', 'CLASS_LEVEL_FORCE'];
 const epilogue = NL + ';' + NL +
   EXPORTS.map(n => 'try { globalThis.' + n + ' = ' + n + '; } catch (e) {}').join(NL) + NL +
   // S is reassigned every run, so it must be exported as a GETTER, never a copied reference.
