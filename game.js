@@ -633,7 +633,16 @@ const ROAD_FELLGRIND = [
     { type: 'journey', name: 'The Long Bank',   mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
   ]},
   { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
-    { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
+    // ⚔️ THE FIRST MULTI-BEAT CREATURE (2026-08-30, step one of [[Fights_Have_Weight]]).
+    // HP is ~3× an ordinary creature's because a beat CHIPS rather than kills; `par` is the beat
+    // count a clean kill wants, and it is what the reward will scale on once Narrow is gone.
+    // 🔑 Its three attacks are FIXED and NAMED — the pool owns the rule, the Hound owns the words.
+    // ⚠️ STEP ONE IS ONE CREATURE ON PURPOSE. Everything else stays a one-hand encounter so the
+    // comparison is live inside the same run.
+    { type: 'fight',   name: 'Quarry Hound',   hp: 34, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5,
+      par: 3, attacks: [{ a: 'harden', name: 'Slag Crust' },
+                        { a: 'windup', name: 'Set Jaw' },
+                        { a: 'circle', name: 'Run Down' }] },
     { type: 'fight',   name: 'Millstone Crab', hp: 11, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
@@ -5371,6 +5380,8 @@ function takeMapNode(f, c) {
     else drawEncounter(null, node.type === 'elite');
     S.phase = 'assign';
     logChallenge();
+    // ⚔️ a creature with attacks runs its own beat loop, which does its own phase and render
+    if (S.foeState) { startFoeBeat(); return; }
   } else if (node.type === 'event') {
     S.phase = 'event';
     startEvent();
@@ -5609,6 +5620,94 @@ function drawEncounter(avoidType, elite) {
 // not the SIZE of the hit, and no multiplier reaches frequency.** Fixing her needs something that
 // costs cards on a *Complete*, or a road that can kill you — not this dial.
 let FOE_ATK_MULT = 1.30;
+// ============================================================
+// ⚔️ MULTI-BEAT FIGHTS — STEP ONE (2026-08-30, branch `big-changes`)
+// Spec: `01_Core_Systems/Fights_Have_Weight.md`. Thomas: *"every monster should feel like our
+// bosses. different attacks every turn… rather than how we just 1 shot every monster and move
+// on right away."*
+//
+// 🔴 THIS BREAKS A PILLAR ON PURPOSE. *One hand per encounter* came off the inviolables on
+// 2026-08-30; five remain. Multi-beat was cut twice on **problems per decision**, and the
+// arithmetic behind that rejection assumed **you replay the same hand against the same creature**.
+// Both halves are now false: the hand is redrawn every beat, and the creature's telegraphed attack
+// changes what is correct. ⚠️ **The objection returns as the acceptance test — if beat 2 wants
+// beat 1's play, this is grinding and gets cut a third time.**
+//
+// 🔑 STEP ONE IS DELIBERATELY THE LOOP AND NOTHING ELSE. No wounds, no map cut, no economy.
+// The only question it exists to answer is *does a fight feel like a fight?*
+//
+// 🔑 AND IT GENERALISES THE DUEL RATHER THAN WRITING A THIRD TURN LOOP. `startDuelBeat()`
+// already does almost exactly what Thomas described — no mid-fight reshuffle, draw back each beat,
+// deck-dry is a developed loss, attacks telegraphed a beat ahead. **The finale has swallowed half
+// of every change made to the other two loops** (🔥 the Emberwake and ● Momentum both froze for an
+// entire finale once), so the direction of travel is FEWER loops, not more.
+//
+// ✅ AN ATTACK IS A ONE-BEAT MODIFIER TO THE CREATURE'S OWN STATS, which is why step one needs no
+// surgery inside computeAction(): the beat re-shapes the synthetic encounter and the existing
+// maths reads it. Attacks that change the PLAYER's terms (🌫️ feints, 🌑 shrouds) need real hooks
+// and are deliberately not in this cut.
+// ============================================================
+let FIGHT_BEATS = true;          // 🔬 the branch switch; off restores one-hand fights exactly
+
+// 🔑 THE POOL OWNS THE RULE, THE CREATURE OWNS THE NAME — the same seam as the classes, where
+// the engine owns the rule and the class owns the noun. Two Armour creatures can both *harden*
+// and it is a different move with a different name on each.
+// ⚠️ Every entry must change WHICH ARRANGEMENT IS CORRECT, never merely how much it stings. A
+// creature that hits for 4, then 6, then 5 is the same problem three times, and that is precisely
+// the grinding the old rejection warned about.
+const FOE_ATTACKS = {
+// ⚠️ TWO STRINGS, NOT ONE. `tell` is the WARNING, `now` is what is actually happening — and the
+  // first cut had only `tell`, so the live attack announced itself as *"Armour +2 NEXT beat"*
+  // while it was already applying. 🔑 A telegraph and a state read differently even when they
+  // describe the same rule, and using one string for both makes the game lie in the present tense.
+  harden: { icon: '🛡️', tell: 'its plate is thickening — <b>Armour +2</b> next beat',
+            now: 'its plate is thick — <b>Armour +2</b>', fx: { armour: 2 } },
+  windup: { icon: '💢', tell: 'it draws back — its next blow is <b>doubled</b>',
+            now: 'it swings with everything — its blow is <b>doubled</b>', fx: { atkMult: 2 } },
+  circle: { icon: '💨', tell: 'it starts to circle — it <b>takes Initiative</b> next beat',
+            now: 'it has your flank — it <b>takes Initiative</b>', fx: { initTake: true } },
+  set:    { icon: '🧱', tell: 'it is setting itself — your <b>first blow will be halved</b>',
+            now: 'it is set — your <b>first blow is halved</b>', fx: { guard: 1 } },
+  lunge:  { icon: '⚔️', tell: 'it coils — <b>Early Damage</b> next beat even if you are faster',
+            now: 'it lunges — <b>Early Damage</b> whatever your speed', fx: { earlyAlways: true } },
+  quicken:{ icon: '⏳', tell: 'it is quickening — its <b>Initiative climbs</b>',
+            now: 'it is quick now — its <b>Initiative has climbed</b>', fx: { initStep: 3 } },
+};
+// 🎲 A SHUFFLED BAG, NOT A DIE (Thomas's call). Pure random can roll *harden* three beats
+// running and then the creature never shows you the two things that make it itself. A bag
+// guarantees you meet the whole creature and still cannot be predicted.
+function foeBagDraw() {
+  const st = S.foeState;
+  if (!st.bag || !st.bag.length) {
+    st.bag = st.atks.map((_, i) => i);
+    for (let i = st.bag.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1)); [st.bag[i], st.bag[j]] = [st.bag[j], st.bag[i]];
+    }
+    // 🔴 A REFILLED BAG COULD REPEAT THE CARD IT HAD JUST DEALT (found in play, beat 4: the panel
+    // read "Slag Crust" as both the current attack AND the telegraph). A bag exists precisely to
+    // stop the same move landing twice running, and it failed at the one place a bag can — the
+    // SEAM between two bags. 🔑 Shuffling inside a cycle is not the same as shuffling ACROSS one.
+    if (st.atks.length > 1 && st.last != null && st.bag[st.bag.length - 1] === st.last) {
+      const j = Math.floor(rnd() * (st.bag.length - 1));
+      const k = st.bag.length - 1; [st.bag[k], st.bag[j]] = [st.bag[j], st.bag[k]];
+    }
+  }
+  st.last = st.bag.pop();
+  return st.atks[st.last];
+}
+// resolve a creature's three into { name, icon, tell, fx } — the rule from the pool, the name
+// from the creature.
+function foeAttacksOf(e) {
+  return (e.attacks || []).map(a => {
+    const rule = FOE_ATTACKS[a.a]; if (!rule) return null;
+    return { id: a.a, name: a.name, icon: rule.icon, tell: rule.tell, now: rule.now || rule.tell, fx: rule.fx };
+  }).filter(Boolean);
+}
+// ⚠️ `function` declarations, not const arrows — a top-level const never lands on the headless
+// sandbox and this is exactly the sort of thing an instrument will want to ask.
+function isBeatFight(e) { return !!(FIGHT_BEATS && e && e.type === 'fight' && !e.finale && (e.attacks || []).length); }
+function foeFx() { return (S.foeState && S.foeState.active && S.foeState.active.fx) || {}; }
+
 function scaleFoe(e) {
   if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
   return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
@@ -5617,6 +5716,16 @@ function beginEncounter(e) {
   const region = RUN()[S.region - 1];
   e = scaleFoe(e);
   S.encounter = e;
+  // ⚔️ a creature with attacks becomes a FIGHT rather than a hand. Everything below still runs
+  // (hardship roll, logging, the panel) — the beat loop takes over at the end of this function.
+  if (isBeatFight(e)) {
+    // ⚠️ KEEP THE UNMODIFIED CREATURE. Each beat REPUBLISHES `S.encounter` with that beat's
+    // stats, so without a pristine copy the modifiers would compound: a creature that hardened
+    // twice would be at Armour +4 forever.
+    S.foeBase = e;
+    S.foeState = { hp: e.hp, maxHp: e.hp, beat: 0, par: e.par || 3,
+                   atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0 };
+  } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
@@ -5647,6 +5756,92 @@ function beginEncounter(e) {
     if (!S.hardship) S.hardship = list[Math.floor(rnd() * list.length)];
     S.curseNextFight = false;
   }
+}
+
+// ⚔️ ONE BEAT OF A FIGHT. Deliberately shaped like startDuelBeat(): draw back to a full hand,
+// an empty hand is a developed loss, last beat's telegraph becomes this beat's reality, and the
+// creature is re-published as a synthetic encounter carrying THIS beat's stats.
+// 🔑 THE ATTACK IS EXPRESSED AS THE CREATURE'S STATS FOR ONE BEAT, which is why nothing inside
+// computeAction() had to change: the existing maths reads armour, init and atk off the encounter
+// and does not care that they moved.
+// ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
+// has taken over the turn; FALSE if it fell and the caller should finish the encounter.
+function foeResolveBeat(r) {
+  const st = S.foeState, base = S.foeBase;
+  const dealt = Math.max(0, r.value || 0);
+  st.hp = Math.max(0, st.hp - dealt);
+  log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
+  if (st.hp <= 0) {
+    const pace = st.beat <= st.par ? 'clean' : 'slow';
+    log(`🏆 <b>${base.name} falls</b> — ${st.beat} beat${st.beat === 1 ? '' : 's'} ` +
+        `(par ${st.par}, ${pace}).`, 'good result');
+    return false;
+  }
+  // it lives, so it answers. ⚠️ Uses the SAME terms computeAction already produced — no second
+  // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
+  const damage = (r.early || 0) + (r.combatDmg || 0);
+  tickMomentum(damage, r);
+  S.damage = damage; S.damageEl = null;
+  S.afterSoak = 'foeNext';
+  if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
+  else foeCleanupAndNext();
+  return true;
+}
+
+function startFoeBeat() {
+  const st = S.foeState, base = S.foeBase;
+  // 🃏 THE DECK IS THE FIGHT'S AMMUNITION. No reshuffle mid-fight (Thomas: *"discard doesn't
+  // come back"*), so a long fight visibly drains you and running dry is a real death.
+  if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+  if (S.hand.length === 0) {
+    defeat(`Your cards are spent — the ${base.name} still stands at ${st.hp} of ${st.maxHp} HP.`);
+    return;
+  }
+  st.beat++;
+  // 🎲 beat 1 is deliberately plain: you have not been given a chance to react to anything yet.
+  st.active = st.next || null;
+  st.next = foeBagDraw();
+  if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
+
+  // ⚡ this beat's creature. ⚠️ hp 9999 so computeAction() never judges the kill — the beat
+  // chips a pool and `foeResolveBeat()` decides. That sentinel is the one that leaked to the
+  // screen as "LOSS" in the duel, so it is kept OFF every display here.
+  const fx = (st.active && st.active.fx) || {};
+  const climb = (fx.initStep || 0) * (st.beat - 1);
+  S.encounter = Object.assign({}, base, {
+    hp: 9999, beatFight: true,
+    init: fx.initTake ? 99 : base.init + climb,
+    atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
+    shape: fx.armour ? 'armour' : base.shape,
+    shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
+    guard: fx.guard || base.guard || 0,
+    ability: fx.earlyAlways ? 'Ranged' : base.ability,
+  });
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.boostTarget = 'Attack';
+  S.loseReserve = null; S.afterSoak = 'foeNext';
+  S.damage = 0; S.damageEl = null;
+  // ⚠️ EVERY PER-TURN RESET THAT nextTurn() DOES HAS TO HAPPEN HERE TOO. The finale learned this
+  // the hard way — 🔥 the Emberwake and ● Momentum both froze for an entire boss fight because a
+  // third loop skipped the resets the other two shared. A beat IS a turn.
+  S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false; S.moTarget = null;
+  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+  S.phase = 'assign';
+  logHeader(`— ⚔️ ${base.name} · beat ${st.beat} —`);
+  log(`${base.name}: ${st.hp}/${st.maxHp} HP` + (st.next ? ` · next: ${st.next.icon} <b>${st.next.name}</b> — ${stripTags(st.next.tell)}` : ''));
+  render();
+}
+
+// end of a beat: the spent set goes to the discard and does not come back until the fight ends.
+function foeCleanupAndNext() {
+  rollTurnTokens();
+  const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
+  S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
+  S.discard.push(...setCards);
+  S.foeState.spent += setCards.length;
+  startFoeBeat();
 }
 
 function logChallenge() {
@@ -6582,6 +6777,19 @@ function finishResolve() {
   const r = S.pendingR;
   const e = S.encounter;
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
+  // ⚔️ A BEAT CHIPS A POOL. It must intercept BEFORE the once-per-encounter bookkeeping below
+  // — coins, drops, the candle, the craft tally, contracts, the elite boon — or a five-beat
+  // fight would pay five times and light the candle five times.
+  // 🔑 The creature dying is what turns the last beat into an ENCOUNTER result; every earlier
+  // beat is damage and a counterstrike and nothing else.
+  if (S.foeState && isBeatFight(S.foeBase) && e && e.beatFight) {
+    if (foeResolveBeat(r)) return;      // it survived — the beat took over
+    // it fell: this beat IS the encounter's result, so fall through as a Complete.
+    // ⚠️ NARROW IS GONE FROM FIGHTS (Thomas, 2026-08-30): *"you beat it or you die."* The
+    // three-way outcome survives on JOURNEYS, which is one more way the two stop being the
+    // same puzzle. What scales here is the REWARD, by beats against par — not the label.
+    r.outcome = 'Complete';
+  }
   S.results[r.outcome]++;
   contractTick(r);   // 📜 a contract reads the turn the engine already resolved
   // 💀 remember a clean elite kill; backToMap() pays it
@@ -7909,6 +8117,7 @@ function exitSoak() {
   S.afterSoak = 'upgrade';
   if (dest === 'turnEnd') finishTurn();
   else if (dest === 'duelNext') duelCleanupAndNext();
+  else if (dest === 'foeNext') foeCleanupAndNext();
   else startUpgrade();
 }
 
@@ -9976,11 +10185,25 @@ function renderEncounter() {
   if (e.type === 'fight') {
     panel.innerHTML =
       `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
+      // ⚔️ A BEAT FIGHT SHOWS ITS POOL AND ITS TELEGRAPH, never the 9999 sentinel — that is the
+      // placeholder that leaked to the screen as "LOSS" in the duel this week, and it is the
+      // same trick being played here.
+      // 🔑 The telegraph is LOAD-BEARING, not flavour: you can die to a hit your hand cannot
+      // soak, and the only thing that makes that a mistake rather than a mugging is having been
+      // told a beat early.
+      (S.foeState ? `<div class="enc-stats"><span>❤️ HP <b>${S.foeState.hp}</b>/${S.foeState.maxHp}</span>` +
+        `<span>⚔️ beat <b>${S.foeState.beat}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
+        `<span>💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
+        `<span>🪙 <b>${e.xp}</b></span></div>` +
+        (S.foeState.active ? `<div class="foe-now">${S.foeState.active.icon} <b>${S.foeState.active.name}</b> — ${S.foeState.active.now}</div>` : '') +
+        (S.foeState.next ? `<div class="foe-tell">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '')
+      : '') +
+      (S.foeState ? '' :
       `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
 
-      `<span>🪙 <b>${e.xp}</b></span></div>` + modLines + candleLine();
+      `<span>🪙 <b>${e.xp}</b></span></div>`) + modLines + candleLine();
   } else {
     panel.innerHTML =
       `<div class="enc-type">JOURNEY — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
