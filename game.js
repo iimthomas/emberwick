@@ -497,8 +497,10 @@ const REGIONS = [
   { name: 'Verdant Edge', hardshipChance: 0, hardships: [], encounters: [
     { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 5 },
-    { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4 },
-    { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 1, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6 },
+    { type: 'fight', name: 'Mist Crane', hp: 16,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4,
+      par: 2, attacks: [{ a: 'circle', name: 'Wingbeat' }, { a: 'lunge', name: 'Stoop' }, { a: 'quicken', name: 'Rising Air' }] },
+    { type: 'fight', name: 'Cairnstag',  hp: 22, init: 1, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6,
+      par: 3, attacks: [{ a: 'harden', name: 'Stonehide' }, { a: 'set', name: 'Antlers Down' }, { a: 'windup', name: 'Bellow' }] },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 1, element: 'Lightning', nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 2, element: 'Water',     nightfall: 3, xp: 2 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
@@ -508,8 +510,10 @@ const REGIONS = [
   { name: 'Wilding Marches', hardshipChance: 0.35, hardships: ['Ambush', 'Mire', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3 },
-    { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6 },
-    { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 4, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze' },
+    { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6,
+      par: 3, attacks: [{ a: 'windup', name: 'Tusk Charge' }, { a: 'harden', name: 'Cinder Crust' }, { a: 'quicken', name: 'Blood Up' }] },
+    { type: 'fight', name: 'Frostbark Elder', hp: 22, init: 4, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze',
+      par: 3, attacks: [{ a: 'harden', name: 'Rimeplate' }, { a: 'circle', name: 'Drift' }, { a: 'windup', name: 'Deep Freeze' }] },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 1, element: 'Fire',      nightfall: 5, xp: 3, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
@@ -517,8 +521,10 @@ const REGIONS = [
   ]},
   // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 9, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6 },
+    { type: 'fight', name: 'Basalt Basilisk', hp: 28, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6,
+      par: 4, attacks: [{ a: 'harden', name: 'Stoneskin' }, { a: 'set', name: 'Coil Tight' }, { a: 'lunge', name: 'Gaze' }] },
+    { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6,
+      par: 3, attacks: [{ a: 'set', name: 'Coil' }, { a: 'circle', name: 'Second Head' }, { a: 'lunge', name: 'Snap' }] },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 1, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
@@ -2935,14 +2941,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
-  { build: 424, date: '2026-08-30', title: 'Fights have beats',
+  { build: 425, date: '2026-08-30', title: 'Fights have beats · a shorter road',
     warn: "Runs in progress from build 422 will not load — fights changed shape. Your stages, grades, equipment and materials are all safe.",
     added: [
-      "⚔️ The <b>Quarry Hound</b> now fights over <b>several beats</b> instead of one. It has 34 HP and you chip it down.",
-      "It has <b>three named attacks</b> — 🛡️ Slag Crust, 💢 Set Jaw, 💨 Run Down — and it <b>tells you which is coming</b> a beat early. Arrange around it.",
+      "⚔️ <b>Some creatures now fight over several beats</b> instead of one — you chip them down. In region 1 that is the Mist Crane, Cairnstag, Ashen Boar, Grotto Hydra, Frostbark Elder and Basalt Basilisk. The rest still resolve in one hand, so you can feel the difference in the same run.",
+      "Each has <b>three named attacks</b> of its own and <b>tells you which is coming</b> a beat early. Arrange around it.",
     ],
     changed: [
       "During a fight your <b>discard does not come back</b>. Your deck is that fight's ammunition — run out and you lose.",
+      "🗺️ <b>Stage 1 is a short road now</b> — five encounters instead of fourteen. Fights are longer, so the road is shorter.",
     ] },
 
   { build: 422, date: '2026-08-28', title: 'Multi-hit works at the lair',
@@ -3856,6 +3863,9 @@ function startStage(n, confirmed) {
   // 🎓 Stage 0 is MAGE by construction: its authored deck order names mage cards, and the tutorial
   // teaches the engine through the class you start with.
   setClass(n === 0 ? MAGE : (CLASSES[pickedClassId()] || MAGE));
+  // 🗺️ the road's length is a property of the STAGE. ⚠️ Must be set before freshGame(), which
+  // is what builds the map.
+  MAP_FLOORS = floorsForStage(n);
   freshGame(n);
   // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
   // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
@@ -4947,6 +4957,15 @@ function log(text, cls = '') {
 // ⚠️ `let`, not `const` - these are TUNING constants and the sweep sets them (same reason
 // ATTUNE_BONUS and FORK_ENABLED are let). A const here throws inside the headless harness.
 let MAP_FLOORS = 16;          // 4 region bands of 4 - the band decides which pool a node draws from
+// 🗺️ HOW LONG A STAGE'S ROAD IS (2026-08-30, `01_Core_Systems/Fights_Have_Weight.md`).
+// 🔑 THE MAP CUT IS THE DIFFICULTY LEVER HIDING INSIDE MULTI-BEAT. Halving the encounters halves
+// your income and your shop visits without touching a single combat number — and a 14-encounter
+// road at 3+ beats each is ~45 turns against today's 17, which is a different game on a phone.
+// ⚠️ `bandOf()` and `mapFloors()` already read the BUILT map's height rather than this global, so
+// a short road divides into its region bands correctly with no further change.
+// ⚠️ Set per stage in startStage(), never read directly after a map exists.
+const STAGE_FLOORS = { 1: 6 };    // 5 encounters and the hearth on top
+function floorsForStage(n) { return STAGE_FLOORS[n] || 16; }
 let MAP_COLS   = 5;           // StS uses 6; we are on a phone and the map is a dialog
 let MAP_PATHS  = 6;           // paths walked upward. More paths = wider, more connected map
 let MAP_BAND   = 4;           // floors per region band
