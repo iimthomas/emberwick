@@ -898,6 +898,16 @@ button.stage.locked .stage-shape { font-style: italic; }
 .wk-hunt { font-size: 11px; color: #9fc0d1; margin-top: 4px; line-height: 1.35; }
 .wk-hunt b { color: #cfe4ef; }
 
+/* ⚔️ THE BEAT FIGHT'S TWO LINES. ⚠️ `display: block` for the `.opt-why` reason — an inline
+   telegraph beside an inline label butts straight against it and reads as one run-on sentence.
+   🔑 The NEXT line is deliberately the quieter of the two: what is happening now is a fact, what
+   is coming is the thing you arrange around, and they must not compete for the same glance. */
+.foe-now  { display: block; font-size: 12px; line-height: 1.5; margin-top: 6px;
+  color: #e8b98a; border-left: 2px solid #7a4a2e; padding-left: 8px; }
+.foe-tell { display: block; font-size: 11.5px; line-height: 1.5; margin-top: 5px;
+  color: #9fc0d1; border-left: 2px solid #2f4a55; padding-left: 8px; }
+.foe-now b, .foe-tell b { color: #ecdfc8; }
+
 /* ⚒️ THE +N LADDER on a forged piece — a second block under the Wear button, ruled off from it,
    because they are two different transactions and a run-on reads as one control.
    ⚠️ `.wk-upnext` is `display: block` for the reason `.opt-why` had to be: an inline note beside
