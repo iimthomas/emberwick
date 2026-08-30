@@ -6,6 +6,18 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 430 — Perfect Kills, and a fight that survives a reload
+*2026-08-30*
+
+> ⚠️ If you reloaded the page in the middle of a fight, that fight was quietly running on the old one-hand rules for the rest of it. Fixed — no action needed, and saves still load.
+
+**Changed**
+- ✦ **PERFECT KILL is a real achievement now.** Two conditions, both across the whole fight: the killing blow deals **exactly** the health it had left, and **nothing got through** on any turn — you never lost a card to it.
+
+**Fixed**
+- ✦ It no longer happens on journeys. It is a kill; nothing dies on a road.
+- 🔁 **Reloading mid-fight no longer breaks the fight.** The creature came back with its real health bar and the turn structure gone — a verdict after every turn, and a bone shard carved each time.
+
 ## build 429 — Fights stop interrupting themselves
 *2026-08-30*
 
