@@ -5,19 +5,19 @@ const H = require('./headless.js');
 const S = H.sandbox;
 const t = { kills: 0, exact: 0, untouched: 0, both: 0, journeys: 0, plainFights: 0, plainPerfect: 0 };
 
-const realResolveBeat = S.foeResolveBeat;
-S.foeResolveBeat = function (r) {
+const realApply = S.foeApplyBlow;
+S.foeApplyBlow = function (r) {
   const st = H.getS().foeState;
   const dealt = Math.max(0, r.value || 0);
   const wasExact = dealt === st.hp, wasClean = !!st.untouched;
-  const alive = realResolveBeat.apply(this, arguments);
-  if (!alive) {
+  const felled = realApply.apply(this, arguments);
+  if (felled) {
     t.kills++;
     if (wasExact) t.exact++;
     if (wasClean) t.untouched++;
     if (wasExact && wasClean) t.both++;
   }
-  return alive;
+  return felled;
 };
 
 const realPK = S.perfectKillInfo;

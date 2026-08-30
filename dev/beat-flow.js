@@ -21,8 +21,8 @@ S.advanceBeat = function () {
   return realAdvance.apply(this, arguments);
 };
 
-const realResolveBeat = S.foeResolveBeat;
-S.foeResolveBeat = function (r) { const a = realResolveBeat.apply(this, arguments); if (!a) seen.kills++; return a; };
+const realApply = S.foeApplyBlow;
+S.foeApplyBlow = function (r) { const felled = realApply.apply(this, arguments); if (felled) seen.kills++; return felled; };
 
 const realBank = S.bankDrops;
 S.bankDrops = function (bag) { seen.banks.push(bag || {}); return realBank.apply(this, arguments); };

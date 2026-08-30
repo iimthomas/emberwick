@@ -30,12 +30,12 @@ S.rollDrops = function (e, outcome, perfect) {
   return bag;
 };
 
-const realResolveBeat = S.foeResolveBeat;
-S.foeResolveBeat = function (r) {
+const realApply = S.foeApplyBlow;
+S.foeApplyBlow = function (r) {
   tally.beatTurns++;
-  const alive = realResolveBeat.apply(this, arguments);
-  if (!alive) tally.beatKills++;
-  return alive;
+  const felled = realApply.apply(this, arguments);
+  if (felled) tally.beatKills++;
+  return felled;
 };
 
 H.useClass('mage');
