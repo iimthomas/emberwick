@@ -6,17 +6,18 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
-## build 424 — Fights have beats
+## build 425 — Fights have beats · a shorter road
 *2026-08-30*
 
 > ⚠️ Runs in progress from build 422 will not load — fights changed shape. Your stages, grades, equipment and materials are all safe.
 
 **Added**
-- ⚔️ The **Quarry Hound** now fights over **several beats** instead of one. It has 34 HP and you chip it down.
-- It has **three named attacks** — 🛡️ Slag Crust, 💢 Set Jaw, 💨 Run Down — and it **tells you which is coming** a beat early. Arrange around it.
+- ⚔️ **Some creatures now fight over several beats** instead of one — you chip them down. In region 1 that is the Mist Crane, Cairnstag, Ashen Boar, Grotto Hydra, Frostbark Elder and Basalt Basilisk. The rest still resolve in one hand, so you can feel the difference in the same run.
+- Each has **three named attacks** of its own and **tells you which is coming** a beat early. Arrange around it.
 
 **Changed**
 - During a fight your **discard does not come back**. Your deck is that fight's ammunition — run out and you lose.
+- 🗺️ **Stage 1 is a short road now** — five encounters instead of fourteen. Fights are longer, so the road is shorter.
 
 ## build 422 — Multi-hit works at the lair
 *2026-08-28*
