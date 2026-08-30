@@ -6,6 +6,16 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 420 — Cards speak your class
+*2026-08-28*
+
+**Changed**
+- Charms, potions and equipment now use **your** slot names. The rogue reads **Strike**, **Combo** and **Energy** where the mage reads Spell, Catalyst and Surge.
+
+**Fixed**
+- 🧪 **Bitterroot**, 🎁 **Deep Tinderbox** and 💧 **Damp Wick** did **nothing at all** for the rogue — they change a stat she does not have. They are mage-only now.
+- 💧 Damp Wick is a curse, so for the rogue it was a free one.
+
 ## build 419 — What's new
 *2026-08-28*
 

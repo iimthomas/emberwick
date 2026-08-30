@@ -355,6 +355,60 @@ function hardshipText(name) {
     .replace(/\{slot:(\w+)\}/g, (_, z) => `<b>${SLOT_LABEL[z] || z}</b>`);
 }
 
+// 🔤 THE SAME RULE, FOR EVERY OTHER CONTENT STRING (2026-08-28).
+// Thomas: *"the bitterroot potion is only for mage right? we need to figure out a system of
+// naming things… or else we have to just make every potion, charms, events, equip, everything,
+// call every characters slots correctly."*
+//
+// ❌ HIS OTHER SUGGESTION — number the slots — IS THE ONE THING ALREADY RULED OUT, and by his own
+// correction: **"accord"** was invented so one sentence could cover two classes and therefore
+// meant nothing to either (*"what does accord even mean"*). 🔑 *"Slot 3"* is a class-neutral
+// noun of exactly that kind: the mage translates it to Surge, the rogue to Energy, and it is
+// worse for both than either word alone. **If you find yourself inventing a class-neutral noun,
+// the answer is a PLACEHOLDER, not a new word** — which is what this is.
+//
+// ⚠️ EVERY DISPLAY SITE MUST GO THROUGH HERE. A raw `.text` read prints the placeholder, which is
+// the identical warning `hardshipText()` above carries — and the load-time guard below is what
+// stops a new charm quietly reintroducing a hardcoded mage word, **silently, because the mage
+// reads fine either way.**
+//
+// 🔑 AND THE DISTINCTION THAT DECIDES WHICH FIX A STRING NEEDS:
+//     the class HAS the thing under another name  → a PLACEHOLDER  (`{slot:Spell}`)
+//     the class DOES NOT HAVE the thing at all    → a `cls` GATE   (never a reworded lie)
+// You cannot rename "your Surge gives +3" for a class whose `compose()` returns `boost: 0`.
+function classText(t) {
+  if (!t) return t;
+  const gate = (CLASS.craft && CLASS.craft.gate) || 'combine';
+  return String(t)
+    .replace(/\{gate\}/g, gate)
+    .replace(/\{slot:(\w+)\}/g, (_, z) => SLOT_LABEL[z] || z);
+}
+
+// 🚨 THE GUARD. A generic entry that hardcodes one class's slot word reads perfectly for the
+// mage and nonsense for everyone else, so nothing on screen ever complains — which is exactly how
+// seven of them survived to build 419. This shouts at load, the way the UNLOCKS id assertion and
+// the patch-note build check do; both of those caught a real mistake on their first boot.
+// ⚠️ It runs on the TABLES, so it cannot be fooled by a display site that renders correctly.
+function auditSlotWords() {
+  // ⚠️ ARSENAL IS DELIBERATELY ABSENT FROM THIS LIST. It is the one slot whose label is IDENTICAL
+  // in every class — *"the player's fixed anchor, never re-skinned"* — so naming it outright is
+  // correct, not a leak. 🔑 The first cut of this guard flagged 🦴 Grindtooth Shins for saying
+  // "your Arsenal", which is the one thing every class calls an Arsenal. **A guard that flags the
+  // deliberately-shared case will get switched off**, and then it stops catching the real ones.
+  const words = /\b(Spell|Catalyst|Surge|Strike|Combo|Energy)\b/;
+  const bad = [];
+  const scan = (list, kind) => (list || []).forEach(x => {
+    if (!x || x.cls || !x.text) return;            // a class-gated entry may use its own words
+    const plain = String(x.text).replace(/<[^>]+>/g, '').replace(/\{slot:\w+\}/g, '');
+    if (words.test(plain)) bad.push(`${kind} · ${x.name}`);
+  });
+  scan(typeof POTIONS !== 'undefined' ? POTIONS : null, 'potion');
+  scan(typeof CHARMS !== 'undefined' ? CHARMS : null, 'charm');
+  scan(typeof ARMOUR !== 'undefined' ? ARMOUR : null, 'equipment');
+  if (bad.length) console.warn('🔤 generic content naming a class-specific slot — use {slot:Zone} or add cls:\n   ' + bad.join('\n   '));
+  return bad;
+}
+
 const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
 // ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
 // road it would either never fire or always fire. A hardship that cannot be answered is weather.
@@ -2458,7 +2512,8 @@ const CHARMS = [
   { id: 'lanternpace', tier: 2, name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
     text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
   { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
-    text: '➕ Your Surge gives +1 more',            mods: { boost: 1 } },
+    cls: 'mage',   // 🔴 dead for a class with no boost stat — see Bitterroot
+    text: '➕ Your {slot:Boost} gives +1 more',        mods: { boost: 1 } },
   { id: 'wardstone', tier: 2,   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
     text: '🛡️ Every card blocks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse', tier: 1,   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
@@ -2478,7 +2533,8 @@ const CHARMS = [
   { id: 'dulledge',    name: 'Dulled Edge',      rarity: 'curse', curse: true, cost: 0,
     text: '⚔️ Every card strikes −1',                 mods: { atk: -1 } },
   { id: 'dampwick',    name: 'Damp Wick',        rarity: 'curse', curse: true, cost: 0,
-    text: '➕ Your Surge gives −2',                  mods: { boost: -2 } },
+    cls: 'mage',   // 🔴 A CURSE THAT COSTS THE ROGUE NOTHING IS A GIFT. Worst of the three.
+    text: '➕ Your {slot:Boost} gives −2',              mods: { boost: -2 } },
   { id: 'thinplate',   name: 'Thin Plate',       rarity: 'curse', curse: true, cost: 0,
     text: '🛡️ Every card blocks −1',                  mods: { soak: -1 } },
   { id: 'tithe',       name: 'The Tithe',        rarity: 'curse', curse: true, cost: 0,
@@ -2513,7 +2569,7 @@ const CHARMS = [
 const RULE_CHARMS = [
   // ---- GENERIC: engine rules, so every future class inherits these unchanged ----
   { id: 'unspent', tier: 4,  name: 'Unspent',       rarity: 'rare', cost: 13, rule: true,
-    text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
+    text: '✦ Complete an encounter and your <b>{slot:Spell} is not spent</b> — it slides under the deck instead',
     why: 'the smallest sufficient Spell becomes the whole game' },
   { id: 'reversed', tier: 1, name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
     text: '🃏 <b>Choose</b> where your returning cards go — each to the <b>TOP</b> or the <b>BOTTOM</b> of your deck',
@@ -2538,7 +2594,10 @@ const RULE_CHARMS = [
     text: '⚖️ If no two cards in hand differ by more than <b>2</b> in value, your strike is <b>+3</b>',
     why: 'pays you for the flat hand - and sharpening is what breaks it' },
   { id: 'keenedge', tier: 2, name: 'Keen Edge', rarity: 'uncommon', cost: 10, rule: true,
-    text: '🗡️ Your Spell strikes <b>+2 for every level above Lv2</b>',
+    // ⚠️ *hits*, not *strikes*: with the placeholder in place the rogue read "Your Strike
+    // strikes". 🔑 A placeholder fixes the NOUN; the sentence around it still has to survive
+    // every noun that can land in it.
+    text: '🗡️ Your {slot:Spell} hits <b>+2 for every level above Lv2</b>',
     why: 'the opposite bet to Even Keel - sharpen one card and lean on it' },
   { id: 'ironbound', tier: 3, name: 'Ironbound', rarity: 'rare', cost: 12, rule: true,
     text: '🧱 A card that blocks never drops below <b>Lv2</b>',
@@ -2654,7 +2713,7 @@ function evGrantPotion(id) {
   if (!p) return 'Nothing comes of it.';
   if ((S.potions || []).length >= POTION_CAP) return `Your kit is full — you leave the ${p.name} where it is.`;
   S.potions.push(id);
-  return `🧪 ${p.name} goes in your kit — ${p.text}`;
+  return `🧪 ${p.name} goes in your kit — ${classText(p.text)}`;
 }
 // a random potion you can actually carry, biased to the cheap ones for free gifts
 function evRandomPotion(rare) {
@@ -2668,7 +2727,7 @@ function evGrantCharm(id) {
   if (!c) return 'Nothing comes of it.';
   if (S.charms.includes(id)) return `You already carry ${c.name}.`;
   S.charms.push(id);
-  return c.curse ? `☠️ You take on ${c.name} — ${c.text}` : `🎁 ${c.name} — ${c.text}`;
+  return c.curse ? `☠️ You take on ${c.name} — ${classText(c.text)}` : `🎁 ${c.name} — ${classText(c.text)}`;
 }
 // a curse you don't already carry, for Events that charge one as a price.
 // 🔑 It must never be the curse that exactly UNDOES what you were just given: the Mirror Fen could
@@ -2689,7 +2748,7 @@ function evLiftCurse() {
   if (!held.length) return 'You carry nothing that needs lifting.';
   const id = rand(held);
   S.charms = S.charms.filter(x => x !== id);
-  return `✨ ${charmById(id).name} lifts from you — ${charmById(id).text} is gone.`;
+  return `✨ ${charmById(id).name} lifts from you — ${classText(charmById(id).text)} is gone.`;
 }
 function curseCount() { return (S.charms || []).filter(id => (charmById(id) || {}).curse).length; }
 // 🔑 GETTING A LOST CARD BACK (2026-07-27). Trashing is permanent and it compounds: measured,
@@ -2846,6 +2905,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 420, date: '2026-08-28', title: 'Cards speak your class',
+    changed: [
+      "Charms, potions and equipment now use <b>your</b> slot names. The rogue reads <b>Strike</b>, <b>Combo</b> and <b>Energy</b> where the mage reads Spell, Catalyst and Surge.",
+    ],
+    fixed: [
+      "🧪 <b>Bitterroot</b>, 🎁 <b>Deep Tinderbox</b> and 💧 <b>Damp Wick</b> did <b>nothing at all</b> for the rogue — they change a stat she does not have. They are mage-only now.",
+      "💧 Damp Wick is a curse, so for the rogue it was a free one.",
+    ] },
+
   { build: 419, date: '2026-08-28', title: "What's new",
     added: [
       "📋 A <b>What's New</b> page — tap the build number at the bottom of the menu to read what changed in each release.",
@@ -3357,7 +3425,7 @@ function pieceCardHTML(d, st, equipped) {
     `<span class="wk-name">${d.name}${up ? ` <span class="wk-plus">+${up}</span>` : ''}</span>` +
     `<span class="wk-block">${blockNow > 0 ? 'blocks ' + blockNow : 'no block'}</span></div>` +
     `<div class="wk-kind"><span class="wk-rar">${rar.icon} ${rar.label}</span> · ${kind}</div>` +
-    (d.text ? `<div class="wk-text">${d.text}</div>` : `<div class="wk-text dim">no ability</div>`) +
+    (d.text ? `<div class="wk-text">${classText(d.text)}</div>` : `<div class="wk-text dim">no ability</div>`) +
     `<div class="wk-foot">${foot}</div></div>`;
 }
 // 🛡️ ⚠️ NOTHING EARNS SLOTS ANY MORE, so nothing may claim they can be earned. The old string said
@@ -3829,7 +3897,7 @@ function pickBoon(id) {
   const c = charmById(id); if (!c) return;
   S.charms.push(id);
   S.boon = null;
-  log(`💀 You take <b>${c.name}</b> off the thing you killed — ${c.text}`, 'good');
+  log(`💀 You take <b>${c.name}</b> off the thing you killed — ${classText(c.text)}`, 'good');
   backToMap();
 }
 
@@ -3857,16 +3925,16 @@ const SETOUT = [
   { id: 'classcharm', bucket: 'rule',
     pick: () => { const p = classCharmPool().filter(c => !S.charms.includes(c.id));
                   return p.length ? { c: rand(p).id } : null; },
-    name: o => charmById(o.c).name, text: o => charmById(o.c).text,
+    name: o => charmById(o.c).name, text: o => classText(charmById(o.c).text),
     why: () => 'your class rule, chosen at the door',
-    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${charmById(o.c).text}`; } },
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${classText(charmById(o.c).text)}`; } },
   { id: 'genericcharm', bucket: 'rule',
     pick: () => { const p = CHARMS.filter(c => !c.curse && !c.cls && charmUnlocked(c) &&
                     charmFitsClass(c) && !S.charms.includes(c.id));
                   return p.length ? { c: rand(p).id } : null; },
-    name: o => charmById(o.c).name, text: o => charmById(o.c).text,
+    name: o => charmById(o.c).name, text: o => classText(charmById(o.c).text),
     why: () => 'a rule of the road, not of your craft',
-    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${charmById(o.c).text}`; } },
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${classText(charmById(o.c).text)}`; } },
   // 🪙 FUEL - spendable, and the bucket that decides how the first shop goes
   { id: 'purse', bucket: 'fuel', pick: () => ({}),
     name: () => 'A Full Purse', text: () => 'Start with <b>12 coins</b>',
@@ -4482,8 +4550,11 @@ const POTIONS = [
     text: '⚔️ <b>+2</b> to your action when used' },
   { id: 'grit',     name: 'Grit',         cost: 2, rarity: 'common',
     text: '🛡️ every card <b>blocks +1</b> when used' },
-  { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common',
-    text: '➕ your <b>Surge gives +3</b> more when used' },
+  // 🔴 MAGE-GATED 2026-08-28, not reworded. `ROGUE.compose()` returns `boost: 0` and the boost
+  // path is guarded by `boostVal > 0`, so this did **nothing** for her — and it was generic, so
+  // she could buy it. *A string cannot be renamed into a stat the class does not have.*
+  { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common', cls: 'mage',
+    text: '➕ your <b>{slot:Boost} gives +3</b> more when used' },
   { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
     text: '🌙 <b>+3 Pace</b> against the dark when used' },
   { id: 'tallow',   name: 'Tallow Stub',  cost: 3, rarity: 'common',
@@ -4513,7 +4584,7 @@ const POTIONS = [
   { id: 'nightglass', name: 'Nightglass', cost: 6, rarity: 'common',
     text: '🌙 the dark <b>cannot catch you</b> — for the whole journey' },
   { id: 'breath',  name: 'Second Breath',  cost: 10, rarity: 'rare',
-    text: '✦ your <b>Spell is not spent</b> when used' },
+    text: '✦ your <b>{slot:Spell} is not spent</b> when used' },
   { id: 'quench',  name: 'Quenching Draught', cost: 11, rarity: 'rare',
     text: "🛡️ the enemy's <b>defence does nothing</b> when used" },
   { id: 'gravewax', name: 'Grave Wax',     cost: 8, rarity: 'uncommon',
@@ -6767,7 +6838,7 @@ const ARMOUR = [
   { id: 'grindshin', slot: 'Legs', name: 'Grindtooth Shins',   block: 2, brk: 'worn', rarity: 'rare',
     ongoing: 'nightwise', text: '🌙 Nightfall no longer takes your <b>Arsenal</b>.' },
   { id: 'lanterngreave', slot: 'Legs', name: 'Lanternjaw Greaves', block: 2, brk: 'worn', rarity: 'legendary',
-    ongoing: 'swiftfoot', text: '🌙 Your <b>Pace</b> uses your <b>fastest card</b>, not your Catalyst.' },
+    ongoing: 'swiftfoot', text: '🌙 Your <b>Pace</b> uses your <b>fastest card</b>, not your {slot:Element}.' },
   // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
   // own power source into the strike — which is exactly what that zone is for.
   // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
@@ -7790,7 +7861,7 @@ function rollOffer(rich) {
   const potPool = potionPool();
   const roomForPotion = (S.potions || []).length < POTION_CAP;
   const mkCharm = () => { const c = rand(charmPool);
-    return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost }; };
+    return { kind: 'charm', id: c.id, name: c.name, text: classText(c.text), rarity: c.rarity, cost: c.cost }; };
   // 🥄 WEIGHTED: commons show up three times as often as rares, so the shelf reads like a
   // shop — mostly cheap things, occasionally something you actually want.
   const weight = p => p.rarity === 'common' ? 3 : p.rarity === 'uncommon' ? 2 : 1;
@@ -7798,7 +7869,7 @@ function rollOffer(rich) {
     const bag = [];
     for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
     const p = rand(bag);
-    return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
+    return { kind: 'potion', id: p.id, name: p.name, text: classText(p.text), rarity: p.rarity, cost: p.cost }; };
   // 📜 a contract only appears when you have none. ⚠️ IT NO LONGER NEEDS THE REGION-TIME GATE
   // — a contract carries its OWN window now and crosses region breaks, so "will it fit before the
   // region ends" is not a question any more. What replaced the gate is the check below: there must
@@ -9569,7 +9640,7 @@ function renderArmourRail() {
     return `<div class="eq eq-${slot.toLowerCase()} rar-${d.rarity || 'common'}` +
       `${tap ? ' is-ready' : ''}${(bv > 0 && a.wear <= 0 && !charging) ? ' is-spent' : ''}"` +
       (tap ? ` onclick="${tap}" role="button" tabindex="0"` : '') +
-      ` title="${stripTags(d.name + ' — ' + (d.text || 'no ability'))}">` +
+      ` title="${stripTags(d.name + ' — ' + (classText(d.text) || 'no ability'))}">` +
       `<div class="eq-zone">${sl.label}</div>` +
       `<div class="eq-name">${d.name}${(a.up || 0) ? ` <span class="eq-plus">+${a.up}</span>` : ''}</div>` +
       `<div class="eq-block">${bv > 0 ? 'blocks <b>' + bv + '</b>' : '<span class="dim">no block</span>'}</div>` +
@@ -9612,7 +9683,7 @@ function renderField() {
 // of here. Two ledgers is the Mirror Fen bug again.
 function carried() {
   const out = [];
-  for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
+  for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: classText(c.text) }); }
   // 📜 a contract is a run-layer promise with a deadline — exactly the thing the 2026-07-29
   // rule says must be on screen every turn, with its PROGRESS, not just its name
   const ct = activeContract();
@@ -9638,7 +9709,7 @@ function carriedPanelHTML(heading) {
   const kit = S.potions || [];
   if (kit.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">🧪 Kit</span>` +
     kit.map(x => { const d = potionById(x.id) || x;
-      return `<span class="carry-chip" title="${stripTags(d.text || '')}">${d.name}</span>`; }).join('') +
+      return `<span class="carry-chip" title="${stripTags(classText(d.text) || '')}">${d.name}</span>`; }).join('') +
     `<span class="dim carry-row-note">${kit.length}/${POTION_CAP} · one use each, the turn you drink it</span></div>`);
   const items = carried();
   const charms = items.filter(x => !x.text.startsWith('📜'));
@@ -10073,7 +10144,7 @@ function renderControls() {
         `<span class="dim">Each is one use, and lasts only the turn you drink it.</span></div>` +
         kit.map((p, i) =>
           `<button class="kit-potion${S.potionPick === p.id ? ' arming' : ''}" onclick="usePotion('${p.id}')">` +
-          `<b>🧪 ${p.name}</b><span class="kit-text">${p.text}</span></button>`).join('') +
+          `<b>🧪 ${p.name}</b><span class="kit-text">${classText(p.text)}</span></button>`).join('') +
         (S.potionPick ? `<div class="kit-ask">Tap a card to use the <b>${potionById(S.potionPick).name}</b> on it — ` +
           `<button onclick="cancelPotion()">cancel</button></div>` : '') +
         `</div>`
@@ -10212,7 +10283,7 @@ function renderControls() {
       `<button onclick="wheelReroll()" ${canReroll ? '' : 'disabled'}>🎲 Re-spin — 🪙 ${REROLL_COST}${canReroll ? '' : ' (short)'}</button>` +
       `<button class="primary" onclick="wheelDone()">${w.rich ? 'Break camp' : 'Move on'}</button>` +
       (S.charms.length ? `<div class="charm-tray">${S.charms.map(id => { const ch = charmById(id);
-        return `<span class="charm-chip r-${ch.rarity}" title="${ch.text}">${ch.name}</span>`; }).join('')}</div>` : '');
+        return `<span class="charm-chip r-${ch.rarity}" title="${stripTags(classText(ch.text))}">${ch.name}</span>`; }).join('')}</div>` : '');
   } else if (S.phase === 'event') {
     const def = currentEventDef();
     const ev = S.event;
