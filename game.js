@@ -2935,6 +2935,16 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 424, date: '2026-08-30', title: 'Fights have beats',
+    warn: "Runs in progress from build 422 will not load — fights changed shape. Your stages, grades, equipment and materials are all safe.",
+    added: [
+      "⚔️ The <b>Quarry Hound</b> now fights over <b>several beats</b> instead of one. It has 34 HP and you chip it down.",
+      "It has <b>three named attacks</b> — 🛡️ Slag Crust, 💢 Set Jaw, 💨 Run Down — and it <b>tells you which is coming</b> a beat early. Arrange around it.",
+    ],
+    changed: [
+      "During a fight your <b>discard does not come back</b>. Your deck is that fight's ammunition — run out and you lose.",
+    ] },
+
   { build: 422, date: '2026-08-28', title: 'Multi-hit works at the lair',
     changed: [
       "🐉 A <b>multi-hit</b> card now really lands more than once against a <b>dragon</b>. It never did — two hits did the same damage as one, minus rounding.",
@@ -3052,7 +3062,11 @@ const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // two can never drift again. Bumped to 5 here because dragons changed shape (shields -> SHAPE).
 // ⚙️ 6 — 🛡️ armour (2026-08-23). ⚠️ loadGame() failing is SILENT (indistinguishable from
 // "no save yet"), so always round-trip a save after touching the schema.
-const SAVE_VERSION = 6;
+// ⚙️ 7 — ⚔️ multi-beat fights (2026-08-30). A 422 save has no `foeState`, and its encounter data
+// now carries `attacks`, so a run restored mid-Quarry-Hound would resume as a one-hand fight
+// against a 34 HP creature it cannot kill. ⚠️ **Bump whenever a shape the run depends on changes**
+// — loadGame() failing is SILENT and indistinguishable from "no save yet".
+const SAVE_VERSION = 7;
 
 // 🔑 THE KEY IS A PARAMETER SO DEV SLOTS SHARE THIS EXACT SERIALIZER (2026-08-22).
 // ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
@@ -3090,6 +3104,13 @@ function saveGame(key) {
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
+      // ⚔️ THE BEAT FIGHT'S STATE MUST TRAVEL. 🔴 Without this a save made mid-fight restored
+      // `S.encounter` with its **hp: 9999 sentinel** and no foeState to interpret it — the
+      // creature would come back unkillable. 🔑 Same family as every other placeholder leak this
+      // week: a value that exists to suppress a rule is dangerous the moment it outlives the
+      // function that put it there. `foeBase` is the pristine creature; `foeState` is the pool,
+      // the beat, the bag and the telegraph.
+      foeState: S.foeState || null, foeBase: S.foeBase || null,
       lastMileOutcome: S.lastMileOutcome, lastMileApproach: S.lastMileApproach, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       fork: S.fork ? S.fork.map(e => e.name) : null,
       boon: S.boon, boonOwed: S.boonOwed,
@@ -3225,6 +3246,7 @@ function loadGame(key) {
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
       beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
+      foeState: d.foeState || null, foeBase: d.foeBase || null,
       lastMileOutcome: d.lastMileOutcome || null, lastMileApproach: d.lastMileApproach || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
       // ⚠️ re-resolved from the region by NAME, never stored as objects - a serialized copy
