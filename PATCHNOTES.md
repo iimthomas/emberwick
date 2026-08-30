@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 431 — Every creature has a life bar
+*2026-08-30*
+
+**Changed**
+- ❤️ **Creatures that die in one hand have the bar too** — with a mark on it showing **half**. Reach the mark and it is a Narrow; clear the bar and it is a Complete. Same fact the old text said, in a place you can read at a glance.
+
 ## build 430 — Perfect Kills, and a fight that survives a reload
 *2026-08-30*
 
