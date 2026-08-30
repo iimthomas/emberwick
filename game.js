@@ -1279,6 +1279,12 @@ let TIME_PENALTY_MULT = 1.0;   // ⏳ scales every encounter's printed Time Pena
 let MOMENTUM_FULL = 'add';
 // 🔑 see the note at `added`: a multi-hit card divides its OWN value, never the bonuses on top.
 let SPLIT_ADDS_PER_HIT = true;
+// 🔥 MEASUREMENT FLAG, DEFAULT OFF (2026-08-28). Thomas, after a 24 Emberwake landed once on a
+// 2-hit card: *"i sorta expected to have the 24 emberwake, get doubled because of the multihit."*
+// ⚠️ It exists so the question can be PRICED rather than argued — `BANK_MULT` is on record as
+// hypersensitive (×1.1 swung the duel 27-43 points), and this is the same lever from another side.
+// **Do not ship it on without a Balance_Log entry.**
+let WAKE_PER_HIT = false;
 // ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
 // *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
 // work in flesh and blood, blue cards are weaker but they give more pitch."*
@@ -6070,9 +6076,14 @@ function computeAction(reserve) {
     // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
     // ⚠️ SPLIT ONLY THE CARD. `withBoost` is card + bonuses + Surge; dividing all of it made a
     // +4 potion worth +2 a hit, which is not what the face says.
-    const splitBase = withBoost - added;
+    // 🔥 the banked Emberwake, optionally moved from the SPLIT bucket into the PER-HIT one.
+    // It rides inside `withBoost` (compose() folds it into `value`), so it has to be named here
+    // rather than added — subtract it out of the split, then hand it to every blow.
+    const wakeAdd = (WAKE_PER_HIT && a.wakeTarget === 'atk') ? (a.wake || 0) : 0;
+    const added2 = added + wakeAdd;
+    const splitBase = withBoost - added2;
     const perHit = (hits > 1 && SPLIT_ADDS_PER_HIT
-                      ? Math.floor(splitBase / hits) + added
+                      ? Math.floor(splitBase / hits) + added2
                       : hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
     // 🧱 GUARD REDUCES, IT DOES NOT NULLIFY (softened 2026-08-17, Thomas: *"that doesn't sound
     // fun if a mage literally can't do anything about guard"* / *"i don't want to have to force
