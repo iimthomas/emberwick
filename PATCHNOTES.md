@@ -6,6 +6,17 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 422 — Multi-hit works at the lair
+*2026-08-28*
+
+**Changed**
+- 🐉 A **multi-hit** card now really lands more than once against a **dragon**. It never did — two hits did the same damage as one, minus rounding.
+- 🔥 Your **Emberwake** now lands on **every blow**, like potions and ● Momentum pips already did. Channel a big one, then strike twice.
+
+**Fixed**
+- A dragon's 🛡️ **Armour** is now subtracted from **each** blow, the same as everywhere else. Many small hits are worse against Armour — that is the trade.
+- A duel beat no longer says **LOSS**. It was saying that on **every** beat, even when you took most of the dragon's health. It now tells you what you took off it and what it hits back for.
+
 ## build 421 — The reveal names what charged you
 *2026-08-28*
 

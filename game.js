@@ -1279,12 +1279,27 @@ let TIME_PENALTY_MULT = 1.0;   // ⏳ scales every encounter's printed Time Pena
 let MOMENTUM_FULL = 'add';
 // 🔑 see the note at `added`: a multi-hit card divides its OWN value, never the bonuses on top.
 let SPLIT_ADDS_PER_HIT = true;
-// 🔥 MEASUREMENT FLAG, DEFAULT OFF (2026-08-28). Thomas, after a 24 Emberwake landed once on a
-// 2-hit card: *"i sorta expected to have the 24 emberwake, get doubled because of the multihit."*
-// ⚠️ It exists so the question can be PRICED rather than argued — `BANK_MULT` is on record as
-// hypersensitive (×1.1 swung the duel 27-43 points), and this is the same lever from another side.
-// **Do not ship it on without a Balance_Log entry.**
-let WAKE_PER_HIT = false;
+// 🔥 THE EMBERWAKE LANDS ON EVERY BLOW (on since 2026-08-28). Thomas, after a 24 Emberwake
+// landed once on a 2-hit card: *"i sorta expected to have the 24 emberwake, get doubled because of
+// the multihit."*
+//
+// ✅ IT IS THE CONSISTENT ANSWER, and it was measured before it was argued. 🧪 potions and
+// ● Momentum pips already landed on every blow; the wake and the Surge split. Three sources of
+// "added damage", two rules. The alternative — split everything — was measured and REJECTED:
+// it lowered every column at once for the rogue (road −16.4%, win −15, blow 11.1→9.6) and
+// **reduced multi-hit use 41.9→35.0%**, discouraging the exact thing it was meant to make coherent.
+// 🔑 *If one order moves every column the same way, it is a power change wearing a consistency
+// argument.*
+//
+// 📏 Measured cost on the road: under a point of win rate (mage 65.0→65.8), and the only column
+// that really moves is 🛡️ Armour +1.9 — which is right, because Armour is the shape multi-hit is
+// meant to struggle against and this is a BUILD that answers it rather than a change to the shape.
+// ⚠️ The rogue is unaffected: she has no Emberwake.
+// ⚠️ THE 3% BOT RATE FOR "BANKED A WAKE AND HOLDING A MULTI-HIT SPELL" IS A FLOOR, NOT A RATE.
+// `solver.js` cannot bank well by construction, and a player who deliberately holds ⚡ Sparkstrike
+// hits it far more often. **Do not tune this from solver data** — same standing caution as
+// `BANK_MULT`, which is hypersensitive (×1.1 swung the duel 27-43 points).
+let WAKE_PER_HIT = true;
 // ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
 // *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
 // work in flesh and blood, blue cards are weaker but they give more pitch."*
@@ -2911,6 +2926,16 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 422, date: '2026-08-28', title: 'Multi-hit works at the lair',
+    changed: [
+      "🐉 A <b>multi-hit</b> card now really lands more than once against a <b>dragon</b>. It never did — two hits did the same damage as one, minus rounding.",
+      "🔥 Your <b>Emberwake</b> now lands on <b>every blow</b>, like potions and ● Momentum pips already did. Channel a big one, then strike twice.",
+    ],
+    fixed: [
+      "A dragon's 🛡️ <b>Armour</b> is now subtracted from <b>each</b> blow, the same as everywhere else. Many small hits are worse against Armour — that is the trade.",
+      "A duel beat no longer says <b>LOSS</b>. It was saying that on <b>every</b> beat, even when you took most of the dragon's health. It now tells you what you took off it and what it hits back for.",
+    ] },
+
   { build: 421, date: '2026-08-28', title: 'The reveal names what charged you',
     fixed: [
       'A ⏳ <b>Time Penalty</b> in a <b>fight</b> now says what caused it. Only the ⚠️ <b>Hazards</b> hardship can charge one there, and the reveal used to print the penalty with nothing explaining why.',
@@ -6139,7 +6164,10 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { ...classPayload, slipped, type: 'fight', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    // 🗡️ `perHit` TRAVELS NOW, because the duel needs it. ⚠️ This is the payload trap the note on
+    // compose() warns about, met from the other side: the value was computed and never left the
+    // function, so the finale had no way to charge armour per blow and quietly stopped trying.
+    return { ...classPayload, slipped, type: 'fight', spell, hits, perHit, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -6465,6 +6493,44 @@ function beatDisplayHTML(beat, isNew) {
   const r = S.pendingR, e = S.encounter;
   if (beat.outcomeBeat) {
     const subs = [];
+    // 🔴 A DUEL BEAT IS NOT WON OR LOST, AND IT USED TO SAY IT WAS (fixed 2026-08-28, found by
+    // Thomas in play: *"i did 10 initiative, and 38 damage, how come its still considered a loss"*).
+    //
+    // 🔑 THE CAUSE IS A SENTINEL LEAKING INTO A DISPLAY. The duel's encounter carries `hp: 9999`
+    // so the road's kill logic can never fire inside the finale — which also makes `half` 5000, so
+    // `outcome` is **Loss on every single beat, by construction**. It was never a verdict about
+    // the player's play; it was a placeholder wearing one.
+    // ⚠️ He chipped a dragon 46 → 8 HP and the screen told him he had failed. **A number that
+    // exists to stop a rule firing must never reach the screen** — the same class as a stale
+    // comment, except it lies once a beat instead of once a year.
+    //
+    // ✅ A duel beat reports what a duel beat actually is: how much you took off it, and what it
+    // gives back. Coins are dropped too — a beat pays none, and *a term shown doing nothing teaches
+    // the player the number does not matter.*
+    const inDuel = !!(S.finalMode && S.finalPhase === 'duel');
+    if (inDuel) {
+      // ⚠️ READ THE DUEL'S OWN RESULT, not the road payload. `r` is computeAction's, and it has no
+      // idea a dragon exists; the finale writes what actually happened to `S.duelResult`.
+      // (My first cut read `r.duelToHp`, a field I had invented. The payload trap, from the
+      // authoring side this time.)
+      // ⚠️ `S.duelResult` IS NOT WRITTEN YET when the reveal renders — the beat is displayed before
+      // it resolves, so reading it printed nothing. Ask the duel's OWN functions instead, which is
+      // also the `computeAction()` rule applied here: **resolution and display share one source,
+      // never a second copy.** `duelStrike()` and `duelCounter()` are pure, so calling them from a
+      // renderer computes the same numbers the resolution is about to.
+      const ds = S.dragonState || {};
+      const st = duelStrike(r);
+      const hpAfter = Math.max(0, (ds.hp || 0) - st.toHp);
+      const felled = hpAfter <= 0;
+      subs.push(`<div class="pv-sub good">🐉 ${S.dragon.name}: −${st.toHp} HP${felled ? ' — it falls' : ` → ${hpAfter} left`}</div>`);
+      if (st.evaded) subs.push(`<div class="pv-sub bad">🌀 it slipped the blow — halved</div>`);
+      // mirrors the resolution exactly: a dead dragon neither bites nor breathes
+      const dmgD = felled ? 0 : (r.early || 0) + duelCounter(hpAfter);
+      if (dmgD > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgD}</div>`);
+      return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
+        `${felled ? 'FELLED' : 'STRUCK'}</span>` +
+        `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+    }
     subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
     // ✦ named where the verdict is, because it IS part of the verdict
     if (r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
@@ -11469,7 +11535,23 @@ function duelStrike(r) {
   const evaded = !quenched && hasShape('evasion') && r.initLost
                  && !(hasCharm('windreader') && evMargin <= 2)
                  && !(S.dragonState.boon.unseen > 0);
-  let toHp = Math.max(0, r.value - armour);
+  // 🔴 THE FINALE NEVER APPLIED HIT COUNT (fixed 2026-08-28, found by Thomas in play).
+  // This was `Math.max(0, r.value - armour)` — the total, with the dragon's armour subtracted
+  // ONCE and `hits` never consulted at all. 🔑 So a multi-hit card was **strictly worse** at the
+  // lair than a single-hit card of the same value: measured 24 vs 25 on identical numbers, the
+  // split losing its rounding remainder and buying nothing back. ⚡ Sparkstrike's two hits,
+  // 🎯 Twinned Bracers and the rogue's full-meter split were all downside-only against a dragon.
+  //
+  // ⚠️ The road has always charged armour per blow — `(perHit - armorCut) * hits` — and the duel
+  // is the third turn loop that only ever got half of what the other two got. **Same formula now.**
+  // ⚠️ On its own this is a NERF into 🛡️ Armour, which is correct and is the whole point of
+  // multi-hit being LATERAL: many small blows lose to a flat cut, one big blow does not. What pays
+  // for it is 🔥 WAKE_PER_HIT, shipped in the same commit — the two were measured together
+  // because a nerf and a buff landing separately would each be tuned against the wrong baseline.
+  // 🧱 Guard is not handled here on purpose: no dragon has it, and inventing an untested branch
+  // for content that does not exist is how a rule ends up half-applied.
+  const per = Math.max(0, (r.perHit != null ? r.perHit : r.value) - armour);
+  let toHp = per * (r.hits || 1);
   if (evaded) toHp = Math.floor(toHp / 2);
   return { toHp, armour, evaded };
 }
