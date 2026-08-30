@@ -6,6 +6,20 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 429 — Fights stop interrupting themselves
+*2026-08-30*
+
+**Changed**
+- ⚔️ **No more pop-up after every turn of a fight.** The turn plays out in the log and you keep going. The window only opens when the creature falls — or you do.
+- ❤️ **Creatures have a life bar** now, like the dragons — it drops as you hit them.
+- 💨 The log says what winning the race actually did: **nothing gets through**, or its attack lands in full. It was still talking about **Early Damage**, which no longer exists.
+
+**Fixed**
+- ✦ **PERFECT KILL was firing on journeys.** It is a kill — it only happens when something dies. It never paid anything on a road, so it was purely a wrong word on the screen.
+- ✦ **And it never fired in the new multi-turn fights, where it belongs.** Land the killing blow with nothing to spare — when a smaller card in your hand would not have finished it, and a different one would — and it counts.
+- 🧰 **Multi-turn fights now drop what they should.** They were carving a single bone shard on the turn the creature died, and never the creature's own part — so Plumes, Antlers and the rest were unobtainable in region 1. A clean kill pays in full again.
+- 🧰 The carve no longer appears after every turn of a fight. It shows once, when the creature falls.
+
 ## build 427 — Initiative decides everything
 *2026-08-30*
 

@@ -2941,6 +2941,19 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 429, date: '2026-08-30', title: 'Fights stop interrupting themselves',
+    changed: [
+      "⚔️ <b>No more pop-up after every turn of a fight.</b> The turn plays out in the log and you keep going. The window only opens when the creature falls — or you do.",
+      "❤️ <b>Creatures have a life bar</b> now, like the dragons — it drops as you hit them.",
+      "💨 The log says what winning the race actually did: <b>nothing gets through</b>, or its attack lands in full. It was still talking about <b>Early Damage</b>, which no longer exists.",
+    ],
+    fixed: [
+      "✦ <b>PERFECT KILL was firing on journeys.</b> It is a kill — it only happens when something dies. It never paid anything on a road, so it was purely a wrong word on the screen.",
+      "✦ <b>And it never fired in the new multi-turn fights, where it belongs.</b> Land the killing blow with nothing to spare — when a smaller card in your hand would not have finished it, and a different one would — and it counts.",
+      "🧰 <b>Multi-turn fights now drop what they should.</b> They were carving a single bone shard on the turn the creature died, and never the creature's own part — so Plumes, Antlers and the rest were unobtainable in region 1. A clean kill pays in full again.",
+      "🧰 The carve no longer appears after every turn of a fight. It shows once, when the creature falls.",
+    ] },
+
   { build: 427, date: '2026-08-30', title: 'Initiative decides everything',
     changed: [
       "💨 <b>Beat its Initiative and nothing gets through.</b> Lose the race and its attack lands, in full, at the end of your turn. That is the whole rule.",
@@ -5766,7 +5779,52 @@ function foeAttacksOf(e) {
 // ⚠️ `function` declarations, not const arrows — a top-level const never lands on the headless
 // sandbox and this is exactly the sort of thing an instrument will want to ask.
 function isBeatFight(e) { return !!(FIGHT_BEATS && e && e.type === 'fight' && !e.finale && (e.attacks || []).length); }
+// ❤️ THE CREATURE'S LIFE BAR (2026-08-30, Thomas: *"lets give monsters an hp bar like the
+// dragons, it should animate and drop down when they get hit"*).
+// 🔑 IT IS INFORMATION, WHICH IS WHY IT IS BUILT HERE AND NOT DEFERRED. *Do not build
+// presentation* still stands; the exception is the one the xp bar earned — **does the movement
+// carry a fact you could not read otherwise?** A number says 13 HP. The drop says *that blow was
+// a quarter of it*, which is the question a five-turn fight asks every turn and a chip cannot
+// answer. When the creature died in one hand there was nothing to plot, so this is new
+// information the rebuild created rather than decoration it invited.
+// ⚠️ THE TRUTH IS IN THE FILL; THE ANIMATION IS A GHOST BEHIND IT. `foeHpBar()` always writes
+// the real width, so a render with no follow-up still states the truth — the ghost is what
+// lingers at the old width and catches down. *An animation may never be the only thing that
+// writes the truth*, learned when the xp bar froze in a hidden tab and lied about a level.
+function foeHpBar(st, name) {
+  const pct = h => Math.max(0, Math.min(100, Math.round(100 * h / Math.max(1, st.maxHp))));
+  const now = pct(st.hp);
+  // `shownHp` is what the bar was last DRAWN at. A repaint mid-turn redraws the same numbers, so
+  // the ghost only exists while it is genuinely ahead of the fill.
+  const was = Math.max(now, pct(st.shownHp == null ? st.hp : st.shownHp));
+  return `<div class="foe-hp">` +
+    (was > now ? `<div class="foe-hp-ghost" id="foe-hp-ghost" style="width:${was}%"></div>` : '') +
+    `<div class="foe-hp-fill" style="width:${now}%"></div>` +
+    `<span class="foe-hp-label">❤️ ${name} — ${st.hp} / ${st.maxHp} HP</span></div>`;
+}
+// ⚠️ setTimeout, NOT requestAnimationFrame — rAF does not fire in a hidden tab. This one is
+// cosmetic either way (the fill is already correct), but the habit is what matters: the xp bar
+// froze for exactly this reason and that one WAS load-bearing.
+function foeHpSettle(st) {
+  if (st.shownHp == null || st.shownHp <= st.hp) { st.shownHp = st.hp; return; }
+  st.shownHp = st.hp;
+  const pct = Math.max(0, Math.min(100, Math.round(100 * st.hp / Math.max(1, st.maxHp))));
+  setTimeout(() => { const g = document.getElementById('foe-hp-ghost'); if (g) g.style.width = pct + '%'; }, 30);
+}
 function foeFx() { return (S.foeState && S.foeState.active && S.foeState.active.fx) || {}; }
+// ⚠️ THE ANSWER TO `hp: 9999`, IN ONE PLACE. That sentinel has now driven FIVE wrong things
+// on screen — the duel's LOSS, the duel's placeholder atk, every fight turn reporting LOSS, the
+// counterattack ignoring the race, and (2026-08-30) the carve. Every reader that wants to know
+// *did this turn kill it* was deriving it from an outcome computed against a lie.
+// 🔑 So stop deriving it. `beatPool()` says whether a beat fight is live, `beatFells()`
+// asks the POOL the one question, and every reader asks THEM instead of re-deriving.
+function beatPool() {
+  return (S.foeState && S.encounter && S.encounter.beatFight) ? S.foeState : null;
+}
+function beatFells(r, st) {
+  st = st || beatPool();
+  return !!(st && Math.max(0, (r && r.value) || 0) >= st.hp);
+}
 
 function scaleFoe(e) {
   if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
@@ -6552,9 +6610,24 @@ function computeAction(reserve) {
 // measures* trap. So: synchronous, never renders in between, restores in a `finally`, and runs
 // ONCE per encounter from resolve() — in computeAction() it would re-run on every repaint for a
 // fact that cannot change mid-turn.
-function perfectKillInfo(outcome) {
+// 🔴 IT IS A **KILL**, AND FOR MONTHS IT FIRED ON JOURNEYS (2026-08-30, Thomas from a
+// screenshot of a road reveal: *"this isn't a perfect kill"*). Measured over 40 runs: **31 journeys
+// to 13 fights**, and 108 of its 135 grade "chances" were roads. 🔑 `rollDrops()` already knew
+// the rule — *a road is walked, not carved*, it returns an empty bag — so the announcement paid
+// LITERALLY NOTHING exactly where it fired most. **When one half of a feature is gated and the
+// other is not, the ungated half is lying**, and the loud half is the one the player believes.
+// ⚠️ And it fired on **0 of 31** beat-fight kills, because a beat fight's outcome is the
+// sentinel's lie — so the one place it belongs was the one place it was dark.
+function perfectKillInfo(r) {
   const none = { perfect: false, contested: false };
-  if (outcome !== 'Complete' || !S.hand) return none;
+  const e = S.encounter;
+  if (!e || e.type !== 'fight' || !S.hand) return none;
+  // ⚔️ ONE QUESTION, TWO WAYS TO ANSWER IT. A beat fight asks the pool; an ordinary fight still
+  // asks computeAction. The alternatives below are then judged by the SAME predicate the real
+  // arrangement was, which is the `computeAction()` rule again: never a second notion of winning.
+  const st = beatPool();
+  const wins = st ? (x => beatFells(x, st)) : (x => x && x.outcome === 'Complete');
+  if (!wins(r)) return none;
   const a = S.assign, curId = a.Spell, cur = cardById(curId);
   if (!cur) return none;
   const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
@@ -6568,7 +6641,7 @@ function perfectKillInfo(outcome) {
     try {
       a.Spell = c.id; a[zone] = prevSpell;
       const alt = computeAction(cardById(a.Reserve));
-      if (alt && alt.outcome === 'Complete') {
+      if (alt && wins(alt)) {
         anyOtherWorks = true;
         if (eff(c).value < curVal) smallerWorks = true;
       }
@@ -6591,7 +6664,7 @@ function resolve() {
 
   const r = computeAction(reserve);
   // ✦ computed here, once, while the hand is still seated exactly as it was played
-  const pk = perfectKillInfo(r.outcome);
+  const pk = perfectKillInfo(r);
   r.perfect = pk.perfect && pk.contested;   // the PRIZE needs both
   r.perfectChance = pk.contested;           // ...and this is the grade's denominator
 
@@ -6612,11 +6685,31 @@ function resolve() {
     // ⚠️ Ordering only. The maths never depended on the order; computeAction resolved the whole
     // turn before a single beat was built. This is the staged reveal reading in causal order.
     const b2 = [];
-    if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
+    // 🔴 THESE LINES OUTLIVED THE RULE THEY DESCRIBE. ❌ Early Damage was deleted when
+    // Initiative became the single damage gate, and the log went on naming it every turn — which
+    // is the third thing that rule's deletion left behind (after ⚔️ lunge and the 9999 header).
+    // ⚠️ It only surfaced once the modal stopped popping and the LOG became the only channel:
+    // *moving information to a quieter place is also an audit of it.*
+    // 🔑 In a multi-turn fight the gate states itself: win the race and nothing gets through;
+    // lose it and its attack lands whole, at the end of the turn.
+    const bfInit = beatPool();
+    if (bfInit) {
+      const atk = S.encounter.atk, un = foeFx().unstoppable;
+      const seen = e.init > 90 ? `it seizes the race` : `vs ${e.init}`;
+      if (un) b2.push(L(`Initiative: yours ${r.init} — it lunges: <b>your speed will not save you</b>, ${atk} lands`, 'bad'));
+      else if (r.initLost) b2.push(L(`Initiative: yours ${r.init} ${seen} → it is faster — its attack lands in full: <b>${atk}</b>`, 'bad'));
+      else b2.push(L(`Initiative: yours ${r.init} vs ${e.init} → you are faster — <b>nothing gets through</b>`, 'good'));
+    }
+    else if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
     else if (r.rangedHits) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, but RANGED hits anyway → Early Damage ${e.atk}`, 'bad'));
     else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage`, 'good'));
     if (r.early > 0 && S.hardship === 'Ambush') b2.push(L(`Ambush: Early Damage doubled → ${r.early}`, 'bad'));
-    beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
+    // ⚠️ init 99 is 💨 circle's "it seizes the race" sentinel, and the header printed it raw.
+    // The panel already knew (`e.init > 90 ? '—'`). 🔑 Every sentinel in this file has leaked
+    // through whichever reader nobody thought to check — so check them TOGETHER, not one bug at a time.
+    beats.push({ label: '💨 INITIATIVE', big: r.init,
+      vs: e.init > 90 ? 'it seizes the race' : `vs ${e.init}`,
+      numCls: r.early ? 'bad' : 'ok', lines: b2 });
 
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
@@ -6641,9 +6734,24 @@ function resolve() {
       `🧱 Guard ${r.guardPool}: ${r.guarded} of your ${r.hits} hit${r.hits === 1 ? '' : 's'} met the plates and was halved — <b>−${r.guardCut}</b>` +
       (r.hits > r.guarded ? ` (the other ${r.hits - r.guarded} landed whole)` : ` · a second hit would have landed whole`), 'bad'));
     if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
-    beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
+    // 🔴 SIXTH READER OF `hp: 9999` (2026-08-30, off a screenshot: *"ATTACK vs ❤️ 9999
+    // (half 5000)"*). A beat fight has no half and no printed HP — it has a POOL — so the header
+    // asks the pool. ⚠️ Every one of these has been *a reader deriving a fact from a value that
+    // exists to suppress a rule*; the fix each time is to ask the thing that actually knows.
+    const bp = beatPool();
+    beats.push({ label: '⚔️ ATTACK', big: r.value,
+      vs: bp ? `vs ❤️ ${bp.hp} left` : `vs ❤️ ${e.hp} (half ${r.half})`,
+      numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
-    beats.push({ outcomeBeat: true, final: true, lines: [
+    // 🔴 SEVENTH READER OF `hp: 9999`, AND THE LOG WAS THE LAST PLACE IT HID. The panel had
+    // already been taught to say CREATURE FALLS, but `advanceBeat()` logs every beat's lines, so
+    // the killing turn still wrote *"Attack 7 vs HP 9999 (half = 5000) → LOSS · Combat Damage 4"*
+    // into the turn log — under a reveal that said the opposite two inches away.
+    // 🔑 A DISPLAY FIX THAT ONLY FIXES THE LOUD SURFACE LEAVES THE QUIET ONE LYING, and the
+    // quiet one is the record the player scrolls back through.
+    beats.push({ outcomeBeat: true, final: true, lines: bp ? [
+      L(`Attack ${r.value} vs ${bp.hp} left → <b>${e.name} falls</b>`, 'good result'),
+    ] : [
       L(`Attack ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
         r.outcome === 'Loss' ? 'bad result' : r.outcome === 'Narrow' ? 'result' : 'good result'),
     ] });
@@ -6697,10 +6805,38 @@ function resolve() {
   // ⚠️ Rolled HERE rather than in finishResolve() so the beat can show it. finishResolve() then
   // banks what was rolled instead of rolling again — two rolls would have shown you one haul and
   // given you another.
-  r.drops = rollDrops(S.encounter, r.outcome, r.perfect);
+  // 🧰 ⚔️ A BEAT FIGHT CARVES ONCE, ON THE TURN IT DIES. Measured 2026-08-30: this rolled on
+  // EVERY turn (66 rolls for 31 kills) carrying the sentinel's `outcome: 'Loss'`, so the reveal
+  // showed a carve of **1 shard every turn** that was then thrown away unbanked — and the KILLING
+  // turn, a clean kill, carved 1 shard and **no signature part**. 🔴 Every region-1 quarry part
+  // was unreachable, which quietly deletes *"I need 3 Plumes, so that is 3 clean kills"* — the
+  // countable plan the whole drop table exists to make possible.
+  const beatSt = beatPool();
+  r.drops = (beatSt && !beatFells(r, beatSt)) ? {}
+    : rollDrops(S.encounter, beatSt ? 'Complete' : r.outcome, r.perfect);
   if (Object.keys(r.drops).length) {
     beats[beats.length - 1].final = false;
     beats.push({ carveBeat: true, final: true, lines: [] });
+  }
+
+  // 🚪 ⚔️ A TURN THAT SETTLES NOTHING GETS NO MODAL (2026-08-30, Thomas: *"after every
+  // turn we shouldn't have this pop up, its disruptive to gameplay. lets keep it to the turn
+  // log"*). A one-hand encounter earns a modal because the modal IS the encounter's verdict; a
+  // five-turn fight was throwing five of them, four of which said STRUCK and waited for a click.
+  // 🔑 SAME SENTENCE AS THE VERDICT AND THE CARVE, NOW APPLIED TO THE INTERRUPTION ITSELF:
+  // nothing reports until the creature falls or you do. Third consumer of that one rule.
+  // ⚠️ THE INFORMATION IS NOT DROPPED, IT MOVES — *legible math always* is not negotiable, so
+  // every line the modal would have shown is written to the log instead, in order. What is
+  // removed is the INTERRUPTION, not the arithmetic.
+  if (beatSt && !beatFells(r, beatSt)) {
+    for (const b of beats) {
+      if (b.carveBeat || b.outcomeBeat) continue;
+      if (b.label) log(`${b.label} <b>${b.big}</b> ${stripTags(b.vs || '')}`);
+      for (const ln of (b.lines || [])) log(ln.text, ln.cls);
+    }
+    S.pendingR = r; S.beats = null; S.beatIndex = -1;
+    finishResolve();
+    return;
   }
 
   S.pendingR = r;
@@ -6815,6 +6951,8 @@ function beatDisplayHTML(beat, isNew) {
       const after = Math.max(0, st.hp - dealt);
       const felled = after <= 0;
       subs.push(`<div class="pv-sub good">⚔️ ${S.foeBase.name}: −${dealt} HP${felled ? ' — it falls' : ` → ${after} left`}</div>`);
+      // ✦ named on the beat that kills it, and nowhere before — same rule as the verdict itself
+      if (felled && r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
@@ -10309,7 +10447,8 @@ function renderEncounter() {
       // 🔑 The telegraph is LOAD-BEARING, not flavour: you can die to a hit your hand cannot
       // soak, and the only thing that makes that a mistake rather than a mugging is having been
       // told a beat early.
-      (S.foeState ? `<div class="enc-stats"><span>❤️ HP <b>${S.foeState.hp}</b>/${S.foeState.maxHp}</span>` +
+      (S.foeState ? foeHpBar(S.foeState, e.name) +
+        `<div class="enc-stats">` +
         `<span>⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
         `<span>💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
         `<span>🪙 <b>${e.xp}</b></span></div>` +
@@ -10322,6 +10461,9 @@ function renderEncounter() {
       `<span>${shapeText(e)}</span>` +
 
       `<span>🪙 <b>${e.xp}</b></span></div>`) + modLines + candleLine();
+    // ❤️ AFTER the markup exists, because the catch-down looks the ghost up by id. The fill is
+    // already at the true width by now — this only releases the ghost that is lagging behind it.
+    if (S.foeState) foeHpSettle(S.foeState);
   } else {
     panel.innerHTML =
       `<div class="enc-type">JOURNEY — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
