@@ -20,7 +20,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=220">
+<link rel="stylesheet" href="style.css?v=422">
 </head>
 <body>
 <header>
@@ -39,8 +39,24 @@
     <div id="hud">
       <section id="encounter-panel"></section>
     </div>
+    <!-- 🎴 THE FIELD — persistent state as tokens, sitting on the table in front of your hand.
+         Empty until you hold something, and it collapses to nothing when you don't. -->
+    <!-- 🛡️ THE EQUIPMENT RAIL — Flesh and Blood's own zone layout, on the left of the stage:
+         HEAD across the top, CHEST and ARMS side by side, LEGS below. It is separate from #field
+         on purpose: the FIELD holds what a TURN creates and consumes, the RAIL holds what you
+         WEAR for the whole run. Two different clocks, two different places. -->
+    <aside id="armour-rail" aria-label="Equipment"></aside>
+    <section id="field"></section>
     <section id="slots-panel"></section>
     <section id="controls-panel"></section>
+
+    <!-- 🚪 THE MODAL LAYER lives INSIDE #left-col so it covers the GAME and never the log.
+         Thomas: *"was hoping it wouldn't cover the log either and was just over the actual game
+         part."* #left-col is position:relative, so inset:0 scopes it exactly. -->
+    <div id="modal-layer" aria-live="polite">
+      <div id="modal-backdrop"></div>
+      <div id="modal-panel"></div>
+    </div>
   </div>
   <div id="right-col">
     <h2>Turn Log</h2>
@@ -48,6 +64,6 @@
   </div>
 </main>
 
-<script src="game.js?v=220"></script>
+<script src="game.js?v=422"></script>
 </body>
 </html>

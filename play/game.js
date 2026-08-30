@@ -9,9 +9,182 @@
 const START_LEVEL = 2;
 const MAX_LEVEL = 4;
 // ✦ how much attuning is worth: value + (level + ATTUNE_BONUS). Swept 2026-07-29.
-let ATTUNE_BONUS = 1;
+//
+// 🔑 RAISED 1 → 3 ON 2026-08-22, from a feel report: *"doing the dragons now with mage and it just
+// seems miserable compared to rogue. even on the first one."*
+//
+// 🔑 THE CAUSE WAS IN THE FORMULA, NOT IN THE CARDS. Compare the two classes' payoff for FULL
+// investment, which is the thing a run is spent buying:
+//     mage   attuned = value + level + ATTUNE_BONUS        → Lv4: value + 5
+//     rogue  paid    = value + paid  + PAID_STEP×(level−1) → Lv4: value + 4 + 6 = value + 10
+// **Her return on a fully sharpened card was exactly half the rogue's.** Measured duel blow bore it
+// out: ~13.0 against her ~18.0. Sharpening is the only progression system in the game, so a class
+// that gets half as much for it is not a harder class, it is a class playing a worse game.
+//
+// ⚠️ THIS IS NOT THE RETRY THE OTHER NOTE FORBIDS. The 2026-07-29 sweep that says *"measured twice,
+// do not retry"* was asking whether a bigger bonus turns the attune/Initiative fork into a
+// SACRIFICE — it does not (lv+0→5 moved "paid a lost Initiative to attune" only 3%→8%). That is a
+// finding about creating a DILEMMA. This is a POWER change, and Balance_Log's own pre-planned lever
+// list for the mage opens with *"bonus → lv+2"*. Different question, same constant.
+//
+// 📏 Swept +1..+5 (n=320, per stage), BEFORE channelling paid interest:
+//     +1  duel 80/41/18/26   +2  94/54/19/36   +3  93/69/41/46   +4  94/85/56/56 (overshoots)
+//     rogue control 90/64/49/66 — she is untouched by this constant, having no elements.
+//
+// ⚠️ RE-TUNED 3 → 2 THE SAME DAY, AND THE MISTAKE IS WORTH KEEPING. ⟳ Channelling landed hours
+// later and the two stacked: at +3 with interest she measured **97/77/69/58** and led the rogue at
+// three stages out of four. 🔑 I CHANGED TWO VARIABLES BEFORE MEASURING EITHER — which is the one
+// thing the tuning process explicitly forbids (*smallest change, one variable at a time*), and the
+// result was not attributable to either change.
+// ✅ Re-measured with channelling live (n=120/stage): **+2 → 93/68/51/42** against +3's 97/77/69/58.
+// 🔑 +2-with-channelling lands on top of +3-without at stages 1, 2 and 4 — but stage 3 is BETTER
+// (51 vs 41), i.e. the same total power, concentrated where she was worst, and earned by a decision
+// instead of handed over as a flat number.
+// 🔑 THE RULE FOR CHOOSING WHICH ONE TO GIVE BACK: **if two buffs overshoot, return the FLAT one
+// and keep the CONDITIONAL one.** Flat power answers "miserable"; a recurring decision also answers
+// "too simple", and Thomas reported both.
+// ⚠️ WATCH TWO THINGS. (1) Stage 1 goes 80 → 93 for the bot, and stage 1 is the ON-RAMP — the bot
+// always finds the attuned arrangement and a human misses it about one turn in five, but if it
+// reads soft in play, +2 is the fallback rather than a creature nerf. (2) Attune OBLIGATION rises
+// 66% → 76% (attuned-when-available), which is further outside the 35–50% band the 16-card brief
+// asks for — that band was already blown at +1, but this widens it.
+// ✅ The compensating measurement, and the reason this is not simply "make the number bigger":
+// **naive=optimal FELL, 73% → 66%.** Playing your biggest card is now right LESS often, because the
+// element match is worth more relative to raw size. The turn got slightly less solved, not more.
+let ATTUNE_BONUS = 2;
+// 🎯 GRANTED MULTI-HIT (2026-08-25, Thomas: *"we should add potions and charms and equipment
+// that can give an attack multihit"*).
+// 🔑 IT BELONGS TO THE ENGINE, NOT A CLASS. `hits` is an engine concept - the shapes read it
+// (🧱 Guard halves your first N HITS, 🛡️ Armour subtracts from EACH) - so potions, charms and
+// equipment may all grant it and every class inherits it for free.
+// 🔑 AND IT IS THE PUREST LATERAL EFFECT IN THE GAME: a multi-hit card DIVIDES its own value,
+// so +1 hit adds **no damage at all**. It changes the SHAPE of the blow - strictly better into
+// 🧱 Guard, strictly worse into 🛡️ Armour. *Lateral power, not vertical*, by construction rather
+// than by tuning. ⚠️ Which also means it needs no downside written on it: **the downside is the
+// hand where you meet Armour.**
+function extraHits(isStrike) {
+  if (!isStrike) return 0;
+  let n = 0;
+  if (S.potionFx && S.potionFx.hits) n += S.potionFx.hits;      // 🧪 Splitting Draught
+  if (S.splitPending) n += S.splitPending;                      // 🛡️ Twinned Bracers, on its block
+  if (hasCharm('forkedstrike') && foeHas(S.encounter, 'guard')) n += 1;   // 🎁 Forked Strike
+  return n;
+}
+// ✦ LOOSE WEAVE's divisor. 2 (a half) → 3 (a third), 2026-08-24. Thomas: *"loose weave might be a
+// bit too good... not having to fully attune, and just using the boost card gives a lot of good
+// damage."* Measured: the charm took attune availability from **59% → 96%** and 46% of all attunes
+// became freebies, and it is worth **+5.0 road Complete** at 10 coins.
+// 🔑 THE FAULT IS TEXTURE, NOT POWER. Priced against all 23 charms it ranks FIFTH — ✦ Cold Iron
+// (+11.6) at the same rarity and the same 10 coins is more than twice as strong. What makes this
+// one felt is that it is the only charm that switches off the mage's SIGNATURE DECISION: pairing
+// stops being a question 96% of the time.
+// ⚠️ AND IT HAD NO COST. `looseOnly()` returns false whenever the Catalyst really matches, so a
+// genuine pair still pays FULL — the charm can never make a turn worse. It is a FLOOR, not the
+// trade its `why` line claimed ("ceiling traded for consistency"). A third keeps the floor and
+// stops the freebie rivalling the real thing: **+5.0 → +2.0 road Complete**.
+// ❌ DO NOT "FIX" THIS BY RAISING ATTUNE_BONUS. A loose attune is a FRACTION of that same
+// bonus, so raising it buffs the freebie too — and attune obligation already measures **76%**
+// against a design band of 35-50%.
+// ❌ AND DO NOT MAKE EVERY ATTUNE HALF WHILE HELD (the "honest trade" the why-line implied):
+// measured **-3 road C / -15 stage win**, i.e. strictly worse than not owning it. 🔑 A PRINTED
+// COST CAN BE HONEST AND STILL BE A TRAP; this charm is usable precisely because it only ever adds.
+let LOOSE_CUT = 3;
+// 🔑 THE DISPLAYS READ THE DIAL. Three separate strings said "half" — a hand-written fraction in
+// three places is three chances to disagree with the maths the next time the number moves.
+function looseWord() { return LOOSE_CUT === 2 ? 'half' : LOOSE_CUT === 3 ? 'a third' : `1/${LOOSE_CUT}`; }
+// ⚡ how much PAYING is worth to the rogue: value + (paid + PAID_STEP × levels invested).
+// ⚠️ THE STEP EXISTS BECAUSE THE FLAT VERSION SHRANK. Thomas: *"i think attuned and unattuned
+// number gap needs to be a bit wider, feels like im pretty happy with unattuned damage, i need to
+// feel like attuning is more important."*
+// 🔑 THE GAP WAS FLAT WHILE EVERYTHING AROUND IT SCALED. Her blades spike +4 value a level, so
+// paying doubled a Lv1 blade (4→8) and added a quarter to a Lv4 one (16→20) - it got steadily
+// LESS important exactly as the run went on, and Lv4 arrives around turn 6. Measured flat: paying
+// supplied 20% of her damage on 75% of turns.
+// 🔑 AND IT WAS BACKWARDS FOR THE CLASS. Paying is the rogue's combination rule, and
+// [[Levelling_As_Sharpening]] says a level makes a card MORE ITSELF. A flat gap meant sharpening
+// made her blades strong enough UNPAID, which dulls the one rule the class is built on. The spike
+// and the payoff have to climb together or the payoff is a Lv1 mechanic you outgrow.
+// ⚡ PAID_STEP 2 → 0 (2026-08-22). Thomas: *"things still feel fairly easy across the board...
+// i want like 40/35/30/20"*. She was the furthest off BY FAR — 96/69/58/56 against a 40/35/30/20
+// target, ~35 points too easy at every rung, while the mage sat at 65/54/33/21.
+// ⚠️ THIS REVERSES A CALL OF HIS (*"the wider paid gap was asked for"*), so it is his to overrule.
+// What it changes: the paid bonus no longer CLIMBS with the card's level. Paying still pays a flat
+// `paid` (6 tool / 4 blade) and a levelled blade still hits harder, because SPIKE_STEP is untouched
+// at +3 a level — sharpening still sharpens, it just no longer sharpens twice over.
+// 📏 Swept at n=100/stage: PAID 2 → 96/69/58/56 · PAID 1 → 83/48/52/42 · **PAID 0 → 46/29/25/30**.
+// ✅ Picked over (SPIKE 2 + PAID 1), which measured 29/28/27/30 — a closer average but it makes
+// stage 1 HARDER for her than for the mage, and *a newly unlocked class steamrolling the on-ramp is
+// how you FEEL an unlock* (2026-08-21). Her being easiest at stage 1 is design, not slack.
+let PAID_STEP = 0;
+// 🛤️ the fork can be switched off, so it can be A/B'd against the blind draw it replaced.
+// ⚠️ Keep it: the fork changes the RUN ECONOMY (free agency where there was only paid agency
+// via ↩️ Divert), so every number taken before it is measured against a different game.
+let FORK_ENABLED = true;
+// 🛒 does the shop open after EVERY encounter, or only at a 🎰 node?
+// ⚠️ A/B toggle, because the answer is measurable and was being argued instead. Thomas:
+// *"i think the game is built on being able to upgrade after every encounter. but i wonder how
+// itll be if we have to go to a shop to do it... but that might take too long, and youll have
+// hoarded a bunch of coin possibly."*
+let WHEEL_PER_ENCOUNTER = true;
+// ⚔️👣 BLOW AND DISTANCE (prototype, [[Blow_And_Distance]]).
+// 'spike'    = the old behaviour - a journey scores exactly like a fight, your Spell alone.
+// 'distance' = every card you COMMIT walks. The Spell leads (with your class's technique applied
+//              to it, as always) and the Catalyst and Surge add their own value behind it.
+//              ⚠️ The ✦ ARSENAL IS EXCLUDED - the card you keep is the progress you did not make.
+// ⚠️ This does NOT reopen ONE VALUE PER CARD. No second stat is printed anywhere; the same
+// single value is simply READ BY MORE CARDS on a journey than in a fight.
+// ❌ DEFAULT BACK TO 'spike' (2026-08-18, same day) - 'distance' is kept only so the measurement
+// can be re-run. Thomas, before any number said so: *"do you just add up all the attack values in
+// your hand for a journey? that doesn't seem fun, doesn't seem to require any thought, you just
+// press resolve journey during a journey then?"*
+// 🔑 HE WAS RIGHT, AND THE FAULT IS STRUCTURAL, NOT A TUNING MISS: **A SUM IS
+// PERMUTATION-INVARIANT.** Addition does not care about order, so once the score is *add up your
+// committed cards*, placement can only matter through the leftover bonuses.
+// Measured - with the Arsenal held fixed, permuting the other three cards:
+//   journey, spike:    changes the outcome **94%** of the time
+//   journey, distance: changes the outcome only **44%** of the time
+// ⚠️ MY ACCEPTANCE TEST WAS THE WRONG TEST. It asked *is a journey DIFFERENT from a fight* and
+// got a clean pass (65%→29% identical arrangements). It never asked *is a journey INTERESTING*.
+// 🔑 TWO PUZZLES CAN BE DIFFERENT AND ONE OF THEM CAN STILL BE A CONTINUE BUTTON. Any future
+// "make X different" test must measure DEPTH as well as DIFFERENCE.
+// ✅ And the finding that survives: spike-mode journeys were already DEEP (6% flat), just deep in
+// the SAME WAY as fights. The problem was never that a journey had no decision - it is that it is
+// the same decision. See [[Blow_And_Distance]] for the direction that follows from this.
+let JOURNEY_MODE = 'spike';
+// ⚠️ MP is multiplied at runtime rather than hand-edited into REGIONS: those rows are
+// transcribed from the source tables and are not ours to rewrite for a prototype.
+// ⚠️ TUNED BY MEASUREMENT, AND MY FIRST GUESS WAS MILES OUT. I estimated ×2.4 on the reasoning
+// that "three cards contribute instead of one" - at which point the mage completed **4%** of
+// journeys. 🔑 THE STRIDE IS MUCH SMALLER THAN THE CARD COUNT SUGGESTS, BECAUSE THE CATALYST AND
+// SURGE ARE CHOSEN FOR SPEED AND BOOST, NOT FOR VALUE - they are usually the small cards.
+// Swept: ×1.3 mage journeys 71% · ×1.5 **55%** · ×1.7 39% · ×2.0 15% · ×2.4 4%.
+// ×1.5 holds the mage at her old journey rate (58%) and lifts the rogue's (82% → 92%), which is
+// the right way round: her road was never the problem, her duel was.
+let JOURNEY_MP_MULT = 1.5;
 const INIT_FLOOR = 3;      // 💨 no card is ever disqualified from the Catalyst slot
+// 🧱 how much of a blow 🧱 Guard eats. A DIAL, not a wall — see the note in computeAction.
+const GUARD_CUT = 0.5;
 const HAND_SIZE = 4;
+// 🔼 THE COST OF A LEVEL, one ladder for every class (2026-08-18). Thomas: *"we sorta get into
+// this loop where we win, and we upgrade to lvl 4, so that makes us win more, and we get more
+// gold, and you kinda just keep winning."*
+//
+// 🔑 MEASURED FIRST, AND IT CHANGED THE FIX. A deck's TOTAL levels barely move across a run -
+// 32 -> 37 - because soaking eats almost exactly what sharpening buys. So the runaway is not
+// ACCUMULATION, it is CONCENTRATION: the same few levels funnelled into one dominant card. A
+// surcharge on a sharp deck would have fired almost never.
+// ⚠️ So the fix is the SHAPE of the ladder, not its height. It was a flat 2/3/4, which made the
+// last level - the one that creates the runaway - the cheapest thing in the game relative to what
+// it buys. Now 2/4/7: the first step is UNCHANGED so the shop stays reachable (the 2026-08-05 fix
+// that put the Wheel before the forge), and the climb to Lv4 costs 13 instead of 9.
+// ⚠️ Costs are hypersensitive - [[Balance_Log]] records 2/3/4 -> 4/7/10 taking stage 1 from 98%
+// to 49%. That change raised the FIRST step; this one deliberately does not.
+// 🔑 One constant for both classes: the mage's 16 level tables and ROGUE_COST both carried their
+// own copy of this ladder, which is 49 numbers to keep in step for a value that was always shared.
+// ⚠️ 2/3/7, not 2/4/7. Raising the MIDDLE step taxed all levelling and cost the mage 11 points
+// (51% -> 40%) - too blunt for a complaint that was specifically about Lv4. The first two steps are
+// now untouched and only the LAST one bites, which is the level he actually named.
+const LEVEL_COST = [2, 3, 7, null];
 const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so it must stay ABOVE it
 // A region is a FIXED number of encounters (2026-07-26), not "however long the deck lasts".
 // Emergent length made runs sprawl to ~29 turns and, worse, made them unpredictable: you could
@@ -25,7 +198,6 @@ const POTION_CAP = 3;      // 🧪 ⚠️ read by TUTORIAL's potion lesson, so i
 const REGION_ENCOUNTERS = 4;
 const REGION_END_THRESHOLD = 5;  // safety net: a deck this thin can't fill a hand
 const KO_DECK_DISCARD = 4;       // knocked out: also discard this many from deck
-const MAX_DIVERTS = 2;           // diverts allowed before you must face an encounter
 
 // BEATS CUT 2026-07-26. A creature is ONE hand again. Per-creature beat counts were arbitrary
 // (nothing said a toad took one exchange and an ape took two), and the pile's depth decision
@@ -46,6 +218,23 @@ const CARD_DEFS = [
   // weaknesses fall, so a card becomes more itself, never simply better. Lv1 is the damaged
   // state (soaking softens a card back toward the middle); Lv4 is the extreme.
   //   FORCE -> the Spell   SPARK -> the Catalyst   FLOW -> the Surge   WARD -> soaking
+  //
+  // 🛡️ ARMOUR IS CAPPED AND THE WARD SPIKE IS +1 A LEVEL (2026-08-23). Thomas: *"there
+  // shouldnt be a lvl 2 card that has like 4+ armor."* It was far past that: the WARD spike ran
+  // **+3 a level**, so Cairnguard blocked 5 / 8 / 11 / **14** while every other card in the game
+  // sat between 1 and 4. 🔑 A Lv2 WARD card blocked FOUR TIMES what a piece of crafted armour does.
+  // ✅ WARD armour is now **2 / 3 / 4 / 5** on all four, and the rogue's Shadow Double matches.
+  // ⚠️ The four WARD cards no longer differ by armour NUMBER, and that is deliberate — they
+  // differ by element (the mage's whole combination rule) and by their Lv4 verb. The 16-card brief
+  // asks for one shape per archetype × four elements; it never asked the numbers to differ too.
+  //
+  // 🔴 THIS IS THE CAUSE THE 2026-08-22 DAMAGE BUFF WAS TREATING AS A SYMPTOM. `FOE_ATK_MULT`
+  // went to 1.5 because *one card covered 72% of hits* — but that was true because ONE ARCHETYPE
+  // had plates three to five times everyone else's. Fix the plates and the designated victim goes
+  // with them. Re-measure the multiplier in the same commit; a workaround outliving its cause is
+  // how two dials end up fighting.
+  // ⚠️ The standing rule *never hand-edit a level row* still holds. This edits ONE COLUMN across
+  // ALL FOUR cards of an archetype, systematically — that is a rule change, not a tweak.
   //   Fire hits harder / guards worse .. Water fuels and endures, never fast
   //   Lightning is speed at the cost of guard .. Stone is armour, slow and dry
   // Row = [value, (dead), init, boost, armor, (dead), costToNextLevel]
@@ -56,7 +245,7 @@ const CARD_DEFS = [
   { name: 'Bellowsbreath', element: 'Fire', arch: 'FLOW',
     lv: [[4,null,3,3,1,null,2], [3,null,2,6,1,null,3], [3,null,1,9,1,null,4], [3,null,1,12,1,null,null]] },
   { name: 'Hearthwall', element: 'Fire', arch: 'WARD',
-    lv: [[4,null,3,2,2,null,2], [3,null,2,1,5,null,3], [4,null,1,1,8,null,4], [5,null,1,1,11,null,null]] },
+    lv: [[4,null,3,2,2,null,2], [3,null,2,1,3,null,3], [4,null,1,1,4,null,4], [5,null,1,1,5,null,null]] },
   { name: 'Tidebreak', element: 'Water', arch: 'FORCE',
     lv: [[3,null,1,3,3,null,2], [5,null,0,2,2,null,3], [7,null,0,1,1,null,4], [9,null,0,1,1,null,null]] },
   { name: 'Riverstep', element: 'Water', arch: 'SPARK',
@@ -64,15 +253,26 @@ const CARD_DEFS = [
   { name: 'Wellspring', element: 'Water', arch: 'FLOW',
     lv: [[2,null,2,4,3,null,2], [2,null,1,7,2,null,3], [2,null,0,10,1,null,4], [2,null,0,13,1,null,null]] },
   { name: 'Rimeguard', element: 'Water', arch: 'WARD',
-    lv: [[2,null,2,3,4,null,2], [2,null,1,2,7,null,3], [3,null,0,1,10,null,4], [4,null,0,1,13,null,null]] },
-  { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE',
+    lv: [[2,null,2,3,2,null,2], [2,null,1,2,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
+  // ⚡ THE ONE MAGE CARD THAT FORKS (2026-08-17, Thomas: *"doesn't feel fair for mage to not have
+  // ANY if this is a shape we want to add. maybe its a lightning spell"*). Right, and it is the same
+  // argument that softened 🧱 Guard: a shape a class cannot engage with AT ALL is not difficulty.
+  // ⚠️ THIS IS NOT THE PILE BY THE BACK DOOR, and the difference is the whole reason it is allowed.
+  // The banned thing was ACCUMULATING hits by pouring cards into the Spell — a mechanic. This is a
+  // PRINTED PROPERTY of one card in sixteen, like its armour or its initiative. You cannot build
+  // toward it, stack it, or choose it; you draw it.
+  // 🔑 AND IT COSTS WHAT IT SHOULD: hits divide the blow and 🛡️ Armour is paid on every one, so
+  // Sparkstrike is the mage's worst card into armour and her only real answer to a pool. A shaped
+  // card, not a better one — which is also the first time an ELEMENT means something in combat
+  // beyond its temperament.
+  { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE', hits: 2,
     lv: [[4,null,4,2,1,null,2], [6,null,3,1,1,null,3], [8,null,2,1,1,null,4], [10,null,2,1,1,null,null]] },
   { name: 'Quickfire', element: 'Lightning', arch: 'SPARK',
     lv: [[3,null,7,3,1,null,2], [2,null,10,2,1,null,3], [2,null,13,1,1,null,4], [2,null,16,1,1,null,null]] },
   { name: 'Stormglass', element: 'Lightning', arch: 'FLOW',
     lv: [[3,null,5,3,1,null,2], [2,null,4,6,1,null,3], [2,null,3,9,1,null,4], [2,null,3,12,1,null,null]] },
   { name: 'Staticwall', element: 'Lightning', arch: 'WARD',
-    lv: [[3,null,5,2,2,null,2], [2,null,4,1,5,null,3], [3,null,3,1,8,null,4], [4,null,3,1,11,null,null]] },
+    lv: [[3,null,5,2,2,null,2], [2,null,4,1,3,null,3], [3,null,3,1,4,null,4], [4,null,3,1,5,null,null]] },
   { name: 'Rockfall', element: 'Stone', arch: 'FORCE',
     lv: [[4,null,1,1,4,null,2], [6,null,0,1,3,null,3], [8,null,0,1,2,null,4], [10,null,0,1,2,null,null]] },
   { name: 'Flintdart', element: 'Stone', arch: 'SPARK',
@@ -80,7 +280,7 @@ const CARD_DEFS = [
   { name: 'Deepvein', element: 'Stone', arch: 'FLOW',
     lv: [[3,null,2,2,4,null,2], [2,null,1,5,3,null,3], [2,null,0,8,2,null,4], [2,null,0,11,2,null,null]] },
   { name: 'Cairnguard', element: 'Stone', arch: 'WARD',
-    lv: [[3,null,2,1,5,null,2], [2,null,1,1,8,null,3], [3,null,0,1,11,null,4], [4,null,0,1,14,null,null]] },
+    lv: [[3,null,2,1,2,null,2], [2,null,1,1,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
 ];
 
 // ---------- modifiers (source rulebook) ----------
@@ -94,17 +294,27 @@ const CARD_DEFS = [
 // low Initiative, which is why a ☠️ Ranged creature (whose Early Damage is certain) could roll none
 // at all. None of the three below touch Early Damage.
 const HARDSHIPS = {
-  'Ambush':       'Double the Early Damage you suffer this encounter.',
-  'Hazards':      'Suffer 1 Time Penalty if you take Early Damage, and 1 more if you take Combat Damage.',
-  'Night Travel': "Your Boost is reduced by your Catalyst's Initiative (min 0).",
-  'Storm':        'Any Time Penalties this encounter also deal that much damage.',
+  'Ambush':       'Early Damage against you is <b>doubled</b>.',
+  'Hazards':      'Take Early Damage: <b>+1 Time Penalty</b>. Take Combat Damage: <b>+1 more</b>.',
+  // ⚠️ ENGINE TERMS, NOT ONE CLASS'S STAT. "Your Boost" is a mage word, and a hardship that
+  // names it is a free ride for every class without a boost - which was literally true for the
+  // rogue until 2026-08-18.
+  'Night Travel': "Your <b>{slot:Boost}</b> gives its value minus your {slot:Element}'s Initiative (min 0).",
+  'Storm':        'Time Penalties also deal <b>that much damage</b>.',
   // ⚖️ aims straight at the most-solved part of the turn: the Spell is simply your biggest card 83%
-  'Dead Weight':  'Your heaviest card cannot be your Spell.',
+  'Dead Weight':  'Your <b>heaviest</b> card cannot be your {slot:Spell}.',
   // 🐌 the same trick on the race — your fastest card is barred from the Catalyst
-  'Mire':         'Your fastest card cannot be your Catalyst.',
+  'Mire':         'Your <b>fastest</b> card cannot be your {slot:Element}.',
   // 🔇 kills the class's combination rule for one encounter. Stated class-blind on purpose: for the
   // mage that means no attuning, for a rogue it would mean no chain.
-  'Dead Air':     'Your cards find no accord — nothing attunes this encounter.',
+  // ⚠️ "ACCORD" MEANT NOTHING TO ANYONE (2026-08-22). Thomas: *"what does accord even mean"* —
+  // and he is right: it is a word invented so ONE sentence could cover two classes, because the
+  // mage ATTUNES and the rogue PAYS and neither word fits both. This one was worse still: it said
+  // *"find no accord"* and then *"nothing attunes"* in the same breath, i.e. the invented neutral
+  // word AND the mage's word, contradicting its own reason for existing.
+  // 🔑 THE FIX IS THE ONE ALREADY BUILT FOR THE GRADE THIS MORNING: **the ENGINE owns the rule,
+  // the CLASS owns the noun.** `{gate}` is filled from CLASS.craft.gate — see hardshipText().
+  'Dead Air':     'Nothing can <b>{gate}</b> this encounter.',
   // 🌪️ STAGE 2's OWN TWO (2026-08-05). A land should press on the thing its dragon presses on,
   // so Skyrender's country attacks SPEED from both ends — one takes your fast card away from the
   // race, the other makes the race a condition on your class rule.
@@ -112,26 +322,93 @@ const HARDSHIPS = {
   // 🔃 Vertigo is the INVERSE of Mire, and that is the point: Mire bars your fastest card from
   // the Catalyst, Vertigo nails it INTO the Spell. Same card, opposite instruction, and both are
   // stated in engine terms (`init`), so a rogue meets them unchanged.
-  'Vertigo':      'The ground falls away — your <b>fastest</b> card must be your <b>Spell</b>.',
+  'Vertigo':      'Your <b>fastest</b> card must be your {slot:Spell}.',
   // ⚡ Squall puts a SECOND condition on the Catalyst, which is the one card already serving two
   // masters. ⚠️ We measured in July that a permanent second condition produces search, not
   // sacrifice — with 12 arrangements you can usually satisfy both. A HARDSHIP is where that
   // finding says the pressure belongs: it is one encounter, so "you cannot have both today" is a
   // problem you solve rather than a tax you route around forever.
-  'Squall':       'The air will not hold — your cards find accord <b>only if you win Initiative</b>.',
+  'Squall':       'Cards can only <b>{gate}</b> if you <b>win Initiative</b>.',
   // ⏳ STAGE 3's TWO. Cragmourn's demand is *waste nothing*, so its land takes away the slack
   // you did not know you were relying on.
   // ⚠️ Rationed is a RESOURCE denial, not an option denial — the Surge still goes somewhere, it
   // just pays nothing, so no slot is sealed and no choice is removed (sealed slots shipped once and
   // were killed the same day).
-  'Rationed':     'Nothing is spare here — your <b>Surge adds nothing</b> this encounter.',
+  'Rationed':     'Your <b>{slot:Boost}</b> gives <b>nothing</b>.',
   // ⚖️ Exacting is the mountain's own logic: half-measures are nothing. It is the harshest
   // hardship in the game and it is deliberately confined to late Fellgrind regions.
-  'Exacting':     'It gives no half credit — a <b>Narrow counts as a Loss</b>.',
+  'Exacting':     'A <b>Narrow counts as a Loss</b>.',
   // 🌊 STAGE 4's. The Arsenal is the one slot that is identical in every class, and this is the
   // only rule that takes the carry itself — the exam's way of saying *nothing you save is safe*.
-  'Riptide':      'The current takes what you held — your <b>Arsenal is spent</b>, not kept.',
+  'Riptide':      'Your <b>{slot:Reserve}</b> is <b>spent</b>, not kept.',
 };
+// 🔑 A HARDSHIP IS STATED IN ENGINE TERMS AND EACH CLASS READS ITS OWN WORD FOR IT.
+// `{gate}` becomes "attune" for the mage and "be paid in full" for the rogue — the same rule the
+// grade follows, and the same one already written down for hardships: *a rule that names ATTUNING,
+// the rogue reads as PAYING.* ⚠️ Every consumer must go through here; a raw HARDSHIPS[x] lookup
+// would print the placeholder.
+function hardshipText(name) {
+  const t = HARDSHIPS[name] || '';
+  const gate = (CLASS.craft && CLASS.craft.gate) || 'combine';
+  return t
+    .replace(/\{gate\}/g, gate)
+    .replace(/\{slot:(\w+)\}/g, (_, z) => `<b>${SLOT_LABEL[z] || z}</b>`);
+}
+
+// 🔤 THE SAME RULE, FOR EVERY OTHER CONTENT STRING (2026-08-28).
+// Thomas: *"the bitterroot potion is only for mage right? we need to figure out a system of
+// naming things… or else we have to just make every potion, charms, events, equip, everything,
+// call every characters slots correctly."*
+//
+// ❌ HIS OTHER SUGGESTION — number the slots — IS THE ONE THING ALREADY RULED OUT, and by his own
+// correction: **"accord"** was invented so one sentence could cover two classes and therefore
+// meant nothing to either (*"what does accord even mean"*). 🔑 *"Slot 3"* is a class-neutral
+// noun of exactly that kind: the mage translates it to Surge, the rogue to Energy, and it is
+// worse for both than either word alone. **If you find yourself inventing a class-neutral noun,
+// the answer is a PLACEHOLDER, not a new word** — which is what this is.
+//
+// ⚠️ EVERY DISPLAY SITE MUST GO THROUGH HERE. A raw `.text` read prints the placeholder, which is
+// the identical warning `hardshipText()` above carries — and the load-time guard below is what
+// stops a new charm quietly reintroducing a hardcoded mage word, **silently, because the mage
+// reads fine either way.**
+//
+// 🔑 AND THE DISTINCTION THAT DECIDES WHICH FIX A STRING NEEDS:
+//     the class HAS the thing under another name  → a PLACEHOLDER  (`{slot:Spell}`)
+//     the class DOES NOT HAVE the thing at all    → a `cls` GATE   (never a reworded lie)
+// You cannot rename "your Surge gives +3" for a class whose `compose()` returns `boost: 0`.
+function classText(t) {
+  if (!t) return t;
+  const gate = (CLASS.craft && CLASS.craft.gate) || 'combine';
+  return String(t)
+    .replace(/\{gate\}/g, gate)
+    .replace(/\{slot:(\w+)\}/g, (_, z) => SLOT_LABEL[z] || z);
+}
+
+// 🚨 THE GUARD. A generic entry that hardcodes one class's slot word reads perfectly for the
+// mage and nonsense for everyone else, so nothing on screen ever complains — which is exactly how
+// seven of them survived to build 419. This shouts at load, the way the UNLOCKS id assertion and
+// the patch-note build check do; both of those caught a real mistake on their first boot.
+// ⚠️ It runs on the TABLES, so it cannot be fooled by a display site that renders correctly.
+function auditSlotWords() {
+  // ⚠️ ARSENAL IS DELIBERATELY ABSENT FROM THIS LIST. It is the one slot whose label is IDENTICAL
+  // in every class — *"the player's fixed anchor, never re-skinned"* — so naming it outright is
+  // correct, not a leak. 🔑 The first cut of this guard flagged 🦴 Grindtooth Shins for saying
+  // "your Arsenal", which is the one thing every class calls an Arsenal. **A guard that flags the
+  // deliberately-shared case will get switched off**, and then it stops catching the real ones.
+  const words = /\b(Spell|Catalyst|Surge|Strike|Combo|Energy)\b/;
+  const bad = [];
+  const scan = (list, kind) => (list || []).forEach(x => {
+    if (!x || x.cls || !x.text) return;            // a class-gated entry may use its own words
+    const plain = String(x.text).replace(/<[^>]+>/g, '').replace(/\{slot:\w+\}/g, '');
+    if (words.test(plain)) bad.push(`${kind} · ${x.name}`);
+  });
+  scan(typeof POTIONS !== 'undefined' ? POTIONS : null, 'potion');
+  scan(typeof CHARMS !== 'undefined' ? CHARMS : null, 'charm');
+  scan(typeof ARMOUR !== 'undefined' ? ARMOUR : null, 'equipment');
+  if (bad.length) console.warn('🔤 generic content naming a class-specific slot — use {slot:Zone} or add cls:\n   ' + bad.join('\n   '));
+  return bad;
+}
+
 const FIGHT_HARDSHIPS = ['Ambush', 'Hazards', 'Night Travel', 'Dead Weight', 'Mire', 'Dead Air', 'Vertigo', 'Squall', 'Rationed', 'Exacting', 'Riptide'];
 // ⚠️ Squall is FIGHT-ONLY by construction — a journey has no enemy Initiative to beat, so on the
 // road it would either never fire or always fire. A hardship that cannot be answered is weather.
@@ -175,7 +452,7 @@ const ABILITIES = {
 };
 
 const PERILS = {
-  'Steep':       "The journey's MP is increased by your Arsenal's Boost.",
+  'Steep':       "The journey's MP is increased by what your Arsenal would have given.",
   'Treacherous': 'Fail to attain Complete Victory → suffer 1 damage after the Time Penalty.',
   // 🏔️ UPDRAFT is the mirror of Steep, and the first peril that PAYS. A road hazard that can
   // only ever cost you makes the peril line something to dread and skim past; one that rewards the
@@ -222,10 +499,10 @@ const REGIONS = [
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 5 },
     { type: 'fight',   name: 'Mist Crane', hp: 9,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4 },
     { type: 'fight',   name: 'Cairnstag',  hp: 13, init: 1, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6 },
-    { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 4 },
-    { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 2 },
-    { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
-    { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 1, element: 'Stone',    nightfall: 3, xp: 2 },
+    { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 1, element: 'Lightning', nightfall: 4, xp: 4 },
+    { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 2, element: 'Water',     nightfall: 3, xp: 2 },
+    { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Quarry Hollow',    mp: 10, timePenalty: 2, element: 'Stone',    nightfall: 3, xp: 2 },
   ]},
   // 🏹 Wilding Marches — open country full of ambushers and archers: it is about being CAUGHT
   { name: 'Wilding Marches', hardshipChance: 0.35, hardships: ['Ambush', 'Mire', 'Night Travel'], encounters: [
@@ -233,7 +510,7 @@ const REGIONS = [
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3 },
     { type: 'fight',   name: 'Ashen Boar',     hp: 15, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6 },
     { type: 'fight',   name: 'Frostbark Elder', hp: 13, init: 4, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze' },
-    { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 3, peril: 'Treacherous' },
+    { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 1, element: 'Fire',      nightfall: 5, xp: 3, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Scree Track', mp: 9,  timePenalty: 2, element: 'Stone',    nightfall: 4, xp: 3, peril: 'Steep' },
@@ -241,24 +518,24 @@ const REGIONS = [
   // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
     { type: 'fight',   name: 'Basalt Basilisk', hp: 17, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6 },
-    { type: 'fight',   name: 'Grotto Hydra',   hp: 14, init: 2, atk: 3, atkEl: 'Water',     shape: 'armour', shapeV: 1,     xp: 6 },
+    { type: 'fight',   name: 'Grotto Hydra',   hp: 9, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6 },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
-    { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
-    { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
+    { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 1, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'Granite Cut',    mp: 11, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 4 },
   ]},
   // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
   { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 13, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'armour', shapeV: 2,    xp: 5, ability: 'Poison' },
+    { type: 'fight',   name: 'Cairntide Warden', hp: 8, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze' },
     { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6 },
-    { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
-    { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 3, element: 'Stone',    nightfall: 6, xp: 4 },
-    { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 4 },
-    { type: 'journey', name: 'Tempest Ridge',  mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 1, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'Tempest Ridge',  mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 7, xp: 4, peril: 'Steep' },
   ]},
 ];
 
@@ -292,19 +569,19 @@ const ROAD_STORMREACH = [
     { type: 'fight',   name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4 },
     { type: 'fight',   name: 'Rill Otter',   hp: 10, init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 4 },
     { type: 'fight',   name: 'Scarp Ram',    hp: 14, init: 2, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'journey', name: 'Kestrel Stair',   mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 4, xp: 4, peril: 'Updraft' },
-    { type: 'journey', name: 'Whistling Gap',   mp: 9,  timePenalty: 1, element: 'Water',     nightfall: 3, xp: 2 },
-    { type: 'journey', name: 'Sunlit Terrace',  mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
-    { type: 'journey', name: 'Cloudmere Path',  mp: 10, timePenalty: 1, element: 'Stone',     nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Kestrel Stair',   mp: 11, timePenalty: 1, element: 'Lightning', nightfall: 4, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Whistling Gap',   mp: 9,  timePenalty: 2, element: 'Water',     nightfall: 3, xp: 2 },
+    { type: 'journey', name: 'Sunlit Terrace',  mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Cloudmere Path',  mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
   ]},
   // 🦅 The Shrike Downs — hunting country. Everything here reaches you first, and 🌀 Vertigo
   // arrives to take the one card that could have answered that.
   { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'fight',   name: 'Quillback',      hp: 11, init: 4, atk: 2, atkEl: 'Stone',     shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
+    { type: 'fight',   name: 'Quillback',      hp: 7, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
-    { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
+    { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 1, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
     { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
     { type: 'journey', name: 'Gorsewind Run',    mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Cairn Ladder',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 3, peril: 'Steep' },
@@ -316,7 +593,7 @@ const ROAD_STORMREACH = [
     { type: 'fight',   name: 'Anvil Toad',      hp: 18, init: 2, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Fulgurite Wolf',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Skylash Serpent', hp: 13, init: 4, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'journey', name: 'Thunder Stair',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Thunder Stair',  mp: 13, timePenalty: 1, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Updraft' },
     { type: 'journey', name: 'Static Flats',   mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Rainshadow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'The Long Gale',  mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
@@ -325,12 +602,12 @@ const ROAD_STORMREACH = [
   { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
     { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
     { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'fight',   name: 'Riven Warden',    hp: 18, init: 4, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
+    { type: 'fight',   name: 'Riven Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 6 },
     { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
-    { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
-    { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
-    { type: 'journey', name: 'Cloudbreak Run',  mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
-    { type: 'journey', name: 'Wingshadow Pass', mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 4 },
+    { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 1, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
+    { type: 'journey', name: 'Cloudbreak Run',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Wingshadow Pass', mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 4 },
   ]},
 ];
 
@@ -350,40 +627,40 @@ const ROAD_FELLGRIND = [
     { type: 'fight',   name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5 },
     { type: 'fight',   name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash' },
     { type: 'fight',   name: 'Fen Ox',        hp: 16, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 6 },
-    { type: 'journey', name: 'The Slow Ford',   mp: 12, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 4 },
+    { type: 'journey', name: 'The Slow Ford',   mp: 12, timePenalty: 1, element: 'Water',     nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Turfcutter Way',  mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
-    { type: 'journey', name: 'Reedlight Path',  mp: 11, timePenalty: 2, element: 'Fire',      nightfall: 4, xp: 3 },
+    { type: 'journey', name: 'Reedlight Path',  mp: 11, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
     { type: 'journey', name: 'The Long Bank',   mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
   ]},
   { name: 'Grindstone Vale', hardshipChance: 0.35, hardships: ['Rationed', 'Dead Weight', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Quarry Hound',   hp: 12, init: 4, atk: 3, atkEl: 'Stone', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Millstone Crab', hp: 17, init: 2, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight',   name: 'Millstone Crab', hp: 11, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
     { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
-    { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
+    { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
     { type: 'journey', name: 'Ashfall Steps',   mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
-    { type: 'journey', name: 'Cold Furrow',     mp: 11, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 3 },
-    { type: 'journey', name: 'The Iron Cut',    mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'Cold Furrow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 5, xp: 3 },
+    { type: 'journey', name: 'The Iron Cut',    mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Steep' },
   ]},
   { name: 'The Unquiet Deep', hardshipChance: 0.5, hardships: ['Rationed', 'Dead Air', 'Night Travel', 'Dead Weight'], encounters: [
     { type: 'fight',   name: 'Deepdelver',     hp: 18, init: 3, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Cavern Shrike',  hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
     { type: 'fight',   name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash' },
     { type: 'fight',   name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7 },
-    { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 3, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
-    { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
-    { type: 'journey', name: 'The Winding Cut', mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5 },
-    { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Winding Cut', mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5 },
+    { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 4 },
   ]},
   { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
-    { type: 'fight',   name: 'Scree Warden',   hp: 18, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight',   name: 'Scree Warden',   hp: 12, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
     { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
     { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
     { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'journey', name: 'The Grinding Pass', mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
-    { type: 'journey', name: 'Shoulderfall',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 5, peril: 'Steep' },
-    { type: 'journey', name: 'The Last Furrow',   mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5 },
-    { type: 'journey', name: 'Thunderfoot Road',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Grinding Pass', mp: 14, timePenalty: 2, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Shoulderfall',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5, peril: 'Steep' },
+    { type: 'journey', name: 'The Last Furrow',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5 },
+    { type: 'journey', name: 'Thunderfoot Road',  mp: 13, timePenalty: 2, element: 'Lightning', nightfall: 7, xp: 5, peril: 'Treacherous' },
   ]},
 ];
 
@@ -401,18 +678,18 @@ const ROAD_FATHOM = [
     { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
     { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
     { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Barnacle Ox',    hp: 18, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
-    { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 2, element: 'Water',     nightfall: 5, xp: 4 },
+    { type: 'fight',   name: 'Barnacle Ox',    hp: 12, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 1, element: 'Water',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
-    { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
-    { type: 'journey', name: 'The Ebb Path',    mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 4 },
+    { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'The Ebb Path',    mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 4 },
   ]},
   { name: 'Drowned Kell', hardshipChance: 0.35, hardships: ['Riptide', 'Vertigo', 'Rationed', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Kell Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 6 },
     { type: 'fight',   name: 'Silt Crawler',   hp: 17, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
     { type: 'fight',   name: 'Drowned Piper',  hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
     { type: 'fight',   name: 'Anchorback',     hp: 16, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
-    { type: 'journey', name: 'The Kell Stair',  mp: 14, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'The Kell Stair',  mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Bell Causeway',   mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Steep' },
     { type: 'journey', name: 'Weedlight Reach', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
     { type: 'journey', name: 'The Undertow',    mp: 15, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
@@ -420,26 +697,30 @@ const ROAD_FATHOM = [
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
     { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'fight',   name: 'Coldvein Worm',  hp: 18, init: 2, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7 },
+    { type: 'fight',   name: 'Coldvein Worm',  hp: 12, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
     { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
-    { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
-    { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
-    { type: 'journey', name: 'The Sounding',    mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
-    { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5 },
+    { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 2, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
+    { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Sounding',    mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
+    { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 5 },
   ]},
   { name: "Fathomdread's Trench", hardshipChance: 0.6, hardships: ['Riptide', 'Exacting', 'Squall', 'Vertigo', 'Dead Weight', 'Rationed'], encounters: [
     { type: 'fight',   name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
     { type: 'fight',   name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear' },
     { type: 'fight',   name: 'Pressureback',   hp: 19, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7, ability: 'Backlash' },
     { type: 'fight',   name: 'The Pale Herald',hp: 14, init: 5, atk: 5, atkEl: 'Fire',  shapes: ['armour', 'evasion'], shapeV: 1, xp: 7, ability: 'Freeze' },
-    { type: 'journey', name: 'The Trench Road', mp: 14, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 6, peril: 'Toll' },
-    { type: 'journey', name: 'Deadlight Deep',  mp: 14, timePenalty: 3, element: 'Fire',      nightfall: 7, xp: 5, peril: 'Treacherous' },
+    { type: 'journey', name: 'The Trench Road', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 6, peril: 'Toll' },
+    { type: 'journey', name: 'Deadlight Deep',  mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Long Descent',mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Steep' },
     { type: 'journey', name: 'Stormfathom',     mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 7, xp: 6, peril: 'Updraft' },
   ]},
 ];
 
 const ROADS = { 1: REGIONS, 2: ROAD_STORMREACH, 3: ROAD_FELLGRIND, 4: ROAD_FATHOM };
+// 🗺️ ⚠️ AT MODULE SCOPE BECAUSE TWO SCREENS NEED IT. It lived inside the Stash renderer as a
+// local; the Workshop's hunt line would have been a second copy, and this project has watched the
+// arrangement search reach FOUR copies before anyone extracted it. Extract at TWO.
+const ROAD_NAME = { 1: 'The Ember Hollow', 2: 'The Stormreach', 3: 'The Fellgrind', 4: 'The Sunless Fathom' };
 function roadFor(stage) { return ROADS[stage] || REGIONS; }
 
 const ROLES = ['Spell', 'Element', 'Boost'];
@@ -561,12 +842,14 @@ function cardValue(card) { return card ? eff(card).value : 0; }
 // What makes it HARD is already built: 🕯️ the candle. Lit, you can see the next encounter's HP,
 // Initiative and shape, so banking is informed. Out, it is a bet that next turn's problem is bigger
 // than this one's. An existing system does the work instead of a new rule.
+// ⚠️ EVERY Emberwake consumer asks the CLASS first — it is the mage's slot ③, not the engine's.
+function hasEmberwake() { return !!(CLASS && CLASS.emberwake); }
 function banksNow() {
-  return !!(S.bankArmed && cardById(S.assign.Boost));
+  return !!(hasEmberwake() && S.bankArmed && cardById(S.assign.Boost));
 }
 // ⚠️ ARMED PER TURN, CLEARED WITH THE TURN. Anything that outlived its turn would be a charm.
 function toggleBank() {
-  if (!isAssignPhase() || !cardById(S.assign.Boost)) return;
+  if (!hasEmberwake() || !isAssignPhase() || !cardById(S.assign.Boost)) return;
   S.bankArmed = !S.bankArmed;
   render();
 }
@@ -578,7 +861,48 @@ function toggleBank() {
 // in 53.6% of hands (combinatorics over all 1820 four-card hands). It was never unavailable —
 // it was never worth taking. At full value it is a pure tempo trade: move this boost to next
 // turn, and pick its target. Correct on the ~30% of turns the Surge already changes nothing.
-function bankValueOf(surge) { return surge ? eff(surge).boost : 0; }
+// 🔥 CHANNELLING PAYS INTEREST (2026-08-22). Thomas: *"i want the emberwake to be a bigger part of
+// her kit.. the way to get it is probably not good enough"* — and then, on the fix:
+// *"we can think of it as like.. channeling or charging up which seems to fit lore wise for a mage."*
+// ✅ That is the name the original slot-③ proposal used ([[Class_System]]: *"CHANNELLING … banked as
+// an Emberwake worth more next turn"*). He arrived back at it independently; the vocabulary is his.
+//
+// 🔑 THE FAULT WAS THAT THE TRADE WAS BREAK-EVEN BY CONSTRUCTION. You gave up N this turn to get
+// exactly N next turn, so the only turn it was ever correct on was one that did not need the boost.
+// Measured: a Surge card is seated **100%** of turns — availability was never the problem — but
+// banking was FREE on only **47%** (already won 18% · already lost 12% · stuck on Narrow 18%) and
+// **cost an outcome tier on 53%**. 🔑 A MECHANIC YOU ONLY USE WHEN THE TURN IS ALREADY DECIDED IS
+// A CONSOLATION PRIZE, NOT A KIT — which is exactly the feeling reported.
+// ⚠️ And the design always said *worth MORE next turn*; that half simply was never built.
+//
+// 🔑 PROPORTIONAL, NOT FLAT, AND THE REASON IS THE FORK. Flat interest is proportionally biggest on
+// a SMALL boost, so you would dump your junk card into the Surge slot — the slot becomes a bin.
+// ×1.5 makes channelling a BIG boost best, so you put a strong card in ③ *in order to* channel it,
+// giving up using it as your Spell or Catalyst. **That is contention for one card**, which
+// [[The_Arsenal_Question]] records as one of only three fork mechanisms that have ever worked here
+// (the others being an enemy shape and a run-layer price; a rule bolted onto a slot has failed 3×).
+// 📏 Mean boost is 5.0 (spread 1-13), so an average Emberwake goes 5 → 8 against a duel blow of ~15.
+// ⚠️ ✦ Backdraft doubles the result, so it now reads ×3 of the raw boost. Watch it.
+// 🔥 BANK_MULT 1.5 → 1.0 (2026-08-22). ⚠️ THIS REVERSES THIS MORNING'S CALL, and the reason
+// is that the morning's call was measured against a FINALE THAT THREW THE WAKE AWAY (build 339).
+// 🔴 ANY INTEREST RATE ABOVE 1.0 IS UNCONDITIONAL PROFIT IN A DUEL. Against a fixed HP pool,
+// delaying damage costs nothing as long as another beat comes — and in the finale it always does.
+// So BANK_MULT is not a dial, it is a SWITCH: above 1.0 channelling every beat is simply correct.
+// 📏 Measured at a channelling policy (n=100/stage), gain over never channelling:
+//     ×1.0 → +2/14/9/10   ×1.1 → +27/33/40/43   ×1.5 → +33/45/64/55
+// Thomas, playing it: *"mage starting to feel a bit easy with emberwake making some of my damage
+// be like 25+"*. He is describing ×1.5 exactly.
+// ✅ AND THE GOOD NEWS THE SWEEP FOUND: at ×1.0 — pure deferral, zero interest — channelling is
+// STILL worth +10-15 points, because 🔑 CONCENTRATION beats flat 🛡️ ARMOUR. One big blow loses
+// `armour` once; two small ones lose it twice. That is *lateral power, not vertical*: better into
+// Armour, neutral into Evasion, and it costs a turn of tempo. The interest was never what made
+// channelling good — it was what made it MANDATORY.
+// ⚠️ Its DISPLAY had to change with it: "+5 next turn (it was worth +5 now)" reads as a pure
+// loss. The reveal now names the real payoff — you carry it, and you choose where it lands.
+let BANK_MULT = 1.0;
+// 🔥 ×2 while the Emberwake Band is broken this turn. ⚠️ HERE, in the ONE place a bank is
+// valued, so the Surge row, the reveal line and the token can never disagree about the number.
+function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) * (S && S.armourTwin ? 2 : 1) : 0; }
 // ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
 // you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
 // hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
@@ -604,8 +928,21 @@ function bankCostPhrase(surge) {
 // the case a human does NOT have: seeing on the candle that the next one is fast and banking for it.
 const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
-function wakeReady() { return S.wake > 0 && isAssignPhase(); }
-function aimWake(t) { if (!S.wake) return; S.wakeTarget = WAKE_TARGETS[t] ? t : null; render(); }
+function wakeReady() { return hasEmberwake() && S.wake > 0 && isAssignPhase(); }
+// 🎴 AIMED BY TAPPING THE TOKEN ITSELF (2026-08-21). It used to be a labelled row of buttons in
+// the controls panel, which meant the Emberwake was drawn in TWO places — a prose line in the
+// status bar saying what you held, and a button row somewhere else for doing something with it.
+// 🔑 A TOKEN YOU CAN ACT ON IS THE CONTROL. Picking it up and putting it on a target is the
+// board-game gesture, and it collapses the two displays into the one object.
+// ⚠️ It never cycles back to UNAIMED: an unaimed Emberwake simply gutters out, so "no target" is
+// not a choice anyone would make — offering it would be the picker rule again, an option that is
+// never correct. First tap aims at ⚔️ attack (indexOf(-1) + 1 === 0), then it toggles.
+function cycleWake() {
+  if (!wakeReady()) return;
+  const keys = Object.keys(WAKE_TARGETS);
+  S.wakeTarget = keys[(keys.indexOf(S.wakeTarget) + 1) % keys.length];
+  render();
+}
 
 // ============================================================
 // 🕯️ THE CANDLE (2026-07-29, Thomas). While it is lit you can see the NEXT encounter.
@@ -643,14 +980,26 @@ function lightCandle(why) {
 }
 function snuffCandle(why) {
   if (!S.candle) return;
+  // 🕯️ Deepglass Crown — the legendary version of Farseer's Circlet, which only survives a Narrow.
+  if (hasArmourRule('everlit')) { log(`🛡️ <b>Deepglass Crown</b> — the flame does not gutter.`, 'good'); return; }
   // 🧪 Tallow Stub — one turn's insurance on the thing the whole road pays for
   if (S.potionFx && S.potionFx.keepCandle) { log(`🕯️ The tallow holds — your candle survives ${why}.`, 'good'); return; }
+  // 🏕️ A Steady Flame — the same insurance, taken at the door instead of bought.
+  // ⚠️ It is SPENT here rather than checked, and it is on the status bar until then: *any
+  // persistent modifier must be on screen every turn*, and a one-shot that vanishes silently is
+  // the Mirror Fen bug in miniature - you would never learn whether it fired.
+  if (S.candleGrace > 0) { S.candleGrace--; log(`🕯️ <b>A Steady Flame</b> holds — your candle survives ${why}.`, 'good'); return; }
   S.candle = false;
   log(`🕯️ Your candle gutters out — ${why}. You cannot see what is coming.`, 'bad');
 }
 // what waits after this one, if you can see it
 function nextEncounter() {
   if (!S.candle || S.finalMode) return null;
+  // ⚠️ ON THE MAP THERE IS NO SINGLE NEXT ENCOUNTER - there are the roads you can take, and the
+  // queue this used to read is not what chooses them any more. Returning a stale queue entry made
+  // the status line name a creature that was not coming. 🔑 When a system stops driving something,
+  // find every reader that still trusts it.
+  if (S.map) return null;
   return S.encounterQueue && S.encounterQueue.length ? S.encounterQueue[0] : null;
 }
 
@@ -662,6 +1011,12 @@ function squallBlocks() {
   return !el || eff(el).init < S.encounter.init;
 }
 function attunedNow() {
+  // ⚠️ PAIRING IS THE MAGE'S RULE AND ONLY THE MAGE'S. Caught by the rogue seam proof: rogue cards
+  // carry `element: null`, and the match below is `elOf(c) === elOf(sp)` — so null === null read as
+  // ATTUNED and every rogue turn claimed a pair it does not have.
+  // 🔑 A CLASS RULE THAT COMPARES TWO FIELDS WILL HAPPILY MATCH TWO ABSENCES. Ask whose rule it is
+  // before you ask whether it fired.
+  if (!CLASS.pairs) return false;
   if (S.hardship === 'Dead Air') return false;   // 🔇 nothing finds accord
   if (squallBlocks()) return false;              // ⚡ Squall — too slow to hold together
   if (duelFx().noAttune) return false;           // 🐉 Silt — the water dulls everything
@@ -717,8 +1072,9 @@ function mageStrike(spell, attuned, elem, boostC) {
   // (all four elements, no pair possible) something you wanted. Anti-synergy with every other mage
   // charm by construction, which is exactly what makes choosing it a build rather than a pickup.
   if (!attuned) return st.value + (hasCharm('coldiron') ? 3 : 0);
-  // ✦ LOOSE WEAVE: an unmatched pair attunes for only half the bonus
-  let v = looseOnly() ? st.value + Math.floor((st.attuned - st.value) / 2) : st.attuned;
+  // ✦ LOOSE WEAVE: an unmatched pair attunes for only a THIRD of the bonus (was a half,
+  // 2026-08-24). ⚙️ LOOSE_CUT is the dial — 2 restores the old half.
+  let v = looseOnly() ? st.value + Math.floor((st.attuned - st.value) / LOOSE_CUT) : st.attuned;
   // ✦ THREE OF A KIND: pair attunes, three RESONATES. Requires a genuine match by construction -
   // if all three share an element then the Catalyst matches the Spell, so it can never stack with
   // a Loose Weave freebie.
@@ -731,8 +1087,74 @@ function mageStrike(spell, attuned, elem, boostC) {
 
 const MAGE = {
   id: 'mage',
+  mark: '✦',
   multi: null,                          // no slot holds more than one card
   labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' },
+  // 🐛 WAS `null` WITH A COMMENT PROMISING IT WOULD BE SET "below" - and nothing ever set it
+  // (found 2026-08-18). CARD_DEFS is declared ~700 lines ABOVE this, so the deferral was never
+  // needed. ⚠️ `CLASS.defs` is read by SAVE and LOAD to serialise cards by index, so the mage
+  // was round-tripping through a null. 🔑 A COMMENT THAT DESCRIBES A FIXUP IS NOT THE FIXUP -
+  // I trusted this line's own note instead of checking, and it silently broke a charm filter.
+  defs: CARD_DEFS,
+  deck() { return shuffle(CARD_DEFS.map(newCard)); },
+  pairs: true,                          // ✦ elements agree → the Spell attunes. The mage's one rule.
+  boosts: true,                         // ➕ the Surge adds a printed number — the rogue's does not
+  // 🔥 THE EMBERWAKE IS THE MAGE'S FILL OF SLOT ③, NOT AN ENGINE RULE (corrected 2026-08-12).
+  // ⚠️ I got this backwards earlier the same day. Making banking a plain choice fixed two REAL
+  // faults — a trigger that came from the shuffle rather than the encounter, and a 2:1 exchange
+  // rate — but I then argued it should therefore be generic "so every class inherits it".
+  // 🔑 THAT IS THE ONE SLOT NO RULE MAY BE GENERIC IN. The slot contract says ①②④ each feed an
+  // engine system and are therefore constrained, and ③ feeds nothing — which is exactly why it is
+  // the free space where a CLASS poses its signature fork. A generic rule sitting in ③ does not
+  // give every class a gift; it spends the only room each class had.
+  // So: flag it, and gate every consumer. A rogue's ③ is its own (extend the chain, or cycle).
+  name: 'Mage',
+  emberwake: true,
+  // 🎭 THE PASSIVE TRAIT (2026-08-18). Thomas: *"lets give them a passive trait, just so
+  // players can see what they do at a glance on the character select screen."*
+  // 🔑 A CLASS IS ITS SLOT-③ FORK, AND UNTIL NOW THE ONLY PLACE THAT WAS STATED WAS INSIDE A
+  // RUN. [[Class_System]] says a class is *what unlocks a card's big value*; the picker was
+  // describing flavour instead. The trait is that fork, named, on the screen where you choose.
+  // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
+  // cannot drift from the game as long as it is written from the code.
+  trait: { icon: '🔥', name: 'Emberwake',
+    text: '<b>Channel</b> your Surge instead of spending it. You carry it into next turn as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b>. One big hit beats 🛡️ Armour, which is only subtracted once.' },
+  // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
+  // "does this hand hold a same-element pair" and finding it is attuning.
+  // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
+  // what its power IS. This used to live in the engine as a bare element check, which credited
+  // the rogue with phantom chances every turn — see the note at the craft tracker.
+  // how many blows this card lands as the Spell — the mage never splits.
+  // ⚠️ compose() used to compute hits INLINE and this only fed the card face - two readings of
+  // one fact, which is how 🃏 the card printed `◆8` while the maths did `◆12×2`. It is the single
+  // source now: compose() asks this, so the face and the resolution cannot disagree.
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  // what gets added to EACH blow rather than divided across them — see `added` in computeAction.
+  // ⚠️ `card` is the Spell being drawn, because 🗡️ Keen Edge reads ITS level. 💨 Slow
+  // Strength is deliberately absent: it depends on Initiative, which the face cannot know - the
+  // same precedent as the rogue's blade verb, whose bonus depends on the fuel card.
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  craft: {
+    label: 'attuned', gate: 'attune',
+    avail(hand) { const els = hand.map(c => elOf(c)); return els.some((e, i) => els.indexOf(e) !== i); },
+    found(r) { return !!r.enhUsed; },
+  },
+  // 🎴 THE MAGE'S BOARD STATE. The banked Surge is a thing on the table until it is spent or
+  // gutters out, and tapping it is how you aim it — see cycleWake().
+  // ⚠️ CLASS-OWNED ON PURPOSE. The Emberwake is the mage's slot ③ and a rogue must never inherit
+  // it by sharing an array; that is the same mistake as making the rule generic, one layer down.
+  tokens() {
+    if (!S.wake) return null;
+    return [{
+      id: 'wake', icon: '🔥', name: 'Emberwake', count: S.wake,
+      worth: S.wakeTarget ? `→ <b>${WAKE_TARGETS[S.wakeTarget]}</b>` : '<b>unaimed</b> — tap to aim it',
+      // 🔑 EVERY TOKEN SAYS HOW IT DIES, and this one has two deaths — ✦ Deepwell buys it an extra
+      // turn, and a note that stated only the usual one would be the ✦ Second Flame trap again:
+      // a second way for something to happen, with every line still explaining the first.
+      note: S.wakeDeep ? '✦ Deepwell — it survives one unspent turn' : 'spend it or lose it',
+      tap: wakeReady() ? 'cycleWake()' : null,
+    }];
+  },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
@@ -767,8 +1189,12 @@ const MAGE = {
       init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
       boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
-      hits: 1,
+      hits: CLASS.hitsOf(spell, true),   // ⚡ a forking card prints its own; grants add to it
       attuned, attBonus: st.attuned - st.value,
+      // 🔑 THE BONUS ACTUALLY APPLIED, not the one on the card. ✦ Loose Weave halves it, and the
+      // reveal was printing the FULL bonus regardless — see attunedLineText.
+      attApplied: attuned ? (looseOnly() ? Math.floor((st.attuned - st.value) / 2) : st.attuned - st.value) : 0,
+      cardVal: st.value,
       banks, bank, wake: w, wakeTarget: wt,
       vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
       vElem: vElem && vElem.slot === 'Element' ? vElem.name : null,
@@ -777,7 +1203,611 @@ const MAGE = {
     };
   },
 };
+
+// ============================================================
+// ============================================================
+// 🗡️ THE ROGUE — ENERGY, THE PAIR, AND MOMENTUM (third design, 2026-08-12).
+//
+// ⚠️ TWO DESIGNS WERE THROWN AWAY BEFORE THIS ONE AND BOTH FAILURES ARE WORTH KEEPING:
+//   v1 THE CHAIN — your Strike had to follow the card you struck with LAST turn. A pair is only
+//      four physical cards and the Strike is spent every turn, so the chain consumed the thing that
+//      sustained it. Measured average length 1.35: off seven turns in ten.
+//      🔑 A CROSS-TURN CONDITION IS A CROSS-TURN COST — you cannot see it or plan around it.
+//   v2 BUILDERS / FINISHERS — legible, but the turn was a mode switch rather than a decision, and
+//      Thomas simply did not enjoy it. 🔑 A MECHANIC CAN BE PERFECTLY CLEAR AND STILL BE FLAT.
+//
+// WHAT SURVIVED BOTH: the eight names, the four pairs, 🧱 GUARD, hits-divide-and-Armour-is-paid-
+// per-hit, and the class seam. Everything else here is new.
+//
+// THE TURN ASKS FOUR THINGS, and every one of them is answered by a number printed on a card:
+//   ① STRIKE   costs ⚡. Paid in full it deals its ◆ damage; short, it deals its plain ⚔️.
+//   ② COMBO    your Initiative — and its PAIR fires that card's VERB.
+//   ③ ENERGY   burn a card to pay; it provides its own ⚡.
+//   ④ ARSENAL  the card you keep. Identical in every class, as always.
+//
+// 🔑 SLOT ② IS THE SQUEEZE, AND IT IS THE MAGE'S TENSION REACHED BY ANOTHER ROAD: the card you
+// want there for the PAIR is competing with the card you want there for SPEED. The mage's Catalyst
+// has exactly that problem via elements; the rogue's has it via names, and the pair pays twice.
+//
+// ⚠️ THE CARD'S SECOND NUMBER IS BACK, WITH A ROGUE MEANING. ✦ was the mage's attuned value and
+// this class cannot attune — but the COLUMN is reused rather than deleted, which is the right way
+// round: a rogue card carries five numbers, exactly the density of a mage card, and nothing on it
+// belongs to a mechanic it does not have.
+// ============================================================
+// ● MOMENTUM IS AN UNTOUCHED STREAK (rebuilt 2026-08-17, third design and the first one that is
+// not a currency). Thomas: *"i do want to keep these momentum tokens, but i want it feel good
+// getting it, and be fun trying to keep up the momentum."*
+//
+// 🔑 THE MISTAKE IN THE FIRST TWO DESIGNS WAS BUILDING A WALLET AND ASKING WHAT IT BUYS. He never
+// once said *spend* — he said *keep up*. If the fun is in maintaining it then the decision lives on
+// every turn in between, not at the cash-out, so it must not be a currency at all.
+//
+// ⚠️ AND THE OLD ONE FAILED TWICE OVER, both faults already named elsewhere in this file:
+//   GETTING it felt like nothing — a pip was CHANGE FROM A PURCHASE (surplus ⚡ you overpaid),
+//     an accounting remainder rather than an event.
+//   SPENDING it was impossible — the two targets were 💨 Initiative, which she already wins on
+//     99–100% of turns (`outpace`'s fault: it reprints a freebie), and 🎯 hits, which is correct
+//     only against 🧱 Guard and Guard is on no creature (measured dead in every real encounter).
+//   Result: earned 0.88 a turn, spent 0.13. 🔑 THE METER WAS NEVER BROKEN. THE SHOP WAS EMPTY.
+//   ⚠️ I read that as "players don't engage with meters" for three designs running.
+//
+// 🔑 DECAY WAS THE OTHER HALF OF THE PROBLEM: losing 1 a turn is EROSION, not pressure. Nothing you
+// did caused it, so there was nothing to try at. A streak is fun because BREAKING it is an event
+// and the event is your fault.
+// ⚠️ `let`, not const — these three define the SHAPE of the streak and the shape is the whole
+// question. 📏 Measured 2026-08-22: at a 53% clean-turn rate a reset-on-any-damage streak yields
+// **1.13 pips** and reaches a cap of 5 **4.2%** of the time — predicted from p alone, and the game
+// measured 1.0 and 4%. 🔑 MOMENTUM IS NOT MISTUNED, IT IS ARITHMETICALLY DETERMINED: expected
+// length is p/(1−p) and P(cap) is p^cap, so **no payout tuning can deepen it** — only p, the cap,
+// or the reset RULE can. And p just went DOWN, because damage went up.
+let MOMENTUM_CAP = 3;
+let MOMENTUM_STEP = 1;    // pips earned by a clean turn
+let MOMENTUM_BREAK = 1;   // damage of at least this much breaks the streak (1 = any damage)
+let MOMENTUM_VALUE = 1;   // strike damage per pip
+// ● AT A FULL METER THE STRIKE SPLITS IN TWO. 0 = off · 'add' = an extra hit AND keep the pip
+// damage · 'convert' = an extra hit INSTEAD of the pip damage.
+// 🔑 WHY LATERAL RATHER THAN BIGGER: every other payout knob on this meter is raw damage, so
+// "make Momentum matter" and "do not power-creep the rogue" were the same dial pointing opposite
+// ways — pips worth 2 bought a +10/+20/+2/+16 duel swing. **Multi-hit divides the total instead of
+// raising it**, so a full meter changes the KIND of your strike: better into 🧱 Guard (fewer blows
+// eaten), worse into 🛡️ Armour (subtracted from each). *Lateral power, not vertical.*
+// ⚠️ IT ALSO MOVES A CONSTRAINT WRITTEN THIS MORNING: 🧱 Guard must be 1 because the game's hit
+// ceiling is 2. At a full meter Second Fang lands THREE — so Guard 2 becomes theoretically
+// answerable. Do not act on that until this has been played; one class reaching 3 hits on 12% of
+// turns is not the same as the game having a hit ceiling of 3.
+let TIME_PENALTY_MULT = 1.0;   // ⏳ scales every encounter's printed Time Penalty
+let MOMENTUM_FULL = 'add';
+// 🔑 see the note at `added`: a multi-hit card divides its OWN value, never the bonuses on top.
+let SPLIT_ADDS_PER_HIT = true;
+// 🔥 THE EMBERWAKE LANDS ON EVERY BLOW (on since 2026-08-28). Thomas, after a 24 Emberwake
+// landed once on a 2-hit card: *"i sorta expected to have the 24 emberwake, get doubled because of
+// the multihit."*
+//
+// ✅ IT IS THE CONSISTENT ANSWER, and it was measured before it was argued. 🧪 potions and
+// ● Momentum pips already landed on every blow; the wake and the Surge split. Three sources of
+// "added damage", two rules. The alternative — split everything — was measured and REJECTED:
+// it lowered every column at once for the rogue (road −16.4%, win −15, blow 11.1→9.6) and
+// **reduced multi-hit use 41.9→35.0%**, discouraging the exact thing it was meant to make coherent.
+// 🔑 *If one order moves every column the same way, it is a power change wearing a consistency
+// argument.*
+//
+// 📏 Measured cost on the road: under a point of win rate (mage 65.0→65.8), and the only column
+// that really moves is 🛡️ Armour +1.9 — which is right, because Armour is the shape multi-hit is
+// meant to struggle against and this is a BUILD that answers it rather than a change to the shape.
+// ⚠️ The rogue is unaffected: she has no Emberwake.
+// ⚠️ THE 3% BOT RATE FOR "BANKED A WAKE AND HOLDING A MULTI-HIT SPELL" IS A FLOOR, NOT A RATE.
+// `solver.js` cannot bank well by construction, and a player who deliberately holds ⚡ Sparkstrike
+// hits it far more often. **Do not tune this from solver data** — same standing caution as
+// `BANK_MULT`, which is hypersensitive (×1.1 swung the duel 27-43 points).
+let WAKE_PER_HIT = true;
+// ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
+// *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
+// work in flesh and blood, blue cards are weaker but they give more pitch."*
+//
+// 🔑 BEFORE THIS, `energy` WAS ONE NUMBER DOING TWO JOBS — the cost to strike with a card AND
+// what it paid as fuel — and it did not vary by level at all. So LEVELLING A CARD HAD NO DOWNSIDE:
+// it struck harder and fuelled exactly as well as before. That is the one thing
+// [[Levelling_As_Sharpening]] says must never be true: *a level makes a card MORE ITSELF, spike up
+// and weakness DOWN.*
+//
+// Now they are separate. COST is identity and never moves (a heavy blade is always heavy). PITCH
+// falls as the card sharpens, so your best strike is your worst fuel.
+// 🔑 AND IT DELIVERS A DESIGN GOAL THE VAULT ALREADY WANTED FOR FREE: an all-Lv4 deck becomes
+// literally unplayable, because nothing left in it can pay for anything.
+// ⚠️ Tools pitch one better than blades at the same level — the fuel/strike split is the roles
+// restated in the resource, not a second axis to learn.
+// ⚡ WHAT A CARD GIVES WHEN FED: PITCH_BASE − its level. Dropped by 1 on 2026-08-18 as the
+// matched half of PAID_STEP. 🔑 A BIGGER PRIZE AND AN EASIER PRICE IS NOT A WIDER GAP, IT IS A
+// BIGGER NUMBER - measured, scaling the payoff ALONE took her duel from 71% to 88% and paying rose
+// to 81% of turns, so the mechanic got louder AND more automatic at once. Raising the prize while
+// tightening the price is what turns a formality into an event: paying fell 76% -> 64% of turns
+// while the turns it decided the OUTCOME rose 34% -> 44%, at an unchanged 69% Complete.
+// 🔑 And it lands on the right cards. A Lv4 blade now gives ZERO energy - sharpened, it is pure
+// payload and cannot fuel anything, exactly as a Lv4 Hammer is actively bad as a Catalyst.
+// [[Levelling_As_Sharpening]]: spike up, weakness DOWN.
+// ⚠️ ASYMMETRIC, AND THE TOOL SIDE IS A CEILING CONSTRAINT, NOT A TASTE (fixed same day).
+// Dropping BOTH to 5/4 made ⚡4 the most any card could ever give - and Ghostblade costs ⚡5, so
+// it became UNPAYABLE by any card in the deck at any level. Its ◆27 strike and its verb were
+// simply unreachable. Thomas felt the edge before the measurement found it: *"having a card be
+// lvl 1 to give 5 energy sounds a bit rough though."*
+// 🔑 THE RULE: WITH A SUBTRACTIVE PITCH FORMULA (base − level), A COST EQUAL TO THE GIVE
+// CEILING IS PAYABLE BY EXACTLY ONE CARD STATE IN THE DECK - THAT IS NOT A PRICE, IT IS A LOCKOUT.
+// Ghostblade sat at 25-30% paid even BEFORE the drop, because only a Lv1 tool could ever cover it.
+// A cost ceiling needs at least one level of headroom under the give ceiling to be a real price.
+// 🔑 The split is role-honest and does the work the flat drop was meant to do: TOOLS ARE THE
+// FUEL, so they stay able to pay at every level; BLADES ARE THE PAYLOAD, so a Lv4 blade gives ⚡0
+// and cannot fuel anything, exactly as a Lv4 Hammer is actively bad as a Catalyst.
+const PITCH_BASE = { tool: 6, blade: 4 };
+function pitchOf(card) {
+  if (!card || !card.def) return 0;
+  const base = PITCH_BASE[card.def.role] || 5;
+  return Math.max(0, base - (card.level || 1));
+}
+const MOMENTUM_DISCOUNT_CAP = 2;   // ⚠️ DEAD: momentum no longer touches cost. Kept so old saves load.
+const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
+const SLIP_CUT = 0.5;            // 🌀 ...and 'barely' means HALF. ⚠️ It used to mean NOTHING.
+
+// 🔑 ⚡ IS ONE NUMBER DOING TWO JOBS: what a card COSTS as your Strike, and what it PAYS when
+// burned for energy. That is the whole resource tension in a single column — your best cards are
+// also your best fuel, so a big turn is bought with something you wanted to play.
+// 🗡️ THE COMBO VERBS (2026-08-17). A card's verb fires when IT sits in ② beside its partner.
+//
+// ⚠️ THIS REPLACES "the pair cuts the cost by 1", which Thomas killed as *"a bit too abstract"* —
+// and he was right: a discount is bookkeeping, a verb is a thing that HAPPENS. It also gives the
+// ② card a job instead of making it a key that fits a lock.
+//
+// 🔑 THE STRUCTURE IS THE POINT: a pair has two cards, so WHICH VERB YOU GET DEPENDS ON WHICH
+// HALF YOU STRIKE WITH. Strike with Lethal Dose and Venom Needle sits in ② (ignore Armour); strike
+// with Venom Needle and Lethal Dose sits there instead (its ✦ for free). Eight cards, eight verbs,
+// sixteen different turns — and the encounter tells you which way round to play the pair.
+//
+// ⚠️ A VERB MUST NOT REPEAT ITS OWN CARD'S NUMBERS. Viper Strike is already the fastest card in
+// the deck at 💨 7, so giving it "win Initiative" would be free; its partner carries that instead.
+// A verb that restates the stat is a verb that never changes a decision.
+const ROGUE_VERBS = {
+  draw:      'you <b>draw a card</b>',
+  // 🗡️ THE BLADE-SIDE VERBS ARE THE BIG ONES, and they have to be (re-dealt 2026-08-17).
+  // A verb fires when its card sits in ②, which means STRIKING WITH ITS PARTNER. So a verb printed
+  // on a TOOL fires when you strike with the blade — free upside, and those four measured 2–13%.
+  // A verb printed on a BLADE fires when you strike with the TOOL, which costs ~9 damage, so it
+  // must be worth about a blade or it is never correct. All four measured 0–1%.
+  // 🔑 AND TWO OF THEM WERE NOT MERELY SMALL, THEY REPRINTED SOMETHING FREE:
+  //   `outpace`  'win Initiative automatically' — she already wins 99–100% of races.
+  //   `freepaid` 'deals its ✦ even unpaid'      — it only ever fires on a TOOL strike, and tools
+  //              cost ⚡1–2 while any fuel is ⚡2–3, so the cost was already covered.
+  // Same fault 🌀 Slipped had. *A verb that restates something you already get for free is not a
+  // weak verb, it is an absent one.* Both replaced with verbs that pay about a blade.
+  // ⚠️ worded as ADDED DAMAGE, never "strikes again" — 🎯 hits is a real mechanic that DIVIDES
+  // the blow, so "again" would promise the wrong thing against 🛡️ Armour and 🧱 Guard.
+  fangs:     'your strike gains <b>+its own ⚔️</b>',
+  lethal:    'your strike gains <b>+2 damage per ⚡</b> you feed it',
+  pierce:    'your strike <b>ignores 🛡️ Armour</b>',
+  nocounter: 'it <b>does not counter</b> you',
+  cycle2:    'you <b>draw two cards</b>',
+  surge:     '<b>+2 ●</b> Momentum',
+  unspent:   'your Strike is <b>not spent</b>',
+};
+// ⚠️ POLARISED 2026-08-17. The pairs used to be roughly symmetric — both halves mid-weight —
+// and pairing measured 64% AVAILABLE but only 25% TAKEN, against attuning's 86/66. So the pair was
+// not hard to find, it was **not worth what it cost**: slot ② is your Initiative, and a situational
+// verb loses to speed you need every single turn.
+//
+// 🔑 THE FIX IS NOT TO MAKE PAIRING STRONGER, IT IS TO MAKE IT FREE. Each pair is now a BLADE and
+// a TOOL, and the tool is the card you wanted in ② anyway:
+//     BLADE  heavy ⚔️, expensive ⚡, slow 💨   → it belongs in ①
+//     TOOL   light ⚔️, cheap ⚡, FAST 💨         → it belongs in ② whatever you were doing
+// So completing a pair stops being a sacrifice and the question moves to a better place: not
+// "can I afford to pair?" but "which pair can I complete, and is that the verb this creature wants?"
+//
+// ⚠️ A TOOL'S VERB IS WHAT FIRES WHEN YOU SWING THE BLADE, so the tools carry the verbs you want
+// on a big turn (pierce, draw, +●) and the blades carry the ones you want when you cannot swing.
+const ROGUE_SPEC = [
+  // ⚠️ RESCALED 2026-08-17. Thomas, two encounters in: *"the rogue's numbers just seem way too
+  // high, at lvl 2 cards"* — and the sim agreed at 81% Complete against the mage's 48%.
+  // 🔑 THE MISTAKE WAS OVER-PAYING FOR A MISSING SLOT. The rogue has no ➕ Surge, so I lifted her
+  // Strike to compensate — and lifted it to the mage's WHOLE TURN. Measured at Lv2 the mage lands
+  // 12-17 (⚔️ 5-7 plus ➕ 5-7); a rogue blade was landing 12-13 UNPAID and 15-16 paid, then also
+  // taking a verb and 🌀 Slipped on top.
+  // The scale now: a PAID blade ≈ a mage turn (14-15), an UNPAID one is a bad turn (9-10). Paying is
+  // what buys you parity, which is the whole point of the ⚡ layer.
+  // ⚠️ Tools also came UP (3-4 → 5), narrowing the blade:tool gap from ~3x to ~2x, so striking
+  // with a tool stays viable — four verbs measured 0% because you never did.
+  // ⚡ THE COST LADDER (2026-08-17). Thomas asked for a ⚡5 ceiling; measured, putting THREE cards
+  // at ⚡4–5 cost the class ~15 points of run win (52% mage vs 34% rogue at n=240, reproduced) and
+  // left stage 3 at 5–8%, which breaks the rule that every class must be able to beat every stage.
+  // 🔑 THE FAULT DOES NOT SHOW UP IN "PAID IN FULL", WHICH BARELY MOVED (92% → 89%). Slot ③ takes
+  // a whole CARD, so a ⚡5 Strike is paid by burning ANOTHER BLADE as fuel — she still pays, she
+  // just spends her best card to do it. *A cost measured only by whether it was met will read as
+  // free right up until you ask what met it.*
+  // ✅ So the ceiling stays, on exactly ONE card: 🗡️ Ghostblade, the payoff half of the PAYOFF
+  // pair. ⚡5 is now aspirational rather than routine — the card you are keeping the streak up FOR.
+  // 🔑 THE BASELINE IS DELIBERATELY WEAK (Thomas, 2026-08-17): *"baseline of the hero should be
+  // weak, its the charms and the level of the cards that help players get through the stuff."*
+  // Measured before this: a Lv1 rogue turn produced 6-12 against a Lv1 MAGE turn of 5-11 — she
+  // started where the mage arrived, so nothing the run gave you afterwards felt like it mattered.
+  // Blades now open at ⚔️4-5 and climb +3 a level; tools strike for ⚔️4 and are not meant to.
+  // ⚠️ HER TRADEOFF IS ARMOUR, AND IT IS ALREADY PRICED: mage cards soak avg 2.9 at Lv2 (WARD cards
+  // 5-8), rogue cards 0.9. She takes HALF the damage a mage does (0.70 a turn against 1.46) and
+  // still sheds the same 13 levels a run, because every hit costs her more cards.
+  // 🔑 So 💨 Initiative may sit a *little* above the mage's — that is what the thin armour buys.
+  // pair          name              role     ⚡ pairs with          spike    base [val, init, armor]  ✦  verb
+  { pair: 'RUSH',    name: 'Viper Strike',    role: 'tool',  energy: 2, combo: 'Second Fang',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'draw' },
+  // 🎯 SECOND FANG STRIKES TWICE - the name was describing a mechanic the card did not have.
+  // ⚠️ MULTI-HIT IS LATERAL, NEVER MORE DAMAGE: the total is DIVIDED between the blows
+  // (`perHit = floor(value / hits)`), so two hits is the same damage delivered differently.
+  // 🔑 AND THAT IS WHAT MAKES IT A TRADE - 🧱 Guard eats the first N hits, so splitting means less
+  // of your damage is eaten; 🛡️ Armour subtracts PER HIT, so splitting means it comes off twice.
+  // **Better into a pool, worse into a wall.** The two shapes are opposites, and this is the first
+  // card in the game that has to choose between them.
+  { pair: 'RUSH',    name: 'Second Fang',     role: 'blade', energy: 3, combo: 'Viper Strike',    spike: 'value', base: [4, 2, 1], paid: 4, verb: 'fangs', hits: 2 },
+  { pair: 'OPENING', name: 'Venom Needle',    role: 'tool',  energy: 1, combo: 'Lethal Dose',     spike: 'init',  base: [4, 5, 2], paid: 3, verb: 'pierce' },
+  { pair: 'OPENING', name: 'Lethal Dose',     role: 'blade', energy: 4, combo: 'Venom Needle',    spike: 'value', base: [5, 2, 0], paid: 4, verb: 'lethal'  },
+  { pair: 'HOLD',    name: 'Sleight of Hand', role: 'tool',  energy: 2, combo: 'Slow Poison',     spike: 'init',  base: [4, 6, 1], paid: 3, verb: 'cycle2' },
+  { pair: 'HOLD',    name: 'Slow Poison',     role: 'blade', energy: 3, combo: 'Sleight of Hand', spike: 'value', base: [4, 2, 3], paid: 4, verb: 'nocounter' },
+  { pair: 'PAYOFF',  name: 'Shadow Double',   role: 'tool',  energy: 1, combo: 'Ghostblade',      spike: 'armor', base: [4, 5, 2], paid: 3, verb: 'surge' },
+  { pair: 'PAYOFF',  name: 'Ghostblade',      role: 'blade', energy: 5, combo: 'Shadow Double',   spike: 'value', base: [5, 2, 1], paid: 4, verb: 'unspent' },
+];
+const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST for every class now
+// generated from the spec, never hand-authored. Column 1 carries the PAID damage, so the card face
+// can print `⚔️ 7 → ✦ 12` off the same row shape every other card in the game uses.
+// ⚠️ THE SPIKE STEP IS PER-STAT (2026-08-17). It used to be +3 a level for ANY spike, which was
+// right for ⚔️ damage and catastrophic for 💨 Initiative: a tool went 9 → 18, against creatures
+// that run 💨 1-6. Thomas, playing stage 1: *"theres a card with 17 initiative, like what... i just
+// put the highest one in slot 2."*
+// 🔑 A STAT THAT ALWAYS WINS IS NOT A STAT, IT IS A FORMALITY — and it took slot ② with it,
+// because pairing costs you the race only if there IS a race. Initiative now steps +1.
+// ⚠️ init steps 2, not 1 — and the reason is the gap between the two things Initiative races.
+// Road creatures sit at 💨 1-6; DRAGONS sit at 7-10. A flat +1 made her tools top out at 9, so she
+// lost the race on every beat of every duel and the stage win rates fell to 16/4/0/0.
+// 🔑 SO THE CURVE IS THE POINT: at Lv1 a tool (5-6) races CREATURES and often loses; by Lv4
+// (11-12) it contests DRAGONS. Levelling Initiative buys you "I can outrun the boss now" instead of
+// buying a number that was already unbeatable at Lv1.
+// ⚠️ THE BASE WAS THE BUG, NOT THE STEP — and cutting the step too cost 15 points of run win.
+// At base 8-9 a Lv1 tool already beat EVERY creature in the game (they run 💨 1-6), so Initiative
+// was decided before you looked at your hand. That is what made slot ② thoughtless.
+// But flattening the growth as well took her answer to 🌀 EVASION away, and Evasion halves your
+// hit unless you WIN the race — so stages 2 and 4, the Evasion stages, fell from 58%/42% to 27%/7%
+// while stages 1 and 3 barely moved. A textbook case of the measurement naming the mechanic.
+// 🔑 SO: START CONTESTED, BECOME DOMINANT ONLY THROUGH INVESTMENT. Base 5-6 races creatures at
+// Lv1 and loses often; Lv3-4 reaches 12-15 and contests dragons at 7-10. The big number is now the
+// REWARD for levelling rather than the state you start in.
+// ⚠️ value steps 4, not 3. A weak baseline is only half of Thomas's rule - *"its the charms and
+// the LEVEL of the cards that help players get through"* - so if the start comes down the CURVE has
+// to come up, or the run has nothing to give you. Dropping the base alone took her to 5% run win:
+// weak at Lv1 AND weak at Lv4 is not a tradeoff, it is just weak.
+// Lv1 ⚔️4-5 (below the mage's 5-11 turn) climbing to Lv4 ⚔️16-17 / ✦20-21.
+// ⚠️ 💨 STEPS 1. Thomas, looking at a Lv2 card sitting on 💨 10: *"lvl 2 cards having
+// initiative at 10 is also crazy, why are we doing this?"* There is no good reason, and the
+// principle is the keeper:
+// 🔑 INITIATIVE IS A THRESHOLD STAT, NOT AN ACCUMULATING ONE. You win the race or you do not.
+// Once you are faster than the thing you are racing, MORE SPEED BUYS NOTHING - so scaling it is
+// pure inflation, and it inflates against creatures that never scale at all (💨 1-6, fixed).
+// Measured at +3 a level: 76% of her races were won by 3 or more, i.e. decided before she looked
+// at her hand, average margin +5.1. The mage sits at 48% / +2.6 and her race still reads as a race.
+// ⚠️ Kept at 1 rather than 0 so a tool still SHARPENS - but the number now stays legible for
+// the whole run instead of running away from the board it is compared against.
+// ⚠️ value steps 5. Flattening 💨 to 1 was right for legibility and took her run win to 6%,
+// because her duel was being held up ENTIRELY by out-racing the dragon - nothing else she owns
+// scales to 50-68 HP over 3-4 beats. Taking that away means the damage has to arrive instead.
+// 🔑 This is Thomas's rule applied to BOTH ends: *"baseline of the hero should be weak, its the
+// charms and the LEVEL of the cards that help players get through."* Weak at Lv1 (⚔️4-5, under the
+// mage's 5-11 turn) and genuinely strong at Lv4 (⚔️19-20 / ✦23-24, against the mage's 20-29).
+// A weak baseline is only half the rule; if the curve does not repay it, the run has nothing to give.
+// ⚠️ value steps 4, down from 5, because ● MOMENTUM IS DAMAGE NOW and has to be paid for
+// somewhere. Thomas: *"it should probably just add to attack instead. and we should probaby lower
+// attack across the board because of it."* The streak runs 0-5 and averages ~1.3, so the card
+// table gives back roughly what the meter now supplies.
+// ⚠️ value 4 → 3 (2026-08-18). Thomas, after playing: *"rogue attack numbers are higher than
+// mages… was able to get crazy attack numbers right off the bat with rogue and a few upgrades."*
+// 🔑 MEASURED, AND MY FIRST TEST SAID THE OPPOSITE BECAUSE IT WAS THE WRONG TEST. With every card
+// at one level the mage LOOKS ahead at Lv4 (18.4 vs 16.1) - because an all-Lv4 rogue deck gives
+// ⚡0 energy and cannot pay for itself. **Nobody plays a uniform deck.** Re-run against a real one
+// (all Lv2, a few cards pushed to Lv4) and the rogue led by **+3 at every level of investment** and
+// hit 20+ roughly **twice as often**.
+// 🔑 THE MECHANISM: HER SHARPENING IS MULTIPLICATIVE WITH HER UNSHARPENED CARDS. A low-level card
+// is excellent fuel, so upgrading a few blades buys the payload while the rest of the deck still
+// pays for it. The mage's attune bonus is level+1 - linear, no synergy.
+// Growth Lv1→Lv4, averaged over the deck: mage **+4.4**, rogue **+11.5**; her four blades **+18
+// each**. A blade gained +6 a level against the mage's best card at +3 - exactly double.
+// Swept on the realistic-deck test: value 4 → gap +3.2 · **value 3 → gap +0.9** · value 2 → −1.1.
+// ✅ PAID_STEP stays at 2 - the wider paid gap was asked for and is not the thing that was wrong.
+// 🗡️ 3 → 2 (2026-08-23). Thomas: *"rogue should do less damage, combined with momentum,
+// rogue is a bit overtuned i think."*
+// 🔑 THE REPORT WAS ABOUT DAMAGE AND I SPENT THREE SWEEPS CHASING WIN RATE. On win rate she is
+// only over at stages 1 and 4; on DAMAGE he is plainly right — her duel blow is **17-18 against the
+// mage's 12-13**, roughly 40% harder for a nearly identical win rate. That is exactly what makes a
+// class feel overtuned in the hand while the win column looks fine. **Answer the report that was
+// given, not the one the instrument finds easiest to measure.**
+// ✅ This is PARITY, not a nerf: her blades grew **+3 a level** against the mage's **+2**, and 2
+// puts the two classes on the same growth curve. It also lands where he said it lands — on a
+// LEVELLED rogue, not a fresh one. Second Fang goes 4/7/10/13 → 4/6/8/10.
+// 📏 Same seeds, ⭐6/🎭3, n=320: rogue 74/31/21/43 → **51/20/8/19** against a mage of
+// 50/15/16/25 on those same seeds — +24/+16/+5/+18 becomes +1/+5/−8/−6.
+// ⚠️ Cost: she drops BELOW the mage at stages 3 and 4. Watch stage 3 especially.
+// ❌ 2.5 was measured and does nothing (69/28/15/40) — the rounding eats it. It is 2 or it is
+// nothing.
+// ❌ ● MOMENTUM IS UNTOUCHED, deliberately. Cap 3→2 took ten points off stage 2 where she is
+// already under target, and the full-meter SPLIT was chosen precisely because it is damage-neutral
+// — it makes her hit twice rather than harder. Cutting it removes the interesting half and leaves
+// the numbers.
+// ❌ AND FATHOMDREAD'S HP WAS TRIED AND REJECTED: +10 moved the rogue 43→29 and the mage
+// 26→11, leaving the gap at 17→18. 🔑 **A DRAGON IS CLASS-BLIND, SO IT CAN NEVER CLOSE A CLASS
+// GAP** — which this file already said under the class-gap section, and I proposed it anyway.
+// ⚠️ STILL A DEAD DIAL FOR SWEEPS: the `const SPIKE_STEP` below copies this at load, before
+// ROGUE_DEFS is generated from that copy, so `setTunable` cannot move it. Changing the literal here
+// works; a runtime sweep does not.
+let SPIKE_STEP_VALUE = 2;   // 🗡️ the rogue's power dial
+const SPIKE_STEP = { value: SPIKE_STEP_VALUE, init: 1, armor: 1 };
+const ROGUE_DEFS = ROGUE_SPEC.map(s => {
+  const idx = { value: 0, init: 1, armor: 2 };
+  const step = SPIKE_STEP[s.spike];
+  const lv = [0, 1, 2, 3].map(L => {
+    const st = s.base.map((v, i) => (i === idx[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+    // 🛡️ ARMOUR FLOORS AT 1, NEVER 0 (2026-08-18). Thomas: *"feel like rogue cards shouldn't
+    // block 0, like what happens if i take damage and they all don't block?"*
+    // Measured: FIVE of her eight cards soaked nothing at Lv2, and 9% of her hands could soak
+    // nothing AT ALL - roughly one turn in eleven where any damage at all is an automatic
+    // knock-out (every card downgraded plus a deck burn). The mage's floor is 1 on every card at
+    // every level; hers had holes.
+    // 🔑 DECK-AS-HEALTH MEANS EVERY CARD IS A HIT POINT. A 0-armour card is not a weak card, it
+    // is a card that cannot take part in the health system at all - a hole in the health bar, not
+    // a thin one. Her tradeoff is meant to be THIN armour (1-4 against the mage's 1-8), and it
+    // still is.
+    st[idx.armor] = Math.max(1, st[idx.armor]);
+    return [st[0], st[0] + s.paid, st[1], null, st[2], null, ROGUE_COST[L]];
+  });
+  return { name: s.name, element: null, arch: null, pair: s.pair, role: s.role,
+           combo: s.combo, energy: s.energy, paid: s.paid, verb: s.verb, hits: s.hits || 1, lv };
+});
+
+// ② the pair sits in the COMBO slot — the whole condition, on the table, checkable at a glance.
+// 🗡️ Twin Blades lets the ARSENAL complete it instead, which is that slot's job for this class.
+function pairedNow() { return !!comboCard(); }
+// 🔑 WHICH card is completing the pair — because it is that card's verb that fires, and three
+// different lines need to name it. ✦ Second Flame's lesson: the rule must name its own cause.
+// 🗡️ Twin Blades lets the ARSENAL complete it instead, which is that slot's job for this class.
+function comboCard() {
+  const st = spellCard(); if (!st || !st.def.combo) return null;
+  const seats = [cardById(S.assign.Element)];
+  if (hasCharm('twinblades')) seats.push(cardById(S.assign.Reserve));
+  return seats.find(c => c && c.def.name === st.def.combo) || null;
+}
+function comboVerb() { const c = comboCard(); return c ? c.def.verb : null; }
+
+// 🗡️ THE PAIR MARK. Eight unique sigils told you which card this was — which you already knew
+// from its name. One glyph per PAIR tells you the thing you actually need: these two go together,
+// visible without reading either name.
+const PAIR_SIGIL = { RUSH: '⟡', OPENING: '◈', HOLD: '≈', PAYOFF: '⧉' };
+
+// 🔑 POINT AT THE ANSWER INSTEAD OF LABELLING THE CATEGORY. Whatever sits in ① STRIKE, the card
+// that would complete it lights up wherever it is in your hand — the same move fuse-highlighting
+// made for the mage.
+// ⚠️ Deliberately NOT colour-coded pairs. The mage's colours earn their complexity: an element
+// says what a card seeks, what enemy armour checks, and what it fuels — one colour, four meanings.
+// A rogue pair means exactly one thing, so wrapping it in a second four-colour language (on the same
+// card frames, in the same game, meaning something different) would teach a system to answer a
+// yes/no question. A glow is an ANSWER; a colour is a category you have to interpret.
+function pairMateId() {
+  const st = spellCard();
+  if (!st || !st.def.combo) return null;
+  if (comboCard()) return null;                       // already paired — nothing to point at
+  const m = S.hand.find(c => c.id !== st.id && c.def.name === st.def.combo);
+  return m ? m.id : null;
+}
+// ⚠️ ONE FUNCTION FOR THE WHOLE TURN'S BOOKKEEPING, so the line on screen, the card face and the
+// damage in the reveal all read the same source — the `computeAction` rule, applied to a resource.
+function rogueMath() {
+  const st = spellCard();
+  if (!st) return null;
+  const verb = comboVerb();
+  const paired = !!verb;
+  const fuel = cardById(S.assign.Boost);
+  // ⚠️ NO MORE PAIR DISCOUNT — the pair pays in a VERB now, not in arithmetic.
+  // ● THE STREAK IS THE DISCOUNT. Each pip takes 1 off what your Strike costs, so momentum does not
+  // make you hit harder — it makes more ARRANGEMENTS LEGAL. That keeps it inside *lateral power,
+  // not vertical*: a five-turn streak does not inflate a number, it lets you swing the ⚡5 card you
+  // have been holding. 🔑 And it reads right — the longer you are in rhythm, the more you can pull
+  // off. At a full streak every card in the deck costs nothing, which is the payoff for five clean
+  // turns and is meant to feel like getting away with something.
+  // ⚠️ MOMENTUM NO LONGER TOUCHES COST (2026-08-18). Thomas: *"i feel like momentum takes the
+  // fork away, if every card is nearly free, slot 3 is not doing anything for us. it should
+  // probably just add to attack instead."*
+  // 🔑 He is right and the capped version was worse than either extreme: capped at 2, the meter
+  // hit its ceiling on its SECOND pip, so pips 3-5 did literally nothing while still being drawn
+  // on screen. A resource that stops paying but keeps counting is a lie told every turn.
+  // It adds to the STRIKE now, which cannot dissolve slot ③ — what you feed still has to cover
+  // the cost on its own.
+  // 🔑 AND THE FAULT IS BIGGER THAN THE NUMBER: ⚡ WAS THE CLASS'S ONE REAL CONSTRAINT, AND
+  // MOMENTUM WAS PAYING IT OFF. A reward that removes the constraint it rewards you within does not
+  // make the game easier, it DELETES THE DECISION — slot ③ stopped being a choice about which card
+  // you can afford and became a formality. *Cheaper costs are not lateral power when the cost WAS
+  // the fork.* Worse, a streak is easiest to hold when you are already winning, so the discount
+  // arrived exactly when it was least needed.
+  // Now: 2 pips buy 1 ⚡, and it never exceeds MOMENTUM_DISCOUNT_CAP — a real help at a long
+  // streak, never a bypass.
+  const rawCost = st.def.energy || 0;
+  // ⚠️ min(cap, streak), NOT floor(streak/2). The halving version starved her exactly where she
+  // needed it: at the LAIR her streak averages 1.4-1.9 (the dragon hits every beat), so floor/2
+  // paid out ZERO there, her ⚡-paid rate fell 85-94% -> 70-75%, and the duel collapsed to 4/12/4/4.
+  // 🔑 THE CAP IS WHAT STOPS THE BYPASS; THE RATE WAS NEVER THE PROBLEM. Capping at 2 keeps
+  // slot ③ a real question (a ⚡5 blade never drops below ⚡3) without taxing the one place her
+  // streak is hardest to hold.
+  const cost = rawCost;
+  // ⚠️ THE HARDSHIPS THAT NAMED A MAGE STAT DID NOTHING TO HER (2026-08-18). Thomas, on a
+  // journey: *"damn night travel doesn't work against rogue... i suppose we will need hazards and
+  // hardships and journies that affect classes."*
+  // 🔑 HE IS RIGHT ABOUT THE PROBLEM AND I THINK THE FIX IS THE OTHER WAY ROUND. The ENGINE owns
+  // hardships - [[Class_System]]'s seam says so - so a hardship must be stated in ENGINE terms and
+  // each CLASS reads what it means for its own maths. Class-SPECIFIC hardships would mean writing
+  // every one of them eight times; this way one hardship bites eight classes.
+  // The mapping is mechanical once you see it:
+  //   a hardship that names the mage's ➕ BOOST  -> the rogue reads her ⚡ ENERGY
+  //   a hardship that names ATTUNING              -> the rogue reads PAYING
+  // ⚠️ Four were free rides for her: Night Travel, Rationed, Dead Air and Squall, plus the
+  // ⛰️ Steep peril. Dead Air and Squall were gated inside attunedNow(), which returns early on
+  // `!CLASS.pairs`, so they never even reached her.
+  const h = S.hardship;
+  const comboCd = cardById(S.assign.Element);
+  let paid = pitchOf(fuel);
+  if (h === 'Rationed') paid = 0;                                   // ⏳ nothing is spare
+  else if (h === 'Night Travel') paid = Math.max(0, paid - (comboCd ? eff(comboCd).init : 0));
+  // 🔇 Dead Air / ⚡ Squall gate her combination rule the same way they gate the mage's
+  const full = (paid >= cost) && h !== 'Dead Air' && !squallBlocks();
+  // 🗡️ THE TWO BIG BLADE-SIDE VERBS, both paid in damage so the tool-strike can compete with the
+  // ~9 you gave up by not striking with the blade. They scale off DIFFERENT things on purpose:
+  //   Second Fang — the strike's own ⚔️, so it grows as you sharpen that card.
+  //   Lethal Dose — what you feed slot ③, so it makes the fuel choice matter beyond "does it cover".
+  // ⚠️ `lethal` is +1 per ⚡ now, not +2 — costs run to 5, and +2 on a ⚡5 fuel was +10 on a tool.
+  // ● the streak is damage now — one point a pip, the whole meter live all the way to 5
+  const verbBonus = verb === 'fangs'  ? eff(st).value
+                  : verb === 'lethal' ? paid
+                  : 0;
+  // ● WHAT ONE PIP IS WORTH. Separated from the cap 2026-08-22 so the two can be traded against
+  // each other: a SHORT meter you actually fill, with pips that matter, is a different design from
+  // a long meter you never fill. Thomas: *"whats so bad about having a momentum cap of 3? what if
+  // we increase what you get as well with a cap of 3"* — that is Design A done properly.
+  const atFullNow = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+  const streakDmg = (MOMENTUM_FULL === 'convert' && atFullNow) ? 0 : (S.momentum || 0) * MOMENTUM_VALUE;
+  const bonus = verbBonus + streakDmg;
+  return { paired, verb, rawCost, cost, paid, full, fuel, bonus, verbBonus, streakDmg,
+           saved: 0, streak: S.momentum || 0 };
+}
+// ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
+// is "is this the turn to cash out", not "yes or no".
+// ⚠️ DEAD, kept only so an older save's stored target cannot throw. Momentum is not spent any more.
+function setMoTarget(t) {
+  return;
+  render();
+}
+
+const ROGUE = {
+  id: 'rogue',
+  mark: '🗡️',
+  multi: null,
+  labels: { Spell: 'Strike', Element: 'Combo', Boost: 'Energy', Reserve: 'Arsenal' },
+  defs: ROGUE_DEFS,
+  deck() { return shuffle(ROGUE_DEFS.concat(ROGUE_DEFS).map(newCard)); },   // 8 x 2
+  emberwake: false,        // 🔥 that is the MAGE's slot ③
+  pairs: false,            // ✦ no elements, so nothing ever attunes
+  boosts: false,           // ➕ no Surge stat either
+  energy: true,            // ⚡ the Strike costs, slot ③ pays
+  name: 'Rogue',
+  momentum: true,          // ● the untouched streak — earned by taking nothing, lost by taking anything
+  trait: { icon: '●', name: 'Momentum',
+    text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
+      '. Each pip adds <b>+1 to your Strike</b>. Take any damage and the whole streak breaks.' },
+  // 🏅 WHAT THE GRADE CALLS CRAFT — her source of power is PAYING, so availability is "could any
+  // card in this hand have covered another's ⚡ cost" and finding it is striking for the full value.
+  // 🔑 THE MAPPING IS THE ONE ALREADY WRITTEN DOWN FOR HARDSHIPS: *a rule that names ATTUNING,
+  // the rogue reads as PAYING.* Same sentence, one layer up.
+  // ● a FULL meter splits the Strike. Reads the same MOMENTUM_FULL the maths does, so the face and
+  // the resolution cannot disagree.
+  hitsOf(c, isStrike) {
+    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+    return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0) + extraHits(isStrike);
+  },
+  // ● pips land on every blow, like a potion does. ⚠️ The blade VERB bonus is not shown here —
+  // it depends on the fuel card, which the face cannot know; the reveal still states it.
+  perHitBonus(card) {
+    return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card)
+         + (MOMENTUM_FULL === 'convert' && (S.momentum||0) >= MOMENTUM_CAP ? 0 : (S.momentum || 0) * MOMENTUM_VALUE);
+  },
+  craft: {
+    label: 'paid in full', gate: 'be paid in full',
+    avail(hand) {
+      return hand.some(f => hand.some(st => st !== f && pitchOf(f) >= (st.def.energy || 0)));
+    },
+    found(r) { return !!(r.rogue && r.rogue.full); },
+  },
+  // 🎴 THE ROGUE'S BOARD STATE — and the token that was already almost one. The pips gave it a
+  // body in 2026-08-17; this only moves it onto the table where the rest of the board lives.
+  // ⚠️ IT SHOWS AT ZERO, ALWAYS. An empty meter is still a thing you are trying to fill — and
+  // 🗡️ Lone Fang pays +4 *precisely while the streak is broken*, so hiding an empty token would
+  // hide that charm's entire payout. The Mirror Fen rule: show the terms even when they are zero.
+  tokens() {
+    const now = S.momentum || 0, lone = hasCharm('lonefang');
+    return [{
+      id: 'mo', icon: '🗡️', name: 'Momentum', count: now, cap: MOMENTUM_CAP,
+      // ⚠️ THE TOKEN MUST NAME THE PAYOFF *BEFORE* YOU REACH IT, or filling the meter is a surprise
+      // rather than a goal — "be fun trying to keep up the momentum" needs something to aim at.
+      worth: (MOMENTUM_FULL && now >= MOMENTUM_CAP)
+             ? `<b>+${now}</b> — and your Strike <b>splits in two</b>`
+           : now > 0 ? `your Strike hits for <b>+${now}</b>` +
+               (MOMENTUM_FULL ? ` <span class="dim">· fill it and the Strike splits</span>` : '')
+           : (lone ? 'nothing yet — but <b>Lone Fang</b> gives <b>+4</b>' : 'no bonus yet'),
+      note: now > 0
+        ? `any damage breaks it${hasCharm('secondnature') ? ' back to 2' : ''}`
+        : 'come through a turn untouched to start it',
+    }];
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
+  // wasn't thinking the fuel would leave the deck"*). The fuel card slides back UNDER the deck like
+  // the Combo card — only the STRIKE is discarded, exactly as the mage's Spell is.
+  // 🔑 THE ASYMMETRY THIS KILLS WAS REAL AND UNMEASURED: burning to the discard made the rogue
+  // spend TWO cards a turn against the mage's one — 8 cards a region against 4, out of the same
+  // 16-card deck — and in a game where the deck IS the health bar that is an enormous hidden tax.
+  // The cost of ③ is now what it should be: that card does nothing else this turn, and you will
+  // not see it again for a while.
+  spentIds() {
+    // 🗡️ Ghostblade in ② — the Strike is not spent at all
+    if (comboVerb() === 'unspent') return [];
+    return S.assign.Spell ? [S.assign.Spell] : [];
+  },
+  compose() {
+    const strike = spellCard();
+    if (!strike) return null;
+    const combo = cardById(S.assign.Element);
+    const st = eff(strike);
+    const m = rogueMath();
+    // 🔑 PAID IN FULL BUYS THE BIG NUMBER. Short, you still swing — a card that cannot be played
+    // is the harshest thing a four-card hand can hold, so underpaying costs power, never the turn.
+    const dmg = (m.full ? st.attuned : st.value);
+    // 🎯 hits: the 🧱 GUARD ANSWER, AND IT IS HERS AGAIN (2026-08-18).
+    // ⚠️ This read `const hits = 1;` under a comment promising hits were *"reachable only through
+    // 🎯-granting effects"* - and no such effect existed anywhere. The rogue could never land more
+    // than one blow, while the MAGE quietly owned the only multi-hit card in the game
+    // (Sparkstrike ×2). 🔑 The class Guard was designed to EXCLUDE could engage with it; the class
+    // it was built FOR could not. Thomas found it on meeting his first Guard creature:
+    // *"how do i do multiple hits as rogue?"*
+    // 🔑 A COMMENT THAT DESCRIBES A SYSTEM IS NOT THE SYSTEM - same fault as `defs: null`.
+    // ● A FULL METER SPLITS THE STRIKE — see MOMENTUM_FULL.
+    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+    const hits = CLASS.hitsOf(strike, true);   // ⚠️ her card is `strike`, not `spell`
+    return {
+      value: Math.max(0, dmg + (duelFx().value || 0)
+        + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
+      element: null,
+      init: combo ? eff(combo).init : 0,
+      boost: 0,
+      hits,
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0, wakeTarget: null,
+      vSpell: null, vElem: null,
+      spell: strike, elem: combo, boostC: cardById(S.assign.Boost),
+      attuner: null, loose: false,
+      // 🌀 SLIP is stated as a REQUEST, not a verdict — computeAction owns the Initiative race, so
+      // it is the only place that knows the margin. The class only says "this class can slip".
+      rogue: { cost: m.cost, paid: m.paid, full: m.full, paired: m.paired, verb: m.verb,
+               // ⚠️ `gain` was missing here until 2026-08-17, so nothing outside rogueMath() could
+               // see momentum EARNED — including the instrument, which read NaN and said so.
+               // ⚠️ THE REVEAL CANNOT EXPLAIN A TERM THE PAYLOAD DOES NOT CARRY. `verbBonus`,
+               // `streakDmg` and the fuel's name were all missing, so the new rogue action lines
+               // would have silently printed "nothing fed" beside a PAID verdict and never once
+               // mentioned momentum. 🔑 THAT IS THE THIRD TIME TODAY a class-authored field was
+               // computed and not passed through - after `hits` and `gain`. When compose() gains a
+               // field, check the payload spread in the same edit.
+               bonus: m.bonus, verbBonus: m.verbBonus, streakDmg: m.streakDmg,
+               fuelName: m.fuel ? m.fuel.def.name : null,
+               rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true },
+    };
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE };
 let CLASS = MAGE;
+function setClass(c) { CLASS = c || MAGE; }
 
 // The candle vocabulary (adopted 2026-07-01) — display names only; internal keys unchanged.
 // Spell = your action · Catalyst = ignites it (Initiative) · Surge = fuel (+value) · Arsenal = kept for tomorrow.
@@ -815,15 +1845,15 @@ const VERBS = {
   Quickfire:    { slot: 'Element', name: 'Outpace',    text: 'You win Initiative automatically.' },
   Flintdart:    { slot: 'Element', name: 'Bedrock',    text: 'You take no Early Damage, even when you lose the race.' },
   // FLOW → SURGE — the fork, the 🔥 Emberwake
-  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Banking from here DOUBLES the Emberwake.' },
-  Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake banked from here lasts a second turn.' },
-  Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Banking from here also gives +3 Initiative this turn.' },
-  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Banking from here ALSO fires the boost this turn.' },
+  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Channelling from here DOUBLES the Emberwake.' },
+  Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake channelled from here lasts a second turn.' },
+  Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Channelling from here also gives +3 Initiative this turn.' },
+  Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Channelling from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
-  Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it soaks each encounter, it loses no level.' },
-  Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It soaks 4 more than its armour.' },
-  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it soaks, you gain a 🔥 +2 Emberwake.' },
-  Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it soaks, it soaks ALL remaining damage.' },
+  Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it blocks each encounter, it loses no level.' },
+  Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It blocks 4 more than its armour.' },
+  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it blocks, you gain a 🔥 +2 Emberwake.' },
+  Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it blocks, it blocks ALL remaining damage.' },
 };
 // a card only has its verb at Lv4 — soften it and the verb is gone
 function verbOf(card) { return card && card.level >= MAX_LEVEL ? VERBS[card.def.name] || null : null; }
@@ -834,7 +1864,12 @@ function verbLive(name, zone) {
   return !!(c && c.def.name === name && verbOf(c));
 }
 
-const SLOT_LABEL = { Spell: 'Spell', Element: 'Catalyst', Boost: 'Surge', Reserve: 'Arsenal' };
+// 🔤 SLOT VOCABULARY IS A DISPLAY LAYER AND IT IS PER CLASS — the mage reads Spell/Catalyst/
+// Surge/Arsenal, the rogue reads Strike/Combo/Momentum/Arsenal, off identical internal keys.
+// ⚠️ THIS WAS A FROZEN CONST AND THE ROGUE INHERITED THE MAGE'S WORDS. Caught by the seam proof:
+// the whole point of `CLASS.labels` is that it is the class's, so nothing may keep its own copy.
+// A Proxy so every existing `SLOT_LABEL.Spell` call site keeps working unchanged.
+const SLOT_LABEL = new Proxy({}, { get: (_, k) => (CLASS.labels || MAGE.labels)[k] });
 const slotLabel = zone => SLOT_LABEL[zone.replace(/[AB]$/, '')] + (zone.endsWith('A') ? ' — Set A' : zone.endsWith('B') ? ' — Set B' : '');
 
 // ============================================================
@@ -880,20 +1915,31 @@ let RELENTLESS_STEP = 4;   // ⏳ how much the breath grows per duel beat (tuned
 //
 // ⚠️ IT IS A GUIDE, NOT A VERDICT. At stage 4, decks below par still win 24% of the time and
 // decks above it still lose. Never phrase it as a prediction, and never gate anything on it.
+// ⚠️ PAR RE-MEASURED 2026-08-22 (36/44/48/52 → 36/34/34/32) BECAUSE `FOE_ATK_MULT` MOVED.
+// 🔑 `par` is a MEASUREMENT, not a design choice — it is *the deck a winner brings to this lair*.
+// Harder hits mean fewer levels survive the road, so a stale par would have made the Standing chip
+// read `Deck 31 → 48 by the lair` on essentially every run at every stage. **A display that always
+// says you are losing is worse than no display** — the exact bug the Standing shipped with.
+// 📏 n≈350/stage: winners arrive with 36 / 34 / 34 / 32, losers with 28 / 30 / 30 / 27.
+// ⚠️ NOTE THE SHAPE CHANGED, NOT JUST THE NUMBERS. The old pars RISE (36→52) and the new ones are
+// flat-to-falling. That is honest: later dragons are not harder because they demand a bigger deck,
+// they are harder at the SAME deck — and the later roads take more off you, so you arrive with less.
+// 🔑 Par was never a cross-stage difficulty predictor; it judges you against THIS lair, from region
+// 4 only, and it remains a pure display — nothing reads it, nothing gates on it.
 const DRAGONS = [
-  { stage: 1, name: 'Cindermaw', par: 36, element: 'Fire', init: 10, breath: 6, hp: 52,
+  { stage: 1, name: 'Cindermaw', par: 34, element: 'Fire', init: 10, breath: 6, hp: 60,
     shapes: ['armour'], shapeV: 4,
     teaches: 'HIT BIG',
     brief: 'Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath.' },
-  { stage: 2, name: 'Skyrender', par: 44, element: 'Lightning', init: 10, breath: 8, hp: 55,
+  { stage: 2, name: 'Skyrender', par: 33, element: 'Lightning', init: 10, breath: 8, hp: 60,
     shapes: ['evasion'], shapeV: 0,
     teaches: 'HIT FIRST',
     brief: 'It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing.' },
-  { stage: 3, name: 'Cragmourn', par: 48, element: 'Stone', init: 7, breath: 5, hp: 68,
+  { stage: 3, name: 'Cragmourn', par: 30, element: 'Stone', init: 7, breath: 5, hp: 68,
     shapes: ['relentless'], shapeV: 0,
     teaches: 'WASTE NOTHING',
     brief: 'The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost.' },
-  { stage: 4, name: 'Fathomdread', par: 52, element: 'Water', init: 10, breath: 7, hp: 50,
+  { stage: 4, name: 'Fathomdread', par: 29, element: 'Water', init: 10, breath: 7, hp: 50,
     shapes: ['armour', 'evasion'], shapeV: 4,
     teaches: 'BIG *AND* FIRST',
     brief: 'Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once.' },
@@ -933,11 +1979,11 @@ const TUTORIAL = {
       { type: 'fight',   name: 'Wick Moth',   hp: 5,  init: 1, atk: 1, xp: 4 },
       { type: 'journey', name: 'Lamplit Lane', mp: 5,  nightfall: 1, timePenalty: 1, xp: 4 },
       { type: 'fight',   name: 'Tallow Vole', hp: 6,  init: 2, atk: 1, shape: 'armour', shapeV: 1, xp: 4 },
-      { type: 'journey', name: 'The Long Meadow', mp: 6, nightfall: 2, timePenalty: 1, xp: 5 },
+      { type: 'journey', name: 'The Long Meadow', mp: 6, nightfall: 2, timePenalty: 2, xp: 5 },
     ] },
     { name: 'The Ember Hollow', hardshipChance: 0, hardships: [], encounters: [
       { type: 'fight',   name: 'Sootling',    hp: 8,  init: 4, atk: 1, shape: 'evasion', shapeV: 0, xp: 5 },
-      { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 1, xp: 5 },
+      { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 3, xp: 5 },
       { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
@@ -947,40 +1993,20 @@ const TUTORIAL = {
   // no in-play lesson can do because by then you are already in one.
   intro: [
     { title: 'You are a mage on the road',
-      body: 'There is a dragon at the end of the road, and you are what stands between it and everyone behind you.<br><br>' +
-            'You carry <b>sixteen cards</b> — the whole of your craft. You will hold <b>four at a time</b>, ' +
-            'and every turn you decide what those four are for.' },
+      body: 'A dragon waits at the end of the road. Your job is to reach it and kill it.<br><br>You carry <b>sixteen cards</b>. You hold <b>four at a time</b>, and each turn you decide what those four do.' },
     // ⚠️ REWRITTEN 2026-08-12 (Thomas: *"doesn't explain what it does. we gotta explain what things
     // do exactly"*). The old page said "fall short and you lose time" and "the dark catches you" —
     // both name a consequence without defining it, which is the one thing a brief exists to do.
     // 🔑 THE BAR: every stat must say what it SUBTRACTS FROM WHAT. If a sentence could be true of
     // three different rules, it is flavour, not a brief.
     { title: 'A turn is an arrangement',
-      body: 'Your four cards sit under four labels, and <b>position is the role</b> — you rearrange by swapping.<br><br>' +
-            '<b>SPELL</b> — its number is what you deal. Afterwards it is <b>spent</b>: into the discard, and you will not see it again until the region ends.<br>' +
-            '<b>CATALYST</b> — its <b>💨 Initiative</b> races the enemy\'s. And if it shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger <b>✦</b> number on its face instead.<br>' +
-            '<b>SURGE</b> — its <b>➕</b> is added to your Spell. Or <b>bank</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br>' +
-            '<b>ARSENAL</b> — the one card you <b>keep</b> into the next hand. Your Catalyst and Surge slide back under your deck.' },
+      body: 'Your four cards sit under four labels. The position is the role. Swap cards to change it.<br><br><b>SPELL</b> — its number is what you deal. It is then spent: it goes to the discard and does not come back until the region ends.<br><br><b>CATALYST</b> — its 💨 Initiative races the enemy\'s. If it also shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger ✦ number on its face.<br><br><b>SURGE</b> — its ➕ is added to your Spell. Or channel it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br><br><b>ARSENAL</b> — the one card you keep for the next hand. Your Catalyst and Surge slide back under your deck.' },
     { title: '⚔️ A fight asks for damage',
-      body: 'Your <b>Spell</b> (plus your Surge) is your blow, measured against its <b>❤️ HP</b>:<br><br>' +
-            '• <b>Complete</b> — you meet or beat its HP. It never touches you.<br>' +
-            '• <b>Narrow</b> — you reach <b>half</b> its HP. You still get past it, but it <b>hits back for its ⚔️</b>.<br>' +
-            '• <b>Loss</b> — below half. It hits back and you gain nothing. <i>You still move on</i> — an encounter is never the end of your run.<br><br>' +
-            '<b>💨 And the race is separate.</b> If your Catalyst is slower than its 💨, it <b>bites first for its ⚔️</b> — even if your blow then kills it. Speed is not damage; it is whether you get hurt on the way in.<br><br>' +
-            'Each creature also defends with a <b>shape</b>: 🛡️ <b>Armour N</b> subtracts N from your blow, so it wants <b>one big hit</b>. 🌀 <b>Evasion</b> <b>halves</b> your blow unless you won the race, so it wants <b>speed</b>.' },
+      body: 'Your Spell plus your Surge is your blow. Compare it to the creature\'s ❤️ HP:<br><br>• <b>Complete</b> — you meet or beat its HP. It does not touch you.<br>• <b>Narrow</b> — you reach half its HP. You get past it, but it hits you for its ⚔️.<br>• <b>Loss</b> — below half. It hits you and you gain nothing. You still move on; one encounter never ends the run.<br><br>💨 Initiative is separate from damage. If your Catalyst is slower than the creature\'s 💨, it strikes first for its ⚔️, even if your blow then kills it.<br><br>Each creature also has a defence. 🛡️ <b>Armour N</b> takes N off your blow, so it wants one big hit. 🌀 <b>Evasion</b> halves your blow unless you won Initiative, so it wants speed.' },
     { title: '👣 A journey asks for distance',
-      body: 'The same cards, read a different way. Your <b>Spell</b> is how far you get, measured against its <b>MP</b> — <b>Complete</b>, <b>Narrow</b> at half, <b>Loss</b> below.<br><br>' +
-            '<b>⏳ Time Penalty</b> — anything short of Complete costs you this many cards, <b>burned off the top of your deck</b> into the discard. You do not bleed; you lose the cards you were about to draw. <i>(Only if your deck is already empty does it become damage.)</i><br><br>' +
-            '<b>🌙 Nightfall</b> — your <b>Catalyst\'s 💨</b> is your <b>Pace</b>. If your Pace is <b>below</b> this number the dark catches you: the card in your <b>ARSENAL</b> is discarded, and your 🕯️ candle goes out.<br><br>' +
-            'So a fight punishes you in <b>blood</b> and a journey punishes you in <b>cards and time</b>.' },
+      body: 'The same cards, measured differently. Your Spell is how far you get, compared to the road\'s <b>MP</b>. Complete, Narrow at half, Loss below.<br><br>⏳ <b>Time Penalty</b> — anything short of a Complete costs you time. You cannot <b>sharpen</b> your cards at the Wheel for this many encounters. A fight costs you cards; a journey costs you growth.<br><br>🌙 <b>Nightfall</b> — your Catalyst\'s 💨 is your Pace. If your Pace is below this number, the card in your <b>ARSENAL</b> is discarded and your 🕯️ candle goes out.' },
     { title: 'Your deck is your health',
-      body: 'There is no health bar. When something damages you, you <b>blunt your own cards</b> to absorb it.<br><br>' +
-            '• Each card you blunt <b>drops one level</b> and soaks its printed <b>🛡️ armour</b>.<br>' +
-            '• A card showing <b>🛡️ —</b> cannot soak at all.<br>' +
-            '• A card already at <b>Lv1</b> does not drop — it <b>leaves your deck for the rest of the run</b>.<br>' +
-            '• If your cards cannot absorb it all, <b>the run ends there</b>.<br><br>' +
-            'So every fight costs you something real, and the dragon at the end is a race between <b>its HP</b> and <b>how many cards you have left</b>.<br><br>' +
-            'You will lose runs. That is the game working — you learn the shapes, unlock more, and come back.' },
+      body: 'There is no health bar. You pay damage with cards: you choose which cards <b>block</b> it.<br><br>• A card blocks its printed 🛡️ number and drops one level.<br>• A card showing 🛡️ — cannot block.<br>• A card already at Lv1 does not drop a level. It leaves your deck for the rest of the run.<br>• If your cards cannot cover the whole hit, the run ends.<br><br>So every fight costs you cards, and at the dragon you are racing its HP against how many cards you have left.<br><br>You will lose runs. You keep the materials and the xp, unlock more, and go again.' },
   ],
   // 🎓 REACTIVE LESSONS — the tutorial watches what you DO and speaks to it. Each has a when()
   // exactly like an EVENT does, fires at most once, and may POINT at the thing it is talking
@@ -998,124 +2024,141 @@ const TUTORIAL = {
     // read enemy → arrange cards → confirm.
     { id: 'f-hp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(1)',
-      text: '❤️ <b>HP</b> is what it takes to put it down. Deal that much and you <b>Complete</b> the fight. ' +
-            'Reach the <b>half</b> and it is a <b>Narrow</b> — you win through, but it still hits you back.' },
+      text: '❤️ <b>HP</b> is what it takes to put it down. Deal that much for a <b>Complete</b>. Deal <b>half</b> for a <b>Narrow</b> — you get past it, but it hits you back.' },
     { id: 'f-init', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
       // ⚠️ initLost is `e.init > init`, so a TIE WINS. "Has to beat" was wrong by one.
-      text: '💨 <b>Init</b> is what your <b>Catalyst</b> must <b>match or beat</b> — a tie goes to you. ' +
-            'Win and it never touches you on the way in; lose and it <b>bites first for its ⚔️</b>, even if your blow then kills it.' },
+      text: '💨 <b>Init</b> is what your Catalyst must match or beat. A tie goes to you. Lose it and the creature strikes first for its ⚔️, even if your blow then kills it.' },
     { id: 'f-atk', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⚔️ <b>Atk</b> is what it does to you — once if it strikes first, and again if you fail to Complete. ' +
-            'You pay that in <b>cards</b>, so a small number is not a small thing.' },
+      text: '⚔️ <b>Atk</b> is what it deals to you: once if it strikes first, and again if you fail to Complete. You pay it with cards.' },
     { id: 'f-shape', when: () => isAssignPhase() && S.encounter && S.encounter.shape,
       point: '#encounter-panel .enc-stats span:nth-child(4)',
-      text: 'Its <b>shape</b> is how it defends. 🛡️ <b>Armour</b> shaves a flat amount off <i>any</i> blow, so it wants <b>one big hit</b>. ' +
-            '🌀 <b>Evasion</b> halves you unless you <b>strike first</b>. The shape decides what your turn should be.' },
+      text: 'Its defence changes what your blow is worth. 🛡️ <b>Armour N</b> takes N off every hit. 🌀 <b>Evasion</b> halves your hit unless you win Initiative.' },
+    // 🛡️ EQUIPMENT (2026-08-23, Thomas: *"we need to teach the equipment(armor) stuff"*).
+    // 🔴 The tutorial has dealt you the full Adventurer's set since the day armour shipped and
+    // never said a word about it — four pieces on screen, from turn one, unexplained.
+    // 🔑 Placed straight after ⚔️ Atk on purpose: that lesson ends *"you pay that in CARDS"*, and
+    // this is the answer to it. **Teach the cost, then the thing that absorbs the cost.**
+    { id: 'equipment', when: () => isAssignPhase() && (S.armour || []).some(a => armourBlock(a) > 0),
+      point: '#armour-rail .eq',
+      text: '🛡️ This is your <b>equipment</b>. You choose it before the run and it is not part of your deck. A piece blocks a hit the way a card does, but it costs you no cards — it is spent instead, for the rest of the run.' },
+    // 🦴 the carve. Fires the moment loot exists, which in stage 0 is the first fight you win.
+    { id: 'carve', when: () => S.phase === 'reveal' && Object.keys(S.loot || {}).length > 0,
+      point: '.haul, .pv-carve',
+      text: '🦴 Creatures drop <b>materials</b>. You keep them whether you win or lose the run. Spend them at the ⚒️ Workshop to forge equipment for next time.' },
     { id: 'f-coin', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'fight',
       point: '#encounter-panel .enc-stats span:nth-child(5)',
-      text: '🪙 What it pays. Coins buy levels between encounters — and they <b>keep</b>, so you can save for something better.' },
+      text: '🪙 What it pays. Coins buy card levels and charms between encounters, and unspent coins carry over.' },
     // 👣 the journey panel asks a different question and gets its own walkthrough
     { id: 'j-mp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(1)',
-      text: '👣 A journey wants <b>distance</b>, not damage — the same cards, read a different way. Beat its <b>MP</b> to arrive; reach half and you get there late.' },
+      text: '👣 A journey measures distance instead of damage, using the same cards. Beat its MP to arrive. Reach half and you arrive late.' },
     { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '🌙 <b>Nightfall</b> races your <b>Catalyst</b>. If its Initiative is lower than this, the dark catches you and takes the card in your <b>Arsenal</b>.' },
+      text: '🌙 Nightfall races your Catalyst\'s 💨. If yours is lower, you lose the card in your Arsenal and your candle goes out.' },
     { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⏳ <b>Time Penalty</b> is what arriving late costs — cards burned off the top of your deck. On a journey you lose <b>time</b>, not blood.' },
+      text: '⏳ <b>Time Penalty</b> is what arriving late costs. You cannot <b>sharpen</b> your cards for this many encounters. A fight costs you cards; a journey costs you growth.' },
 
-    { id: 'slots', when: () => S.turn === 1 && isAssignPhase(),
+    { id: 'slots', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '#slots-panel',
-      text: 'Your four cards sit under four labels — <b>position is the role</b>. Tap two cards to swap them, or tap a card then tap a label.' },
-    { id: 'spent', when: () => S.turn === 1 && isAssignPhase(),
+      text: 'Your four cards sit under four labels. The position is the role. Tap two cards to swap them, or tap a card then tap a label.' },
+    { id: 'spent', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Spell',
-      text: 'The card under <b>SPELL</b> is your action — and it is <b>spent</b>, gone for the rest of the region. The biggest card is not always the one you can afford to lose.' },
-    { id: 'arsenal', when: () => S.turn === 1 && isAssignPhase(),
+      text: 'The card under SPELL is your action, and it is spent for the rest of the region. Weigh that before you play your biggest card.' },
+    { id: 'arsenal', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '.in-Reserve',
-      text: '✋ <b>ARSENAL</b> is the one card you <b>keep</b> into next turn — everything else leaves your hand. ' +
-            'It is the only slot that works the same way for every class, so it is the one anchor that never moves.' },
+      text: '✋ <b>ARSENAL</b> is the one card you keep for next turn. Everything else leaves your hand. Choose it for the hand you want next turn.' },
     // 🕯️ THE CANDLE WAS NEVER TAUGHT (found 2026-08-12) — it is on screen every single turn, it
     // decides whether banking is informed or a bet, and nothing had ever named it.
-    { id: 'candle', when: () => isAssignPhase() && S.candle && !!nextEncounter(),
-      point: '.candle',
-      text: '🕯️ Your <b>candle</b> is lit, so you can see what comes <b>after</b> this — its HP, its speed and its shape. ' +
-            'Plan two encounters, not one.' },
+    // 🗺️ THE MAP ITSELF — the first screen of every run, and it had no lesson because until
+    // today the tutorial had no map. ⚠️ FIRST IN THE LIST, because it is the first thing you see.
+    // 🔑 The tutorial's map is a SPINE then a FORK: region 1 gives one road so you learn what a node
+    // is, region 2 gives two so you learn that the choice is yours. **Teach the noun, then the verb.**
+    { id: 'map', when: () => S.phase === 'map',
+      point: '.mp',
+      text: '🗺️ This is the road ahead. You move up it from the bottom. Each stop is one encounter: ◇ the road, ❓ an event, 🕯️ a hearth. Tap a stop you can reach to take it. Higher up the road forks, so you choose which problem to face.' },
+    // 🕯️ REWRITTEN FOR THE MAP (2026-08-23). The old lesson said *"you can see what comes
+    // after this — its HP, its speed"*, which was true of the QUEUE. `nextEncounter()` returns null
+    // whenever a map exists — its own comment says so — so with the tutorial map this lesson could
+    // never fire, and if it had, it would have described a system that no longer chooses anything.
+    // 🔑 **When a system stops driving something, find every reader that still trusts it** — including
+    // the ones that only teach.
+    { id: 'candle', when: () => S.phase === 'map' && S.candle,
+      point: '.mp-peek, .mp',
+      text: '🕯️ Your <b>candle</b> is lit, so you can read a road before you take it — what waits there and what it asks for. Only a <b>Complete</b> keeps it lit. A Narrow, a loss or nightfall puts it out.' },
     { id: 'candle-out', when: () => isAssignPhase() && !S.candle,
       point: '.candle',
-      text: '🕯️ It went out. Only a <b>Complete</b> keeps it lit — a Narrow or a loss snuffs it, and you travel blind until you come through one cleanly. ' +
-            '<b>That is what a Narrow really costs you.</b>' },
+      text: '🕯️ Your candle is out, so you cannot read the roads ahead. Come through an encounter with a <b>Complete</b> to light it again.' },
     { id: 'couldattune', when: () => isAssignPhase() && !attunedNow() && handHasPair(),
       point: () => { const id = pairPartnerId(); return id ? '.in-' + (zoneOf(id) || 'Spell') : null; },
-      text: 'Two of your cards share an element. Put the matching one under <b>CATALYST</b> and your Spell <b>attunes</b> — it strikes for the bigger ✦ number on its face.' },
+      text: 'Two of your cards share an element. Put the matching one under CATALYST and your Spell attunes: it strikes for the bigger ✦ number on its face.' },
     { id: 'attuned', when: () => isAssignPhase() && attunedNow(),
       point: '.attuned-pair',
-      text: '✦ <b>Attuned.</b> But your Catalyst is also your <b>Initiative</b> — and your fastest card is rarely the one that matches. <b>Strike first, or strike hard?</b>' },
+      text: '✦ <b>Attuned.</b> Your Catalyst sets your Initiative as well, and the matching card is rarely the fastest one. Pick whichever this encounter needs.' },
     // ⚠️ this used to fire on banksNow(), i.e. only once you had ALREADY banked by accident. Now
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
-    { id: 'bank', when: () => isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
+    { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> can fire now — or <b>bank</b> instead: nothing this turn, but next turn you aim its full power at your <b>strike</b> or your <b>speed</b>. ' +
-            'Worth it when this turn is already decided. 🕯️ Your candle shows you what is coming.' },
+      text: 'Your <b>SURGE</b> can fire now, or ⟳ <b>channel</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed. A bigger Surge channels for more.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
+    // ⚠️ POINTS AT THE TOKEN (2026-08-21). It used to point at `.wake-row`, which no longer
+    // exists — a lesson whose target is gone silently rings nothing at all.
     { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
-      point: '.wake-row:not(.bank-row)',
-      text: '🔥 You are holding an <b>Emberwake</b>. Aim it at your <b>strike</b> or your <b>speed</b> — whichever this encounter actually asks for ' +
-            '(🛡️ Armour wants the bigger hit, 🌀 Evasion wants you first). <b>Spend it or lose it</b>: it does not keep.' },
+      point: '#field .tok-wake',
+      text: '🔥 You are holding an <b>Emberwake</b>. Tap it to aim it at your strike or your speed. 🛡️ Armour wants the bigger hit, 🌀 Evasion wants you to go first. Spend it this turn or lose it.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
-      text: 'Damage is soaked by <b>blunting your own cards</b> — tap one and it drops a level. <b>Your deck is your health</b>, so every fight costs you something real.' },
+      text: 'Tap a card to <b>block</b>. It blocks its printed 🛡️ number and drops one level. Block the whole hit or the run ends. Your deck is your health.' },
     { id: 'stack', when: () => S.phase === 'stack',
       point: '#slots-panel',
-      text: '🃏 <b>Reversed</b> lets you choose where each returning card goes — the <b>top</b> of your deck (you will draw it next hand) or the <b>bottom</b> (much later). Without the charm they simply slide under in slot order.' },
+      text: '🃏 Reversed lets you send each returning card to the top of your deck (drawn next hand) or the bottom (much later). Without the charm they slide under in slot order.' },
     // ⚠️ STALE UNTIL 2026-08-12 — this said only "coins buy levels", which described the Wheel from
     // before sharpening was merged onto it. The screen now does BOTH, and the budget split between
     // them is the actual decision, so a lesson naming one half taught the wrong thing.
     { id: 'wheel', when: () => S.phase === 'wheel',
       point: '#controls-panel',
-      text: '🎰 <b>The Wheel.</b> One screen, one purse: <b>sharpen</b> your own cards, or <b>buy</b> what is on the shelf. ' +
-            'A level makes a card <b>more itself</b> — its best stat rises and its worst falls, so a sharpened card is superb in one slot and poor everywhere else. ' +
-            '<b>Deciding between the two IS the shop</b>, so spend knowing you cannot have both.' },
+      text: '🎰 <b>The Wheel.</b> One purse, two things to spend it on: sharpen your own cards, or buy from the shelf. A level raises a card\'s best stat and lowers its worst, so a sharpened card is strong in one slot and weak elsewhere. You cannot afford both, so choose.' },
     { id: 'charm', when: () => S.phase === 'wheel' && S.wheel && (S.wheel.offers || []).some(o => o && o.kind === 'charm'),
       point: '#controls-panel',
-      text: '🎁 A <b>charm</b> lasts the whole run and <b>changes a rule</b> rather than a number — so it can make a different arrangement correct. ' +
-            'Everything you are carrying is shown in the bar at the top, always.' },
+      text: '🎁 A <b>charm</b> lasts the whole run and changes a rule rather than a number. Everything you carry is listed in the bar at the top.' },
     { id: 'potion', when: () => (S.potions || []).length > 0,
       point: '.kit-row',
-      text: '🧪 A <b>potion</b> is one use, spent on a turn <b>you</b> choose, and it lasts that turn only. You can carry ' + POTION_CAP + '. ' +
-            'It buys you a single turn where the arrangement you wanted is legal — so hold it for the turn that needs it.' },
+      text: '🧪 A <b>potion</b> is one use, spent on a turn you choose, and lasts that turn only. You can carry ' + POTION_CAP + '. Hold one for a turn that needs it.' },
     // ⚠️ CURSES ARE A DIFFERENT LESSON FROM CHARMS. They arrive without being bought, and the whole
     // point of `carried()` is that a run-long penalty must be on screen every turn — so the lesson's
     // job is to send you to the status bar, not to explain the individual curse.
     { id: 'curse', when: () => (S.charms || []).some(id => { const c = charmById(id); return c && c.curse; }),
       point: '#status-bar',
-      text: '⚠️ You picked up a <b>curse</b> — a charm that costs you instead of paying you. It sits in the same bar as your boons, ' +
-            'because a penalty you cannot see is one you cannot play around.' },
+      text: '⚠️ You picked up a <b>curse</b>: a charm that costs you instead of paying you. It sits in the same bar as your charms so you can see it every turn.' },
     { id: 'event', when: () => S.phase === 'event',
       point: '#controls-panel',
-      text: '📖 The road throws things at you between encounters. Read the options — some cost coins or a card, and one is usually just <b>walk on</b>. ' +
-            'An option you cannot afford says so instead of hiding.' },
+      text: '📖 <b>Events</b> happen between encounters. Read the options. Some cost coins or a card, and one is usually to walk on. An option you cannot afford says why.' },
     { id: 'verb', when: () => S.hand.some(c => verbOf(c)),
       point: '#slots-panel',
-      text: '✦ A card at <b>Lv4</b> gains a <b>verb</b> — but only in one slot. Move it there and the verb lights up. Blunt it below Lv4 and the verb is gone.' },
+      text: '✦ A card at Lv4 gains a verb, and it only works in one slot. Move the card to that slot and the verb lights up. Block with the card below Lv4 and the verb is gone.' },
     // ✦ the rainbow hand is now taught as a PROBLEM, not as a thing the game fixes for you
     { id: 'rainbow', when: () => S.phase === 'assign' && S.hand.length >= 4 && new Set(S.hand.map(c => elOf(c))).size >= 4,
       point: '#slots-panel',
-      text: 'All four elements, so <b>nothing can pair</b> — no Spell will attune this turn. Some hands simply cannot. Play the best plain line you have, and keep your best card for a hand that can.' },
+      text: 'All four elements, so no two cards pair and nothing can attune this turn. Play the best plain line you have.' },
     // ⚠️ WRITTEN WRONG ONCE (2026-08-12) — the first draft described the press-your-luck "stir band"
     // approach, which was CUT and replaced by this ordinary journey. It was copied out of CLAUDE.md,
     // which still documented the cut version. The lesson must describe LAST_MILE, not the history.
+    // ⭐ THE TWO BARS. Every encounter feeds them, win or lose, and nothing on screen said so.
+    // ⚠️ Fires at the WHEEL rather than the end screen, because the end screen is the one moment a
+    // new player is definitely reading — and a lesson that appears there competes with the grade,
+    // the haul and two moving bars for attention. Teach it while it is still quiet.
+    { id: 'levels', when: () => S.phase === 'wheel' && (S.xpRun || 0) > 0,
+      point: '#status .chip, #controls-panel',
+      text: '⭐ Every encounter earns <b>xp</b>. A clean win pays most, a loss still pays. It fills two bars: your <b>account level</b>, which opens charms any class can use, and this <b>character\'s level</b>, which opens hers. Both are shown when the run ends.' },
     { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
       point: '#encounter-panel',
-      text: '⚔️ <b>The Last Mile</b> — one journey between you and the lair, and it <b>costs you nothing</b>: no Nightfall, no Time Penalty, no hardship, nothing kept. ' +
-            'Everything is reshuffled for the duel afterwards, so this is the one turn in the game where you should <b>empty the tank</b>. ' +
-            'Arrive cleanly and the ' + '<b>dragon starts wounded</b>; scrape in and it starts a little wounded.' },
+      text: '⚔️ <b>The Last Mile</b> is one journey before the lair, and it costs you nothing: no Nightfall, no Time Penalty, no hardship. Every card is reshuffled for the duel afterwards, so play everything you have. Arrive with a <b>Complete</b> and the dragon starts wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
-      text: 'The duel is a <b>race</b>. Two bars: its HP, and your remaining cards. <b>You lose when your cards run out</b>, so every card you soak with is stamina you never get back.' },
+      text: 'The duel is a race between two numbers: its HP, and how many cards you have left. You lose when you run out of cards, so every card you block with is stamina you do not get back.' },
   ],
 };
 // does the hand hold a same-element pair at all, and which card is the partner worth moving?
@@ -1196,6 +2239,7 @@ function dragonShapeText(d) {
   const bits = [];
   if (d.shapes.includes('armour')) bits.push(`🛡️ <b>Armour ${d.shapeV}</b>`);
   if (d.shapes.includes('evasion')) bits.push(`🌀 <b>Evasion</b>`);
+  if (d.shapes.includes('guard')) bits.push(`🧱 <b>Guard ${d.shapeV}</b>`);
   if (d.shapes.includes('relentless')) bits.push(`⏳ <b>Relentless</b>`);
   return bits.join(' + ') || '— unguarded';
 }
@@ -1203,6 +2247,7 @@ function dragonDemand(d) {
   const bits = [];
   if (d.shapes.includes('armour')) bits.push(`it shaves <b>${d.shapeV}</b> off every blow`);
   if (d.shapes.includes('evasion')) bits.push(`it <b>halves</b> any blow it saw coming`);
+  if (d.shapes.includes('guard')) bits.push(`its plates <b>halve your first ${d.shapeV} hit${d.shapeV === 1 ? '' : 's'}</b>`);
   if (d.shapes.includes('relentless')) bits.push(`its breath <b>grows +${RELENTLESS_STEP} every beat</b>`);
   return bits.join(' · ');
 }
@@ -1253,10 +2298,27 @@ const GRADE_KEY = 'emberwick-grades-1' + KEY_NS;
 function bestGrades() {
   try { return JSON.parse(localStorage.getItem(GRADE_KEY) || '{}') || {}; } catch (e) { return {}; }
 }
+// 🏆 THE WALL IS STAGES x CLASSES (2026-08-12) — a grade belongs to the class that earned it.
+//
+// 🔑 THIS IS WHY CLASSES ARE NOT BALANCED TO EQUAL WIN RATES. A cell only means something if it is
+// a real achievement, and the whole point of a second class is that the SAME dragon is a different
+// problem: 🛡️ Armour is easy for the mage and murder for the rogue, 🧱 Guard the reverse. Keeping
+// one grade per stage would average that away and turn the difference into a balance complaint
+// instead of the content it is. See Class_System.md.
+//
+// ⚠️ BACKWARD COMPATIBLE BY CONSTRUCTION: every grade recorded before today was a mage grade,
+// because the rogue did not exist. A bare `"2"` key is therefore read as `"mage:2"`, so nobody
+// loses their wall — and this needed no version bump, the same way `par` did not.
+function gradeKey(stage, clsId) { return (clsId || CLASS.id) + ':' + String(stage); }
+function gradeFor(stage, clsId) {
+  const all = bestGrades();
+  const id = clsId || CLASS.id;
+  return all[gradeKey(stage, id)] || (id === 'mage' ? all[String(stage)] : null) || null;
+}
 function recordGrade(stage, g, won) {
   if (stage == null) return;
   try {
-    const all = bestGrades(), key = String(stage), prev = all[key];
+    const all = bestGrades(), key = gradeKey(stage), prev = gradeFor(stage);
     if (!prev || g.total > prev.total) {
       all[key] = { total: g.total, letter: g.letter, won: !!won };
       localStorage.setItem(GRADE_KEY, JSON.stringify(all));
@@ -1269,13 +2331,44 @@ function recordGrade(stage, g, won) {
 // of things on it. The tutorial carries its own badge on its own menu button now, which is the
 // whole reason it stopped belonging in this total. 🔑 When something moves to a new screen,
 // find every count that still includes it.
+// ⚠️ THE TOTAL IS NOW STAGES x UNLOCKED CLASSES. Counting only the stages would have reported
+// "4 of 4 graded" to someone who has cleared the ladder as the mage and never touched the rogue —
+// a board that says you are finished when half of it is blank. Locked classes are excluded, so the
+// denominator never counts a cell you cannot reach.
 function wallSummary() {
-  const all = bestGrades();
   const stages = DRAGONS.map(d => d.stage);
-  const got = stages.filter(n => all[String(n)]).length;
-  const s_ = stages.filter(n => all[String(n)] && all[String(n)].letter === 'S').length;
-  return { graded: got, total: stages.length, perfect: s_ };
+  const ids = Object.keys(CLASSES).filter(classUnlocked);
+  let got = 0, s_ = 0;
+  for (const id of ids) for (const n of stages) {
+    const g = gradeFor(n, id);
+    if (g) { got++; if (g.letter === 'S') s_++; }
+  }
+  return { graded: got, total: stages.length * ids.length, perfect: s_, classes: ids.length };
 }
+// ============================================================
+// 🗡️ CHOOSING A CLASS (2026-08-12). The rogue opens once you have felled stage 1.
+//
+// ⚠️ THE "unlock by runs PLAYED, never dragons felled" NOTE DOES NOT APPLY HERE. That rule is
+// about CHARM TIERS, which are power — gating power on winning punishes exactly the players who
+// need it. A class is lateral CONTENT, and the ladder itself already gates on dragons felled
+// (clearing a stage opens the next), so this is the existing pattern rather than a new one.
+//
+// 🔑 AND STAGE 1 IS THE RIGHT GATE FOR A TEACHING REASON, not just a pacing one. Cindermaw is
+// 🛡️ Armour — "hit big" — and the rogue is the class that structurally CANNOT hit big. Handing
+// you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
+// ============================================================
+const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
+function classUnlocked(id) { return id === 'mage' || stagesCleared() >= 1; }
+function pickedClassId() {
+  try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
+  catch (e) { return 'mage'; }
+}
+function pickClass(id) {
+  if (!CLASSES[id] || !classUnlocked(id)) return;
+  try { localStorage.setItem(CLASS_KEY, id); } catch (e) {}
+  render();
+}
+
 function stagesCleared() {
   try { return Math.max(0, Math.min(DRAGONS.length, +localStorage.getItem(LADDER_KEY) || 0)); }
   catch (e) { return 0; }
@@ -1316,7 +2409,65 @@ function dragonForStage(n) { return DRAGONS.find(d => d.stage === n) || DRAGONS[
 // 46% Narrow / 3% Loss - which is the point: a bonus earned about half the time and graded the
 // rest, instead of the old Approach's all-or-nothing cliff. Dragon HP was retuned with it
 // (40/44/56/44 -> 44/47/60/42) to land the curve at 85 / 58 / 48 / 36.
-const LAST_MILE = { mp: 16, hpComplete: 14, hpNarrow: 7 };
+// ⚔️ THE LAST MILE — ONE hand, TWO races (second race added 2026-08-21, Thomas).
+//
+// 🔑 IT USED TO ASK ONE QUESTION AND PRINT TWO. `nightfall: 0` meant the Pace line on screen was a
+// race that COULD NOT BE LOST — a term displayed doing nothing, which is the opposite of legible
+// math. Thomas: *"the first MP part, is there only an MP check, nothing else? initiative check
+// too, there should be some sort of consequence as well."*
+//
+// 🔑 AND THE FICTION ALREADY PROMISED IT. *"You fall on it before it stands"* is a claim about
+// SPEED, and it was being paid out by a DISTANCE number. So the two races buy two different things:
+//   👣 MOVE  vs its MP        → how hurt it starts   (dragon HP — unchanged, already tuned)
+//   💨 PACE  vs its INITIATIVE → whether it is ready for you (its SHAPE, and the opening blow)
+//
+// 🔑 THE BOON HALF IS NOT NEW MACHINERY — IT IS THREE FIELDS THAT HAVE BEEN WIRED TO ZERO SINCE
+// 2026-08-05. `dragonState.boon = { armourCut, unseen, calm }` is one softener per defence shape,
+// read by duelArmour() / duelStrike() / duelCounter(), with display strings ("cracked", "unseen
+// you (N left)") that could never fire. They were the clean-Approach reward, deleted with the
+// Approach; the comment left behind said *"a future reward may fill them again."* This is it.
+// ⚠️ [[Balance_Log]]: that boon was worth **+41 points at stage 4** and nothing had replaced it.
+//
+// 🔑 WHY THE PENALTY IS A SOAK, AND WHY THAT IS THE ONLY HONEST COST HERE (Thomas's call):
+// everything re-gathers for the duel, so a Time Penalty or a deck-ORDER cost at the lair is
+// PHANTOM — which is exactly why the old Approach's costs were deleted rather than tuned. But a
+// SOAK downgrades cards permanently and a Lv1 soaked is TRASHED outright, so it carries into the
+// duel as lost levels and lost stamina. Measured: 1 card of duel stamina ≈ 8 points of win rate.
+// ⚠️ AND IT DOES NOT BREAK THE PROMISE THE LAST MILE MAKES. *"Hold nothing back"* is about what you
+// PLAY, and playing still costs nothing — every card you play comes back. Only FAILING costs.
+//
+// ⚠️ BANDS ARE SET FROM THE MEASUREMENT, NOT THE FICTION (dev/lastmile-probe.js, n=120/class).
+// Pace runs a median of 5-6 against a dragon Initiative of 7-10, so "beat its Initiative" is an
+// 18%/27% event — right for a top band — and "below half" is 34% mage / 22% rogue.
+// 🔑 The mage eats the penalty more BECAUSE SHE IS SLOWER, and that is legitimate class texture:
+// classes differ in HOW HARD, never in WHETHER.
+const LAST_MILE = {
+  mp: 16, hpComplete: 14, hpNarrow: 7,
+  // 🌒 what arriving unheard softens — ONE tick of whatever the shape is.
+  // ⚠️ Deliberately gentle on first ship. These are the biggest levers in the game; raise them
+  // from a measurement, never from an argument.
+  armourCut: 2,     // 🛡️ Armour −2
+  unseenBeats: 1,   // 🌀 Evasion sleeps this many beats
+  calmBeats: 1,     // ⏳ the breath holds steady this many beats
+};
+// what arriving unheard is actually worth against THIS dragon — read off its shape rather than
+// stated in prose, so the briefing can never promise a softening the duel does not grant.
+function unseenPromise() {
+  const bits = [];
+  if (hasShape('armour'))     bits.push(`its plate is not set (<b>Armour −${LAST_MILE.armourCut}</b>)`);
+  if (hasShape('evasion'))    bits.push(`<b>Evasion sleeps ${LAST_MILE.unseenBeats}</b> beat${LAST_MILE.unseenBeats === 1 ? '' : 's'}`);
+  if (hasShape('relentless')) bits.push(`<b>its breath holds ${LAST_MILE.calmBeats}</b> beat${LAST_MILE.calmBeats === 1 ? '' : 's'}`);
+  return bits.length ? bits.join(' and ') + '.' : 'it has nothing to set — this one guards nothing.';
+}
+// which of the three bands this Pace lands in. ONE place decides, so the briefing, the beat
+// display, the resolution and the bot can never disagree about what the race was.
+function lastMileApproach(pace) {
+  const di = (S.dragon && S.dragon.init) || 0;
+  if (!di) return 'even';
+  if (pace >= di) return 'unseen';
+  if (pace >= Math.ceil(di / 2)) return 'even';
+  return 'heard';
+}
 const ELEMENTS = ['Fire', 'Water', 'Lightning', 'Stone'];
 // dragonWeakness CUT 2026-07-29 — "weakness = the elements it does not shield" cannot survive
 // the move to shapes, and a shape has no colour. What replaced it is the SHAPE ITSELF: the
@@ -1336,6 +2487,9 @@ function shapeText(e) {
   const bits = [];
   if (foeHas(e, 'armour')) bits.push(`🛡️ <b>Armour ${e.shapeV}</b> — needs one big hit`);
   if (foeHas(e, 'evasion')) bits.push(`🌀 <b>Evasion</b> — halves your hit unless you strike first`);
+  // 🧱 states the demand in HITS, because that is the unit it charges in — "absorbs 2 damage" would
+  // be a lie about a pool that counts blows, and a shape you misread is a shape you cannot answer.
+  if (foeHas(e, 'guard')) bits.push(`🧱 <b>Guard ${e.shapeV}</b> — halves your first ${e.shapeV} hit${e.shapeV === 1 ? '' : 's'}, so it wants MANY`);
   return bits.join(' + ') || '— unguarded';
 }
 
@@ -1348,21 +2502,41 @@ function shapeText(e) {
 // ============================================================
 const CHARMS = [
   { id: 'emberheart', tier: 1,  name: 'Emberheart',      rarity: 'common', cost: 5,
-    text: '🔥 Fire cards gain +1 armor',            mods: { armor: 1, el: 'Fire' } },
+    text: '🔥 Fire cards gain +1 armour',            mods: { armor: 1, el: 'Fire' } },
   { id: 'tideglass', tier: 1,   name: 'Tideglass Bead',   rarity: 'common', cost: 5,
-    text: '💧 Water cards gain +1 armor',           mods: { armor: 1, el: 'Water' } },
+    text: '💧 Water cards gain +1 armour',           mods: { armor: 1, el: 'Water' } },
   { id: 'stormpin', tier: 1,    name: 'Storm Pin',        rarity: 'common', cost: 6,
     text: '⚡ Lightning cards strike +1',            mods: { atk: 1, el: 'Lightning' } },
   { id: 'nightveil', tier: 1,   name: 'Nightveil',        rarity: 'common', cost: 6,
     text: '🪨 Stone cards strike +1',               mods: { atk: 1, el: 'Stone' } },
   { id: 'swiftwick', tier: 2,   name: 'Swiftwick',        rarity: 'uncommon', cost: 8,
     text: '💨 +1 Initiative every turn',             mods: { init: 1 } },
+  // 🔑 THE RUN LAYER OWES YOU INITIATIVE, NOT THE CARD TABLE (Thomas, 2026-08-17): *"right now we
+  // don't have something that helps initiative, that would come from potions or charms, and
+  // definitely lvling up cards."* Audited on the spot: exactly ONE positive Initiative charm
+  // existed in 32 (Swiftwick, +1, tier 2), against three potions - so the only place speed could
+  // come from was the printed number, which is precisely why that number had inflated to 18.
+  // ⚠️ AND THE SHAPES HAD NO ANSWERS AT ALL: zero charms named 🌀 Evasion, zero named
+  // 🛡️ Armour, one named 🧱 Guard. The three defence shapes ARE the combat design, and the
+  // run layer could not engage with two of them.
+  { id: 'quickwick', tier: 1,   name: 'Quickwick',        rarity: 'uncommon', cost: 9,
+    text: '💨 +2 Initiative every turn',             mods: { init: 2 } },
+  // 🌀 the first answer to Evasion in the game. Lateral by construction: it adds no damage, it
+  // narrows WHEN the shape applies - so a slightly slower card becomes a legal choice, which is a
+  // different arrangement rather than a bigger number.
+  { id: 'windreader', tier: 2,  name: 'Windreader',       rarity: 'rare', cost: 12, rule: true,
+    text: '🌀 <b>Evasion</b> only halves you if it beats your Initiative by <b>3</b>' },
+  // 🛡️ and the first answer to Armour. ⚠️ Deliberately flat rather than a multiplier: Armour
+  // is subtracted per HIT, so a percentage would swing wildly between a mage (1 hit) and a rogue.
+  { id: 'ironsplit', tier: 2,   name: 'Ironsplitter',     rarity: 'uncommon', cost: 10, rule: true,
+    text: '🛡️ <b>Armour</b> takes <b>2 less</b> off every hit' },
   { id: 'lanternpace', tier: 2, name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
     text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
   { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
-    text: '➕ Your Surge gives +1 more',            mods: { boost: 1 } },
+    cls: 'mage',   // 🔴 dead for a class with no boost stat — see Bitterroot
+    text: '➕ Your {slot:Boost} gives +1 more',        mods: { boost: 1 } },
   { id: 'wardstone', tier: 2,   name: 'Wardstone',        rarity: 'uncommon', cost: 9,
-    text: '🛡️ Every card soaks +1',                  mods: { soak: 1 } },
+    text: '🛡️ Every card blocks +1',                  mods: { soak: 1 } },
   { id: 'coinpurse', tier: 1,   name: "Pilgrim's Purse",  rarity: 'common', cost: 6,
     text: '🪙 +2 coins from every encounter',        mods: { coin: 2 } },
   // ❌ FOUR ARCHETYPE-GATED CHARMS WERE CUT HERE (2026-08-05, Thomas) — see the note above
@@ -1370,7 +2544,7 @@ const CHARMS = [
   { id: 'brightwick', tier: 3,  name: 'Brightwick',       rarity: 'rare', cost: 14,
     text: '⚔️ All cards strike +1',                  mods: { atk: 1 } },
   { id: 'oathstone', tier: 3,   name: 'Oathstone',        rarity: 'rare', cost: 14,
-    text: '🛡️ All cards gain +1 armor',              mods: { armor: 1 } },
+    text: '🛡️ All cards gain +1 armour',              mods: { armor: 1 } },
 
   // ☠️ CURSES — charms with negative mods. Never sold on the Wheel; you take one as the PRICE of
   // something in an Event. The engine already sums mods, so a negative charm needs no new
@@ -1380,9 +2554,10 @@ const CHARMS = [
   { id: 'dulledge',    name: 'Dulled Edge',      rarity: 'curse', curse: true, cost: 0,
     text: '⚔️ Every card strikes −1',                 mods: { atk: -1 } },
   { id: 'dampwick',    name: 'Damp Wick',        rarity: 'curse', curse: true, cost: 0,
-    text: '➕ Your Surge gives −2',                  mods: { boost: -2 } },
+    cls: 'mage',   // 🔴 A CURSE THAT COSTS THE ROGUE NOTHING IS A GIFT. Worst of the three.
+    text: '➕ Your {slot:Boost} gives −2',              mods: { boost: -2 } },
   { id: 'thinplate',   name: 'Thin Plate',       rarity: 'curse', curse: true, cost: 0,
-    text: '🛡️ Every card soaks −1',                  mods: { soak: -1 } },
+    text: '🛡️ Every card blocks −1',                  mods: { soak: -1 } },
   { id: 'tithe',       name: 'The Tithe',        rarity: 'curse', curse: true, cost: 0,
     text: '🪙 −2 coins from every encounter',        mods: { coin: -2 } },
   { id: 'longshadow',  name: 'Long Shadow',      rarity: 'curse', curse: true, cost: 0,
@@ -1415,7 +2590,7 @@ const CHARMS = [
 const RULE_CHARMS = [
   // ---- GENERIC: engine rules, so every future class inherits these unchanged ----
   { id: 'unspent', tier: 4,  name: 'Unspent',       rarity: 'rare', cost: 13, rule: true,
-    text: '✦ Complete an encounter and your <b>Spell is not spent</b> — it slides under the deck instead',
+    text: '✦ Complete an encounter and your <b>{slot:Spell} is not spent</b> — it slides under the deck instead',
     why: 'the smallest sufficient Spell becomes the whole game' },
   { id: 'reversed', tier: 1, name: 'Reversed',      rarity: 'uncommon', cost: 9, rule: true,
     text: '🃏 <b>Choose</b> where your returning cards go — each to the <b>TOP</b> or the <b>BOTTOM</b> of your deck',
@@ -1423,23 +2598,129 @@ const RULE_CHARMS = [
   { id: 'slowfoot', tier: 3, name: 'Slow Strength', rarity: 'uncommon', cost: 10, rule: true,
     text: '💨 <b>Lose Initiative</b> and your strike is <b>+4</b>',
     why: 'a second answer to 🛡️ Armour, and slow hands stop being dead' },
+  // ============================================================
+  // 🎁 THE ANTI-SYNERGY SET (2026-08-24). Thomas: *"i like anti synergy idea. we need more
+  // build variety. thats a big missing thing. runs should hopefully feel different from each
+  // other. but right now they feel pretty much the same."*
+  // 🔑 THE RULE THEY ARE BUILT ON: charms must not all ADD, or a build is only ever *take the
+  // biggest*. These come in OPPOSING PAIRS, so which two you hold decides what a good turn even
+  // looks like - and holding both halves of a pair is deliberately close to worthless.
+  //   ⚖️ Even Keel  <->  🗡️ Keen Edge   - a FLAT deck against a SHARPENED one
+  //   🧱 Ironbound  <->  💔 Glass Heart - KEEP every card against SPEND them for power
+  // ⚠️ ALL SIX ARE GENERIC (no `cls`), which is the better investment: +1 class = xN refresh,
+  // and the ENGINE owns nearly every rule while the mage owns exactly one. Each names something
+  // PRINTED - a value, a level, the 🃏 Standing - never an element or an archetype.
+  // ============================================================
+  { id: 'evenkeel', tier: 2, name: 'Even Keel', rarity: 'uncommon', cost: 10, rule: true,
+    text: '⚖️ If no two cards in hand differ by more than <b>2</b> in value, your strike is <b>+3</b>',
+    why: 'pays you for the flat hand - and sharpening is what breaks it' },
+  { id: 'keenedge', tier: 2, name: 'Keen Edge', rarity: 'uncommon', cost: 10, rule: true,
+    // ⚠️ *hits*, not *strikes*: with the placeholder in place the rogue read "Your Strike
+    // strikes". 🔑 A placeholder fixes the NOUN; the sentence around it still has to survive
+    // every noun that can land in it.
+    text: '🗡️ Your {slot:Spell} hits <b>+2 for every level above Lv2</b>',
+    why: 'the opposite bet to Even Keel - sharpen one card and lean on it' },
+  { id: 'ironbound', tier: 3, name: 'Ironbound', rarity: 'rare', cost: 12, rule: true,
+    text: '🧱 A card that blocks never drops below <b>Lv2</b>',
+    why: 'the deck can be bruised but never blunted, and never lost' },
+  // 💔 GLASS HEART WAS CUT ON THE DAY IT WAS WRITTEN (2026-08-24). It was meant to be
+  // Ironbound's opposite - *spend the deck for power* - and it was measured three times in three
+  // shapes, all of which came back three times stronger than the best charm in the game:
+  //   +6, cost = the soaking card is DESTROYED        -> **+39.9 road Complete**
+  //   +3, cost = the soaking card loses TWO levels    -> **+27.7**
+  //   +5, cost = your sharpest card dulls each encounter (unconditional) -> **+34.2**
+  // 🔑 THE LAW THIS EARNED, WHICH IS WORTH MORE THAN THE CHARM: **A FLAT, UNCONDITIONAL STRIKE
+  // BONUS IS WORTH ROUGHLY +7 ROAD COMPLETE PER POINT.** Every healthy charm in this game is
+  // CONDITIONAL - Cold Iron +3 when unattuned reads +12.6, Even Keel +3 on a flat hand reads +9.1 -
+  // because the condition is what stops it applying on the turns that were already won.
+  // ⚠️ AND NO COST COULD BUY IT BACK. Thirteen deck levels a run - 40% of the starting deck -
+  // did not offset five points of strike, because levels are paid at the LAIR while the bonus is
+  // collected on every one of ~13 encounters. **A cost denominated in a late resource cannot price
+  // a benefit collected early.**
+  // ✅ So the template for any future charm is: *a bonus, PLUS the condition that makes it a
+  // decision*. A charm with no condition is not a charm, it is a difficulty setting.
+  // 🎯 FORKED STRIKE. 🔴 IT FIRST SHIPPED AS *"after you Complete, your next strike splits"* AND
+  // MEASURED **+0.4 road C / -3 win** - inert, and slightly a liability.
+  // 🔑 THE LESSON, WHICH APPLIES TO ALL THREE OF THESE ITEMS: **A LATERAL EFFECT MUST BE
+  // OPTIONAL, OR IT IS A COIN FLIP YOU DID NOT CALL.** A damage bonus can be unconditional because
+  // more is always better; splitting a blow is a SHAPE change that is strictly worse into
+  // 🛡️ Armour, so forcing it on you is a liability roughly as often as it is a gift.
+  // ✅ So it is pointed at the shape it answers instead. 🧪 The POTION keeps the unconditional
+  // version because **you choose the turn** - that is the same effect made optional by its
+  // delivery, which is the whole distinction.
+  // ✅ AND IT FILLS A RECORDED HOLE: charms answer 🌀 Evasion (Windreader) and 🛡️ Armour
+  // (Ironsplitter), and **🧱 Guard had none**. Narrow by design, exactly as those two are.
+  { id: 'forkedstrike', tier: 3, name: 'Forked Strike', rarity: 'rare', cost: 12, rule: true,
+    text: '🎯 Against 🧱 <b>Guard</b>, your strike <b>splits in two</b>',
+    why: 'the first charm that answers a breakable pool' },
+  { id: 'bloodied', tier: 2, name: 'Bloodied', rarity: 'uncommon', cost: 10, rule: true,
+    text: '🃏 While your deck is <b>below par</b>, your strike is <b>+3</b>',
+    why: 'the 🃏 Standing stops being a warning and becomes a resource' },
+  // 🛡️ BRACE WAS CUT THE DAY IT WAS WRITTEN (2026-08-24) - *one card may soak more than once
+  // in the same encounter*. Two independent reasons, either of which was enough:
+  //  1. **It measured +4.1 road Complete and MINUS 23 stage win.** It buys the road with the lair:
+  //     you drive one card into the ground and arrive with fewer deck levels, which is the single
+  //     strongest predictor of the duel. ⚠️ That is the ✦ Held Ember shape - *a charm you should
+  //     regret buying* - and the bot makes it worse, because a one-encounter scorer collects the
+  //     road benefit and cannot see the bill.
+  //  2. 🔴 **IT MADE 🧱 IRONBOUND INFINITE.** Ironbound keyed off `S.downgraded.size === 1`, and
+  //     `Set.add` of an id already present leaves the size at 1 - so with both charms held, EVERY
+  //     soak for the whole encounter was free, forever.
+  // 🔑 THE LESSON IS THE SECOND ONE: **a charm that removes a UNIQUENESS constraint silently
+  // rewrites every rule that was counting on it.** `S.downgraded` was doing two jobs - *which cards
+  // have soaked* and *how many times has this happened* - and Brace only meant to change the first.
+  // Ironbound is stateless now for exactly that reason.
   // ---- MAGE: the one rule this class owns is PAIRING ----
-  { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, mage: true,
+  { id: 'threekind', tier: 4, name: 'Three of a Kind', rarity: 'rare', cost: 14, rule: true, cls: 'mage',
     text: '✦ Spell, Catalyst <i>and</i> Surge sharing an element — your strike <b>doubles</b>',
     why: 'pair attunes, three resonates' },
-  { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, mage: true,
-    text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>half</b> the bonus',
-    why: 'ceiling traded for consistency' },
-  { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, mage: true,
+  { id: 'looseweave', tier: 1, name: 'Loose Weave',  rarity: 'uncommon', cost: 10, rule: true, cls: 'mage',
+    text: '✦ <b>Any</b> Catalyst attunes your Spell, but an unmatched one gives only <b>a third</b> of the bonus',
+    why: 'no hand is ever dead' },
+  { id: 'secondflame', tier: 3, name: 'Second Flame', rarity: 'rare', cost: 13, rule: true, cls: 'mage',
     text: '✦ Your <b>Surge</b> can attune the Spell too — freeing the Catalyst to be pure speed',
     why: 'the Catalyst stops serving two masters' },
-  { id: 'coldiron', tier: 3, name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, mage: true,
+  { id: 'coldiron', tier: 3, name: 'Cold Iron',      rarity: 'uncommon', cost: 10, rule: true, cls: 'mage',
     text: '✦ Your <b>unattuned</b> strikes are <b>+3</b>',
     why: 'the anti-pairing build — and it makes a hand with no pair a plan instead of a punishment' },
-  { id: 'kindledarsenal', tier: 4, name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, mage: true,
+  { id: 'kindledarsenal', tier: 4, name: 'Kindled Arsenal', rarity: 'rare', cost: 12, rule: true, cls: 'mage',
     text: '✦ Your <b>Arsenal</b> can attune the Spell as well',
     why: 'the one slot with no job in the maths gets one' },
-  { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, mage: true,
+  // 🗡️ THE ROGUE'S SIX. Same bar as the mage's: each must NAME SOMETHING PRINTED ON THE CARD
+  // (the combo partner is printed, so the chain is fair game), must make a DIFFERENT arrangement
+  // correct, and must still hand you a different hand tomorrow.
+  // ⚠️ Gating alone would have EMPTIED 🏕️ Setting Out for the rogue — the phase only starts if the
+  // offer list is non-empty, which is exactly how the first charm-tiering silently deleted that
+  // whole screen on stage 1. A pool filter without a pool is a missing feature, not a filter.
+  { id: 'whetstone', tier: 1, name: 'Whetstone',     rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
+    // ⚠️ "so a long chain gains the most" was DOUBLY dead: the chain is gone, and the rogue's
+    // compose() returns hits: 1 always, so there is never more than one hit to multiply.
+    text: '🗡️ Your strike gains <b>+1</b>' },
+  // 🔑 THE DELIBERATE ANTI-SYNERGY, and the rogue's Cold Iron: the one charm that makes a BROKEN
+  // chain something you wanted. Without it every rogue charm pulls the same way, and a class whose
+  // charms all agree has no build to discover.
+  // ⚠️ its text still said "while your chain is 1" long after the chain was deleted; the CODE always
+  // read momentum === 0. Under a streak that means *just broken*, so it now pays you for the wreck —
+  // deliberate anti-synergy with every other rogue charm, the way ✦ Cold Iron is for the mage.
+  { id: 'lonefang', tier: 1, name: 'Lone Fang',      rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
+    text: '🗡️ While your Momentum is <b>0</b>, your strike gains <b>+4</b>' },
+  { id: 'twinblades', tier: 2, name: 'Twin Blades',  rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
+    // ⚠️ WAS "counts as the previous card" - pure CHAIN language, and the chain was deleted two
+    // redesigns ago. The CODE was always fine: it lets the Arsenal complete a pair. Only the
+    // sentence was describing a mechanic that no longer exists.
+    text: '🗡️ Your <b>Arsenal</b> can complete a pair too — the combo fires from either slot' },
+  { id: 'deepcut', tier: 3, name: 'Deep Cut',        rarity: 'rare', cost: 13, rule: true, cls: 'rogue',
+    text: '🧱 <b>Guard</b> swallows one fewer hit' },
+  // ⚠️ REWRITTEN WITH THE CLASS (2026-08-12). Both of these named the CHAIN, which no longer
+  // exists — a charm whose subject has been deleted is worse than a missing charm, because it still
+  // takes a slot in the offer and still reads as a rule.
+  // 🔑 A FLOOR, NOT AN OFF SWITCH: "Momentum never breaks" would delete the minigame outright.
+  // A charm may bend the class's question, never answer it.
+  { id: 'secondnature', tier: 4, name: 'Second Nature', rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
+    text: '🗡️ When your Momentum breaks it falls to <b>2</b>, not 0' },
+  { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
+    text: '🗡️ <b>Complete</b> an encounter and Momentum rises by <b>2</b>' },
+  { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
     text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
     why: 'attuning stops costing you tempo' },
 ];
@@ -1453,7 +2734,7 @@ function evGrantPotion(id) {
   if (!p) return 'Nothing comes of it.';
   if ((S.potions || []).length >= POTION_CAP) return `Your kit is full — you leave the ${p.name} where it is.`;
   S.potions.push(id);
-  return `🧪 ${p.name} goes in your kit — ${p.text}`;
+  return `🧪 ${p.name} goes in your kit — ${classText(p.text)}`;
 }
 // a random potion you can actually carry, biased to the cheap ones for free gifts
 function evRandomPotion(rare) {
@@ -1467,7 +2748,7 @@ function evGrantCharm(id) {
   if (!c) return 'Nothing comes of it.';
   if (S.charms.includes(id)) return `You already carry ${c.name}.`;
   S.charms.push(id);
-  return c.curse ? `☠️ You take on ${c.name} — ${c.text}` : `🎁 ${c.name} — ${c.text}`;
+  return c.curse ? `☠️ You take on ${c.name} — ${classText(c.text)}` : `🎁 ${c.name} — ${classText(c.text)}`;
 }
 // a curse you don't already carry, for Events that charge one as a price.
 // 🔑 It must never be the curse that exactly UNDOES what you were just given: the Mirror Fen could
@@ -1475,7 +2756,9 @@ function evGrantCharm(id) {
 // invisible and the whole event read as "nothing happened, and also you are worse off tomorrow".
 // A gamble whose faces silently annihilate each other is not a gamble, it is a non-event.
 function randomCurse() {
-  let pool = CHARMS.filter(c => c.curse && !(S.charms || []).includes(c.id));
+  // ⚠️ CURSES GO THROUGH THE SAME GATE. 💧 Damp Wick (−2 Surge) was a free pass for any class
+  // without a Surge - the rogue simply could not be cursed by it.
+  let pool = CHARMS.filter(c => c.curse && charmFitsClass(c) && !(S.charms || []).includes(c.id));
   if (S.paceBless > 0) { const p = pool.filter(c => !(c.mods && c.mods.pace)); if (p.length) pool = p; }
   return pool.length ? rand(pool) : null;
 }
@@ -1486,7 +2769,7 @@ function evLiftCurse() {
   if (!held.length) return 'You carry nothing that needs lifting.';
   const id = rand(held);
   S.charms = S.charms.filter(x => x !== id);
-  return `✨ ${charmById(id).name} lifts from you — ${charmById(id).text} is gone.`;
+  return `✨ ${charmById(id).name} lifts from you — ${classText(charmById(id).text)} is gone.`;
 }
 function curseCount() { return (S.charms || []).filter(id => (charmById(id) || {}).curse).length; }
 // 🔑 GETTING A LOST CARD BACK (2026-07-27). Trashing is permanent and it compounds: measured,
@@ -1547,6 +2830,30 @@ function charmMod(key, el) {
   return t;
 }
 
+// 🎁 THE RULE CHARMS THAT ADD TO A STRIKE, IN ONE PLACE, CALLED FROM BOTH VALUE BRANCHES.
+// 🔑 Extracted on the FIRST day it had two callers rather than the fourth - the arrangement
+// search reached FOUR copies before anyone pulled it out, and every copy after the first had
+// silently missed a rule.
+// ⚠️ ENGINE-ONLY BY CONSTRUCTION: it reads a card's LEVEL and VALUE and the 🃏 Standing, all
+// printed and class-blind. It must never learn an element or an archetype.
+function charmStrike(spell) {
+  let t = 0;
+  // ⚖️ EVEN KEEL - the flat hand, normally the BAD hand, becomes the plan.
+  // 🔑 Its anti-synergy is with the upgrade economy itself: every level you buy widens the
+  // spread that switches it off, so holding it makes SHARPENING a decision instead of a default.
+  if (hasCharm('evenkeel') && S.hand && S.hand.length > 1) {
+    const vals = S.hand.map(c => eff(c).value);
+    if (Math.max(...vals) - Math.min(...vals) <= 2) t += 3;   // ⚠️ 5 measured +14.7 road C
+  }
+  // 🗡️ KEEN EDGE - the exact opposite bet. Holding both is nearly worthless, which is the point.
+  if (hasCharm('keenedge') && spell) t += 2 * Math.max(0, spell.level - 2);
+  // 🃏 BLOODIED - a comeback rule, and the first thing in the game that READS the Standing.
+  // ⚠️ The chip stays a DISPLAY everywhere else; this reads the same two terms it prints, it
+  // does not make the chip an input to anything the chip itself reports.
+  if (hasCharm('bloodied') && S.dragon && S.dragon.par && deckLevels() < S.dragon.par) t += 3;
+  return t;
+}
+
 // ============================================================
 // state
 // ============================================================
@@ -1587,27 +2894,186 @@ const BUILD = (() => {
   catch (e) { return '?'; }
 })();
 
+// ============================================================
+// 📋 PATCH NOTES (2026-08-28) — Thomas: *"lets make a change list/patchnotes file, and update
+// it on every build release. that way i can share updates with playtesters on what got changed"*
+//
+// 🔑 IT LIVES IN `game.js` AND THAT IS THE WHOLE DESIGN DECISION. `cut-playtest.ps1` copies an
+// ALLOW-LIST of seven files, so a new `notes.js` or `PATCHNOTES.md` would have been **excluded by
+// default** and testers would have read release notes that stopped updating the day they were
+// written. The art folder was already missing from that list for two builds for exactly this
+// reason. **Put a thing testers must see inside a file that already ships.**
+// ✅ It also means no second script tag and no second cache-buster — the same argument that keeps
+// the dev menu on `?dev` instead of a second HTML page.
+//
+// 🔑 THIS IS A THIRD REGISTER AND MUST NOT BECOME A SECOND BALANCE LOG.
+//     [[Balance_Log]] — **why** a number moved, with the measurement. For us.
+//     INDEX          — **what happened when**, with the reasoning. For us.
+//     PATCH_NOTES    — **what changed for the PLAYER.** For them. No diagnosis, no percentages
+//                       from the bot, no vault vocabulary.
+// ⚠️ Thomas's own rule for rules text applies here word for word: *"i prefer like, easy to
+// understand, straight to the point. thats how all TCGs are."* One line per change, plain verbs.
+//
+// ⚠️ MARKUP: `<b>` only, like every other content string — Godot wants BBCode later and one
+// flavour of markup is the whole reason that conversion stays cheap.
+// ⚠️ `warn` is for the thing a tester CANNOT work out for themselves: a save that will not load,
+// a piece that changed price, progress that reset. A silent invalidation is the cruellest bug in a
+// playtest because it looks like the tester's fault.
+//
+// 🚨 ADD AN ENTRY EVERY TIME THE CACHE-BUSTER IS BUMPED. `notesCurrent()` checks the newest
+// entry against BUILD and the screen SAYS SO when they disagree, rather than showing the previous
+// build's notes as though they were this one's — the same honesty as the stale-save message.
+// ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
+// ============================================================
+const PATCH_NOTES = [
+  { build: 422, date: '2026-08-28', title: 'Multi-hit works at the lair',
+    changed: [
+      "🐉 A <b>multi-hit</b> card now really lands more than once against a <b>dragon</b>. It never did — two hits did the same damage as one, minus rounding.",
+      "🔥 Your <b>Emberwake</b> now lands on <b>every blow</b>, like potions and ● Momentum pips already did. Channel a big one, then strike twice.",
+    ],
+    fixed: [
+      "A dragon's 🛡️ <b>Armour</b> is now subtracted from <b>each</b> blow, the same as everywhere else. Many small hits are worse against Armour — that is the trade.",
+      "A duel beat no longer says <b>LOSS</b>. It was saying that on <b>every</b> beat, even when you took most of the dragon's health. It now tells you what you took off it and what it hits back for.",
+    ] },
+
+  { build: 421, date: '2026-08-28', title: 'The reveal names what charged you',
+    fixed: [
+      'A ⏳ <b>Time Penalty</b> in a <b>fight</b> now says what caused it. Only the ⚠️ <b>Hazards</b> hardship can charge one there, and the reveal used to print the penalty with nothing explaining why.',
+    ] },
+
+  { build: 420, date: '2026-08-28', title: 'Cards speak your class',
+    changed: [
+      "Charms, potions and equipment now use <b>your</b> slot names. The rogue reads <b>Strike</b>, <b>Combo</b> and <b>Energy</b> where the mage reads Spell, Catalyst and Surge.",
+    ],
+    fixed: [
+      "🧪 <b>Bitterroot</b>, 🎁 <b>Deep Tinderbox</b> and 💧 <b>Damp Wick</b> did <b>nothing at all</b> for the rogue — they change a stat she does not have. They are mage-only now.",
+      "💧 Damp Wick is a curse, so for the rogue it was a free one.",
+    ] },
+
+  { build: 419, date: '2026-08-28', title: "What's new",
+    added: [
+      "📋 A <b>What's New</b> page — tap the build number at the bottom of the menu to read what changed in each release.",
+    ] },
+
+  { build: 418, date: '2026-08-28', title: 'Equipment upgrades',
+    added: [
+      '⚒️ <b>Equipment can be upgraded</b> at the Workshop, up to <b>+3</b>. Costs 🦴 Bone Shard and 🔩 Prime Sinew.',
+      '<b>+1</b> the piece blocks one more blow · <b>+2</b> its ability improves · <b>+3</b> it blocks one more point.',
+      'Each piece says what its next upgrade will give before you buy it.',
+    ],
+    changed: [
+      '🩹 A <b>worn</b> piece now really does keep blocking — it holds until it runs out, instead of stopping after one.',
+      'The starter Adventurer\'s set cannot be upgraded. Forge something first.',
+    ],
+    fixed: [
+      'A piece able to block twice could disappear after its first block.',
+    ] },
+
+  { build: 417, date: '2026-08-28', title: 'Every creature has a face',
+    added: [
+      '🖼️ Art for <b>all 64 creatures</b> in the game.',
+      '🗺️ Backdrops for every road of the <b>Stormreach</b> and the <b>Fellgrind</b>.',
+    ],
+    changed: [
+      'The Sunless Fathom\'s roads still show the plain road glow — those are next.',
+    ] },
+
+  { build: 416, date: '2026-08-27', title: 'Gear that belongs to a class',
+    added: [
+      '🎭 Four <b>class-only</b> pieces: 🔥 Emberwake Cowl and Slowwick Treads for the mage, ● Bloodcord Vest and Quietstep Boots for the rogue.',
+    ] },
+
+  { build: 415, date: '2026-08-27', title: 'Nine great beasts worth hunting',
+    added: [
+      '🏹 Nine new pieces, one for each great beast that had no recipe — so every named creature is now worth going after.',
+    ] },
+
+  { build: 412, date: '2026-08-26', title: 'The Perfect Kill',
+    added: [
+      '✦ Win an encounter with the <b>smallest blow that could have won it</b> and the creature\'s shape material is <b>guaranteed</b>, not rolled.',
+    ] },
+
+  { build: 407, date: '2026-08-26', title: 'Hitting twice',
+    added: [
+      '🧪 <b>Splitting Draught</b> — your strike splits in two this turn.',
+      '🎁 <b>Forked Strike</b> — an extra hit against 🧱 Guard.',
+      '🛡️ <b>Twinned Bracers</b> — once a run, split your strike on the turn you choose.',
+    ] },
+
+  { build: 402, date: '2026-08-25', title: 'Setting Out, rebuilt',
+    added: [
+      '🏕️ The choice before a run now offers <b>three different KINDS</b> of start — a rule, some fuel, or something for the road — instead of three charms.',
+    ] },
+
+  { build: 400, date: '2026-08-25', title: 'Elites, charms and the mage',
+    added: [
+      '🎁 Four new charms: <b>Even Keel</b>, <b>Keen Edge</b>, <b>Ironbound</b>, <b>Bloodied</b>.',
+    ],
+    changed: [
+      '💀 A <b>dangerous</b> foe is tougher, pays more, and only hands you a charm if you actually <b>Complete</b> it.',
+      '✦ <b>Loose Weave</b> gives a third of the attuned bonus rather than half.',
+    ] },
+
+  { build: 397, date: '2026-08-24', title: 'The Tutorial',
+    added: [
+      '📖 The tutorial has its own <b>map</b>, and teaches 🛡️ equipment, 🦴 carving and ⭐ levels.',
+    ],
+    changed: [
+      'Blunting a card is called <b>blocking</b> everywhere. Your loadout is called <b>equipment</b>.',
+    ] },
+
+  { build: 387, date: '2026-08-23', title: 'Damage matters',
+    changed: [
+      '⚔️ Creatures hit <b>harder</b>. Losing an encounter costs you more of your deck.',
+      '🗡️ The rogue\'s blades grow more slowly, so her blow is closer to the mage\'s.',
+    ] },
+];
+// 🚨 THE ENTRY AND THE BUILD NUMBER ARE ONE OBJECT. Bump the cache-buster without writing a
+// note and this returns false, the What's New screen says so in the player's own words, and the
+// console says so in ours. ⚠️ It WARNS rather than throwing: a missing note is a documentation
+// gap, and taking the game down over one would be worse than the gap.
+function notesCurrent() {
+  return !!PATCH_NOTES.length && String(PATCH_NOTES[0].build) === String(BUILD);
+}
+try { if (!notesCurrent()) console.warn(`📋 build ${BUILD} has no patch note — newest entry is ${PATCH_NOTES[0] && PATCH_NOTES[0].build}`); } catch (e) {}
+
 const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // BUG FOUND 2026-07-29: the writer said `v: 4` while the reader demanded `d.v !== 3`, so EVERY
 // load silently failed and every reload started a fresh run. One constant now, used by both - the
 // two can never drift again. Bumped to 5 here because dragons changed shape (shields -> SHAPE).
-const SAVE_VERSION = 5;
+// ⚙️ 6 — 🛡️ armour (2026-08-23). ⚠️ loadGame() failing is SILENT (indistinguishable from
+// "no save yet"), so always round-trip a save after touching the schema.
+const SAVE_VERSION = 6;
 
-function saveGame() {
+// 🔑 THE KEY IS A PARAMETER SO DEV SLOTS SHARE THIS EXACT SERIALIZER (2026-08-22).
+// ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
+// in July — and a slot that saved a slightly different shape would load into a subtly wrong run,
+// which is the worst possible bug in a TESTING tool: it would make you chase ghosts in the game.
+function saveGame(key) {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
-      const o = { id: c.id, n: CARD_DEFS.indexOf(c.def), lv: c.level };
+      // ⚠️ INDEXED INTO THE CLASS'S OWN TABLE. Cards are stored by index because names duplicate;
+      // now that a second class exists, an index is only meaningful alongside `cls` (written below
+      // and restored BEFORE any card is decoded).
+      const o = { id: c.id, n: CLASS.defs.indexOf(c.def), lv: c.level };
       return o;
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
+    localStorage.setItem(key || SAVE_KEY, JSON.stringify({
       v: SAVE_VERSION, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn, regionTurn: S.regionTurn,
       deck: S.deck.map(card), hand: S.hand.map(card),
       discard: S.discard.map(card), trashed: S.trashed.map(card),
       queue: S.encounterQueue.map(e => e.name),
       results: S.results, phase: S.phase,
-      encounter: S.encounter ? S.encounter.name : null,
+      // 🔴 SAVE THE BASE NAME, NOT THE DECORATED ONE (fixed 2026-08-23). An elite is a COPY
+      // with a changed name ("Mirefen Road, grown bold"), so looking that name up in the region's
+      // encounter list on load finds nothing and loadGame() returns false — SILENTLY, which is
+      // indistinguishable from "no save yet". Every run that quit during an elite was gone.
+      // ⚠️ eliteVersion()'s own comment says *"baseName is what makes an elite RELOADABLE"*, and
+      // the save never used it. **A comment that describes a system is not the system.**
+      encounter: S.encounter ? (S.encounter.baseName || S.encounter.name) : null,
+      encounterElite: !!(S.encounter && S.encounter.elite),
       hardship: S.hardship, rangedDodge: S.rangedDodge, loseReserve: S.loseReserve,
       poison: S.poison, afterSoak: S.afterSoak,
       assign: S.assign, divertsUsed: S.divertsUsed,
@@ -1615,11 +3081,33 @@ function saveGame() {
       downgraded: [...S.downgraded], actionSetIds: S.actionSetIds, reserveId: S.reserveId,
       stack: S.stack,
       finalMode: S.finalMode, finalPhase: S.finalPhase, dragonState: S.dragonState,
-      lastMileOutcome: S.lastMileOutcome, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
-      pendingEvent: S.pendingEvent, event: S.event,
+      lastMileOutcome: S.lastMileOutcome, lastMileApproach: S.lastMileApproach, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
+      fork: S.fork ? S.fork.map(e => e.name) : null,
+      boon: S.boon, boonOwed: S.boonOwed,
+      // 🗺️ THE MAP IS THE RUN, SO IT HAS TO BE IN THE SAVE. It was not, and a run left on the
+      // map screen came back with nothing to stand on - Thomas: *"if i happen to leave the page when
+      // the map is up, when i come back and try to continue, the map isn't there and i can't
+      // continue."* 🔑 EVERY NEW PIECE OF RUN STATE NEEDS A LINE HERE; `fork` and `boon` got one
+      // the day they were built and the map, which replaced them both, did not.
+      // ⚠️ Encounters are stored by NAME and rebuilt, never as objects - a deserialized copy would
+      // be a different object from the region's own def, and identity checks elsewhere would miss.
+      map: S.map ? {
+        pos: S.map.pos, taken: S.map.taken,
+        floors: S.map.floors.map(row => row.map(n => n ? {
+          t: n.type, k: n.kind, x: n.next, d: n.done,
+          e: n.enc ? (n.enc.baseName || n.enc.name) : null,
+        } : null)),
+      } : null,
+      pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
+      eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout,
-      duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
+      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
+      loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
+      armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
+      splitPending: S.splitPending || 0, armourWinInit: !!S.armourWinInit,
+      armourPace: S.armourPace, armourPacePending: S.armourPacePending,
+      delayed: S.delayed, duelStamina0: S.duelStamina0, stats: S.stats, tutorial: S.tutorial, candle: S.candle, potions: S.potions, contract: S.contract,
+      cls: CLASS.id, momentum: S.momentum, drawExtra: S.drawExtra,
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
@@ -1627,29 +3115,94 @@ function saveGame() {
   } catch (err) { /* storage unavailable — play on without saves */ }
 }
 
-function loadGame() {
+// 🗺️ rebuild a saved map: node shape back as-is, encounters re-resolved from the band's own
+// region by name, and elites rebuilt through eliteVersion() so they cannot drift.
+function reviveMap(m) {
+  if (!m || !m.floors) return null;
+  return {
+    pos: m.pos || null,
+    taken: m.taken || [],
+    floors: m.floors.map((row, f) => row.map((sn, c) => {
+      if (!sn) return null;
+      // ⚠️ the column comes from the map INDEX, not indexOf - identical node shapes would
+      // otherwise all resolve to the first matching column.
+      const n = mapNode(f, c);
+      n.type = sn.t; n.kind = sn.k || 'fight'; n.next = sn.x || []; n.done = !!sn.d;
+      if (sn.e) {
+        const region = RUN()[bandOf(f) - 1] || RUN()[0];
+        const base = region.encounters.find(e => e.name === sn.e);
+        if (base) n.enc = sn.t === 'elite' ? eliteVersion(base) : base;
+      }
+      return n;
+    })),
+  };
+}
+
+function loadGame(key) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(key || SAVE_KEY);
     if (!raw) return false;
     const d = JSON.parse(raw);
     if (d.v !== SAVE_VERSION) return false;
+    // ⚠️ THE CLASS MUST BE RESTORED BEFORE ANY CARD IS DECODED — a card index means nothing without
+    // knowing whose table it indexes into. Old saves have no `cls` and are mage runs by definition.
+    setClass(CLASSES[d.cls] || MAGE);
     const mk = s => {
-      const def = CARD_DEFS[s.n];
+      const def = CLASS.defs[s.n];
       if (!def) return null;
       const c = { id: s.id, def, level: s.lv };
       return c;
     };
     const deck = d.deck.map(mk), hand = d.hand.map(mk), discard = d.discard.map(mk), trashed = d.trashed.map(mk);
     if ([...deck, ...hand, ...discard, ...trashed].some(c => !c)) return false; // card data changed since save
-    const region = RUN()[d.region - 1];
+    // 🔴 RESOLVE THE SAVED RUN'S OWN ROAD — NEVER `RUN()` (fixed 2026-08-22, found by Thomas:
+    // *"don't know if the continue run is working, my run wasn't saved"*).
+    // 🐛 `RUN()` reads `S.dragon.stage` — the run currently IN MEMORY — and this line used it to
+    // look up an encounter belonging to the run being LOADED. On a cold boot `S` is null, so
+    // RUN() fell back to stage 1's road; a save from stages 2-4 hunted its creature in the wrong
+    // land, found nothing, and `loadGame` returned false.
+    // 🔑 AND THE FAILURE IS SILENT — `loadGame()` returning false is indistinguishable from "no
+    // save yet", so it read as a fresh run and the menu simply stopped offering Continue. That is
+    // the exact shape of the July save-version bug, which is why this file already says: **always
+    // round-trip a save after touching the schema.** It was not the schema this time; it was the
+    // ROAD, which is chosen by state that has not been restored yet at this point in the function.
+    // ⚠️ Every save from stage 2, 3 or 4 was unresumable after closing the app. Stage 1 worked by
+    // pure coincidence — it is what the fallback happens to return.
+    const savedDragon = d.dragon ? DRAGONS.find(x => x.name === d.dragon) : null;
+    const road = d.tutorial ? TUTORIAL.regions : roadFor(savedDragon ? savedDragon.stage : 1);
+    const region = road[d.region - 1];
     if (!region) return false;
-    const encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
-    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel'];
+    // ⚠️ Try the stored name first so saves written before the fix (which hold the decorated
+    // name) are not made worse; then rebuild the elite through the SAME eliteVersion() the fight
+    // used, which is the only way the reload cannot drift from the original.
+    let encounter = d.encounter ? region.encounters.find(e => e.name === d.encounter) : null;
+    if (encounter && d.encounterElite) encounter = eliteVersion(encounter);
+    // ⚠️ PHASES THAT LEGITIMATELY HAVE NO ENCOUNTER. 🛤️ 'fork' had to be added the day it was
+    // built: during a fork no encounter has been chosen yet, so S.encounter is null, and this
+    // guard sent every mid-fork load down the `return false` path.
+    // 🔑 AND loadGame() RETURNING FALSE IS INDISTINGUISHABLE FROM "NO SAVE YET" - the failure is
+    // SILENT and reads as a fresh run. That is exactly the bug that shipped for weeks in July.
+    // **Any new phase that can exist without an encounter belongs in this list.**
+    // 🐛 'setout' WAS MISSING AND A RUN SAVED ON IT COULD NEVER BE RELOADED - since the phase
+    // shipped on 2026-08-05. It has no encounter yet (the map opens after you choose), so it fell
+    // through the "no encounter and not stable" guard and `loadGame` returned false - which is
+    // **indistinguishable from "no save yet"**, so it presented as a run that quietly vanished.
+    // 🔑 IT SURFACED THE HOUR THE BOT WAS TAUGHT TO WALK THE ENTRY PATH, because safety-audit
+    // can only round-trip a situation the bot can reach. **An audit's coverage is bounded by the
+    // instrument's reach, and that boundary is invisible from inside the audit.**
+    const stable = ['summary', 'defeat', 'victory', 'event', 'wheel', 'fork', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'setout'];
+    // ⚠️ A SAVE WRITTEN BEFORE THE MAP WAS SERIALIZED CANNOT BE RESUMED. Builds 287-308 stored a
+    // map phase with no map; loading one produces a run standing on nothing. Refuse it here so the
+    // menu reports a broken save instead of resuming into a dead screen.
+    if (!d.map && MAP_PHASES_NEEDING_MAP.includes(d.phase) && !d.finalMode) return false;
     if (!encounter && !d.finalMode && !stable.includes(d.phase)) return false;
     uid = d.uid;
     S = {
       tutorial: !!d.tutorial, taught: d.taught || [], lessonsOff: !!d.lessonsOff,
       candle: d.candle !== false,
+      // 🗡️ absent on any save written before the rogue existed, which is correct — those are
+      // mage runs and never read it. feedArmed is per-turn, so it is never restored.
+      momentum: d.momentum || 0, moTarget: null, drawExtra: d.drawExtra || 0,
       dragon: (d.tutorial ? TUTORIAL.dragon : DRAGONS.find(x => x.name === d.dragon)) || DRAGONS[0],
       region: d.region, turn: d.turn, regionTurn: d.regionTurn || 0, deck, hand, discard, trashed,
       encounterQueue: d.queue.map(n => region.encounters.find(e => e.name === n)).filter(Boolean),
@@ -1663,16 +3216,43 @@ function loadGame() {
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
       beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
-      lastMileOutcome: d.lastMileOutcome || null, duelBeat: d.duelBeat || 0, duelResult: null,
+      lastMileOutcome: d.lastMileOutcome || null, lastMileApproach: d.lastMileApproach || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
-      pendingEvent: d.pendingEvent || false, event: d.event || null,
+      // ⚠️ re-resolved from the region by NAME, never stored as objects - a serialized copy
+      // would be a DIFFERENT object from the region's own def, and every identity check elsewhere
+      // (the queue, beginEncounter, the tutorial's fixed list) compares references.
+      fork: d.fork ? d.fork.map(n => region.encounters.find(e => e.name === n)).filter(Boolean) : null,
+      boon: d.boon || null, boonOwed: d.boonOwed || false,
+      map: reviveMap(d.map),
+      pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
+      eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
-      duelStamina0: d.duelStamina0 || 0, setout: d.setout || null,
+      // 🛡️ filtered against the live table, so a piece removed in a later build cannot
+      // resurrect as `undefined` and throw on armourBlock().
+      loot: d.loot || {}, encountersDone: d.encountersDone || 0,
+      runBanked: !!d.runBanked,
+      // ⚠️ `up` defaults to 0, so a save written before the ladder existed loads as an UNUPGRADED
+      // run — which is correct: the run started before the upgrade was bought. No SAVE_VERSION bump
+      // is needed because nothing here can fail, and a bump would junk a save for no gain.
+      armour: (d.armour || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0, up: a.up || 0 })),
+      armourStrike: d.armourStrike || 0, armourStrikePending: d.armourStrikePending || 0,
+      splitPending: d.splitPending || 0, armourWinInit: !!d.armourWinInit,
+      armourPace: d.armourPace || 0, armourPacePending: d.armourPacePending || 0,
+      duelStamina0: d.duelStamina0 || 0, candleGrace: d.candleGrace || 0,
+      // ⚠️ SETTING OUT'S OFFERS CHANGED SHAPE (2026-08-24): they used to be bare charm-id
+      // STRINGS and are now objects. A save taken on that one screen would otherwise resolve to
+      // three dead buttons. 🔑 Re-rolling is the right repair rather than a SAVE_VERSION bump,
+      // because the screen has no state worth preserving — nothing has been chosen yet.
+      setout: Array.isArray(d.setout) && d.setout.every(o => o && typeof o === 'object') ? d.setout : null,
       contract: d.contract || null,
       potions: d.potions || [], potionPick: null, potionFx: { init: 0, value: 0, soak: 0, boost: 0, pace: 0, swap: {} },
       upgradePick: null,
-      stats: d.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
+      // ⚠️ an older save carries the mage-named fields; map them rather than dropping a run's
+      // score on the floor. A missing craft stat reads as 'no chances', which scores 0 — same as
+      // before for the mage, and no longer a phantom zero for anyone else.
+      delayed: d.delayed || 0,
+      stats: migrateStats(d.stats),
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
@@ -1713,12 +3293,237 @@ const DEV_DECKS = {
   mediocre: { label: 'Mediocre', cards: 15, offset: -2,  hint: 'about par — a coin flip' },
   strong:   { label: 'Strong',   cards: 16, offset: +6,  hint: 'a run that went well' },
 };
+// 📦 THE STASH — what you own, and where every material comes from.
+// 🔑 THE `from` AND THE RATE ARE THE POINT, not the counts. Monster Hunter publishes its drop
+// tables, and that is the entire difference between a grind and a fruit machine: a printed rate
+// turns *"keep playing and hope"* into *"about five more Evasion creatures"*. A material you own
+// none of still has to say where it comes from, or you cannot plan a hunt.
+function stashLine() {
+  const st = loadStash();
+  const kinds = Object.keys(st.mats).filter(k => st.mats[k] > 0).length;
+  const shards = st.mats.shard || 0;
+  return `🦴 ${shards} Bone Shard · ${kinds} kind${kinds === 1 ? '' : 's'} of material`;
+}
+function showStash() {
+  S = S || {};
+  S.phase = 'stash';
+  S.encounter = null;
+  render();
+}
+// 🕯️ the shape is what the CANDLE prints, so it is the tag that makes a trophy findable
+function shapeTagOf(c) {
+  const sh = shapesOf(c) || [];
+  const ICON = { armour: '🛡️', evasion: '🌀', guard: '🧱' };
+  return sh.length ? ' · ' + sh.map(x => ICON[x] || '').join('') : '';
+}
+function stashHTML() {
+  const st = loadStash();
+  // 🔑 TWO SECTIONS, NOT NINE (Thomas: *"the stash probably shouldn't be categorized that
+  // specifically as well, its a bit too busy"*). Five material tiers and four road headings meant
+  // nine headings over 74 cards, and every card already says where it comes from — the headings
+  // were restating what was written six lines below them.
+  const rate = m => m.tier === 'shape' ? `${Math.round(DROP_RATE.shape * 100)}% on a clean win · ${Math.round(DROP_RATE.narrowShape * 100)}% on a scrape`
+    : m.tier === 'common' ? '2 on a clean win · 1 on a scrape'
+    : m.tier === 'elite' ? 'always — if you survive one'
+    : m.tier === 'rare' ? `${Math.round(DROP_RATE.heart * 100)}% when a dragon falls`
+    : '2 when it falls';
+  let body = '';
+  {
+    const list = MATERIALS;
+    body += `<div class="stash-tier">Materials<span class="stash-tally">${list.filter(m => st.mats[m.id] > 0).length}/${list.length}</span></div><div class="stash-grid">` +
+      list.map(m => {
+        const n = st.mats[m.id] || 0;
+        return `<div class="stash-mat${n ? '' : ' is-none'}">` +
+          `<div class="stash-head"><span class="stash-icon">${m.icon}</span><span class="stash-n">×${n}</span></div>` +
+          `<div class="stash-name">${m.name}</div>` +
+          `<div class="stash-from">${m.from}</div>` +
+          `<div class="stash-rate">${rate(m)}</div>` +
+          // 💰 the release valve, on the object itself — never ask for a choice about a thing
+          // without showing the thing.
+          (n > 0 && breakValue(m.id) > 0 ? `<button class="stash-sell" onclick="breakMat('${m.id}')">🔨 break 1 → 🦴 ${breakValue(m.id)}</button>` : '') +
+          `</div>`;
+      }).join('') + `</div>`;
+  }
+  // 🏆 TROPHIES, GROUPED BY ROAD — and this is the bestiary in its first form. 🔑 Which road a
+  // creature lives on is the ONE fact a hunt needs and the game never told you; the candle can
+  // only say what is on the next node, which is no use for deciding where to GO.
+  {
+    const list = Object.values(CREATURE_INDEX).filter(c => c.quarry)
+      .sort((a, b) => a.road - b.road);
+    const owned = list.filter(c => st.mats[partIdOf(c.name)] > 0).length;
+    body += `<div class="stash-tier">🏆 Trophies<span class="stash-tally">${owned}/${list.length}</span></div>` +
+      `<div class="stash-grid">` +
+      list.map(c => {
+        const id = partIdOf(c.name), n = st.mats[id] || 0, d = matDef(id);
+        return `<div class="stash-mat${n ? '' : ' is-none'}">` +
+          `<div class="stash-head"><span class="stash-icon">🏆</span><span class="stash-n">×${n}</span></div>` +
+          `<div class="stash-name">${d.name}</div>` +
+          `<div class="stash-from">${c.name}${shapeTagOf(c)}</div>` +
+          `<div class="stash-rate">${ROAD_NAME[c.road]} · ${c.region}</div>` +
+          (n > 0 ? `<button class="stash-sell" onclick="breakMat('${id}')">🔨 break 1 → 🦴 ${breakValue(id)}</button>` : '') +
+          `</div>`;
+      }).join('') + `</div>`;
+  }
+  return `<div class="phase-label">📦 STASH</div>` +
+    `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
+    `<span class="dim"> · every recipe wants them, and even a lost encounter carves one</span></div>` +
+    body +
+    `<p class="dev-note">⚒️ Spend these in <b>The Workshop</b>. A named part GATES a piece; 🦴 Bone Shards pay for it. ` +
+    `🔨 Break down anything no recipe wants.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
+
+// ⚒️ THE WORKSHOP — where parts become armour, and where you choose what to walk in wearing.
+// ⚠️ NOT "the Forge": that name is taken by the sharpening step, which merged into the Wheel in
+// August. The Workshop also fits [[Theme_And_Naming]]'s Witch Hat register, where craft is the
+// whole world.
+// 🔑 A RECIPE YOU CANNOT AFFORD STILL SHOWS ITS SHORTFALL BY NAME. "You need 2 more Windquill"
+// is the difference between a disabled button and a disabled button that teaches you where to go
+// — and where to go is the only thing this whole layer is for.
+function showWorkshop() { S = S || {}; S.phase = 'workshop'; S.encounter = null; render(); }
+function workshopLine() {
+  const st = loadStash();
+  return `🦴 ${st.mats.shard || 0} Bone Shard · ${st.owned.length}/${ARMOUR.length} pieces forged`;
+}
+function pieceCardHTML(d, st, equipped) {
+  const owned = st.owned.includes(d.id);
+  const rar = RARITY[d.rarity || 'common'];
+  // ⚒️ the +N ladder. ⚠️ Every figure below is read through upEffects() rather than printed from
+  // the def — *when a value gains a modifier, find every line that prints the unmodified one.*
+  const up = (st.up || {})[d.id] || 0, ue = upEffects(d, up);
+  const blockNow = d.block + ue.block, wearNow = blockNow > 0 ? 1 + ue.wear : 0;
+  // 🎭 another class's gear is SHOWN, never hidden — you should be able to see what the rogue gets
+  // before you unlock her, the same way the Collection states what is not built rather than
+  // pretending it does not exist.
+  const wrongClass = d.cls && d.cls !== CLASS.id;
+  const r = RECIPE[d.id];
+  // 🔑 the kind line states BOTH facts now, because the ladder separated them: how many blows it
+  // has (`wear`) and what becomes of it when they run out (`brk`).
+  const kind = (wearNow > 1 ? `blocks ${wearNow}× · ` : '') +
+    (d.brk === 'worn' ? '🩹 worn — it stays' :
+     wearNow > 1 ? '💥 then it shatters' : '💥 shatters after one block');
+  let foot;
+  if (wrongClass) {
+    foot = `<span class="wk-none">${(CLASSES[d.cls] && CLASSES[d.cls].name) || d.cls} only</span>`;
+  } else if (owned) {
+    const wear = equipped
+      ? `<button class="wk-btn on" onclick="unequipPiece('${d.id}')">✓ Worn — remove</button>`
+      : `<button class="wk-btn" onclick="equipPiece('${d.id}')">Wear it</button>`;
+    // ⚒️ ⚠️ THE STARTER SET IS DELIBERATELY NOT ON THE LADDER. It is a teaching object with no
+    // ability, and letting it scale would remove the reason to hunt anything — and it says so
+    // rather than showing nothing, because *a heading that stops making a promise should state a
+    // fact instead.*
+    let ladder;
+    if (d.starter) {
+      ladder = `<div class="wk-up dim">⚒️ the starter set does not upgrade</div>`;
+    } else if (up >= ARMOUR_UP_MAX) {
+      ladder = `<div class="wk-up done">⚒️ fully upgraded · +${ARMOUR_UP_MAX}</div>`;
+    } else {
+      const chk = upCheck(d.id);
+      const cost = Object.keys(chk.cost || {}).map(m =>
+        `${matDef(m).icon} ${chk.cost[m]} ${matDef(m).name}`).join(' · ');
+      ladder = `<div class="wk-up"><div class="wk-upnext">⚒️ <b>+${chk.step}</b> — ` +
+        `${upGrantText(d, chk.step)}</div><div class="wk-cost">${cost}</div>` +
+        (chk.ok ? `<button class="wk-btn craft" onclick="upgradePiece('${d.id}')">⚒️ Upgrade</button>`
+                : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`) + `</div>`;
+    }
+    foot = wear + ladder;
+  } else if (!r) {
+    foot = `<span class="wk-none">${d.starter ? 'yours from the start' : 'no recipe yet'}</span>`;
+  } else {
+    const chk = craftCheck(d.id);
+    const cost = Object.keys(r.mats).map(m =>
+      `${matDef(m).icon} ${r.mats[m]} ${matDef(m).name}`).join(' · ');
+    // 🏹 WHERE THE QUARRY WALKS — measured 2026-08-27 ([[Drop_Economy]]).
+    // 🔴 THE SHARD COST BINDS ALMOST NOTHING: shards come in at 8.7 a run, so nine of twelve
+    // recipes are gated purely on **whether one named creature turned up**. Runs-to-forge measured
+    // 17 / 30 / 60 / 120 for the tail, and one piece went unseen across 120 runs.
+    // 🔑 AND `rollDrops` ALREADY CARRIES A COMMENT PROMISING THIS IS A "COUNTABLE PLAN" — the part
+    // is certain on a clean kill, but the ENCOUNTER was still a lottery, so nothing was countable.
+    // **Removing one of two stacked lotteries leaves a lottery.** This is the other half.
+    // ✅ It converts *"keep playing"* into *"three runs down the Fellgrind"* WITHOUT TOUCHING A
+    // SINGLE RATE — which is why it is the first lever rather than cheaper recipes.
+    // ⚠️ This is DIRECTION, not tactical data. It does not conflict with the map's *"printing every
+    // demand is complete optimizable data"* rule, which is about the roads you are choosing between
+    // right now; this is which land to set out on, decided before a card is dealt.
+    const hunts = Object.keys(r.mats).filter(m => m.startsWith('p:') && !(st.mats[m] > 0))
+      .map(m => {
+        const c = creatureByName(m.slice(2));
+        return c ? `<div class="wk-hunt">🏹 <b>${c.name}</b> — ${ROAD_NAME[c.road]} · ${c.region}</div>` : '';
+      }).join('');
+    foot = `<div class="wk-cost">${cost}</div>` + hunts + (chk.ok
+      ? `<button class="wk-btn craft" onclick="craftPiece('${d.id}')">⚒️ Forge it</button>`
+      : `<button class="wk-btn" disabled>Need ${chk.missing.join(', ')}</button>`);
+  }
+  return `<div class="wk-piece rar-${d.rarity || 'common'}${owned ? ' is-owned' : ''}` +
+    `${equipped ? ' is-worn' : ''}${wrongClass ? ' is-locked' : ''}">` +
+    `<div class="wk-top"><span class="wk-icon">${ARMOUR_SLOTS[d.slot].icon}</span>` +
+    `<span class="wk-name">${d.name}${up ? ` <span class="wk-plus">+${up}</span>` : ''}</span>` +
+    `<span class="wk-block">${blockNow > 0 ? 'blocks ' + blockNow : 'no block'}</span></div>` +
+    `<div class="wk-kind"><span class="wk-rar">${rar.icon} ${rar.label}</span> · ${kind}</div>` +
+    (d.text ? `<div class="wk-text">${classText(d.text)}</div>` : `<div class="wk-text dim">no ability</div>`) +
+    `<div class="wk-foot">${foot}</div></div>`;
+}
+// 🛡️ ⚠️ NOTHING EARNS SLOTS ANY MORE, so nothing may claim they can be earned. The old string said
+// *"two more to earn"* whenever the count was under 4 and there was no way to earn them — that is
+// the promise this file keeps warning about, and the honest version of it is silence.
+function nextSlotNote() { return ''; }
+function workshopHTML() {
+  const st = loadStash(), worn = loadoutIds();
+  const slots = Array.from({ length: armourSlotsOpen() }, (_, i) => worn[i] || null);
+  let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ YOUR EQUIPMENT` +
+    `<span class="dim"> · ${armourSlotsOpen()} slots</span></div>` +
+    `<div class="wk-slots">` + slots.map(id => {
+      if (!id) return `<div class="wk-slot is-empty">empty</div>`;
+      const d = armourDef(id);
+      const u = (st.up || {})[id] || 0, e = upEffects(d, u);
+      return `<div class="wk-slot">${ARMOUR_SLOTS[d.slot].icon} <b>${d.name}` +
+        `${u ? ` <span class="wk-plus">+${u}</span>` : ''}</b>` +
+        `<span class="dim">blocks ${d.block + e.block}${1 + e.wear > 1 ? ` ×${1 + e.wear}` : ''}</span></div>`;
+    }).join('') + `</div></div>`;
+  for (const slot of Object.keys(ARMOUR_SLOTS)) {
+    // ⚠️ sorted by rarity so a zone reads as a ladder rather than as the order I typed them in
+    const list = ARMOUR.filter(a => a.slot === slot)
+      .slice().sort((x, y) => RARITY_ORDER.indexOf(x.rarity || 'common') - RARITY_ORDER.indexOf(y.rarity || 'common'));
+    if (!list.length) continue;
+    body += `<div class="stash-tier">${ARMOUR_SLOTS[slot].icon} ${ARMOUR_SLOTS[slot].label}` +
+      // ⚠️ WAS THE SLOT'S THEME (*"what you can see"*); that was a design heuristic and is not
+      // shown any more - see ARMOUR_SLOTS. 🔑 Replaced with a COUNT rather than deleted, because
+      // this chip is the only per-zone progress the screen shows and an empty span is a hole where
+      // a fact should be: **a heading that stops making a promise should start stating a number.**
+      `<span class="stash-tally">${list.filter(d => st.owned.includes(d.id)).length}/${list.length}</span></div>` +
+      `<div class="wk-grid">` + list.map(d => pieceCardHTML(d, st, worn.includes(d.id))).join('') + `</div>`;
+  }
+  return `<div class="phase-label">⚒️ THE WORKSHOP</div>` +
+    `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
+    `<span class="dim"> · ${st.owned.length} of ${ARMOUR.length} pieces forged</span></div>` +
+    body +
+    `<p class="dev-note">🏆 A worn piece needs a part from ONE great beast — that is the reason to ` +
+    `go to its region. 🔨 Break down what no recipe wants in the Stash.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
+
 function showDev() {
   if (!DEV_ENABLED) return;   // 🔧 not in the playtest build
   S = S || {};
-  S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '' };
+  S.dev = S.dev || { stage: 1, deck: 'mediocre', candle: true, charm: '', arm0: '', arm1: '' };
   S.phase = 'dev';
   S.encounter = null;
+  render();
+}
+// ⭐ SET THE ACCOUNT LEVEL FOR REAL, not via XP_LEVEL_FORCE. A dev tool should produce a state
+// the game could actually be in — a forced level is the INSTRUMENT's pin and behaves differently
+// (it neither reads nor writes the bar), which is exactly the "a jump behaving differently from a
+// real run is a bug in the jump" rule. This writes the same key a run would.
+function devLevel(n) {
+  ACCOUNT_XP = Math.max(0, (n - 1)) * XP_PER_LEVEL;
+  saveXP(ACCOUNT_XP);
+  render();
+}
+// 🎭 and the class bar, separately — the whole point of the hybrid is that they move apart, so a
+// dev tool that only moved them together could not reproduce the state it exists to test.
+function devClassLevel(n) {
+  saveClassXP(CLASS.id, Math.max(0, (n - 1)) * CLASS_XP_PER_LEVEL);
   render();
 }
 function devSet(k, v) {
@@ -1742,11 +3547,91 @@ function devShapeDeck(cards, target) {
   }
   S.hand = []; S.deck = all;   // beginFinalBattle() gathers them anyway
 }
+// ============================================================
+// 💾 DEV SAVE SLOTS (2026-08-22) — Thomas: *"just save, and load, for me, for my own testing
+// purposes, so i don't have to replay runs from the beginning."*
+//
+// 🔑 A TESTING TOOL, NOT A FEATURE. It is gated on DEV_ENABLED like the rest of the dev menu,
+// so it exists only at `?dev` and is invisible in the playtest drop. ⚠️ Player-facing save/load
+// would delete the genre — deck-as-health, a spent Spell and a blunted card are all permanent by
+// design, and a load button makes every one of them optional.
+//
+// ⚠️ IT REUSES saveGame()/loadGame() BY PASSING A KEY. There is no second serializer, because a
+// slot that wrote a slightly different shape would load into a subtly wrong run — and in a tool
+// whose whole job is reproducing a situation, that would send you hunting bugs that are not there.
+// ⚠️ The slot keys take KEY_NS like every other persistent key, or the live build and the frozen
+// playtest build would fight over the same storage.
+const DEV_SLOTS = 6;
+const devSlotKey = i => `emberwick-devslot-${i}` + KEY_NS;
+
+function devSlotInfo(i) {
+  try {
+    const d = JSON.parse(localStorage.getItem(devSlotKey(i)) || 'null');
+    if (!d) return null;
+    const stale = d.v !== SAVE_VERSION;
+    const where = d.finalMode ? (d.finalPhase === 'duel' ? `duel beat ${d.duelBeat}` : 'the lair')
+                : d.map && d.map.pos ? `floor ${d.map.pos.f + 1}`
+                : `region ${d.region}`;
+    return { stale, cls: d.cls || 'mage', dragon: d.dragon || '?', where,
+             phase: d.phase, turn: d.turn, cards: (d.deck || []).length + (d.hand || []).length };
+  } catch (e) { return null; }
+}
+function devSlotSave(i) {
+  if (!DEV_ENABLED) return;
+  if (!S || !S.deck) { alert('No run to save — start or continue one first.'); return; }
+  // ⚠️ the reveal guard lives inside saveGame(); a mid-reveal slot save would silently write nothing
+  if (S.phase === 'reveal') { alert('Finish the reveal first — a mid-reveal state cannot be saved.'); return; }
+  saveGame(devSlotKey(i));
+  render();
+}
+function devSlotLoad(i) {
+  if (!DEV_ENABLED) return;
+  const info = devSlotInfo(i);
+  if (!info) return;
+  if (info.stale) { alert('That slot was saved by an older build and cannot be loaded.'); return; }
+  if (!loadGame(devSlotKey(i))) { alert('That slot would not load — it may predate a save change.'); return; }
+  // 🔑 write it straight back to the REAL save too, so a reload after loading a slot resumes
+  // the slot rather than whatever run was there before. Without this, testing a slot then reloading
+  // silently drops you back into the previous run — exactly the confusion this tool exists to avoid.
+  saveGame();
+  render();
+}
+function devSlotClear(i) {
+  if (!DEV_ENABLED) return;
+  try { localStorage.removeItem(devSlotKey(i)); } catch (e) {}
+  render();
+}
+function devSlotsHTML() {
+  if (!DEV_ENABLED) return '';
+  const rows = [];
+  for (let i = 0; i < DEV_SLOTS; i++) {
+    const it = devSlotInfo(i);
+    const label = it
+      ? (it.stale ? `<span class="dim">slot ${i + 1} — stale build</span>`
+        : `<b>${it.cls}</b> · ${it.dragon} · ${it.where} · turn ${it.turn} · ${it.cards} cards <span class="dim">(${it.phase})</span>`)
+      : `<span class="dim">slot ${i + 1} — empty</span>`;
+    rows.push(`<div class="dev-slot"><span class="dev-slot-lab">${label}</span>` +
+      `<button onclick="devSlotSave(${i})">${it ? 'overwrite' : 'save here'}</button>` +
+      (it && !it.stale ? `<button class="primary" onclick="devSlotLoad(${i})">load</button>` : '') +
+      (it ? `<button onclick="devSlotClear(${i})">✕</button>` : '') + `</div>`);
+  }
+  return `<div class="dev-slots"><div class="kit-lab">💾 Save slots <span class="dim">— dev only; ` +
+    `saving writes the CURRENT run, loading replaces it and becomes your live save.</span></div>` +
+    rows.join('') + `</div>`;
+}
+
 function devJump() {
+  // 🔧 no guard here on purpose — the dev menu exists to jump, and nagging it would be noise.
   const d = S.dev, cfg = DEV_DECKS[d.deck] || DEV_DECKS.mediocre;
   const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
   freshGame(stage);
   S.dev = d;
+  // 🛡️ an explicit dev loadout REPLACES the granted one; leaving every slot 'empty' is how you
+  // measure the bare game, which is the state the ladder is tuned at.
+  if (Array.from({ length: armourSlotsOpen() }, (_, i) => d['arm' + i]).some(Boolean)) {
+    S.armour = Array.from({ length: armourSlotsOpen() }, (_, i) => d['arm' + i])
+      .filter(id => id && armourDef(id)).map(id => newArmour(id));
+  }
   devShapeDeck(cfg.cards, Math.max(cfg.cards, (S.dragon.par || 44) + cfg.offset));
   S.candle = !!d.candle;
   if (d.charm && charmById(d.charm)) S.charms.push(d.charm);
@@ -1775,8 +3660,8 @@ function tutorialHandoffHTML() {
 }
 
 // 🏆 the badge on a stage button — your best, and what is still above it
-function gradeBadge(stage) {
-  const g = bestGrades()[String(stage)];
+function gradeBadge(stage, clsId) {
+  const g = gradeFor(stage, clsId);
   // ⚠️ NOTHING, not a placeholder (2026-08-12). An ungraded stage used to draw a dashed pill with
   // an em-dash in it — and because `.grade-badge.none` inherited the FILLED dark background from
   // the base class, it read as a small black BUTTON rather than an empty slot. Thomas, in play:
@@ -1787,6 +3672,21 @@ function gradeBadge(stage) {
   if (!g) return '';
   return `<span class="grade-badge g-${g.letter}" title="best: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
     `${g.letter}<span class="gb-score">${g.total}</span></span>`;
+}
+
+// 🏆 one badge per unlocked class, so the WALL shows the difference instead of averaging it away.
+// 🔑 Two classes with the same grade on the same stage is the boring case; the interesting one is
+// an S as the rogue and a C as the mage on the very same dragon. That is the content, on screen.
+// While only the mage is unlocked this is byte-identical to the old single badge.
+function stageBadges(stage) {
+  const ids = Object.keys(CLASSES).filter(classUnlocked);
+  if (ids.length < 2) return gradeBadge(stage, ids[0]);
+  return ids.map(id => {
+    const g = gradeFor(stage, id);
+    if (!g) return '';
+    return `<span class="grade-badge g-${g.letter}" title="${id}: ${g.total}/100${g.won ? '' : ' (on a loss)'}">` +
+      `${CLASSES[id].mark}${g.letter}</span>`;
+  }).join('');
 }
 
 // ============================================================
@@ -1837,6 +3737,38 @@ function hasSave() { return saveState() === 'ok'; }
 const DEV_ENABLED = (() => {
   try { return /(^|[?&])dev\b/.test(location.search); } catch (e) { return false; }
 })();
+// 📋 WHAT'S NEW. ⚠️ Reached from the build stamp rather than from a new menu button: the stamp
+// already names the build at the bottom of the menu, *"what changed in 418?"* is the question it
+// invites, and a menu item for something you read once per release would cost a row forever.
+function showNotes() {
+  S = S || {};
+  S.phase = 'notes';
+  S.encounter = null;
+  render();
+}
+function notesHTML() {
+  const sec = (label, rows) => (rows && rows.length)
+    ? `<div class="pn-sec"><div class="pn-lab">${label}</div>` +
+      rows.map(r => `<div class="pn-row">${r}</div>`).join('') + `</div>` : '';
+  const body = PATCH_NOTES.map((n, i) => {
+    return `<div class="pn-entry${i ? '' : ' is-latest'}">` +
+      `<div class="pn-head"><span class="pn-build">build ${n.build}</span>` +
+      `<b>${n.title}</b><span class="pn-date">${n.date}</span></div>` +
+      (n.warn ? `<div class="pn-warn">⚠️ ${n.warn}</div>` : '') +
+      sec('➕ added', n.added) + sec('♻️ changed', n.changed) + sec('🐛 fixed', n.fixed) +
+    `</div>`;
+  }).join('');
+  return `<div class="phase-label">📋 WHAT'S NEW</div>` +
+    `<div class="notes">` +
+    // ⚠️ IT SAYS SO RATHER THAN PRETENDING. Showing the previous build's notes under this build's
+    // number is the same lie as a Continue button that silently fails.
+    (notesCurrent() ? '' :
+      `<div class="pn-stale">⚠️ You are on <b>build ${BUILD}</b> and the notes below stop at ` +
+      `<b>build ${PATCH_NOTES[0].build}</b>. Anything newer is not written up yet.</div>`) +
+    body +
+    `<p class="dev-note">History before build 385 is not recorded.</p>` +
+    `<button onclick="showMenu()">← Menu</button></div>`;
+}
 function showMenu() {
   S = S || {};
   S.phase = 'menu';
@@ -1844,7 +3776,17 @@ function showMenu() {
   render();
 }
 function resumeRun() { if (loadGame()) render(); else showStages(); }
-function showCollection() { S = S || {}; S.phase = 'collection'; S.encounter = null; render(); }
+// 🎁 no argument = the account page; a class id = that character's page.
+// ⚠️ `collClass` must be CLEARED on the way in, or arriving from the menu would drop you back on
+// whichever character you were last looking at — a screen that remembers a sub-state you did not
+// choose is the same class of bug as a stale filter.
+function showCollection(cls) {
+  S = S || {};
+  S.phase = 'collection';
+  S.collClass = (cls && CLASSES[cls]) ? cls : null;
+  S.encounter = null;
+  render();
+}
 
 // 🗺️ THE STAGES SCREEN. Not a difficulty menu bolted on the side — the stage IS the difficulty,
 // so picking one is the same act as choosing which problem you want to solve tonight.
@@ -1854,7 +3796,35 @@ function showStages() {
   S.encounter = null;
   render();
 }
-function startStage(n) {
+// 🛡️ IS THERE A RUN ON DISK THAT IS STILL BEING PLAYED? (2026-08-22)
+// Used to guard everything that calls freshGame(), which DELETES THE SAVE on its first line.
+function liveRunSaved() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    return !!(d && d.v === SAVE_VERSION && !['victory', 'defeat'].includes(d.phase));
+  } catch (e) { return false; }
+}
+
+// 🐛 STARTING A STAGE SILENTLY DESTROYED AN IN-PROGRESS RUN (found in play 2026-08-22).
+// Thomas: *"don't know if the continue run is working, my run wasn't saved."*
+// It was saving fine — `freshGame()` deletes the save on its FIRST LINE, and the 🗺️ Stages screen
+// called `startStage(n)` with no confirmation at all. One tap and the run was gone before anything
+// rendered. ⚠️ The Stages button sits directly under ▶ Continue on the menu.
+//
+// 🔑 THE TELL WAS AN ASYMMETRY: `newGame()` — the ⟳ New Run button — already asked *"This run will
+// be lost."* **The same destructive act was guarded in one place and unguarded in the other**, which
+// is how a hazard hides: the guarded path teaches you the game asks, so you trust the other one.
+// ⚠️ THE GUARD BELONGS IN startStage, NOT AT THE CALL SITES — every future caller inherits it,
+// which is the whole reason the Stages screen was missing one.
+function startStage(n, confirmed) {
+  if (!confirmed && liveRunSaved() && !confirm(
+      'You have a run in progress. Starting a stage will END it — your saved run is lost. Start anyway?')) return;
+
+  // ⚠️ THE CLASS MUST BE SET BEFORE freshGame — it is freshGame that deals the deck, and the deck
+  // is the class's (16 unique for the mage, 8 x 2 for the rogue).
+  // 🎓 Stage 0 is MAGE by construction: its authored deck order names mage cards, and the tutorial
+  // teaches the engine through the class you start with.
+  setClass(n === 0 ? MAGE : (CLASSES[pickedClassId()] || MAGE));
   freshGame(n);
   // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
   // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
@@ -1866,9 +3836,31 @@ function startStage(n) {
   // past; this one does not, so scroll to the question.
   if (S.phase === 'setout') { const el = $('controls-panel'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); }
 }
+// 🔴 THE BRIEF USED TO END ON `S.phase = 'assign'` (fixed 2026-08-23, Thomas: *"tutorial still
+// broken i think, i think the map isn't showing up or something"* — with a screenshot reading
+// **NO ENCOUNTER · This turn has no encounter, which should not happen**).
+// That line was correct while the tutorial was a linear queue: `freshGame()` had already dealt an
+// encounter, so jumping straight to `assign` landed on it. **The tutorial has a map now**, and a
+// map hands out encounters only when you take a node — so the brief dropped the player into a turn
+// with nothing in front of them.
+//
+// 🔑 THIRD TIME TODAY FOR ONE LESSON: **when you replace the thing that generated content, find
+// every reader that still trusts the old shape.** The solver's `REGIONS.length`, the map render's
+// `MAP_FLOORS`, and now the brief's exit — all three assumed a world that had moved.
+//
+// 🔴 AND THE AUDIT COULD NOT HAVE CAUGHT IT, WHICH IS THE MORE IMPORTANT HALF: `RUNSIM.autoRun()`
+// calls `freshGame(0)` and goes straight to `backToMap()`. **The bot never reads the brief.** So the
+// instrument entered the run through a different door than the player, tested that door, and
+// reported the tutorial healthy while the player's door opened onto a broken screen.
+// ⚠️ **An audit that does not walk the player's entry path has not audited the entry path.**
+// `dev/tutorial-audit.js` now steps through the brief first.
 function introNext(d) {
   S.introPage = Math.max(0, (S.introPage || 0) + d);
-  if (S.introPage >= TUTORIAL.intro.length) { S.introPage = 0; S.phase = 'assign'; }
+  if (S.introPage < TUTORIAL.intro.length) { render(); return; }
+  S.introPage = 0;
+  // ✅ hand off to the same function every node return uses, so there is ONE place that decides
+  // where a run resumes — map if there is a map, the old linear path if there is not.
+  backToMap();
   render();
 }
 
@@ -1886,22 +3878,183 @@ function introNext(d) {
 // ⚠️ CLASS charms only. The generic pool is what the Wheel sells; the opening pick is where the
 // class shows you what IT can do, so a rogue's three will look nothing like these.
 // ⚠️ Not in the tutorial — stage 0 is deterministic and teaches the turn, not the meta.
-function mageCharmPool() { return CHARMS.filter(c => c.mage && !c.curse && charmUnlocked(c)); }
+// 🎭 IS THIS FOR THE CLASS I AM PLAYING? (2026-08-12 — found in play by Thomas: *"with the rogue,
+// im starting out, but its giving me mage charms at the start"*.) `rollSetout` asked for MAGE
+// charms unconditionally, so the rogue's opening pick was three rules it does not have.
+//
+// ⚠️ AND THE SECOND HALF IS WORSE, BECAUSE IT IS SILENT: four generic charms are ELEMENT-gated
+// (`mods.el`). A rogue buying "⚡ Lightning cards strike +1" gets literally nothing and is never
+// told. That is exactly the archetype-gated bug that shipped for months doing invisible arithmetic,
+// and the rule it earned holds here: 🔑 A CHARM MAY ONLY NAME SOMETHING PRINTED ON THE CARD.
+// An element is printed nowhere on a rogue card, so `CLASS.pairs` gates them out entirely.
+function charmForClass(c) {
+  if (c.cls && c.cls !== CLASS.id) return false;
+  if (c.mods && c.mods.el && !CLASS.pairs) return false;   // an element the class cannot read
+  return true;
+}
+function classCharmPool() { return CHARMS.filter(c => c.cls === CLASS.id && !c.curse && charmUnlocked(c)); }
 function rollSetout() {
-  const pool = mageCharmPool().slice();
+  const offers = [];
+  for (const b of SETOUT_BUCKETS) {
+    // ⚠️ A BUCKET THAT CAN PRODUCE NOTHING MUST BE ALLOWED TO PRODUCE NOTHING, not crash and
+    // not silently skip the screen. 🔑 The first charm-tiering left stage 1 with ZERO mage charms
+    // and SILENTLY SKIPPED this entire phase, because the phase only starts if the list is
+    // non-empty - a pool filter deleted a whole screen. Every `pick` may return null; the shuffle
+    // walks the bucket until one yields.
+    const cands = SETOUT.filter(o => o.bucket === b);
+    for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
+    for (const c of cands) { const o = c.pick(); if (o) { offers.push({ k: c.id, ...o }); break; } }
+  }
+  return offers;
+}
+// 💀 THE ELITE BOON — beat a dangerous thing, take one of three charms.
+// 🔑 THIS IS WHAT MAKES AN ELITE A DECISION RATHER THAN A TAX. Coins are the reward every node
+// pays; a charm is a RULE, and [[Market_And_Retention]] says rule-changers are the game's build
+// discovery. Routing toward danger for a rule you choose is the strongest reason the map has to
+// exist at all.
+// ⚠️ Drawn from the FULL pool (class charms and generic both, tier-gated as ever), so the elite
+// is the best charm source in the run and the risk is priced.
+// ⚠️ THE KILL IS THE BAR (2026-08-24) — the gate lives in finishResolve(), and so does the
+// reasoning. Walking away pays the coins and the materials; only a Complete pays a charm.
+// 🔑 This comment stated the OPPOSITE of the code for weeks. A NOTE THAT CONTRADICTS THE RULE IT
+// SITS ON IS WORSE THAN NO NOTE: it is the version that gets quoted.
+function boonPool() {
+  return CHARMS.filter(c => !c.curse && charmUnlocked(c) &&
+    (!c.cls || c.cls === CLASS.id) && !S.charms.includes(c.id) && charmFitsClass(c));
+}
+function rollBoon() {
+  const pool = boonPool().slice();
   const offers = [];
   while (offers.length < 3 && pool.length) offers.push(...pool.splice(Math.floor(rnd() * pool.length), 1));
   return offers.map(c => c.id);
 }
-function pickSetout(id) {
-  if (!S.setout || !S.setout.includes(id)) return;
+function pickBoon(id) {
+  if (S.phase !== 'eliteboon' || !S.boon || !S.boon.includes(id)) return;
   const c = charmById(id); if (!c) return;
   S.charms.push(id);
+  S.boon = null;
+  log(`💀 You take <b>${c.name}</b> off the thing you killed — ${classText(c.text)}`, 'good');
+  backToMap();
+}
+
+// 🏕️ SETTING OUT - three offers, ONE FROM EACH BUCKET (2026-08-24).
+// Thomas: *"in slay the spire, the starting item, its a selection from starting with extra gold,
+// potion, or quest or charm... i don't want players to always pick the same thing every new run,
+// or maybe they cancel out and re do a run just to potentially get something they want."*
+//
+// 🔑 THOSE TWO WORRIES ARE OPPOSITE FAILURE MODES OF ONE DIAL, AND THE FIX SOLVES BOTH AT ONCE:
+//   • *always picks the same* happens when the offers are too ALIKE - it used to draw three
+//     CLASS CHARMS, three of one kind, so one was simply better and the screen read itself.
+//   • *rerolls for a good one* happens when the offers differ too much in VALUE - a jackpot is
+//     a thing worth farming for.
+// ✅ **VARY THE KIND, NOT THE SIZE.** Different kinds are incomparable, so you choose by what
+// THIS run wants; similar weight means there is nothing to reroll toward. That is also the same
+// bar the Wheel's shelf and the 💀 elite boon are held to: *if one offer is strictly better than
+// another, the player did not choose, they read.*
+//
+// ⚠️ DECLARATIVE ON PURPOSE - `pick`/`name`/`text`/`apply`, the same shape as EVENTS and POTIONS,
+// so the port rewrites a lookup table rather than prose.
+// ⚠️ AND THE ROLL IS PER BUCKET, NEVER GLOBAL: a global draw of 3 from 8 would hand you two
+// charms and no fuel about a third of the time, which is the old screen again by accident.
+const SETOUT = [
+  // 🎁 A RULE - the run's direction, and the only bucket that is pure power
+  { id: 'classcharm', bucket: 'rule',
+    pick: () => { const p = classCharmPool().filter(c => !S.charms.includes(c.id));
+                  return p.length ? { c: rand(p).id } : null; },
+    name: o => charmById(o.c).name, text: o => classText(charmById(o.c).text),
+    why: () => 'your class rule, chosen at the door',
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${classText(charmById(o.c).text)}`; } },
+  { id: 'genericcharm', bucket: 'rule',
+    pick: () => { const p = CHARMS.filter(c => !c.curse && !c.cls && charmUnlocked(c) &&
+                    charmFitsClass(c) && !S.charms.includes(c.id));
+                  return p.length ? { c: rand(p).id } : null; },
+    name: o => charmById(o.c).name, text: o => classText(charmById(o.c).text),
+    why: () => 'a rule of the road, not of your craft',
+    apply(o) { S.charms.push(o.c); return `🎁 <b>${charmById(o.c).name}</b> — ${classText(charmById(o.c).text)}`; } },
+  // 🪙 FUEL - spendable, and the bucket that decides how the first shop goes
+  { id: 'purse', bucket: 'fuel', pick: () => ({}),
+    name: () => 'A Full Purse', text: () => 'Start with <b>12 coins</b>',
+    why: () => 'the first Wheel is the one you can never afford',
+    apply() { S.coins += 12; return `🪙 Twelve coins, and the first Wheel is suddenly a shop.`; } },
+  { id: 'kit', bucket: 'fuel', pick: () => ({}),
+    name: () => 'A Packed Kit', text: () => 'Start with <b>two potions</b>',
+    why: () => 'two turns, somewhere, go the way you wanted',
+    apply() { const a = evRandomPotion(false), b = evRandomPotion(false); return `🧪 ${a} · ${b}`; } },
+  { id: 'wellkept', bucket: 'fuel', pick: () => ({}),
+    name: () => 'Well-Kept', text: () => '<b>Two cards</b> begin at <b>Lv3</b>',
+    why: () => 'three levels you did not have to buy',
+    apply() {
+      // ⚠️ THE THREE BIGGEST, NOT A PICKER. A card-picker here would be a phase, and a phase
+      // before the first card is dealt is a screen between the player and the game. 🔑 It is also
+      // the LEVELLING = SHARPENING rule applied honestly: a level makes a card more itself, so
+      // sharpening what is already biggest is what a player would have done anyway.
+      const all = [...S.hand, ...S.deck, ...S.discard].sort((a, b) => eff(b).value - eff(a).value);
+      // ⚠️ TWO, NOT THREE. At three it measured **+7.1 road Complete** against a field running
+      // -1.8 to +3.4 - the jackpot this whole screen was rebuilt to avoid. 🔑 No surprise in
+      // hindsight: the economy is on record as *very sensitive to upgrade cost*, so free levels
+      // are the most concentrated thing that can be handed out at turn zero.
+      const got = all.slice(0, 2);
+      for (const c of got) if (c.level < MAX_LEVEL) c.level++;
+      return `⭐ ${got.map(c => c.def.name).join(', ')} come out of the workshop sharper.`; } },
+  // 🗺️ THE ROAD - neither power nor money. 🔑 The bucket that makes the choice INCOMPARABLE,
+  // and the only place the META layer pays you before turn one.
+  { id: 'steadyflame', bucket: 'road', pick: () => ({}),
+    name: () => 'A Steady Flame', text: () => 'Your 🕯️ candle survives your first <b>Narrow</b>',
+    why: () => 'one scrape that does not cost you the road ahead',
+    apply() { S.candleGrace = 1; return `🕯️ The wick is a good one — the first scrape will not snuff it.`; } },
+  { id: 'earlywork', bucket: 'road', pick: () => { const c = rollFreeContract(); return c ? { c } : null; },
+    name: () => 'Early Work', text: o => `📜 ${contractById(o.c).name} — ${contractById(o.c).text}, and it pays <b>double</b>`,
+    why: () => 'a goal you did not have to buy',
+    apply(o) { const c = contractById(o.c);
+      S.contract = { id: o.c, n: 0, left: contractWindow(c), x2: true };
+      return `📜 <b>${c.name}</b> — ${c.text} within <b>${contractWindow(c)}</b> encounters. Keep it and it pays 🪙 ${c.reward * 2}.`; } },
+  { id: 'headstart', bucket: 'road', pick: () => ({}),
+    name: () => 'A Head Start', text: () => '<b>3 🦴 Bone Shards</b> toward the Workshop',
+    why: () => 'the only offer that outlives the run',
+    apply() { S.loot = S.loot || {}; S.loot.shard = (S.loot.shard || 0) + 3;
+      return `🦴 Three bone shards, already in the pack — they come home whatever happens.`; } },
+];
+const SETOUT_BUCKETS = ['rule', 'fuel', 'road'];
+// ⚠️ REUSES THE RARITY TINTS AS BUCKET TINTS, so the three offers read as three KINDS at a
+// glance rather than three paragraphs. It is the one place colour carries the whole design.
+const SETOUT_RARITY = { rule: 'rare', fuel: 'common', road: 'uncommon' };
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW. A top-level const is LEXICAL: it never
+// lands on the headless sandbox, so no instrument can ask for it, and it hoists into a temporal
+// dead zone for anything evaluated above it. This binding rule has cost this project a load-time
+// crash and three silent no-op probes; it is not a style preference.
+function setoutById(id) { return SETOUT.find(o => o.id === id) || null; }
+
+// 📜 a contract for the Early Work offer, using the same eligibility the Wheel uses
+function rollFreeContract() {
+  const fits = CONTRACTS.filter(x => !x.tier || x.tier <= stageTier());
+  return fits.length ? rand(fits).id : null;
+}
+
+function pickSetout(id) {
+  const off = (S.setout || []).find(o => o.k === id);
+  if (!off) return;
+  const def = setoutById(id); if (!def) return;
+  log(def.apply(off), 'good');
   S.setout = null;
-  S.phase = 'assign';
+  // 🛤️ HAND THE RUN BACK TO THE FORK, NOT TO A TURN THAT HAS NO ENCOUNTER (fixed 2026-08-18).
+  // 🐛 `freshGame` runs nextTurn, which now OPENS A FORK - phase 'fork', S.encounter still null.
+  // startStage then overwrote that phase with 'setout', orphaning the fork; picking a charm jumped
+  // straight to 'assign' with no road chosen, and renderControls threw on `S.encounter.type`.
+  // 🔑 THE CRASH PRESENTED AS *"clicking on the charm doesn't do anything"* - because render()
+  // does its modal bookkeeping LAST, the throw left the dialog open and the screen frozen mid-update.
+  // The charm was actually taken every time; nothing on screen ever said so.
+  // ⚠️ THE SAME BUG TWICE IN ONE DAY: this line has to name every way a run can begin. It
+  // was written for the fork, and when the map replaced the fork it silently dropped the player
+  // onto turn 1 with no road chosen. 🔑 A HANDOFF THAT ENUMERATES DESTINATIONS IS A LINE YOU MUST
+  // REVISIT EVERY TIME YOU ADD ONE.
+  S.phase = S.map ? 'map' : ((S.fork && S.fork.length) ? 'fork' : 'assign');
   logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
-  log(`🏕️ You set out carrying <b>${c.name}</b> — ${c.text}`, 'good');
-  logChallenge();
+  // 🐛 THIS LINE STILL NAMED `c`, THE CHARM THE OLD SCREEN ALWAYS HANDED YOU. With three
+  // KINDS of offer there is no charm to name, and the handoff threw `c is not defined` — which
+  // presented, exactly as this function's own comment predicted a year of bugs ago, as *clicking
+  // the offer does nothing*. 🔑 The offer now describes ITSELF: `apply()` returns its own line and
+  // pickSetout logs it above, so a new offer can never fall out of step with the sentence.
+  if (S.encounter) logChallenge();
   saveGame();
   render();
 }
@@ -1911,9 +4064,12 @@ function freshGame(stage) {
   const tutorialRun = stage === 0;
   TSEED = 20260729;   // 🎲 the tutorial's fixed seed — same run, every time
   // 🎓 the tutorial deals from an authored order; every other run shuffles
+  // 🗡️ THE DECK IS THE CLASS'S, not the engine's — the mage deals 16 unique, the rogue 8 x 2.
+  // ⚠️ The tutorial's authored order is MAGE-only by construction (it names mage cards), which is
+  // correct: stage 0 teaches the engine through the class you start with.
   const cards = tutorialRun
     ? TUTORIAL.deckOrder.map(n => newCard(CARD_DEFS.find(d => d.name === n))).filter(Boolean)
-    : shuffle(CARD_DEFS.map(newCard));
+    : (CLASS.deck ? CLASS.deck() : shuffle(CLASS.defs.map(newCard)));
   // no argument (a cold boot, or the bot) → the highest stage you have unlocked, so a returning
   // player lands on the newest problem rather than replaying the tutorial.
   const tutorial = stage === 0;
@@ -1942,8 +4098,9 @@ function freshGame(stage) {
     poison: 0,           // damage owed to the NEXT drawn hand
     afterSoak: 'upgrade', // where the soak phase exits to: 'upgrade' | 'turnEnd'
     assign: { Spell: null, Element: null, Boost: null, Reserve: null }, // card ids
-    divertsUsed: 0,   // resets every time an encounter is actually faced
-    diverting: false, // true while choosing which hand card to discard
+    // ❌ DEAD since 2026-08-23 — ↩️ Divert was deleted (the map made it redundant). Kept in the
+    // shape only so a save written before that still loads.
+    divertsUsed: 0, diverting: false,
     boostTarget: 'Attack',
     coins: 0,          // ROLLS OVER between encounters — the run-layer currency
     charms: [],        // ids of Charms held this run (run-long passives)
@@ -1971,10 +4128,19 @@ function freshGame(stage) {
     finalPhase: null,     // 'lastmile' | 'duel'
     dragonState: null,    // { hp, maxHp, boon } — the persistent dragon
     lastMileOutcome: null,  // ⚔️ what the run's final journey earned
+    lastMileApproach: null, // ⚔️ ...and how loudly it arrived (unseen / even / heard)
     duelBeat: 0,          // duel beat counter (for the log)
     duelResult: null,     // stashed resolution carried across the staged reveal into finishDuel
     defeatMsg: null,
-    pendingEvent: false, // a Complete/Narrow journey owes an Event this turn
+    fork: null,             // ⚠️ dead since the map replaced it; kept so older saves load
+    map: null,              // 🗺️ the run's map - floors, edges, and where you stand
+    mapPeek: null,          // 🗺️ the node being looked at (hover, or first tap on touch)
+    boon: null,             // 💀 three charms offered for a clean elite kill
+    boonOwed: false,        // 💀 an elite was beaten; pay it at the next map return
+    pendingEvent: false,    // ⚠️ dead since 2026-08-18, kept so older saves load
+    eventAt: 1,             // 🏕️ which encounter this region's event follows
+    eventDone: false,       // 🏕️ has this region's event been spent
+    eventTurnPending: false,// 🏕️ the NEXT turn is the event turn
     event: null,         // active event state { id, step, opt, targetId, wantElement, lines }
     // ---- cross-turn event effects (run layer) ----
     eventsSeen: [],        // ids of events already drawn this run (for `once` events)
@@ -1984,21 +4150,59 @@ function freshGame(stage) {
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
     wake: 0, wakeTarget: null, wakePending: 0,
+    // 🛡️ THE LOADOUT. `wear` counts DOWN from the piece's printed wear; at 0 it is battered
+    // through for the rest of the run. ⚠️ Nothing here is ever destroyed for good — you forged it,
+    // you keep it. What a piece costs is the RUN, and that is the only reason it may exist at all
+    // (it is the first thing in the game that adds health from outside the deck).
+    // 🔴 EMPTY BY DEFAULT. The granted starter kit was step-1 scaffolding, and the ladder is
+    // tuned at an EMPTY loadout — a new player owns nothing and crafts up, which is exactly the
+    // curve the measurement assumed. What you wear now comes from the Workshop.
+    armour: loadoutIds().map(id => newArmour(id)),
+    armourStrike: 0, armourStrikePending: 0, armourPace: 0, armourPacePending: 0,
+    splitPending: 0,   // 🎯 granted multi-hit, cleared every turn like potionFx
+    armourWinInit: false,   // 👢 Anvil Toad Boots, this turn only
+    // 🧰 THE HAUL. Kept on the run so the summary can show it, and banked to the stash when
+    // the run ENDS — win or lose. ⚠️ `runBanked` is the guard: a run pays out exactly once.
+    loot: {}, encountersDone: 0, runBanked: false, xpRun: 0, xpBefore: 0, clsXpBefore: 0,
+    stageOpened: null,               // 🗺️ set by victory() when this run unlocked the next stage
+    // 🗡️ MOMENTUM (rogue). Engine state for the same reason `lastAttuned` is: cleanup owns the
+    // moment it changes, and cleanup is the engine's. Only the rogue ever reads it.
+    // ⚠️ IT IS A STREAK, NOT A POOL: it rises by 1 on any turn that costs you no cards and falls to
+    // 0 the moment one does — that reset is the minigame, and it is always your own fault.
+    momentum: 0, moTarget: null,     // ● the streak (moTarget is dead, kept for old saves)
+    sharpenedVisit: [],              // 🔼 cards already sharpened on THIS visit - one level each
+    drawExtra: 0,                    // 🗡️ cards a combo verb owes you next turn
     // 🔥 whether you have ARMED the Surge to bank this turn (2026-08-12 — was an element
     // coincidence, is now a choice). Per-turn; cleared in nextTurn and both finale beat-starts.
     bankArmed: false,
     // 📊 what the GRADE reads. Tracked as you play so a run can report on itself.
     // 🕯️ THE CANDLE. Lit, you can see the next encounter. See lightCandle/snuffCandle.
     candle: true,
-    stats: { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 },
+    candleGrace: 0,     // 🏕️ A Steady Flame — scrapes this many Narrows survive
+    stats: { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0, perfect: 0, perfectChances: 0 },
     emberguardUsed: false,   // ✦ Emberguard is once per encounter
     duelStamina0: 0,    // cards you arrived at the lair with — the duel's other health bar
+    delayed: 0,            // ⏳ shop stops still owed to a Time Penalty — no sharpening while > 0
     curseNextFight: false, // Cache/Mirror Fen: force a Hardship on the next fight
     paceBless: 0,          // Gray Pilgrim/Mirror Fen: +2 Pace on this many upcoming journeys
     emberShield: false,    // Ember Hollow: your Arsenal survives Nightfall (rest of region)
     logEntries: [], // [{header, lines:[{text, cls}]}], newest first
   };
-  draw(HAND_SIZE);
+  scheduleRegionEvent();   // 🏕️ legacy: kept for the tutorial, which does not use the map
+  // 🗺️ THE MAP IS THE RUN. ⚠️ Not for the tutorial - stage 0 is deterministic by design, and
+  // a route is the one thing a scripted lesson cannot script.
+  S.map = S.tutorial ? tutorialMap() : generateMap();
+  // ⚠️ ON A MAP RUN THE FIRST HAND IS DEALT WHEN YOU SET OFF, NOT BEFORE. This is the exact case
+  // Thomas hit: *"i just started a new game, i see my whole hand, and i see all 3 encounters."*
+  // Turn 1 is the one route you take with NO Arsenal, so it is the purest version of the choice -
+  // you pick a road knowing only the road.
+  if (!S.map) draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   nextTurn();
   // the Dragon is fully revealed from turn 1 — the run's reference frame
   // 🐉 THE BRIEFING. The dragon is known from turn 1 — and now that it is a STAGE rather than a
@@ -2107,13 +4311,14 @@ function newGame() {
   if (!S || isShell()) { showMenu(); return; }
   const st = S.tutorial ? 0 : (S.dragon && S.dragon.stage) || 1;
   const what = st === 0 ? 'the tutorial' : `stage ${st} — ${S.dragon.name}`;
-  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st);
+  if (confirm(`Start ${what} again from the beginning? This run will be lost.`)) startStage(st, true);
 }
 
 function nextRegion() {
   if (S.region >= RUN().length) { freshGame(); return; }
   // 📜 a contract CROSSES the region break now — its own encounter window is the bound
   S.regionTurn = 0;
+  scheduleRegionEvent();       // 🏕️ one event turn, somewhere in this region
   // reshuffle everything non-trashed, keep levels
   const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
   S.region++;
@@ -2121,8 +4326,17 @@ function nextRegion() {
   S.hand = [];
   S.discard = [];
   S.emberShield = false; // the Ember Hollow ward lasts only the region it was banked in
+  // 🕯️ Dawnwatch Cap — a fresh region, a fresh light. ⚠️ Placed at the REGION break rather than
+  // per encounter on purpose: relighting every turn would delete the candle's whole tension.
+  if (hasArmourRule('dawnlit') && !S.candle) lightCandle('Dawnwatch Cap catches the morning');
   S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
   draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   nextTurn();
 }
 
@@ -2151,7 +4365,14 @@ function eff(card) {
     // stays dead. One rule: +(level + 1). It SHARPENS, so the higher a card is levelled the more
     // it depends on being properly fuelled - a Lv4 Emberfall is enormous attuned and merely large
     // raw, which is the same "more itself" curve every other stat follows.
-    attuned: adj(v) + card.level + ATTUNE_BONUS,
+    // 🐛 ...EXCEPT WHEN THE CLASS AUTHORS IT (found 2026-08-17). The rogue's ✦ is what you get
+    // for PAYING a card's ⚡ cost in full, and `ROGUE_SPEC.paid` sets it per card — a cheap tool
+    // pays back a little, an expensive blade a lot. That whole column was being overwritten here by
+    // the mage's derived rule, so every rogue card paid back a flat +(level+1) and `paid` was DEAD
+    // DATA. 🔑 THE SAME SHAPE AS `hits`: a field the class authors and the engine quietly
+    // ignores looks exactly like a tuned mechanic right up until you check the number.
+    attuned: d.paid != null ? adj(v) + d.paid + PAID_STEP * (card.level - 1)
+                            : adj(v) + card.level + ATTUNE_BONUS,
     // `ev` (the old Attuned value, column 2) is DEAD DATA - power comes from pile depth now
     // 💨 THE INITIATIVE FLOOR (2026-07-29). Sharpening drove every non-SPARK card's init to 0-1,
     // so only 4 of the 16 cards could ever contest a race and the deck's MEDIAN init FELL as you
@@ -2161,7 +4382,9 @@ function eff(card) {
     // slots). The floor keeps SPARK enormously faster (13 vs 3 at Lv4) — it stops the rest being
     // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
     init: Math.max(INIT_FLOOR, init + charmMod('init', d.element)),
-    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am), cost,
+    // ⚠️ cost comes from LEVEL_COST, not the row - column 7 of every level table is now dead data
+    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am),
+    cost: LEVEL_COST[card.level - 1],
   };
 }
 
@@ -2220,7 +4443,7 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ HOLD THREE. A cap is what stops them becoming a savings account, and three is small enough
 // that taking one is a decision rather than an accumulation.
 // ⚠️ CLASS-GATED LIKE CHARMS: a potion may only name something PRINTED ON THE CARD, and one that
-// names an ELEMENT is a mage potion (`mage: true`) - a rogue's vial would say something else.
+// names an ELEMENT is a mage potion (`cls: 'mage'`) - a rogue's vial would say something else.
 // ⚠️ Every effect lasts THIS TURN only unless it says otherwise, and `S.potionFx` is wiped in
 // nextTurn() and in the finale's beat-starts. A potion that outlived its turn would be a charm.
 // ============================================================
@@ -2233,6 +4456,15 @@ function isAssignPhase() { return S.phase === 'assign'; }
 // ⚠️ TRIMMED 3 → 1 on 2026-08-05 after the level-table fix made cards much stronger: Thomas
 // reported "charms and potions are really good too, getting completes easy". The clean win still
 // pays more than a scrape, which was the point — it just stopped being an income firehose.
+// 🪙 COINS ARE THE DIFFICULTY DIAL (2026-07-29), and now there is one knob for it.
+// ⚠️ APPLIED AT THE AWARD, exactly once, for the same reason FOE_ATK_MULT is applied at the
+// draw: `e.xp` is read in several places and most of them are DISPLAYS. Scale anywhere else and
+// the panels print numbers the game does not use.
+let COIN_MULT = 1.0;
+// 🐉 PER-STAGE HP OFFSET — the instrument for the SHAPE of the ladder, where COIN_MULT is the
+// instrument for its HEIGHT. 🔑 1 dragon HP ≈ 2 points of win rate (measured), so this is the
+// finest dial in the game. Read at beginFinalBattle(), so a sweep never edits the data table.
+let DRAGON_HP_ADD = { 1: 0, 2: 0, 3: 0, 4: 0 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
@@ -2315,7 +4547,10 @@ function contractTick(r) {
   if (c.track === 'flawless')   hit = r.outcome === 'Complete' && !r.initLost && hurt === 0;
   if (hit) S.contract.n++;
   if (S.contract.n >= c.need) {
-    S.coins += c.reward;
+    // 🏕️ Early Work doubles it. ⚠️ Read off the CONTRACT OBJECT, not a separate flag on S —
+    // one contract is live at a time and it already travels with the run, so the multiplier
+    // travels with the thing it multiplies and cannot be left behind by a save.
+    S.coins += c.reward * (S.contract && S.contract.x2 ? 2 : 1);
     log(`📜 <b>${c.name}</b> — kept. 🪙 +${c.reward} (you now hold ${S.coins}).`, 'good result');
     S.contract = null;
     return;
@@ -2328,6 +4563,12 @@ function expireContract() {
   log(`📜 <b>${c.name}</b> lapses unkept — ${S.contract.n} of ${c.need}. The coin is gone.`, 'bad');
   S.contract = null;
 }
+// ⚠️ EVERY POTION SAYS "WHEN USED", NEVER "THIS TURN" (2026-08-18). Thomas: *"for potion, it
+// should be more clear, instead of saying, this turn, should say when used."*
+// 🔑 "This turn" reads as something ALREADY HAPPENING - passive, like a hardship. A potion is
+// something you SPEND, on a turn you pick, and the text has to say so at the moment you are
+// deciding whether to buy it. The duration is a property of every potion, so it is stated once on
+// the carry chip rather than seventeen times in the shop.
 const POTIONS = [
   // ---- 🥄 FODDER (2026-08-05, Thomas: *"add some cheap shitty potions too, we need fodder to
   // fill up these things as well"*). Cheap, small, and correct about one turn in five.
@@ -2340,41 +4581,54 @@ const POTIONS = [
   // would otherwise have lost by one or two points. A potion that can never be right is litter,
   // and litter in a shop is worse than an empty shelf.
   { id: 'chalkwater', name: 'Chalkwater', cost: 2, rarity: 'common',
-    text: '💨 <b>+2 Initiative</b> this turn' },
+    text: '💨 <b>+2 Initiative</b> when used' },
   { id: 'broth',    name: 'Thin Broth',   cost: 2, rarity: 'common',
-    text: '⚔️ <b>+2</b> to your action this turn' },
+    text: '⚔️ <b>+2</b> to your action when used' },
   { id: 'grit',     name: 'Grit',         cost: 2, rarity: 'common',
-    text: '🛡️ every card <b>soaks +1</b> this turn' },
-  { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common',
-    text: '➕ your <b>Surge gives +3</b> more this turn' },
+    text: '🛡️ every card <b>blocks +1</b> when used' },
+  // 🔴 MAGE-GATED 2026-08-28, not reworded. `ROGUE.compose()` returns `boost: 0` and the boost
+  // path is guarded by `boostVal > 0`, so this did **nothing** for her — and it was generic, so
+  // she could buy it. *A string cannot be renamed into a stat the class does not have.*
+  { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common', cls: 'mage',
+    text: '➕ your <b>{slot:Boost} gives +3</b> more when used' },
   { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
-    text: '🌙 <b>+3 Pace</b> against the dark this turn' },
+    text: '🌙 <b>+3 Pace</b> against the dark when used' },
   { id: 'tallow',   name: 'Tallow Stub',  cost: 3, rarity: 'common',
-    text: '🕯️ your candle <b>cannot be snuffed</b> this turn' },
+    text: '🕯️ your candle <b>cannot be snuffed</b> when used' },
   // ---- generic: every class inherits these unchanged ----
   { id: 'haste',   name: 'Draught of Haste', cost: 6, rarity: 'common',
-    text: '💨 <b>+5 Initiative</b> this turn' },
+    text: '💨 <b>+5 Initiative</b> when used' },
   { id: 'ember',   name: 'Emberdraught',     cost: 7, rarity: 'common',
-    text: '⚔️ <b>+6</b> to your action this turn' },
+    text: '⚔️ <b>+6</b> to your action when used' },
   { id: 'ironskin',name: 'Ironskin Tonic',   cost: 6, rarity: 'common',
-    text: '🛡️ every card <b>soaks +3</b> this turn' },
+    text: '🛡️ every card <b>blocks +3</b> when used' },
   { id: 'clarity', name: 'Draught of Clarity', cost: 5, rarity: 'uncommon',
     text: '🕯️ <b>relight your candle</b> — see the road ahead again' },
+  // 🎯 THE ONE-TURN VERSION OF MULTI-HIT, and the cheapest teacher of it. ⚠️ Deliberately
+  // priced as a mid uncommon rather than a banger: it adds **no damage** (a multi-hit strike
+  // divides its own value), so its whole value is meeting 🧱 Guard with it in your kit. Against
+  // 🛡️ Armour it is actively bad, which is the downside already written into the maths.
+  { id: 'splitting', name: 'Splitting Draught', cost: 8, rarity: 'uncommon',
+    // ⚠️ IT DOES NOT SAY *"same total"*, WHICH WAS THE FIRST DRAFT AND WAS A LIE. Measured against
+    // 🛡️ Armour 1: unsplit 12, split 10 - armour is subtracted from EVERY blow, and an odd value
+    // loses one more to rounding. 🔑 That is the mechanic working as designed, so the text must
+    // state the RULE rather than a comforting summary of it. *A rules string states the rule.*
+    text: '🎯 your strike <b>splits in two</b> this turn — better into 🧱 <b>Guard</b>, worse into 🛡️ <b>Armour</b>' },
   { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
     text: '✨ <b>restore a card a level</b> — undo what the road took',
     can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
   { id: 'nightglass', name: 'Nightglass', cost: 6, rarity: 'common',
-    text: '🌙 the dark <b>cannot catch you</b> this journey' },
+    text: '🌙 the dark <b>cannot catch you</b> — for the whole journey' },
   { id: 'breath',  name: 'Second Breath',  cost: 10, rarity: 'rare',
-    text: '✦ your <b>Spell is not spent</b> this turn' },
+    text: '✦ your <b>{slot:Spell} is not spent</b> when used' },
   { id: 'quench',  name: 'Quenching Draught', cost: 11, rarity: 'rare',
-    text: "🛡️ the enemy's <b>defence does nothing</b> this turn" },
+    text: "🛡️ the enemy's <b>defence does nothing</b> when used" },
   { id: 'gravewax', name: 'Grave Wax',     cost: 8, rarity: 'uncommon',
     when: () => (S.trashed || []).length > 0,
     text: '✨ the last card you <b>lost returns</b>, at Lv1' },
   // ---- mage: it names an ELEMENT, which is the mage's suit ----
-  { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', mage: true, pick: true,
-    text: "✦ one card's <b>element becomes your Spell's</b>, this turn",
+  { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', cls: 'mage', pick: true,
+    text: "✦ one card's <b>element becomes your Spell's</b>",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
     why: 'nothing to change here' },
   // ---- 🗺️ ONE POTION PER LAND (2026-08-10). Each is the single-turn answer to the thing its
@@ -2383,15 +4637,15 @@ const POTIONS = [
   // ⚠️ And they are CONSUMED, which is why they do not break *lateral power, not vertical* —
   // a potion buys ONE turn where the arrangement you wanted is legal.
   { id: 'skyglass',  name: 'Skyglass',   tier: 2, cost: 5, rarity: 'uncommon',
-    text: '🌀 Your blow <b>cannot be halved</b> this turn' },
+    text: '🌀 Your blow <b>cannot be halved</b> when used' },
   { id: 'stillwater', name: 'Stillwater', tier: 3, cost: 6, rarity: 'uncommon',
-    text: '🛡️ Nothing <b>strikes back</b> at you this turn' },
+    text: '🛡️ Nothing <b>strikes back</b> at you when used' },
   { id: 'hardtack',  name: 'Hardtack',   tier: 3, cost: 2, rarity: 'common',
-    text: '⏳ Any <b>Time Penalty is 1 less</b> this turn' },
+    text: '⏳ Any <b>Time Penalty is 1 less</b> when used' },
   { id: 'deepcurrent', name: 'Deepcurrent', tier: 4, cost: 9, rarity: 'rare',
-    text: '💨 You <b>win Initiative</b> this turn, whatever it is' },
-  { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', mage: true,
-    text: '✦ your <b>Catalyst stays in hand</b> this turn instead of going under the deck' },
+    text: '💨 You <b>win Initiative</b>, whatever it is' },
+  { id: 'solvent', name: 'Solvent',           cost: 8, rarity: 'uncommon', cls: 'mage',
+    text: '✦ your <b>Catalyst stays in hand</b> instead of going under the deck' },
 ];
 // 🔓 CHARM TIERS — a STAND-IN for meta-progression (2026-08-05, Thomas: *"since we will have
 // meta progression to unlock better ones, maybe we can simulate it for now — you'll only have
@@ -2413,12 +4667,142 @@ const POTIONS = [
 // silently SKIPPED 🏕️ Setting Out on stage 1 - the one screen a new player meets first. Three of
 // the mildest rule-changers (Loose Weave, Held Ember, Reversed) live in tier 1 for that reason:
 // they are lateral, not powerful, and they teach what a rule-charm even is.
+// 🔓 THE UNLOCK LADDER — one level, one named thing.
+//
+// 🔑 ORDERED LEGIBLE → CONDITIONAL, which is [[Charm_Pools]]'s own answer to the trap Thomas
+// spotted there (*"starter charms are super basic and bad, and progressively get better? but yeah
+// there would be a lot of slop"*). Slay the Spire's commons are not BAD, they are SIMPLE — so the
+// axis that grows is how much the charm asks of you, never how big its number is. Level 2 hands
+// you *+2 armour on every card*; level 19 hands you *your Spell is not spent on a Complete*, which
+// is worth nothing until you know what to do with it. **Nothing here is ever a dud**, so there is
+// no slop to filter past — and that keeps *lateral power, not vertical* true of the meta layer too.
+//
+// ⚠️ WHAT IS NOT IN THIS TABLE IS A STARTER. The nine charms a level-1 account already holds are
+// the current tier-1 set, unchanged, because that pool is what stage 1 is tuned against and it is
+// the one pool a new player ever meets. ⚠️ 🏕️ Setting Out only runs if the CLASS list is
+// non-empty, so every class must keep at least one charm off this table — the tiering bug that
+// silently deleted a whole screen is exactly this mistake made once already.
+//
+// ⚠️ CLASSES ARE INTERLEAVED ON PURPOSE. A run of four generic levels would read as a dead patch
+// to whoever is playing the class that got skipped; alternating keeps both curves moving.
+// 🔑 `kind` is here so the table can carry potions and events later without a second system —
+// [[Addiction_Loop]]'s meta-progression unlocks CONTENT, and a charm is only the first kind of it.
+const UNLOCKS = [
+  // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
+  { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
+  { level: 3,  kind: 'charm', id: 'lanternpace' },
+  { level: 4,  kind: 'charm', id: 'tinderbox' },
+  { level: 5,  kind: 'charm', id: 'swiftwick' },
+  { level: 6,  kind: 'charm', id: 'ironsplit' },
+  { level: 7,  kind: 'charm', id: 'brightwick' },
+  { level: 8,  kind: 'charm', id: 'windreader' },
+  { level: 9,  kind: 'charm', id: 'slowfoot' },
+  { level: 10, kind: 'charm', id: 'oathstone' },
+  { level: 11, kind: 'charm', id: 'unspent' },          // the whole-run rethink
+  // 🎁 THE ANTI-SYNERGY SET TAKES THE TOP THREE RUNGS (2026-08-24), which is exactly the job
+  // this bar was given: *the shelf where content we have not built yet lands*. 🔴 ALL FOUR ARE ON THE BAR, AND THE
+  // FIRST CUT PUT ⚖️ Even Keel and 🗡️ Keen Edge IN THE STARTER POOL to teach the idea early.
+  // That was worth **+19/+15/+13/+15 on the ladder at ★1** - because the ladder measures a fresh
+  // account, so those two were the ONLY new charms it could ever see, landing in a generic starter
+  // pool of nine. 🔑 **A STARTER IS NOT A GENTLER VERSION OF A REWARD - IT IS A DIFFICULTY
+  // SETTING FOR THE ON-RAMP**, and stage 1 is the one rung that is already tuned.
+  // ⚠️ The teaching argument was real and lost to a measurement, which is the right order.
+  { level: 12, kind: 'charm', id: 'bloodied' },
+  { level: 13, kind: 'charm', id: 'ironbound' },
+  { level: 14, kind: 'charm', id: 'evenkeel' },
+  { level: 15, kind: 'charm', id: 'keenedge' },
+  // ❌ ARMOUR SLOTS ARE NOT ON THIS LADDER (Thomas, 2026-08-23: *"i don't want to gate armor slots
+  // in account level"*). They were, for one build; the argument was that `workshopHTML()` had
+  // advertised *"two more to earn"* since it shipped, so the reward already existed.
+  // 🔑 THAT ARGUMENT ANSWERED THE WRONG QUESTION. It showed a slot gate was *available*, not that
+  // it was *right* — and armour is the one system in the game that is deliberately paid for in
+  // MATERIALS, hunted from specific creatures. Putting a second, unrelated gate in front of it
+  // makes the Workshop's own currency mean less: you could hold the parts, forge the piece, and
+  // still not be allowed to wear it. **Two gates on one system is one gate too many, and the one
+  // that has to go is the one that is not the system's own.**
+  // ⚠️ The `kind` field stays — the table is still meant to carry things that are not charms. See
+  // the account-ladder options in [[Charm_Pools]]; characters are the agreed next one.
+  // 🎭 THE CLASS LADDERS — read against that class's OWN level, so each is walked separately and
+  // every future class brings its own. ⚠️ Same legible→conditional ordering, in miniature.
+  { level: 2,  kind: 'charm', id: 'coldiron' },         // ✦ simplest: unattuned strikes +3
+  { level: 3,  kind: 'charm', id: 'secondflame' },      // ✦ the first that changes an arrangement
+  { level: 4,  kind: 'charm', id: 'kindledarsenal' },   // ✦
+  { level: 5,  kind: 'charm', id: 'threekind' },        // ✦ the payoff
+  { level: 2,  kind: 'charm', id: 'twinblades' },       // 🗡️
+  { level: 3,  kind: 'charm', id: 'deepcut' },          // 🗡️
+  { level: 4,  kind: 'charm', id: 'secondnature' },     // 🗡️
+  { level: 5,  kind: 'charm', id: 'deadhand' },         // 🗡️
+];
+const UNLOCK_AT = {};
+for (const u of UNLOCKS) UNLOCK_AT[u.id] = u.level;
+// ⚠️ THE ACCOUNT CAP COUNTS GENERIC RUNGS ONLY. Class rungs are numbered 2-5 against a different
+// bar entirely, so folding them in would have capped the account ladder at 5 and frozen it there.
+const LEVEL_CAP = UNLOCKS.reduce((m, u) => !unlockCls(u) ? Math.max(m, u.level) : m, 1);
+// 🐛 A TABLE THAT NAMES A CHARM THAT DOES NOT EXIST IS A LEVEL THAT UNLOCKS NOTHING, silently —
+// the player reaches it, the log says nothing, and the pool never grows. Fail at load instead.
+for (const u of UNLOCKS) {
+  if (u.kind === 'charm' && !CHARMS.some(c => c.id === u.id))
+    throw new Error('UNLOCKS names a charm that does not exist: ' + u.id);
+  if (u.kind !== 'charm' && !u.label)
+    throw new Error('a non-charm unlock needs a label, or the bar promises nothing: level ' + u.level);
+}
+// ⚠️ A LEVEL NUMBER IS AMBIGUOUS NOW — level 2 exists on three ladders. Every reader must say
+// which one it means, or the account bar would promise you the mage's Cold Iron.
+function unlocksAt(lv, cls) { return UNLOCKS.filter(u => u.level === lv && unlockCls(u) === (cls || null)); }
+function unlockName(u) { return u.label || (CHARMS.find(c => c.id === u.id) || {}).name || u.id; }
+// which ladder a row belongs to: a class charm to that class, everything else to the account.
+// ⚠️ A `function` DECLARATION, and this one is not a preference — `LEVEL_CAP` calls it at LOAD
+// time from further up the file, and a `const` arrow would sit in the temporal dead zone and
+// throw before the game ever booted. **Fourth time in three builds that the const/let vs function
+// binding rule has cost something.** If a helper is used by anything evaluated at load, declare it.
+function unlockCls(u) { const c = u.id && CHARMS.find(x => x.id === u.id); return (c && c.cls) || null; }
+
+// ✅ AND HERE IS WHERE THE SIMULATION ENDS (2026-08-23). The gate above was `c.tier <= stageTier()`
+// — the stand-in. It now reads the account level, which is what that note always said it was
+// waiting for. `tier` survives as the COMPLEXITY BAND (it is what orders `UNLOCKS`), but it no
+// longer gates anything on its own.
+// ⚠️ EVERY LADDER NUMBER ON RECORD WAS MEASURED THROUGH THE OLD GATE. 37/35/33/27 was taken with
+// `tier <= stage`, i.e. a pool of 9 at stage 1 rising to 23 at stage 4. A max-level account now
+// carries all 23 into stage 1. **The stage curve is a BAND now, not a line** — measure it at
+// level 1 and at MAX_LEVEL and quote both, because neither one alone is the game.
 function stageTier() { return (S && S.dragon && S.dragon.stage) ? Math.max(1, S.dragon.stage) : 1; }
-function charmUnlocked(c) { return !c.tier || c.tier <= stageTier(); }
+// 🔑 THE WHOLE HYBRID, IN ONE LINE: a charm unlocks on whichever bar owns the rule it names.
+function charmUnlocked(c) {
+  const at = UNLOCK_AT[c.id];
+  return !at || at <= (c.cls ? classLevel(c.cls) : accountLevel());
+}
+// 🔑 AN ELEMENT GATE IS A CLASS GATE IN DISGUISE (2026-08-18). Thomas, at the Wheel:
+// *"i have a charm for fire cards but im playing rogue"* - and 🔥 Emberheart can never once fire
+// for her, because every rogue card has `element: null`. Four charms are like this
+// (Emberheart, Tideglass Bead, Storm Pin, Nightveil) and all four are marked GENERIC.
+// ⚠️ They were correctly generic when only one class existed. *"Generic" meant "not
+// class-specific", and an element gate did not look like a class gate until a class without
+// elements turned up.* [[Charm_Pools]] even reasoned that element gating was fine "because an
+// element is on the card's face" - true, and only true for the mage.
+// ⚠️ A dead offer is worse than a missing one: it takes a slot on a three-card shelf and it
+// costs a re-spin to clear.
+const classHasElements = () => (CLASS.defs || []).some(d => d && d.element);
+// ⚠️ TWO GATES, NOT ONE (2026-08-18). Thomas, at the Wheel as the rogue: *"mage charm while
+// playing rogue"* - ✦ Loose Weave, which is `cls: 'mage'` and rewrites how ATTUNING works, a rule
+// she does not have. 🔑 THE EXPLICIT GATE WAS THE ONE MISSING: three charm pools (the Wheel and
+// two event grants) filtered on tier, curse and rarity but never on `cls` at all. `classCharmPool()`
+// - used only by 🏕️ Setting Out - was the single place that ever checked it, so the rule
+// existed and simply was not applied where charms are actually bought.
+// ⚠️ I touched this exact line an hour ago to add the ELEMENT gate and did not notice the class
+// gate missing beside it. Fixing one half of a check is how the other half stays broken.
+// ⚠️ THREE GATES. The third found two more dead entries after Thomas asked what Twin Blades
+// meant and the audit widened: ➕ Deep Tinderbox (+1 Surge) and the 💧 Damp Wick CURSE (−2 Surge)
+// both name a stat the rogue does not have. 🔑 THE CURSE IS THE WORSE OF THE TWO - a dead charm
+// wastes an offer, a dead CURSE is a free pass, and a run-layer penalty that skips one class is a
+// difficulty difference nobody chose.
+const charmFitsClass = c =>
+  (!c.cls || c.cls === CLASS.id) &&                        // whose charm is it
+  (!(c.mods && c.mods.el) || classHasElements()) &&        // can this class use an element gate
+  (!(c.mods && c.mods.boost != null) || !!CLASS.boosts);   // does this class even have a ➕ Surge
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
-const potionPool = () => POTIONS.filter(p => (!p.mage || CLASS.id === 'mage') && (!p.when || p.when()) &&
+const potionPool = () => POTIONS.filter(p => (!p.cls || p.cls === CLASS.id) && (!p.when || p.when()) &&
                                              (!p.tier || p.tier <= stageTier()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
@@ -2454,13 +4838,16 @@ function applyPotion(p, card) {
   const fx = S.potionFx;
   if (p.id === 'chalkwater'){ fx.init += 2;  log(`🧪 ${p.name} — 💨 +2 Initiative this turn.`, 'good'); }
   if (p.id === 'broth')    { fx.value += 2; log(`🧪 ${p.name} — ⚔️ +2 to your action this turn.`, 'good'); }
-  if (p.id === 'grit')     { fx.soak += 1;  log(`🧪 ${p.name} — 🛡️ every card soaks +1 this turn.`, 'good'); }
+  if (p.id === 'grit')     { fx.soak += 1;  log(`🧪 ${p.name} — 🛡️ every card blocks +1 this turn.`, 'good'); }
   if (p.id === 'bitterroot'){ fx.boost += 3; log(`🧪 ${p.name} — ➕ your Surge gives +3 more this turn.`, 'good'); }
   if (p.id === 'roaddust') { fx.pace += 3;  log(`🧪 ${p.name} — 🌙 +3 Pace against the dark.`, 'good'); }
   if (p.id === 'tallow')   { fx.keepCandle = true; log(`🧪 ${p.name} — 🕯️ your candle will hold, whatever happens.`, 'good'); }
   if (p.id === 'haste')    { fx.init += 5;  log(`🧪 ${p.name} — 💨 +5 Initiative this turn.`, 'good'); }
   if (p.id === 'ember')    { fx.value += 6; log(`🧪 ${p.name} — ⚔️ +6 to your action this turn.`, 'good'); }
-  if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card soaks +3 this turn.`, 'good'); }
+  if (p.id === 'ironskin') { fx.soak += 3;  log(`🧪 ${p.name} — 🛡️ every card blocks +3 this turn.`, 'good'); }
+  // 🎯 SPLITTING DRAUGHT - the one-turn version of the whole idea, and the cheapest teacher of
+  // it: you drink it, watch ◆12 become ◆6×2, and learn what multi-hit is for in one encounter.
+  if (p.id === 'splitting'){ fx.hits = (fx.hits || 0) + 1; log(`🧪 ${p.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
   if (p.id === 'clarity')  { lightCandle('the draught clears your sight'); }
   if (p.id === 'nightglass'){ fx.noNight = true; log(`🧪 ${p.name} — 🌙 the dark cannot catch you this journey.`, 'good'); }
   if (p.id === 'breath')   { fx.unspent = true; log(`🧪 ${p.name} — ✦ your Spell survives this casting.`, 'good'); }
@@ -2493,23 +4880,743 @@ function elOf(card) {
 // logging
 // ============================================================
 function logHeader(text) { S.logEntries.unshift({ header: text, lines: [] }); }
-function log(text, cls = '') { S.logEntries[0].lines.push({ text, cls }); }
+// ⚠️ NEVER THROW. log() is called from dozens of places and used to assume a header already
+// existed - which was true only because nextTurn() always wrote one first. The map opens the run
+// on a screen that is not a turn, so the first log() of a run had no entry to write into and took
+// the whole boot down with it.
+// 🔑 A LOGGING HELPER THAT CAN CRASH THE CALLER IS WORSE THAN NO LOG.
+function log(text, cls = '') {
+  if (!S.logEntries) S.logEntries = [];
+  if (!S.logEntries[0]) S.logEntries.unshift({ header: '', lines: [] });
+  S.logEntries[0].lines.push({ text, cls });
+}
 
 // ============================================================
 // turn flow
 // ============================================================
-function drawEncounter(avoidType) {
+// ============================================================
+// 🗺️ THE MAP (2026-08-18) — Slay the Spire's run layer, adapted.
+// Thomas: *"not liking this forking thing, do we just have 2 choices every time? yeah i don't
+// like that. was thinking we literally just take slay the spires map run layer."*
+//
+// 🔑 THE FORK WAS THIN BECAUSE OF NODE VARIETY, NOT BRANCHING. Three node types, two of which
+// were "play a hand", makes every choice the same choice. StS's map is interesting because it has
+// SIX kinds of room - and three of ours already existed as systems that simply fired automatically
+// (the Wheel, the Forge, and the events). **Putting a guaranteed step on the map turns it into a
+// choice**, which is this morning's event lesson applied to the shop.
+//
+// ⚠️ AND A MAP IS PILLAR-LEGAL, WHICH I FIRST GOT WRONG. [[Game_Pillars]] bans *"complete
+// optimizable data"* - but StS shows node TYPES, never CONTENTS. You see *elite, then rest*; you
+// never see which elite. That is direction, not calculation. The 🕯️ candle still owns contents.
+//
+// The algorithm (wiki + sts_map_oracle): N paths walked upward through a grid, each step moving
+// to col-1/col/col+1, with a no-crossing rule and a unique-destination rule; then room types are
+// rolled by weight and re-rolled until every constraint holds.
+// ============================================================
+// ⚠️ `let`, not `const` - these are TUNING constants and the sweep sets them (same reason
+// ATTUNE_BONUS and FORK_ENABLED are let). A const here throws inside the headless harness.
+let MAP_FLOORS = 16;          // 4 region bands of 4 - the band decides which pool a node draws from
+let MAP_COLS   = 5;           // StS uses 6; we are on a phone and the map is a dialog
+let MAP_PATHS  = 6;           // paths walked upward. More paths = wider, more connected map
+let MAP_BAND   = 4;           // floors per region band
+
+// ⚠️ WEIGHTS, and they are OURS not StS's - we have no treasure room and two "normal" types.
+// 'normal' resolves to a fight or a journey from the band's own pool, so it keeps the 50/50 the
+// encounter bag already has.
+const MAP_WEIGHTS = [
+  { type: 'normal', w: 55 },
+  { type: 'event',  w: 20 },
+  { type: 'hearth', w: 11 },   // 🕯️ rest: relight the candle
+  { type: 'elite',  w: 12 },   // 🐉 a harder creature paying more coins
+  // ❌ 🎰 THE WHEEL NODE IS CUT (2026-08-18, measured). It was built on a premise I never
+  // checked: that the shop fired at region breaks and the map would turn it into a choice. It does
+  // not - **the Wheel has always opened after EVERY encounter** - so the node handed you a screen
+  // you would have reached anyway after the next fight, and cost you a floor to do it.
+  // 🔑 A NODE THAT GIVES YOU SOMETHING YOU ALREADY GET IS A WASTED FLOOR.
+  // ⚠️ And the alternative was measured before it was argued. Making the shop node-ONLY:
+  //   shop opens 12.4 -> 1.9 · levels bought 7.5 -> 4.3 · **deck at the lair 35.5 -> 32.0, exactly
+  //   where it started** · 🪙 unspent at the lair 4 -> **28** · duel 61% -> 31%.
+  // 🔑 THE CONSTRAINT STOPS BEING COINS AND BECOMES SHOP ACCESS - you cannot spend money you
+  // cannot reach, so more income cannot fix it. Thomas called this before the measurement did:
+  // *"youll have hoarded a bunch of coin possibly."*
+  // (`takeMapNode` still handles type 'wheel' so saves made before this still load.)
+];
+// ⚠️ THE WEIGHTS WERE TUNED AGAINST THE *BEST ROUTE*, NOT THE AVERAGE ONE, AND THAT IS THE WHOLE
+// POINT OF A MAP. Measured over 1200 maps at these weights: 🎰 3.2 on the map, **2.1 reachable by a
+// player who routes for them, 0.9 by a random walk**; 🐉 2.6 on the map, 1.8 best route, 0.7 random.
+// 🔑 THAT GAP *IS* THE DECISION. A node type whose best route and random walk are the same
+// number is decoration - you would get it anyway. Tune map content by asking *what can someone who
+// WANTS this get*, never by the average.
+// ⚠️ Today the Wheel fires 4 times a run, guaranteed. Routing hard now gets ~2, ignoring it ~1,
+// so the coin economy is knowingly loosened-then-tightened and MUST be re-measured before it is
+// called balanced. 🔑 The Wheel keeps SHARPENING on the same screen - that was a considered call
+// (*a budget decision you cannot see both sides of is two guesses*) and the map does not reopen it.
+
+// ⚠️ Floors are 0-indexed here. Constraints mirror StS's, scaled to 16 floors from 15:
+//   • nothing but a normal encounter on floor 0        (StS: floor 1 is always an easy fight)
+//   • no elite / hearth / wheel below MAP_SPECIAL_FLOOR (StS: nothing special below floor 6)
+//   • the last floor is always a 🕯️ hearth              (StS: floor 15 is always a rest)
+//   • no hearth on the floor before that                (StS: no rest on floor 14)
+//   • elite / wheel / hearth are never CONSECUTIVE along an edge
+//   • a node with 2+ exits must have all destinations distinct
+let MAP_SPECIAL_FLOOR = 4;
+let MAP_STARTS = 3;             // 🗺️ roads leaving the gate, always this many
+// 🐉 an elite is the band's own creature, harder and richer. Untuned on purpose - it is a new
+// reward channel and the whole coin economy is being re-measured anyway.
+// 💀 AN ELITE HAS TO BE WORTH AVOIDING (Thomas: *"i think we should make something hard for
+// the elites, and have better rewards for going against an elite node"*).
+// ⚠️ At ×1.5 HP and +2 atk it was a slightly bigger creature — a detour with no dread in it.
+// The reward is the 💀 BOON below, so the danger has to justify a real prize.
+// 🔴 ELITE_HP 2.0 → 1.15 (2026-08-24). ×2.0 put the KILL past any four-card hand — you beat an
+// elite 1-3% of the time and lost it 54-65%, so the node had NO WIN STATE and the charm had to be
+// paid for merely surviving. 🔑 THE AXES WERE THE WRONG WAY ROUND: an elite was HARD TO BEAT and
+// CHEAP TO SURVIVE. It wants to be BEATABLE and EXPENSIVE. ⚠️ **ELITE_ATK IS DELIBERATELY
+// UNTOUCHED** — the average hit an elite lands measured 9.5–10.6 (mage) at every HP setting from
+// ×2.0 down to ×1.0, because Complete is your damage vs its HP while the hit is its atk.
+// **Lowering HP does not make an elite safer, only winnable.**
+// ⚠️ `let` — tuning constants, and the sweep sets them (a const throws in the harness).
+// 🔴 AND ELITE_ATK +4 → +8 IN THE SAME COMMIT, WHICH IS THE OTHER HALF OF ONE DESIGN, NOT A
+// SECOND CHANGE. ⚠️ **Damage only lands on a Narrow or a Loss**, so dropping HP did not just make
+// the kill reachable — it turned ~30% of elite encounters from *"took a big hit"* into *"took
+// nothing"*, and the ladder rose +10 (mage) / +14 (rogue) on the same seeds. 🔑 I HAD MEASURED
+// THE SIZE OF THE HIT AND CONCLUDED ABOUT THE COST: the per-hit figure held at 9.5-10.6 across
+// every HP setting, but the number of hits collapsed. *A hit size is not a bill.*
+// ✅ +8 buys the difficulty back where the design wants it — an elite hits **14.5 against an
+// ordinary creature's 5.8** (mage), 2.5×, which is the dread stated in the one number a player
+// watches. ⚠️ FALLBACK: if elites read as muggings rather than as fights, ELITE_ATK goes back to 4
+// and the run is simply ~10 points easier. Do NOT answer that by raising HP again — that is the
+// change that deletes the win state.
+let ELITE_HP = 1.15, ELITE_ATK = 8, ELITE_COIN = 2.5;
+// 🐉 one place that makes an elite, so the map's preview and the fight itself cannot disagree.
+function eliteVersion(e) {
+  if (!e) return e;
+  return Object.assign({}, e, {
+    // ⚠️ baseName is what makes an elite RELOADABLE. An elite is a modified COPY with a changed
+    // name, so it cannot be found again in the region's list - saving the base and rebuilding
+    // through this same function is the only way the reload cannot drift from the original.
+    name: `${e.name}, grown bold`, baseName: e.name, elite: true,
+    hp: e.hp != null ? Math.round(e.hp * ELITE_HP) : e.hp,
+    mp: e.mp != null ? Math.round(e.mp * ELITE_HP) : e.mp,
+    atk: e.atk != null ? e.atk + ELITE_ATK : e.atk,
+    xp: Math.round((e.xp || 0) * ELITE_COIN),
+  });
+}
+
+// ⚠️ `kind` is fight-or-journey, decided AT GENERATION so the node can advertise it. Without it
+// every ordinary node drew ⚔️ and the icon was a lie on the half of them that turned out to be
+// journeys. 🔑 A map node's whole job is to state what it is; an icon that is right 50% of the
+// time is worse than no icon, because it is trusted.
+function mapNode(f, c) { return { f, c, type: 'normal', kind: 'fight', next: [], enc: null, done: false }; }
+
+// 🎓 THE TUTORIAL'S MAP (2026-08-23, Thomas: *"yeah do a tutorial map, with authored encounters"*).
+//
+// 🔴 THE GAP IT CLOSES: stage 0 was a linear list of eight encounters while every real run OPENS on
+// the map screen. A new player was taught a structure the game no longer has, then met the first
+// decision of every run with no preparation. The map landed six days after the last tutorial audit
+// and nothing connected the two.
+//
+// 🔑 THE TENSION, AND HOW IT IS RESOLVED: the tutorial is deterministic **on purpose** — fixed
+// seed, authored deck order, authored encounter order — so lessons fire in a planned sequence. A
+// map introduces choice, which breaks that. So the map is built in two halves:
+//   • **Region 1 (floors 0-3) is a SPINE.** One node per floor, no choice. You learn that a node is
+//     a thing you tap and that the road runs upward — and the authored teaching order is exact.
+//     ⚠️ This deliberately breaks the real map's *"the first floor must be a choice"* rule. That
+//     rule exists so a RUN opens on a decision; the tutorial's first floor exists so a PLAYER
+//     learns what a node is. **Teach the noun before the verb.**
+//   • **Floor 4 is an ❓ EVENT** — a single node, taught where a screen full of reading lands best:
+//     after the turn is understood, before the map asks its first question.
+//   • **The FORK (floors 5-6).** Two nodes a floor, always a ⚔️ fight and a 👣 journey —
+//     the clearest possible statement of what the map is for: *you choose which kind of problem to
+//     take.* Both branches rejoin, so no lesson can be missed by routing.
+//   • **Floor 7 is the 🕯️ hearth**, mirroring the real map's fixed rest before the lair — which
+//     also teaches the hearth, previously untaught anywhere.
+//
+// 🖼️ THE FORK IS EXACTLY TWO FLOORS BECAUSE THAT IS WHAT THE ART COVERS. A three-floor fork
+// needs six encounters in region 2 and there are four; the first cut of this map invented two
+// (⚔️ Ashback, 👣 The Guttering Stair) and **silently broke the tutorial's 100% art coverage** —
+// on the one screen every player sees first, in the build about to go to friends.
+// 🔑 `foeArt()` returning nothing on a miss is correct (*art never blocks design*) and is exactly
+// why the hole was invisible from the code. **Content authored without art is content that looks
+// broken and reads as finished.** `dev/art-check.js` exists now so this cannot recur quietly.
+// ✅ Shrinking the fork was the better fix than commissioning two pictures: no new content, the
+// coverage stays complete, and a two-floor fork still means **you genuinely skip half of region 2**,
+// which is what makes the choice real and gives the 🕯️ candle something worth reading.
+//
+// ⚠️ NO `rnd()` ANYWHERE IN HERE. The tutorial's determinism is the thing that makes its lessons
+// fire in order; a shuffled tutorial map would quietly reintroduce the problem this solves.
+function tutorialMap() {
+  const R = TUTORIAL.regions;
+  const spine = R[0].encounters;          // 4 — one per floor, no choice
+  const fork  = R[1].encounters;          // 4 — a fight and a journey on each of two floors
+  const floors = [];
+  const C = 2;                            // the tutorial map is two columns wide
+  for (let f = 0; f < 8; f++) floors.push(new Array(C).fill(null));
+  const put = (f, c, enc, type) => {
+    const n = mapNode(f, c);
+    n.enc = enc || null;
+    n.type = type || 'normal';
+    n.kind = enc && enc.type === 'journey' ? 'journey' : 'fight';
+    floors[f][c] = n;
+    return n;
+  };
+  // — the spine: floors 0-3, column 0, each pointing at the next
+  for (let f = 0; f < 4; f++) put(f, 0, spine[f]).next = [0];
+  // — ❓ AN EVENT, floor 4, single node (2026-08-23).
+  // 🔴 THE FIRST CUT OF THIS MAP HAD NO EVENT NODE AT ALL, and that was a REGRESSION, not a known
+  // gap: the old linear tutorial fired events, and the 2026-08-12 audit is on record saying so
+  // (*"the tutorial reaches the Wheel… fires an event, hands you a curse"*). Replacing the queue
+  // with a map I built out of `normal` and `hearth` nodes silently deleted both — and the ❓ event
+  // and ⚠️ curse lessons went with them.
+  // 🔑 **WHEN YOU REPLACE THE THING THAT GENERATED CONTENT, ENUMERATE WHAT IT USED TO GENERATE.**
+  // I checked that the lessons still fired and not that the road still contained what they teach.
+  // ⚠️ It sits AFTER the spine and BEFORE the fork on purpose: an event is a screen full of reading,
+  // and it lands better once the turn is understood and before the map asks its first question.
+  put(4, 0, null, 'event').next = [0, 1];
+  // — the fork: two floors, a fight on the left and a journey on the right
+  for (let f = 5; f < 7; f++) {
+    const pair = fork.slice((f - 5) * 2, (f - 5) * 2 + 2);
+    const a = put(f, 0, pair.find(e => e.type === 'fight')  || pair[0]);
+    const b = put(f, 1, pair.find(e => e.type === 'journey') || pair[1]);
+    // ⚠️ both nodes lead to BOTH nodes above, so the branches rejoin every floor and no path can
+    // miss a kind of encounter. A tutorial must not let routing hide a lesson.
+    const up = f === 6 ? [0] : [0, 1];
+    a.next = up.slice(); b.next = up.slice();
+  }
+  // — the hearth below the lair, exactly as a real map ends
+  put(7, 0, null, 'hearth');
+  return { floors, pos: null, taken: [] };
+}
+
+function generateMap() {
+  const floors = [];
+  for (let f = 0; f < MAP_FLOORS; f++) floors.push(new Array(MAP_COLS).fill(null));
+  const nodeAt = (f, c) => floors[f][c] || (floors[f][c] = mapNode(f, c));
+
+  // —— 1. walk the paths upward
+  // ⚠️ the first two paths must START in different columns, or the map opens on a single node
+  // and the whole first floor is a non-choice. That is StS's rule and it is load-bearing.
+  // 🗺️ EXACTLY MAP_STARTS ROADS OUT OF THE GATE (Thomas: *"slay the spire starts off with
+  // like 3 different starts, i think we should just do 3 as well"*).
+  // ⚠️ It was 2-5 and usually 4, because starts were rolled per path and collided at random.
+  // 🔑 The first choice of a run should be the same SIZE every time - it is the one decision every
+  // player makes, and a run that opens on two roads is a different game from one that opens on five.
+  const startCols = [];
+  { const bag = [];
+    for (let c = 0; c < MAP_COLS; c++) bag.push(c);
+    while (startCols.length < Math.min(MAP_STARTS, MAP_COLS) && bag.length)
+      startCols.push(...bag.splice(Math.floor(rnd() * bag.length), 1));
+    startCols.sort((a, b) => a - b); }
+  const starts = [];
+  for (let p = 0; p < MAP_PATHS; p++) {
+    // every path begins on one of the three, so exactly three roads leave the gate
+    let c = startCols[p % startCols.length];
+    starts.push(c);
+    nodeAt(0, c);
+    for (let f = 0; f < MAP_FLOORS - 1; f++) {
+      const from = nodeAt(f, c);
+      // candidate columns, clamped to the grid
+      let cand = [c - 1, c, c + 1].filter(x => x >= 0 && x < MAP_COLS);
+      // 🔑 NO CROSSING EDGES. If we step right, no node to our right may already run left
+      // past us (and vice versa) - two paths swapping columns would draw an X, which reads as a
+      // connection that is not there.
+      cand = cand.filter(x => {
+        if (x === c) return true;
+        const side = x > c ? c + 1 : c - 1;
+        const sideNode = floors[f][side];
+        return !(sideNode && sideNode.next.includes(c));
+      });
+      if (!cand.length) cand = [c];
+      const nc = cand[Math.floor(rnd() * cand.length)];
+      if (!from.next.includes(nc)) from.next.push(nc);   // unique destinations, by construction
+      nodeAt(f + 1, nc);
+      c = nc;
+    }
+  }
+
+  // —— 2. assign room types
+  const pick = () => {
+    const tot = MAP_WEIGHTS.reduce((t, x) => t + x.w, 0);
+    let r = rnd() * tot;
+    for (const x of MAP_WEIGHTS) { r -= x.w; if (r <= 0) return x.type; }
+    return 'normal';
+  };
+  const parentsOf = (f, c) => f === 0 ? []
+    : floors[f - 1].filter(n => n && n.next.includes(c));
+  const SPECIAL = ['elite', 'wheel', 'hearth'];
+
+  // ⚠️ ONE PREDICATE, USED BY BOTH THE ROLL AND THE FALLBACK. The first version checked the
+  // constraints inside the retry loop but then assigned whatever the LAST roll happened to be if
+  // all 40 tries failed - so ~1500 maps in 3000 shipped consecutive specials.
+  // 🔑 A RETRY LOOP WITHOUT A LEGAL FALLBACK IS NOT A CONSTRAINT, IT IS A PREFERENCE.
+  const legal = (t, f, c) => {
+    if (!SPECIAL.includes(t)) return true;
+    if (f < MAP_SPECIAL_FLOOR) return false;                       // nothing special early
+    if (t === 'hearth' && f === MAP_FLOORS - 2) return false;       // no rest right below the fixed rest
+    return !parentsOf(f, c).some(pn => SPECIAL.includes(pn.type));  // never consecutive
+  };
+  // ⚠️ the fixed top-floor rest is assigned FIRST, so the floor below can see it and the
+  // "never consecutive" test has something to test against. Assigning it last is what let a
+  // 🐉 elite sit directly beneath the guaranteed 🕯️ hearth.
+  floors[MAP_FLOORS - 1].forEach(n => { if (n) n.type = 'hearth'; });
+  floors[0].forEach(n => { if (n) n.type = 'normal'; });             // the road starts plainly
+
+  for (let f = 1; f < MAP_FLOORS - 1; f++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = floors[f][c]; if (!n) continue;
+      // ⚠️ a special on the floor below the fixed rest would be consecutive with it
+      const touchesTop = f === MAP_FLOORS - 2 && n.next.length > 0;
+      let t = 'normal';
+      for (let tries = 0; tries < 40; tries++) {
+        const r = pick();
+        if (legal(r, f, c) && !(touchesTop && SPECIAL.includes(r))) { t = r; break; }
+      }
+      n.type = t;
+    }
+  }
+  // 🗺️ —— 3. every encounter node gets its ACTUAL encounter now, not on arrival.
+  // ⚠️ It has to be decided here or the node cannot advertise what it DEMANDS, and the demand is
+  // the only thing that reliably differs between two encounters. Each band draws from its own
+  // region's bag, refilled as it empties.
+  const bags = {};
+  const takeFrom = band => {
+    const pool = (RUN()[band - 1] || RUN()[0]).encounters;
+    if (!bags[band] || !bags[band].length) bags[band] = shuffle(pool.slice());
+    return bags[band].shift();
+  };
+  for (let f = 0; f < MAP_FLOORS; f++)
+    for (let c = 0; c < MAP_COLS; c++) {
+      const n = floors[f][c];
+      if (!n || (n.type !== 'normal' && n.type !== 'elite')) continue;
+      const base = takeFrom(bandOf(f));
+      n.enc = n.type === 'elite' ? eliteVersion(base) : base;
+      n.kind = n.enc && n.enc.type === 'journey' ? 'journey' : 'fight';
+    }
+  return { floors, pos: null, taken: [] };
+}
+
+// 🗺️ which nodes you may move to right now: floor 0 if you have not started, else the
+// current node's `next` on the floor above.
+// 🗺️ HOW TALL IS *THIS* MAP. ⚠️ The three readers below asked the global `MAP_FLOORS`, which is
+// fine while every map is 16 floors and wrong the moment one is not — the tutorial's is 8, and a
+// map whose top the game cannot recognise is a run that never ends.
+// 🔑 EXACTLY THE BUG JUST FIXED IN solver.js ONE COMMIT AGO (`REGIONS.length` where `RUN().length`
+// was meant), in the same shape: **an object carries the fact, and a reader asks the global
+// instead.** The general form is worth stating once: *if the thing in your hand knows, do not ask
+// the room.*
+const mapFloors = m => (m && m.floors ? m.floors.length : MAP_FLOORS);
+function mapChoices(m) {
+  if (!m) return [];
+  if (!m.pos) return m.floors[0].filter(Boolean);
+  const { f, c } = m.pos;
+  if (f >= mapFloors(m) - 1) return [];
+  const here = m.floors[f][c];
+  return (here ? here.next : []).map(x => m.floors[f + 1][x]).filter(Boolean);
+}
+
+// 🗺️ the region band a floor belongs to (1-based), so encounter pools and hardship density
+// still come from the road's own regions.
+// ⚠️ Derived from the ROAD's own region count and the map's own height, so an 8-floor tutorial
+// over 2 regions bands correctly (4 floors each) without a branch.
+function bandOf(f) {
+  const regions = RUN().length;
+  const band = Math.max(1, Math.round(mapFloors(S && S.map) / regions));
+  return Math.min(regions, Math.floor(f / band) + 1);
+}
+
+// ⚠️ EVENT NODES USE ❓, NOT ✦ (2026-08-18). Thomas: *"place on the road should be called an
+// event, and with a ? symbol instead of the diamond, too similar with encounter."*
+// 🔑 ◇ and ✦ are both small diamonds at 15px - two of the five node types were reading as the
+// same glyph, on the one screen whose entire job is telling node types apart. And *"a place on the
+// road"* was prose where the map needs a NOUN: every other node says what it IS in one word.
+const MAP_LABEL = { normal: 'the road', elite: 'a dangerous thing', event: 'an event',
+                    wheel: 'the wheel', hearth: 'a hearth' };
+// 🗺️ A NODE ADVERTISES ITS **DEMAND**, NOT ITS GENRE (2026-08-18). Thomas: *"initiative is
+// just a number on a card, it doesn't really do anything else. thats why i proposed making an
+// encounter node be random between fight and journey, since they are SORTA the same thing."*
+// 🔑 HE IS RIGHT ABOUT THE EQUATION AND THE MEASUREMENT AGREES. A fight and a journey score
+// `value` with the same line of code; two attempts to split them failed (see [[Blow_And_Distance]]),
+// the second structurally. **⚔️ vs 👣 is a distinction without a mechanical difference, and an icon
+// that promises a difference the rules do not deliver is worse than no icon.**
+// 🔑 BUT THE REAL VARIETY WAS ALREADY THERE, IN THE MODIFIER. Measured over all four roads:
+// fights carry a defence SHAPE **88%** of the time (🛡️17 · 🌀30 · 🧱8), journeys carry a PERIL
+// only **50%** (⛰️9 · 🕳️9 · 🏔️8 · ⏳9). **The shape is what changes your play; the genre is not.**
+// So the map now names what the node DEMANDS, and falls back to a plain road when it demands
+// nothing. ⚠️ 31% of encounters demand nothing at all - that is the content gap this exposes, and
+// it is the thing worth fixing next.
+const DEMAND_ICON = { armour: '🛡️', evasion: '🌀', guard: '🧱',
+  Steep: '⛰️', Toll: '⏳', Treacherous: '🕳️', Updraft: '🏔️', Freeze: '❄️' };
+const DEMAND_WORD = { armour: 'hit it big', evasion: 'hit it first', guard: 'wear it down',
+  Steep: 'the climb takes what you carry', Toll: 'it does not forgive', Treacherous: 'it bites when you fall short',
+  Updraft: 'speed shortens it', Freeze: 'it takes your Arsenal' };
+
+function demandOf(n) {
+  const e = n.enc;
+  if (!e) return null;
+  return e.shape || e.shape2 || e.peril || e.ability || null;
+}
+// ❌ THE MAP DOES NOT SHOW DEMANDS (reverted the same day). Thomas: *"i don't like showing what
+// a node demands."* He is right twice over:
+// ⚠️ (1) IT IS THE PILLAR. [[Game_Pillars]] is LOCKED on *"hints/direction, not complete
+//     optimizable data"* and *"full destination + FUZZY path"*. Every node's demand, visible from
+//     floor 0, is a whole run solvable before it starts - the spreadsheet the pillar forbids.
+// ⚠️ (2) IT DOUBLE-BOOKS THE 🕯️ CANDLE - the same error I had already found and fixed once. The
+//     candle's job is *what is INSIDE the next step*; a map that prints every demand forever
+//     leaves it nothing to reveal.
+// 🔑 THE DIVISION THAT ACTUALLY WORKS: THE MAP SHOWS THE SHAPE OF THE RUN (types), THE CANDLE
+// SHOWS WHAT IS IN THE NEXT STEP. That is what makes a lit candle worth routing toward.
+// ✅ And with ⚔️/👣 merged there are exactly four things a node can be, which is a map you can
+// read at a glance instead of a wall of symbols.
+function mapIcon(n) {
+  if (n.type === 'event')  return '❓';
+  if (n.type === 'wheel')  return '🎰';
+  if (n.type === 'hearth') return '🕯️';
+  if (n.type === 'elite')  return '💀';
+  return '◇';                                  // an encounter. What kind is the candle's business.
+}
+function mapTitle(n) {
+  if (n.type === 'event' || n.type === 'wheel' || n.type === 'hearth') return MAP_LABEL[n.type];
+  if (n.type === 'elite') return 'something dangerous';
+  return 'an encounter';
+}
+
+// 🕯️ WHAT THE CANDLE BUYS: the nodes you can step to RIGHT NOW give up their contents.
+// ⚠️ Only those - a lit candle is one step of sight, not a map key.
+// ⚠️ NAMED mapPeek, NOT candleLine - there is already a candleLine() 2,500 lines below, and
+// because it is declared later IT WINS. My calls silently invoked the old one, which ignores its
+// argument, so every road on the map reported the SAME creature. 🔑 A second function with the
+// same name does not error; it just quietly replaces the first.
+// 🗺️ which node the pointer (or the first tap) is on
+function isPeeked(f, c) { return !!(S.mapPeek && S.mapPeek.f === f && S.mapPeek.c === c); }
+
+// ⚠️ Writes the detail line DIRECTLY rather than calling render(). A full render rebuilds the map
+// and re-measures every edge, which would flicker the whole panel on every mouse move.
+function peekNode(f, c) {
+  S.mapPeek = (f == null) ? null : { f, c };
+  const el = document.getElementById('mp-detail');
+  if (el) el.innerHTML = peekHTML();
+  document.querySelectorAll('#modal-panel .mp-node').forEach(n =>
+    n.classList.toggle('is-peek', isPeeked(+n.dataset.f, +n.dataset.c)));
+}
+
+function peekHTML() {
+  const m = S.map; if (!m) return '';
+  const p = S.mapPeek;
+  if (!p) return `<span class="dim">${HAS_HOVER ? 'Point at a road to see what is on it.'
+    : 'Tap a road to look at it, tap again to take it.'}</span>`;
+  const n = m.floors[p.f] && m.floors[p.f][p.c];
+  if (!n) return '';
+  return mapPeek(n) ||
+    `<span class="dim">${mapTitle(n)} — your candle is out, so you cannot see what is on it.</span>`;
+}
+
+function mapPeek(n) {
+  if (!S.candle || !n.enc) return '';
+  const e = n.enc, d = demandOf(n);
+  const nums = e.type === 'fight'
+    ? `❤️ ${e.hp} · 💨 ${e.init} · ⚔️ ${e.atk} · 🪙 ${e.xp}`
+    : `👣 ${e.mp} · 🌙 ${e.nightfall} · ⏳ ${e.timePenalty} · 🪙 ${e.xp}`;
+  return `<div class="mp-peek"><b>${e.name}</b> — ${nums}` +
+    (d ? ` <span class="mp-dem">${DEMAND_ICON[d] || '◆'} ${DEMAND_WORD[d] || d}</span>` : '') + `</div>`;
+}
+
+// ⚠️ `hover: hover` is the honest test - false on a phone, true on a mouse - and it decides
+// whether a tap is an inspection or a commitment.
+const HAS_HOVER = (() => { try { return window.matchMedia('(hover: hover)').matches; } catch (e) { return true; } })();
+
+// 🗺️ A TAP ON TOUCH LOOKS FIRST AND COMMITS SECOND. On a mouse the hover already showed you
+// the road, so the click goes straight through.
+// 🔑 NO CAPABILITY TEST AT ALL - the rule is simply *a node you are already looking at is a
+// node you may take*. On a mouse, `mouseenter` fires before `click`, so the node is peeked by the
+// time the click lands and one click moves you. On touch nothing fires first, so the first tap
+// looks and the second takes. Same line of code produces the right behaviour on both.
+// ⚠️ The first version branched on `matchMedia('(hover: hover)')`, which reported FALSE on a
+// desktop browser here - had that shipped, a mouse user would have needed two clicks per move.
+// A CAPABILITY TEST YOU CANNOT VERIFY ON THE TARGET IS A GUESS; derive the behaviour from what
+// actually happened instead.
+function tapNode(f, c) {
+  if (isPeeked(f, c)) { S.mapPeek = null; takeMapNode(f, c); return; }
+  peekNode(f, c);
+}
+
+// 🗺️ STEP ONTO A NODE. Everything the old fork did, plus the node types the fork never had.
+// ⚠️ Crossing a BAND boundary is what a region break used to be: the deck reshuffles and the
+// pool changes. That happens here rather than in finishRegionCheck, because the map - not a
+// counter - is the run's clock now.
+function takeMapNode(f, c) {
+  const m = S.map;
+  if (!m || S.phase !== 'map') return;
+  if (!mapChoices(m).some(n => n.f === f && n.c === c)) return;   // must be reachable from where you stand
+  const node = m.floors[f][c];
+  const newBand = bandOf(f);
+  if (newBand !== S.region) { S.region = newBand; enterBand(); }
+  m.pos = { f, c };
+  m.taken.push(f + ',' + c);
+  node.done = true;
+  S.turn++;
+  logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+  // top the hand up on every node - several events and the hearth can thin it
+  if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.loseReserve = null;
+  S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
+  S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false; S.moTarget = null;
+  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+
+  if (node.type === 'normal' || node.type === 'elite') {
+    // 🗺️ the node already HOLDS its encounter - chosen when the map was drawn, which is what
+    // lets it advertise the demand. ⚠️ Falling back to a draw keeps saves made before this working.
+    if (node.enc) beginEncounter(node.enc);
+    else drawEncounter(null, node.type === 'elite');
+    S.phase = 'assign';
+    logChallenge();
+  } else if (node.type === 'event') {
+    S.phase = 'event';
+    startEvent();
+    return;
+  } else if (node.type === 'wheel') {
+    S.encounter = null;
+    startWheel();
+    return;
+  } else if (node.type === 'hearth') {
+    S.encounter = null;
+    S.phase = 'hearth';
+    log(`🕯️ A hearth. You stop, and the wick takes light again.`, 'good');
+  }
+  render();
+}
+
+// 🗺️ a band boundary is the old region break: reshuffle everything non-trashed, keep levels.
+function enterBand() {
+  const pool = shuffle([...S.deck, ...S.discard, ...S.hand]);
+  S.deck = pool; S.hand = []; S.discard = [];
+  S.encounterQueue = [];
+  S.emberShield = false;
+  draw(HAND_SIZE);
+  log(`— you cross into region ${S.region} —`, 'result');
+}
+
+// 🕯️ THE HEARTH IS A CHOICE, NOT A GIFT: take the LIGHT, or work the COALS.
+// ⚠️ The first version only relit the candle, which made it the one node with no question in it -
+// and it broke the economy besides. The 🔧 Forge lives on the Wheel screen, so putting the Wheel on
+// the map cut SHARPENING from 4 guaranteed stops a run to 1.3. Measured: the deck reached the lair
+// at **32.3-33.7 total levels against a start of 32 and a par of 36/44/48/52** - it was arriving
+// with essentially nothing bought.
+// 🔑 StS solved this years ago and the answer was in front of me: its campfire is *Rest OR
+// Smith*. One node, two goods, and you cannot have both.
+// 🔑 It also passes the slot-③ bar that four in-turn forks have failed: **two answers that are
+// each correct in a real situation** - the light when you are walking blind into a hard stretch,
+// the level when your deck is falling behind par.
+function hearthLight() {
+  if (S.phase !== 'hearth') return;
+  S.candle = true;
+  log(`🕯️ You take the light. The wick burns steady — you can see what lies ahead.`, 'good');
+  backToMap();
+}
+function hearthForge(id) {
+  // ⚠️ 'hearthpick', NOT 'hearth' - the picker moves the phase before this is ever called, so
+  // guarding on the wrong one made every call a silent no-op. The bot then hammered it **697 times
+  // a run**, spinning in the phase until the 800-step guard aborted the run: turns fell 15 → 10,
+  // the deck arrived 6 levels lighter and the mage duel read 0%.
+  // 🔑 A GATE NAMING THE WRONG PHASE DOES NOT ERROR, IT STALLS - and a stalled bot reports the
+  // stall as a BALANCE RESULT. This is the documented RUNSIM failure mode, reached from a new
+  // direction: not an untaught phase, but a taught phase whose action refused to fire.
+  if (S.phase !== 'hearthpick') return;
+  const card = cardById(id);
+  if (!card || card.level >= MAX_LEVEL || S.downgraded.has(card.id)) return;
+  card.level++;
+  log(`🔧 You work the coals — <b>${card.def.name}</b> sharpens to Lv${card.level}.`, 'good');
+  backToMap();
+}
+// ⚠️ the hearth sharpens for FREE and deliberately so: it is the half of the choice you pay for
+// with the candle, not with coins. A hearth that charged would just be a small Wheel, and the
+// question would collapse back into *do I have money*.
+function hearthForgeable() { return S.hand.filter(c => c.level < MAX_LEVEL && !S.downgraded.has(c.id)); }
+
+// 🧵 MEND — take back a card that damage took off you for good (Thomas, 2026-08-18).
+// 🔑 THIS IS THE HEAL THE HEARTH WAS MISSING, AND IT IS THE ONLY ONE DECK-AS-HEALTH ALLOWS. In
+// StS a campfire is *Rest or Smith* - rest restores HP. Our HP is the deck, so the honest analogue
+// is not un-softening a card, it is **getting a lost one back**. Until now damage was strictly
+// one-directional: cards left the run and never returned except through one paid event.
+// 🔑 AND IT IS WHAT MAKES THE LAST HEARTH A REAL DECISION. 🪙 1 card of duel stamina ≈ 8 points
+// of win rate (measured 2026-08-05), so on the eve of the duel *mend* and *sharpen* are two
+// genuinely different answers - stamina against power - which is exactly the bar four in-turn
+// forks have failed.
+// ⚠️ The last card lost, not a chosen one: `evRecoverCard('last')` is the existing precedent
+// (the Ashfield event) and it keeps the slot row as the only place a card is ever drawn.
+// ⚠️ FREE, like the forge. The price of every hearth option is the other two.
+// ⚠️ YOU PICK WHICH ONE, AND YOU SEE THEM (Thomas, 2026-08-18): *"a window should pop up with
+// all the cards you lost, and you get to pick 1."*
+// 🔑 THE PROJECT'S OWN RULE SAYS THE SAME THING - *never ask for a choice about an object without
+// showing the object; pickers belong ON the card.* Taking "the last one lost" was cheap of me: by
+// the lair you have usually lost two or three, they are rarely interchangeable, and the whole
+// decision is which hole in the deck hurts most.
+// ⚠️ These are the ONE set of cards not in your hand, so they render inside the window rather
+// than in the slot row - which leaves *the slot row is the only place a HAND card is drawn* intact.
+function startMendPick() { if (S.phase === 'hearth' && S.trashed.length) { S.phase = 'mendpick'; render(); } }
+function cancelMendPick() { if (S.phase === 'mendpick') { S.phase = 'hearth'; render(); } }
+function trashedById(id) { return S.trashed.find(c => c.id === id) || null; }
+
+function hearthMendPick(id) {
+  if (S.phase !== 'mendpick') return;
+  const i = S.trashed.findIndex(c => c.id === id);
+  if (i === -1) return;
+  const card = S.trashed.splice(i, 1)[0];
+  card.level = 1;
+  S.deck.push(card);
+  log(`🧵 <b>${displayName(card)}</b> is yours again — battered, back at Lv1, and now at the bottom of your deck.`, 'good');
+  backToMap();
+}
+// ⚠️ THE PICKER IS ON THE CARD, like every other picker in the game - never a list of names.
+function startHearthPick() { if (S.phase === 'hearth' && hearthForgeable().length) { S.phase = 'hearthpick'; render(); } }
+function cancelHearthPick() { if (S.phase === 'hearthpick') { S.phase = 'hearth'; render(); } }
+
+// 🛤️ THE FORK IN THE ROAD (2026-08-18) - spec in [[The_Fork_In_The_Road]].
+// Thomas: *"what if we did it like slay the spire with branching paths that you select where to
+// go… to give the player some agency and choice, instead of just being completely random."*
+//
+// ⚠️ IT IS A FORK, NOT A MAP, AND THAT IS A PILLAR DECISION. [[Game_Pillars]] is LOCKED on
+// *"all planning is soft & directional, never hard & calculated… hints/direction, NOT complete
+// optimizable data"* and *"full destination + FUZZY path"*. A whole region laid out in advance is
+// exactly the spreadsheet that forbids; two nodes at a time is direction without calculation.
+//
+// 🔑 THE POOL FITS EXACTLY, WHICH IS WHY THIS COSTS NO CONTENT: a region holds 8 encounters and
+// spends REGION_ENCOUNTERS (4). Offering 2 a turn consumes all 8 across the region - **you see
+// everything the region has and take half of it.**
+//
+// ⚠️ THE BRANCH NOT TAKEN IS DISCARDED, NOT RETURNED. Putting it back would let the same
+// creature be offered three turns running, and the *"i was seeing the same ones a lot"* report is
+// about exactly that feeling.
+function offerFork() {
+  const region = RUN()[S.region - 1];
+  const refill = () => S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  if (S.encounterQueue.length === 0) S.encounterQueue = refill();
+  const a = S.encounterQueue.shift();
+  if (S.encounterQueue.length === 0) S.encounterQueue = refill();
+  // ⚠️ prefer a branch of a DIFFERENT TYPE when the bag allows it. Two fights is a weaker
+  // question than a fight against a journey, and the bag is half and half by construction.
+  let bi = S.encounterQueue.findIndex(e => e.type !== a.type);
+  if (bi === -1) bi = 0;
+  const b = S.encounterQueue.splice(bi, 1)[0];
+  S.fork = [a, b].filter(Boolean);
+  return S.fork;
+}
+
+// 🛤️ the player picks a branch; the other is gone.
+function takeFork(i) {
+  if (S.phase !== 'fork' || !S.fork || !S.fork[i]) return;
+  const chosen = S.fork[i];
+  const other = S.fork[1 - i];
+  S.fork = null;
+  log(`🛤️ You take the road toward ${chosen.name}${other ? ` — ${other.name} is left behind` : ''}.`);
+  beginEncounter(chosen);
+  S.phase = 'assign';
+  logChallenge();
+  render();
+}
+
+// 🐉 `elite` scales the drawn creature rather than needing its own table - a harder version of
+// whatever the band offers, paying more. ⚠️ CONTENT IS CLASS-BLIND: hp/init/atk/mp and coins only,
+// never an element or a pair.
+function drawEncounter(avoidType, elite) {
   const region = RUN()[S.region - 1];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
-  // normal turns take the next in the shuffled bag; Divert steers toward a DIFFERENT
+  // normal turns take the next in the shuffled bag; a caller may steer toward a DIFFERENT
   // type (its whole purpose) — falling back to next-in-bag only if the bag has no other type left.
   let idx = 0;
   if (avoidType) {
     const diff = S.encounterQueue.findIndex(e => e.type !== avoidType);
     if (diff !== -1) idx = diff;
   }
-  S.encounter = S.encounterQueue.splice(idx, 1)[0];
+  let picked = S.encounterQueue.splice(idx, 1)[0];
   if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  if (elite && picked) picked = eliteVersion(picked);
+  beginEncounter(picked);
+}
+
+// 🛤️ EVERYTHING THAT HAPPENS ONCE AN ENCOUNTER IS SETTLED - split out of drawEncounter so the
+// ⚠️ Every path into an encounter runs the identical setup — that is the point of this function.
+// ⚠️ The hardship is rolled HERE, i.e. AFTER the branch is chosen. Rolling it per-branch at offer
+// time would double the rolls and let a player shop for a hardship-free road, which turns a risk
+// into a filter - the *"a hardship must stay a risk, not become a tax"* rule, from the other side.
+// ⚔️ HOW HARD THE ROAD HITS — the one dial for "does damage matter" (2026-08-22).
+//
+// Thomas: *"feels like getting damaged has been inconsequential."* 📏 Measured, and he is right in
+// a way the raw numbers do not show: **the deck is not a health bar, it is an XP bar with a tax.**
+// Across a whole run her total card levels go **32 → 34** — the deepest dip is **1.8 levels out of
+// 32**, and 41% of runs never dip below their starting point at all. 🔑 THE CAUSE IS NOT THAT THE
+// DAMAGE NUMBERS ARE SMALL — IT IS THAT UPGRADES OUTPACE THEM. You take ~1.7 a turn, soak about
+// 0.7 of a card level, and buy back more than that at the Wheel. **The bar only rises.**
+// ⚠️ That also explains why a defensive option reads as boring: *you cannot make a defensive choice
+// appealing while the thing it defends against is inconsequential.* Fix the damage, and every
+// defensive choice in the game gets more interesting for free — none of them need touching.
+//
+// 🔑 APPLIED HERE, AT THE DRAW, AND NOWHERE ELSE. `e.atk` is read in ten places — two maths sites
+// and eight DISPLAYS. Multiplying at the maths sites would make every panel, log line and briefing
+// print a number the game does not use. Scaling the encounter as it is drawn keeps one truth.
+// ⚠️ CLASS-BLIND BY CONSTRUCTION, which is what makes it a legal dial: it touches `atk` only, never
+// an element or a pair, exactly as [[The_Roads]] requires of content.
+// ⚠️ AND IT IS COUPLED TO PAR. Harder hits mean fewer levels at the lair, and the lair is measured
+// against `dragon.par` (36/44/48/52) — so raising this makes the DRAGONS harder for free. Re-read
+// par before blaming a dragon for anything after moving it.
+// 🔴 1.5 → 1.0 (2026-08-23) — THE WORKAROUND OUTLIVED ITS CAUSE.
+// It was raised to 1.5 because *one card covered 72% of hits* and soaking was a lookup. But that
+// was true because ONE ARCHETYPE had plates three to five times everyone else's: the mage's WARD
+// spike ran +3 a level, so a Lv2 Cairnguard blocked 8 and a Lv4 blocked 14 while every other card
+// in the game sat between 1 and 4. 🔑 The designated victim was a DATA problem wearing a damage
+// problem's clothes. WARD armour is 2/3/4/5 now, and the multiplier can go home.
+// 📏 Measured against the compressed plates: at ×1.0 one card covers 39% of hits — BETTER than
+// the 45% the ×1.5 workaround bought on the old plates, and bought by fixing the cause instead.
+// ⚠️ ×1.25 holds an even sharper soak (25%) but reopens a 12-point class gap, because the plate
+// compression already fell far harder on the mage (her mean plate 2.9 → 2.1; the rogue's 1.5 → 1.4).
+//
+// 🔥 1.0 → 1.15 (2026-08-23), AND THIS ONE IS A FEEL-REPORT, NOT A MEASUREMENT.
+// Thomas: *"i definitely want damage up, thats sorta how ive been feeling most of the time,
+// whenever i tested so far."* Three sweeps looking for a way to break the deck-health/deck-strength
+// coupling all landed on the same conclusion: **this is the only lever that moves the thing he is
+// describing.** Flattening the level curve made you weaker rather than decoupling anything, and
+// making levels COST armour turned out to be a straight buff (the cost lands at Lv4 and a run ends
+// holding about one Lv4 card).
+//
+// 📏 WHY 1.15 AND NOT 1.25 — measured at ⭐6/🎭3, a real player's state, target 40/35/30/20:
+//   ×1.00  mage 66/43/26/40 · rogue 68/44/26/45   gap −2/−1/0/−5   ← tightest gap ever recorded
+//   ×1.15  mage 66/34/28/28 · rogue 64/39/28/45   gap +2/−5/0/−17
+//   ×1.25  mage 61/33/18/29 · rogue 66/31/33/43   gap −5/+2/−15/−14
+// ×1.15 is the closest the MAGE has been to target at stages 2-4 (34/28/28 against 35/30/20).
+// ⚠️ AND THE COST IS EXACTLY WHAT THE NOTE ABOVE PREDICTED: **the class gap reopens** — 17 points
+// at stage 4, from a starting position of 5. 🔑 *A thinner health bar pays more per point of
+// damage*, and after the plate compression the mage is the thinner one. **Raising damage will
+// always cost class parity in this game; that is structural, not a tuning accident.**
+// ⚠️ Held deliberately: the rogue is over target at stage 4 (45% vs 20%) at EVERY setting. That is
+// the documented shape issue and damage is not its fix.
+// 📏 SETTLED AT 1.30, NOT 1.15 — same seeds at ⭐6/🎭3, and the thing being tuned is
+// *"does the deck ever go DOWN"*, not the win rate:
+//   dmg     mage never-dips / deepest dip     rogue never-dips / dip
+//   ×1.00        28%  /  3.4                      51%  /  2.2
+//   ×1.15        21%  /  4.1                      50%  /  2.6
+//   ×1.30        14%  /  5.3                      40%  /  3.4
+//   ×1.45        14%  /  6.0                      33%  /  3.9
+// 🔑 **×1.15 is below the perception threshold** — it moves the mage's deepest dip by less
+// than one card, and moves the rogue by nothing at all. A change a playtest cannot FEEL is a
+// wasted playtest, and this one exists to answer a feel-report.
+// ⚠️ Cost, stated: the mage's win rate at this level goes 38 → 30%, and the class gap widens.
+//
+// 🔴 AND THE FINDING TO ACT ON LATER: **DAMAGE BARELY TOUCHES THE ROGUE'S SNOWBALL.** Half her
+// runs never lose a card at ×1.0 and still half at ×1.15; ×1.45 only reaches 33%. The cause is
+// already written down elsewhere in this file — *damage only lands on a Narrow or a Loss, so a
+// class that Completes more is simply hit less.* 🔑 **Her problem is the FREQUENCY of being hit,
+// not the SIZE of the hit, and no multiplier reaches frequency.** Fixing her needs something that
+// costs cards on a *Complete*, or a road that can kill you — not this dial.
+let FOE_ATK_MULT = 1.30;
+function scaleFoe(e) {
+  if (!e || FOE_ATK_MULT === 1.0 || e.atk == null) return e;
+  return Object.assign({}, e, { atk: Math.max(1, Math.round(e.atk * FOE_ATK_MULT)) });
+}
+function beginEncounter(e) {
+  const region = RUN()[S.region - 1];
+  e = scaleFoe(e);
+  S.encounter = e;
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
@@ -2551,11 +5658,58 @@ function logChallenge() {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · 🪙 ${e.xp})`);
     if (e.peril) log(`PERIL — ${e.peril}: ${PERILS[e.peril]}`, 'bad');
   }
-  if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${HARDSHIPS[S.hardship]}`, 'bad');
+  if (S.hardship) log(`HARDSHIP — ${S.hardship}: ${hardshipText(S.hardship)}`, 'bad');
+}
+
+// 🏕️ WHICH ENCOUNTER THIS REGION'S EVENT FOLLOWS. Rolled once per region rather than
+// per turn, so events are SPACED by construction instead of clustering - a cap on a per-turn roll
+// still permits two in a row and then a dry region, and the run layer is deliberately predictable.
+// ⚠️ Never slot 0: you should meet the road before the road offers you anything.
+// 🏕️ is THIS turn the region's event turn (as opposed to an event mid-encounter, which no
+// longer happens)? Read it rather than testing `S.phase === 'event'` in display code - the phase is
+// also what the tutorial and any future scripted event would use.
+function isEventTurn() { return S.phase === 'event' && !S.finalMode; }
+
+function scheduleRegionEvent() {
+  // ⚠️ NEVER THE LAST ENCOUNTER. finishTurn() arms the event turn and then finishRegionCheck()
+  // runs immediately - so an event scheduled after encounter REGION_ENCOUNTERS is armed and then
+  // stepped over by the region break, and nextRegion() clears the flag. Measured: it silently ate
+  // one region's event in four (3.1 event turns a run instead of 4.0).
+  // 🔑 A FLAG SET IN THE SAME BREATH AS THE CHECK THAT ENDS THE PHASE WILL LOSE THE RACE.
+  S.eventAt = 1 + Math.floor(rnd() * (REGION_ENCOUNTERS - 1));   // after encounter 1..N-1
+  S.eventDone = false;
+  S.eventTurnPending = false;
+}
+
+// 🏕️ THE EVENT TURN. No encounter is drawn, no cards are spent, no soak, no deck erosion -
+// it is the one beat in the run that asks a question without charging you for the answer.
+// 🔑 That is the whole point: [[Tempo_And_The_Watch]] says the run layer is meant to be the
+// exhale and cannot be while every second encounter stacks another screen on a combat resolution.
+function beginEventTurn() {
+  S.eventTurnPending = false;
+  S.eventDone = true;
+  // ⚠️ top the hand up FIRST - several events take a card, and the next real turn's top-up
+  // would otherwise be the only thing standing between you and a short hand.
+  if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.damage = 0; S.damageEl = null;
+  S.downgraded = new Set();
+  S.actionSetIds = []; S.reserveId = null;
+  logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+  startEvent();
 }
 
 function nextTurn() {
   S.turn++;
+  // 🗺️ HAND THE RUN TO THE MAP BEFORE ANY CARDS ARE DEALT.
+  // ⚠️ This guard used to sit 25 lines lower, BELOW the hand top-up - so nextTurn dealt you back
+  // to four and only then sent you to the map. Gating freshGame's own draw did nothing, because
+  // this was the draw that actually fired. 🔑 A GUARD PLACED AFTER THE THING IT MEANS TO PREVENT
+  // IS NOT A GUARD; and the fix looked correct in the source while changing nothing on screen,
+  // which is why Thomas saw a full hand on a build whose diff says otherwise.
+  if (S.map && !S.finalMode) { backToMap(); return; }
+  // 🏕️ an event takes the turn INSTEAD of an encounter - see beginEventTurn
+  if (S.eventTurnPending) { beginEventTurn(); return; }
   S.regionTurn = (S.regionTurn || 0) + 1;
   // Top the hand up before anything else. Cleanup draws you back to four, but EVENTS run after
   // it and several remove a card from your hand (the Gray Pilgrim takes one, the Toll of Thorns
@@ -2567,10 +5721,35 @@ function nextTurn() {
     const drawn = S.hand.length - before;
     if (drawn > 0) log(`You draw back up to ${S.hand.length} card${S.hand.length === 1 ? '' : 's'} (+${drawn}).`);
   }
-  drawEncounter();
+  // 🗡️ THE EXTRA CARDS A COMBO VERB OWES YOU. ⚠️ This has to sit HERE, in nextTurn, and not
+  // beside the other draw(HAND_SIZE) calls — nextTurn tops up with `draw(HAND_SIZE - before)` and
+  // is the only draw site an ordinary turn ever reaches, so patching the three literal
+  // `draw(HAND_SIZE)` calls (freshGame, nextRegion, the finale) left the verb silently inert.
+  // 🔑 GREPPING FOR A CALL SHAPE IS NOT THE SAME AS FINDING THE CODE PATH.
+  if (S.drawExtra && S.deck.length) {
+    const n = Math.min(S.drawExtra, S.deck.length);
+    draw(n);
+    log(`🗡️ Your combo draws you ${n} extra card${n === 1 ? '' : 's'} — what you leave unseated slides under your deck.`, 'good');
+  }
+  S.drawExtra = 0;
+  // 🗺️ ON THE MAP, takeMapNode() DOES ALL OF THIS - nextTurn is only reached by the tutorial
+  // and by legacy saves, which still walk a region counter and a blind draw.
+  if (S.tutorial || !FORK_ENABLED) { drawEncounter(); }
+  else {
+    offerFork();
+    S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+    S.loseReserve = null;
+    S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
+    S.emberguardUsed = false;
+    S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+    S.bankArmed = false; S.moTarget = null;
+    S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+    S.phase = 'fork';
+    logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
+    render();
+    return;
+  }
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
-  S.divertsUsed = 0;
-  S.diverting = false;
   S.loseReserve = null;
   S.afterSoak = 'upgrade';
   // coins roll over between turns — deliberately NOT reset
@@ -2579,6 +5758,7 @@ function nextTurn() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
   S.reserveId = null;
@@ -2589,34 +5769,22 @@ function nextTurn() {
   render();
 }
 
-// ---------- Divert (Challenge Phase, optional) ----------
-function canDivert() {
-  return S.phase === 'assign' && !S.finalMode && S.divertsUsed < MAX_DIVERTS && S.deck.length > 0;
-}
+// ❌ ↩️ DIVERT IS DELETED (2026-08-23, Thomas: *"i think we can remove our divert option
+// completely now. it was only because we had no choice in our encounters, its redundant now with
+// our new map layer"*).
+// 🔑 HE IS EXACTLY RIGHT ABOUT WHY. Divert existed to answer *"this encounter is wrong for my
+// hand and I cannot do anything about it"* — a problem that only existed while encounters came out
+// of a shuffled bag. The 🗺️ map answers it properly: you now pick your node, seeing its type, with
+// the 🕯️ candle telling you what is in reach. **Divert was a paid apology for a choice the player
+// did not have, and the map gave them the choice.**
+// ⚠️ THE STANDING RULE APPLIES TO THE WHOLE FEATURE, NOT JUST THE BUTTON: *when a rule is cut, the
+// same commit removes its display.* So the button, the picker phase, the log line and the how-to
+// sentence all go with it. `divertsUsed` / `diverting` survive ONLY in the save schema so older
+// saves still load.
+// 📏 And it takes MAX_DIVERTS with it — a constant that named a rule nobody can invoke is exactly
+// the dead data this project keeps finding.
 
-function beginDivert() { if (canDivert()) { S.diverting = true; render(); } }
-function cancelDivert() { S.diverting = false; render(); }
 
-function divertWith(cardId) {
-  if (!S.diverting || !canDivert()) return;
-  const card = cardById(cardId);
-  if (!card) return;
-  for (const z of ZONES) if (S.assign[z] === cardId) S.assign[z] = null;
-  S.assign.Reserve = null; // hand shrank — reserve re-normalizes (or is gone)
-  S.hand = S.hand.filter(c => c.id !== cardId);
-  S.discard.push(card);
-  const key = S.deck.shift();
-  S.discard.push(key);
-  S.divertsUsed++;
-  S.diverting = false;
-  const skipped = S.encounter.name;
-  const skippedType = S.encounter.type;
-  drawEncounter(skippedType); // steer toward a different encounter type
-  const swapped = S.encounter.type !== skippedType;
-  log(`DIVERT: skipped ${skipped} — burned ${key.def.name} off the top of the deck + ${card.def.name} from hand → ${swapped ? `now a ${S.encounter.type}` : `still a ${S.encounter.type} (no other type left in this stretch)`} (${MAX_DIVERTS - S.divertsUsed} divert${MAX_DIVERTS - S.divertsUsed === 1 ? '' : 's'} left)`, 'bad');
-  logChallenge();
-  render();
-}
 
 // ---------- drag & drop assignment ----------
 let dragId = null;
@@ -2647,7 +5815,7 @@ function dropOn(ev, zone) {
 
 // ---------- the slot row: select a card, then swap it with another (or with a role) ----------
 function tapCard(id) {
-  if (!isAssignPhase() || S.diverting) return;
+  if (!isAssignPhase()) return;
   // a card is already picked up → tapping a second card SWAPS the two
   if (S.selectedId != null && S.selectedId !== id) {
     swapCards(S.selectedId, id);
@@ -2778,13 +5946,24 @@ function computeAction(reserve) {
   // enhUsed/isEnh/enhEl are the engine's long-standing "this action was attuned" fields. The mage
   // supplies them from its own pairing rule; a class that has no elements simply leaves them false.
   const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
-  const attBonus = a.attBonus || 0;
+  const attBonus = a.attBonus || 0, attApplied = a.attApplied != null ? a.attApplied : attBonus;
+  const cardVal = a.cardVal != null ? a.cardVal : null;
   const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0, wakeTarget = a.wakeTarget || null;
+  // ⚠️ THE CLASS'S OWN PAYLOAD RIDES ALONG UNREAD. computeAction rebuilds its result field by
+  // field, so anything a class returns that the engine does not name is silently dropped — which
+  // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
+  // hands it straight back to the class. One line, so a third class needs no change here.
+  const classPayload = a.rogue ? { rogue: a.rogue } : null;
+  // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
+  // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
+  // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
+  // rather than a parallel set. A class adds an ANSWER, never a new question.
+  const rVerb = a.rogue ? a.rogue.verb : null;
   const boostVal = a.boost;
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0);   // 🧪 Draught of Haste
+  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0) + (S.armourPace || 0);   // 🧪 Draught of Haste · 👞 Quickstep
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
   const boostEff = h === 'Rationed' ? 0                                   // ⏳ nothing is spare
@@ -2794,10 +5973,16 @@ function computeAction(reserve) {
   if (e.type === 'fight') {
     // ✦ Lv4 CATALYST verbs shape the race itself
     const vS = a.vSpell, vE = a.vElem;
-    const init = elemInit;   // Initiative belongs to the Catalyst alone (charms apply in eff)
+    // 🕯️ Gorsewarden's Hood — seeing it coming IS being ready for it. ⚠️ It couples two systems
+    // that never touched, which is the point: the candle stops being purely information.
+    const init = elemInit + (S.candle && hasArmourRule('farsight') ? 2 : 0);
     // Slipstream only counts against 🌀 Evasion — it buys you the shape's answer, not the race
     const evInit = init + (vE === 'Slipstream' ? 4 : 0);
-    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit)) ? false : e.init > init;
+    // 🗡️ Viper Strike arrives before they are ready — same answer as ✦ Outpace, different class
+    // 👢 Anvil Toad Boots — an active use, so it is spent on a turn YOU choose. (The Twinned
+    // Bracers lesson: a lateral effect must be optional, or it is a coin flip you did not call.)
+    const initLost = (vE === 'Outpace' || (S.potionFx && S.potionFx.winInit) || S.armourWinInit)
+      ? false : e.init > init;
     // Ranged deals Early Damage even when you win Initiative — no opt-out (dodge cut 2026-07-29)
     const rangedHits = ability === 'Ranged' && !initLost;   // it shoots you whether or not you're fast
     let early = initLost || rangedHits ? e.atk : 0;
@@ -2807,7 +5992,29 @@ function computeAction(reserve) {
     if (h === 'Ambush') early *= 2;
     if (vE === 'Bedrock') early = 0;                       // ✦ Bedrock: the early shot never lands
     const wrongType = false;
-    const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
+    // 🗡️ the blade-side verb lands BEFORE the shape does, so 🛡️ Armour is still paid on the total
+    // and 🌀 Evasion still halves it. A verb makes the blow bigger; it does not exempt the blow.
+    // 🔑 THE CARD SPLITS; WHAT YOU ADD TO IT DOES NOT (Thomas, 2026-08-22):
+    // *"if a card does 8x2, any added damage like a +4 potion, will make it 12x2."*
+    // That is how anyone reads a card face, and dividing a buff is the surprising answer — so the
+    // card's OWN value is what a multi-hit strike divides, and every bonus lands on each blow.
+    // ⚠️ It is an ENGINE rule, not a rogue one: 🗡️ Sparkstrike gets it too.
+    const added = (S.potionFx ? S.potionFx.value : 0) + (S.armourStrike || 0)   // 🧪 Emberdraught · 🧤 Cinderfist
+                  + (a.rogue ? (a.rogue.bonus || 0) : 0)            // ● pips + the blade verb
+                  // 🎁 CHARM STRIKE BONUSES BELONG HERE, NOT AFTER THE MULTIPLICATION.
+                  // 🔴 They shipped an hour earlier as `value += charmStrike(...)` AFTER `hits` had
+                  // already been applied, so a multi-hit strike got them ONCE instead of on every
+                  // blow - worth **half** to a rogue and full to a mage, which read as a class
+                  // balance fact in the ladder and was a bug in my own arithmetic.
+                  // 🔑 Thomas's rule is explicit: *"if a card does 8x2, any added damage like a +4
+                  // potion, will make it 12x2."* `added` IS that channel; anything that is "added
+                  // damage" goes in it and nothing goes anywhere else.
+                  // ⚠️ 💨 SLOW STRENGTH MOVED TOO, and it had the same bug from the day it
+                  // shipped - it is listed under the same rule and was simply never revisited when
+                  // multi-hit arrived. `initLost` is computed ~17 lines above, so it fits here.
+                  + charmStrike(spell)
+                  + (initLost && hasCharm('slowfoot') ? 4 : 0);
+    const base = pileVal + added;
     const withBoost = base + boostEff;
     // 🔑 SHAPED DEFENCE (2026-07-28). Enemy armour is no longer a COLOUR you had to match with
     // an elemental attack - a rule no non-elemental class could ever join - but a SHAPE, stated
@@ -2819,17 +6026,123 @@ function computeAction(reserve) {
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
     const quenched = !!(S.potionFx && S.potionFx.noShape);
-    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm') ? (e.shapeV || 0) : 0;
-    // 🧪 Skyglass — the blow simply cannot be halved
+    // 🌀 SLIPPED (rogue) — beat its Initiative by SLIP_MARGIN and its answer comes in HALF.
+    // 🔑 THIS IS WHY THE ROGUE'S METER IS NOT THE MAGE'S: winning the race is BINARY and stops
+    // paying the moment you win it (measured twice — the old Attack-or-Initiative fork read 13%,
+    // then 4% after doubling). A margin that keeps paying past the win line never plateaus.
+    //
+    // ⚠️ IT SHIPPED AS A FULL CANCEL AND THAT WAS A PILLAR BUG (fixed 2026-08-17). Measured against
+    // the mage over 80 runs: mage countered on 32% of turns for 1.14 cards a turn, rogue countered on
+    // — 1% — for 0.04. A 28× reduction. 🔑 THE COUNTER IS THE GAME'S ONLY DAMAGE SOURCE, so a
+    // rule that deletes it doesn't make a class evasive, it EXCUSES THE CLASS FROM DECK-AS-HEALTH.
+    // She never spent her deck, so she never ran out, and 18 of her 18-point lead over the mage was
+    // sitting right here — not in her damage, which measured at parity.
+    // 🔑 THE FIX IS THE ONE ALREADY MADE FOR 🧱 GUARD THE SAME WEEK: HALVE, NEVER SWALLOW. A shape
+    // that reduces to zero is not a hard problem, it is an absent one — in Guard's case it locked the
+    // mage out, here it lets the rogue out. Same cliff, both directions.
+    // ⚠️ AND THE FULL CANCEL STILL EXISTS — it is 🗡️ Slow Poison's verb. Slipping is now the
+    // cheap, common, partial version; the verb is the rare, chosen, total one. That is the shape a
+    // verb should have, and it is why `nocounter` measured 0%: it was reprinting a freebie.
+    const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
+    // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
+    const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce')
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0)) : 0;   // 🛡️ Ironsplitter
+    // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
+    // 🌀 Windreader widens the margin Evasion needs, so a near-miss on the race still lands full
+    const evGrace = hasCharm('windreader') ? 2 : 0;
     const evaded = !quenched && !(S.potionFx && S.potionFx.noEvade) &&
-                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit);
-    let value = Math.max(0, withBoost - armorCut);
+                   foeHas(e, 'evasion') && vS !== 'Landslide' && (e.init > evInit + evGrace);
+    // 🗡️ MULTI-HIT — and the rule is that hits do NOT add damage, they DIVIDE it, with 🛡️ Armour
+    // paid on EVERY one. That is the entire reason a long chain is a liability against Armour and
+    // (once 🧱 GUARD exists) an asset against a breakable pool.
+    // ⚠️ `hits` WAS INERT UNTIL 2026-08-12 — computed by the class, passed through computeAction,
+    // printed in the reveal, and never once touching a number. The rogue's central mechanic was
+    // decoration, which is why teaching the bot to chain moved the win rate by zero.
+    // 🔑 A FIELD THE ENGINE CARRIES BUT NEVER READS IS NOT A MECHANIC, IT IS A COMMENT.
+    // Mage behaviour is byte-identical: hits === 1 takes the original path.
+    // 🧱 GUARD — BUILT 2026-08-12, the third shape, specified at step 5 and deliberately left out
+    // until a class existed that could answer it.
+    //
+    // THE RULE: a pool of N that eats your first N HITS whole. Hits beyond it land in full.
+    // So one enormous blow accomplishes NOTHING against Guard 1, and four small ones get through.
+    // 🔑 THAT IS THE EXACT INVERSE OF ARMOUR, and it is why the two shapes cannot be answered by
+    // the same turn: Armour is paid per hit and wants ONE, Guard consumes hits and wants MANY.
+    // ⚠️ IT IS UNANSWERABLE FOR THE MAGE ON PURPOSE. The mage lands exactly one hit, so a mage
+    // ⚠️ THE PARAGRAPH THAT USED TO SIT HERE IS DELETED, NOT SOFTENED. It said *"Guard must NOT be
+    // added to the existing four roads"* — and Guard was added to all four roads three days later.
+    // 🔑 A NOTE THAT THE DATA HAS OVERRULED IS WORSE THAN NO NOTE: it gets believed. Check the data.
+    //
+    // 🔴 THE HARD CONSTRAINT, MEASURED 2026-08-21 — **GUARD MUST BE 1.**
+    // Guard N halves your first N HITS, so it is only answerable if you can bring MORE than N.
+    // The whole game's hit ceiling is **2** (🗡️ Sparkstrike for the mage, Second Fang for the
+    // rogue — one card each), so at Guard 2 every hit anyone can bring is halved and the shape's
+    // own counter-play stops existing. Measured on the three Guard-2 creatures that shipped:
+    //     mage 0C/4N/**96L** · rogue 0C/20N/**80L**  — nobody beats it, so it is not a shape.
+    // ⚠️ Guard 2 only becomes legal if some class can land THREE hits. Until then it is a wall.
+    //
+    // 🔴 AND THE PAIRING RULE THAT MADE IT WORSE: the eight Guard creatures averaged 18 HP, the TOP
+    // of the range, so a shape that HALVES your damage also carried the BIGGEST health pools.
+    // **A shape and a stat that enforce the same thing MULTIPLY, they do not add** — the exact
+    // error the Stormreach's first cut made with 🌀 Evasion plus init 5–7 (measured 32%).
+    // 🔑 A shape that halves your blow wants BELOW-average HP. Guard creatures now run 7–12
+    // against a non-Guard mean of 12.7 (was 11–18), which is the pass that made it playable:
+    //     mage 0C/21N/79L → **8C/49N/43L** · rogue 5C/38N/57L → **20C/58N/22L**
+    // ...against an ordinary fight's 30C/46N/25L (mage) — so Guard is now the hardest ordinary
+    // thing on the road rather than a loss, which is what a shape is supposed to be.
+    // 🧱 Deep Cut shaves a hit off the pool · 🗡️ Whetstone sharpens every hit
+    const guardPool = (!quenched && foeHas(e, 'guard'))
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('deepcut') ? 1 : 0)) : 0;
+    const guarded = Math.min(hits, guardPool);
+    const whet = hasCharm('whetstone') ? 1 : 0;
+    // ⚠️ ONE PATH, NOT TWO. The single-hit case used to bypass perHit entirely, which meant
+    // 🗡️ Whetstone ("every hit strikes +1") did nothing at all on a one-hit turn — a charm that
+    // silently does nothing is the exact bug the element gate was just fixed for.
+    // 🔑 A SPECIAL CASE FOR THE COMMON PATH IS A PLACE FOR A RULE TO GO MISSING.
+    // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
+    // ⚠️ SPLIT ONLY THE CARD. `withBoost` is card + bonuses + Surge; dividing all of it made a
+    // +4 potion worth +2 a hit, which is not what the face says.
+    // 🔥 the banked Emberwake, optionally moved from the SPLIT bucket into the PER-HIT one.
+    // It rides inside `withBoost` (compose() folds it into `value`), so it has to be named here
+    // rather than added — subtract it out of the split, then hand it to every blow.
+    const wakeAdd = (WAKE_PER_HIT && a.wakeTarget === 'atk') ? (a.wake || 0) : 0;
+    const added2 = added + wakeAdd;
+    const splitBase = withBoost - added2;
+    const perHit = (hits > 1 && SPLIT_ADDS_PER_HIT
+                      ? Math.floor(splitBase / hits) + added2
+                      : hits > 1 ? Math.floor(withBoost / hits) : withBoost) + whet;
+    // 🧱 GUARD REDUCES, IT DOES NOT NULLIFY (softened 2026-08-17, Thomas: *"that doesn't sound
+    // fun if a mage literally can't do anything about guard"* / *"i don't want to have to force
+    // people to play a different class"*).
+    //
+    // ⚠️ IT SHIPPED AS A CLIFF: the first N hits were swallowed WHOLE, so a mage — who lands
+    // exactly one hit, always — dealt literally ZERO to Guard 1. I built that and then defended it
+    // as a feature, when this file's own note had already called it *"unanswerable, not hard"*.
+    //
+    // 🔑 THE RULE THIS EARNS: **EVERY CLASS MUST BE ABLE TO BEAT EVERY STAGE. Classes differ in
+    // how HARD, never in WHETHER.** A shape one class cannot engage with is not difficulty, it is a
+    // paywall made of mechanics — and it makes the wall worse too: "S-graded the Guard stage as the
+    // mage" is a badge, "the mage cannot enter" is a locked door.
+    //
+    // So the first N hits are HALVED. The mage is disadvantaged and never excluded; the rogue is
+    // still plainly the right tool, which is all the differentiation ever needed to be.
+    // ✅ It also dissolves a sharp edge I could not justify: a Lv4 rogue card lands one hit, so
+    // under the old rule a fully sharpened rogue ALSO dealt zero to a pool.
+    const per = Math.max(0, perHit - armorCut);
+    let value = (hits - guarded) * per + guarded * Math.floor(per * GUARD_CUT);
+    // 🧱 WHAT THE PLATES ATE — carried so the REVEAL can say so (found 2026-08-21).
+    // 🐛 Armour and Evasion each got a line in the beat display and Guard never did, so a blow
+    // simply arrived halved with no term accounting for it: the encounter panel promised
+    // "halves your first hit" and the resolution never mentioned it again.
+    // 🔑 *Never state a rule about an object without marking the object* — and *legible math
+    // always* means showing the TERMS, which is exactly what a silent halving is not.
+    // ⚠️ This is the payload trap the note on compose() warns about: three bugs this month came
+    // from a value being computed and never reaching the reveal. Add the field WITH the rule.
+    const guardCut = (hits - guarded) * per + guarded * per - value;
     if (evaded) value = Math.floor(value / 2);
     if (vS === 'Thunderhead' && !initLost) value += 4;      // ✦ strike first, strike harder
     // 💨 SLOW STRENGTH - the mirror. Initiative is currently a race you want to win every time;
     // this makes LOSING it a legitimate plan, which is a whole second answer to 🛡️ Armour and
     // rescues hands whose only fast card is the one they need in the Spell.
-    if (initLost && hasCharm('slowfoot')) value += 4;
     // 'Slow' CUT with the Attack/Move split - it only meant "compare your other value", and
     // there is no other value now. Abilities get revisited wholesale at shaped defence.
     const half = Math.ceil(e.hp / 2);
@@ -2839,8 +6152,11 @@ function computeAction(reserve) {
     // the only encounter in the game where a bigger blow is worse than a sufficient one.
     const backlash = ability === 'Backlash' ? Math.min(3, Math.max(0, value - e.hp)) : 0;
     // ✦ Undertow: a strike that falls short still costs you nothing in return
-    const combatDmg = (outcome !== 'Complete' && vS !== 'Undertow') ? e.atk
-      : (S.potionFx && S.potionFx.noCounter) ? 0 : backlash;
+    // 🗡️ Slow Poison in ② — it simply does not answer. The one FULL cancel the rogue owns.
+    const answers = outcome !== 'Complete' && vS !== 'Undertow' && rVerb !== 'nocounter'
+                    && !(S.potionFx && S.potionFx.noCounter);
+    // 🌀 a slipping rogue takes the blow at an angle — halved, never skipped
+    const combatDmg = answers ? (slipped ? Math.floor(e.atk * SLIP_CUT) : e.atk) : backlash;
     const timePenalty = h === 'Hazards' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
     const stormDmg = h === 'Storm' ? timePenalty : 0;
     let loseReserve = null;
@@ -2848,29 +6164,59 @@ function computeAction(reserve) {
     if (ability === 'Freeze' && early > 0) loseReserve = 'Frozen (took Early Damage)';
     if (h === 'Riptide') loseReserve = '🌊 dragged under by the Riptide';
     const poison = ability === 'Poison' ? (early > 0 ? 1 : 0) + (combatDmg > 0 ? 1 : 0) : 0;
-    return { type: 'fight', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    // 🗡️ `perHit` TRAVELS NOW, because the duel needs it. ⚠️ This is the payload trap the note on
+    // compose() warns about, met from the other side: the value was computed and never left the
+    // function, so the finale had no way to charge armour per blow and quietly stopped trying.
+    return { ...classPayload, slipped, type: 'fight', spell, hits, perHit, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
   const wrongType = false;
-  const base = pileVal + (S.potionFx ? S.potionFx.value : 0);   // 🧪 Emberdraught
+  // ONE VALUE PER CARD, so a blade-side verb reads as PROGRESS here exactly as it reads as damage
+  // in a fight. ⚠️ Anything added to `base` in the fight branch must be added here too, or a rule
+  // silently applies to half the game — the branches are parallel and neither one warns you.
+  const added = (S.potionFx ? S.potionFx.value : 0) + (S.armourStrike || 0) + (a.rogue ? (a.rogue.bonus || 0) : 0);
+  const base = pileVal + added;
   const withBoost = base + boostEff;
   // JOURNEY ELEMENT BONUS CUT 2026-07-26 - the most obscure rule in the game (the tell: months
   // of playtesting and Thomas never mentioned it once). Journeys already carry MP, Nightfall,
   // Pace and perils. Kept as a zeroed field so the log/solver result shapes do not change.
   const reserveBonus = 0;
-  const value = withBoost + reserveBonus;
+  // 👣 THE STRIDE - what the cards behind the Spell contribute on a journey.
+  // 🔑 A FIGHT IS A BLOW: one card lands, the others support it. A JOURNEY IS A DISTANCE: every
+  // card you commit covers ground. So the same 16 cards want a SPIKE for a fight and an EVEN hand
+  // for a journey, which is the one axis on which nothing else in the game pulls two ways.
+  // ⚠️ The class rule still applies to the Spell and nothing else - a journey must not be
+  // class-blind, or a mage and a rogue would play 54% of the game identically.
+  const strideCards = JOURNEY_MODE === 'distance'
+    ? [cardById(S.assign.Element), cardById(S.assign.Boost)].filter(Boolean) : [];
+  const stride = strideCards.reduce((t, c) => t + eff(c).value, 0);
+  // 🎁 the same four charms pay on a journey. 🔑 THEY MUST, OR THEY ARE HALF A CHARM: journeys
+  // are about half of all encounters, and a rule whose TEXT names no encounter type but whose CODE
+  // does is exactly the shape of the Slow Strength limitation directly above.
+  const value = withBoost + reserveBonus + stride + charmStrike(spell);
   // Pace vs Nightfall: your Catalyst's Initiative (+ Boost if targeted) races the dark
   const paceBless = (S.paceBless || 0) > 0 ? 2 : 0; // Gray Pilgrim / Mirror Fen blessing
-  const pace = elemInit + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
+  // 🌙 Lanternjaw Greaves — Pace reads your FASTEST card instead of your Catalyst.
+  // 🔑 THE BUILD-CHANGER OF THE NINE: the Catalyst currently serves two masters (Initiative and
+  // the pair), and Nightfall is a third claim on it. This removes that third claim, so the Catalyst
+  // is free to attune while the night is answered by whatever else you happen to be holding.
+  const fastest = hasArmourRule('swiftfoot')
+    ? Math.max(0, ...S.hand.map(c => eff(c).init)) : 0;
+  const pace = Math.max(elemInit, fastest) + paceBless + charmMod('pace') + (S.potionFx ? S.potionFx.pace : 0);   // 🧪 Road Dust
   const nightfall = e.nightfall || 0;
   const nightCaught = nightfall > pace && !(S.potionFx && S.potionFx.noNight);   // 🧪 Nightglass
   // Steep peril: the journey's MP grows by your Arsenal's Boost
   const peril = e.peril || null;
-  const steepAdd = peril === 'Steep' && reserve ? eff(reserve).boost : 0;
+  // ⛰️ Steep raises MP by what your ARSENAL would have given - the mage's ➕ boost, the
+  // rogue's ⚡ energy. Reading only `boost` made it a free peril for any class without one.
+  const steepAdd = peril === 'Steep' && reserve
+    ? (CLASS.boosts ? eff(reserve).boost : pitchOf(reserve)) : 0;
   // 🏔️ Updraft — speed shortens the road (never below 1 MP: a journey you cannot fail is not one)
   const updraftCut = peril === 'Updraft' ? elemInit : 0;
-  const mpEff = Math.max(1, e.mp + steepAdd - updraftCut);
+  // ⚠️ the road gets longer when more cards walk it, or a journey becomes free
+  const mpBase = JOURNEY_MODE === 'distance' ? Math.round(e.mp * JOURNEY_MP_MULT) : e.mp;
+  const mpEff = Math.max(1, mpBase + steepAdd - updraftCut);
   const half = Math.ceil(mpEff / 2);
   let outcome = value >= mpEff ? 'Complete' : value >= half ? 'Narrow' : 'Loss';
   if (h === 'Exacting' && outcome === 'Narrow') outcome = 'Loss';   // ⚖️ no half credit
@@ -2879,18 +6225,68 @@ function computeAction(reserve) {
   if (timePenalty && S.potionFx && S.potionFx.tpCut) timePenalty = Math.max(0, timePenalty - S.potionFx.tpCut);
   const stormDmg = h === 'Storm' ? timePenalty : 0;
   const treacherousDmg = peril === 'Treacherous' && outcome !== 'Complete' ? 1 : 0;
+  // ⚔️ THE LAST MILE'S SECOND RACE — its INITIATIVE, not Nightfall. See LAST_MILE.
+  // 🔑 IT LIVES IN computeAction() FOR THE SAME REASON EVERYTHING ELSE DOES: resolution, the
+  // reveal and the bot must share one source. Put the rouse in finishResolve instead and the
+  // solver's scorer cannot see it, so the bot would never trade Move for Pace — and every number
+  // we then took would say the penalty was unavoidable. *Teach the instrument or it measures a
+  // game we are not shipping.*
+  const lastMile = e.lastMile ? lastMileApproach(pace) : null;
+  const rouse = lastMile === 'heard' ? Math.ceil((S.dragon.breath || 0) / 2) : 0;
   // Ember Hollow wards the Arsenal: you may still be caught, but the night can't snuff your Arsenal
   const emberShielded = nightCaught && reserve && S.emberShield;
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
-    : nightCaught && reserve && !S.emberShield ? 'caught by Nightfall' : null;
-  return { type: 'journey', spell, hits, attBonus, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    : nightCaught && reserve && !S.emberShield && !hasArmourRule('nightwise') ? 'caught by Nightfall' : null;
+  return { ...classPayload, type: 'journey', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+           // ⚠️ WHEN compose() GAINS A FIELD, CHECK THE PAYLOAD IN THE SAME EDIT - three separate
+           // bugs this month came from a value being computed and then never reaching the reveal.
+           stride, strideNames: strideCards.map(c => c.def.name),
            base, withBoost, reserveBonus, value, mpEff, half, outcome, reserve, early: 0, combatDmg: 0,
            pace, nightfall, nightCaught, paceBless, emberShielded, peril, steepAdd, updraftCut, treacherousDmg, target: mpEff,
+           lastMile, rouse,
            timePenalty, stormDmg, loseReserve, poison: 0, ability: null, hardship: h };
 }
 
 // ---------- Phase 2/3: resolve action, queue penalties ----------
+// ✦ PERFECT KILL — you Completed, and no SMALLER card in your hand would also have done it.
+// 🔑 NOT exact-lethal: hitting HP precisely with four cards is mostly luck, and **a reward you
+// cannot aim for is a slot machine**. *Spend no more than you needed* is checkable, aimable, and
+// states in ENGINE terms — a rogue earns one off a chain exactly as a mage earns one off a card.
+// ⚠️ CONTESTED IS THE HALF THAT MATTERS. Measured over 1,992 Completes, **64% were already
+// perfect by accident**, because only one card could ever have got there. A reward that fires by
+// default is not an achievement, so the prize needs BOTH: yours was the smallest sufficient card
+// AND another card would also have done it — i.e. you actually chose.
+// ⚠️ IT SWAPS `S.assign` AND PUTS IT BACK, which is the *instrument that perturbs what it
+// measures* trap. So: synchronous, never renders in between, restores in a `finally`, and runs
+// ONCE per encounter from resolve() — in computeAction() it would re-run on every repaint for a
+// fact that cannot change mid-turn.
+function perfectKillInfo(outcome) {
+  const none = { perfect: false, contested: false };
+  if (outcome !== 'Complete' || !S.hand) return none;
+  const a = S.assign, curId = a.Spell, cur = cardById(curId);
+  if (!cur) return none;
+  const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
+  const curVal = eff(cur).value;
+  let smallerWorks = false, anyOtherWorks = false;
+  for (const c of S.hand) {
+    if (c.id === curId) continue;
+    const zone = ZONES.find(z => a[z] === c.id);
+    if (!zone || zone === 'Spell') continue;
+    const prevSpell = a.Spell;
+    try {
+      a.Spell = c.id; a[zone] = prevSpell;
+      const alt = computeAction(cardById(a.Reserve));
+      if (alt && alt.outcome === 'Complete') {
+        anyOtherWorks = true;
+        if (eff(c).value < curVal) smallerWorks = true;
+      }
+    } catch (err) { /* an illegal arrangement is simply not an alternative */ }
+    finally { a[zone] = c.id; a.Spell = prevSpell; }
+  }
+  return { perfect: !smallerWorks, contested: anyOtherWorks };
+}
+
 function resolve() {
   if (!rolesValid()) return;
   const e = S.encounter;
@@ -2903,6 +6299,10 @@ function resolve() {
   const boostVal = boostC ? eff(boostC).boost : 0;
 
   const r = computeAction(reserve);
+  // ✦ computed here, once, while the hand is still seated exactly as it was played
+  const pk = perfectKillInfo(r.outcome);
+  r.perfect = pk.perfect && pk.contested;   // the PRIZE needs both
+  r.perfectChance = pk.contested;           // ...and this is the grade's denominator
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
@@ -2914,25 +6314,43 @@ function resolve() {
   const beats = [];
 
   if (r.type === 'fight') {
-    const b1 = [];
-    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
-    else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
- // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
-    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
-    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
-    if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
-    if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
-    beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
-
+    // 🔑 INITIATIVE IS RESOLVED AND SHOWN FIRST (2026-08-17, Thomas: *"initiative should get
+    // checked first when resolving. since it says you act first or not"*). It decides WHO MOVES
+    // FIRST, so revealing it after the blow told the story backwards — the reader learned the
+    // outcome of the exchange and only then who started it.
+    // ⚠️ Ordering only. The maths never depended on the order; computeAction resolved the whole
+    // turn before a single beat was built. This is the staged reveal reading in causal order.
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → enemy is faster → Early Damage ${e.atk}`, 'bad'));
     else if (r.rangedHits) b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, but RANGED hits anyway → Early Damage ${e.atk}`, 'bad'));
     else b2.push(L(`Initiative: yours ${r.init} vs enemy ${e.init} → you act first, no Early Damage`, 'good'));
     if (r.early > 0 && S.hardship === 'Ambush') b2.push(L(`Ambush: Early Damage doubled → ${r.early}`, 'bad'));
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${e.init}`, numCls: r.early ? 'bad' : 'ok', lines: b2 });
+
+    const b1 = [];
+    if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
+    // 🗡️ a rogue turn is not an attunement - it gets its own lines, in its own vocabulary
+    if (r.rogue) rogueActionLines(r, spell, L, 'Atk').forEach(x => b1.push(x));
+    else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
+    else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
+    // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
+ // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+    // ⚠️ the Surge is a MAGE stat - the rogue's slot ③ pays ⚡ and adds no damage, so printing
+    // "Surge +0" reported a mechanic she does not have
+    else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
+    // 🗡️ Whetstone was invisible: it added +1 per hit and the log never said so
+    if (hasCharm('whetstone')) b1.push(L(`🗡️ Whetstone: +1 on every hit`, 'good'));
+    if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
+    // 🧱 GUARD, FINALLY SAID OUT LOUD. It had no line at all, so the blow just arrived smaller.
+    // ⚠️ It names the COUNTER-PLAY too, because the shape has one and a single-hit turn should
+    // be told what it was: hits beyond the pool land whole.
+    if (r.guardCut > 0) b1.push(L(
+      `🧱 Guard ${r.guardPool}: ${r.guarded} of your ${r.hits} hit${r.hits === 1 ? '' : 's'} met the plates and was halved — <b>−${r.guardCut}</b>` +
+      (r.hits > r.guarded ? ` (the other ${r.hits - r.guarded} landed whole)` : ` · a second hit would have landed whole`), 'bad'));
+    if (r.evaded) b1.push(L(`🌀 Evasion: you were too slow — it slips the blow, damage halved → ${r.value}`, 'bad'));
+    beats.push({ label: '⚔️ ATTACK', big: r.value, vs: `vs ❤️ ${e.hp} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     beats.push({ outcomeBeat: true, final: true, lines: [
       L(`Attack ${r.value} vs HP ${e.hp} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Combat Damage ${e.atk}` : ''}`,
@@ -2941,26 +6359,57 @@ function resolve() {
   } else {
     const b1 = [];
     if (r.nightCut > 0) b1.push(L(`Night Travel: Boost reduced by your Catalyst's Initiative (${boostVal} − ${elem ? eff(elem).init : 0}) → +${r.boostEff}`, 'bad'));
-    if (r.steepAdd) b1.push(L(`Steep: MP raised by your Arsenal's Boost → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
-    if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
+    // ⚠️ name the ARSENAL, not the mage's stat - the rogue's Arsenal contributes ⚡ energy
+    if (r.stride) b1.push(L(`👣 The road takes all of you — ${r.strideNames.join(' + ')} walk behind your Spell for +${r.stride}`, 'good'));
+    if (r.steepAdd) b1.push(L(`Steep: MP raised by what your Arsenal would have given → ${e.mp} + ${r.steepAdd} = ${r.mpEff}`, 'bad'));
+    if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
+    else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next turn`, 'good'));
-    else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+    else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
     if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
     const b2 = [];
     if (r.paceBless) b2.push(L(`Gray Pilgrim's blessing: +2 Pace → ${r.pace}`, 'good'));
+    // ⚔️ ON THE LAST MILE, PACE RACES THE DRAGON — NOT NIGHTFALL. It used to print
+    // "vs Nightfall 0 → home before dark", a race that could not be lost, on the most important
+    // turn of the run. 🔑 A term shown doing nothing is worse than no term: it teaches the player
+    // that the number does not matter, on the exact turn it matters most.
+    if (r.lastMile) {
+      const di = S.dragon.init, half = Math.ceil(di / 2);
+      if (r.lastMile === 'unseen') b2.push(L(`🌒 Pace ${r.pace} vs its Initiative ${di} → you match it. You come up on the ${S.dragon.name} unheard — ${stripTags(unseenPromise())}`, 'good'));
+      else if (r.lastMile === 'heard') b2.push(L(`🐉 Pace ${r.pace} vs its Initiative ${di} (half ${half}) → it hears you coming, and takes the opening blow: ${r.rouse} damage`, 'bad'));
+      else b2.push(L(`Pace ${r.pace} vs its Initiative ${di} → you arrive without waking it, but it is set for you. No blow given, none taken.`));
+      beats.push({ label: '💨 APPROACH', big: r.pace, vs: `vs 💨 Init ${di} (half ${half})`,
+                   numCls: r.lastMile === 'heard' ? 'bad' : r.lastMile === 'unseen' ? 'enh' : 'ok', lines: b2 });
+    } else {
     if (r.nightCaught && r.emberShielded) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark, but the Ember Hollow wards your Arsenal (${r.reserve.def.name}) — it survives`, 'good'));
     else if (r.nightCaught) b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → caught after dark${r.reserve ? ` → the night snuffs your Arsenal (${r.reserve.def.name})` : ' (no Arsenal to lose)'}`, 'bad'));
     else b2.push(L(`Pace: yours ${r.pace} vs Nightfall ${r.nightfall} → home before dark`, 'good'));
     beats.push({ label: '🌙 PACE', big: r.pace, vs: `vs Nightfall ${r.nightfall}`, numCls: r.nightCaught && !r.emberShielded ? 'bad' : 'ok', lines: b2 });
+    }
 
     beats.push({ outcomeBeat: true, final: true, lines: [
       L(`Move ${r.value} vs MP ${r.mpEff} (half = ${r.half}) → ${r.outcome.toUpperCase()} ${r.outcome !== 'Loss' ? `· 🪙 +${e.xp}` : ''}${r.outcome !== 'Complete' ? ` · Time Penalty ${e.timePenalty}` : ''}`,
         r.outcome === 'Loss' ? 'bad result' : r.outcome === 'Narrow' ? 'result' : 'good result'),
     ] });
+  }
+
+  // 🧰 THE CARVE IS THE LAST BEAT (2026-08-23, Thomas: *"after that, lets show the drops we got
+  // from that encounter"*).
+  // 🔑 IT COSTS NO CLICK. Beats auto-advance every 1400ms and only the FINAL one waits — so moving
+  // `final` onto the carve makes it play as one more stage of the same reveal rather than a screen
+  // you have to dismiss. *A weightless decision is not a rest, it is homework* — this is not a
+  // decision at all, it is a beat of pacing, which is the one thing the reveal is FOR.
+  // ⚠️ Rolled HERE rather than in finishResolve() so the beat can show it. finishResolve() then
+  // banks what was rolled instead of rolling again — two rolls would have shown you one haul and
+  // given you another.
+  r.drops = rollDrops(S.encounter, r.outcome, r.perfect);
+  if (Object.keys(r.drops).length) {
+    beats[beats.length - 1].final = false;
+    beats.push({ carveBeat: true, final: true, lines: [] });
   }
 
   S.pendingR = r;
@@ -3044,13 +6493,84 @@ function beatDisplayHTML(beat, isNew) {
   const r = S.pendingR, e = S.encounter;
   if (beat.outcomeBeat) {
     const subs = [];
+    // 🔴 A DUEL BEAT IS NOT WON OR LOST, AND IT USED TO SAY IT WAS (fixed 2026-08-28, found by
+    // Thomas in play: *"i did 10 initiative, and 38 damage, how come its still considered a loss"*).
+    //
+    // 🔑 THE CAUSE IS A SENTINEL LEAKING INTO A DISPLAY. The duel's encounter carries `hp: 9999`
+    // so the road's kill logic can never fire inside the finale — which also makes `half` 5000, so
+    // `outcome` is **Loss on every single beat, by construction**. It was never a verdict about
+    // the player's play; it was a placeholder wearing one.
+    // ⚠️ He chipped a dragon 46 → 8 HP and the screen told him he had failed. **A number that
+    // exists to stop a rule firing must never reach the screen** — the same class as a stale
+    // comment, except it lies once a beat instead of once a year.
+    //
+    // ✅ A duel beat reports what a duel beat actually is: how much you took off it, and what it
+    // gives back. Coins are dropped too — a beat pays none, and *a term shown doing nothing teaches
+    // the player the number does not matter.*
+    const inDuel = !!(S.finalMode && S.finalPhase === 'duel');
+    if (inDuel) {
+      // ⚠️ READ THE DUEL'S OWN RESULT, not the road payload. `r` is computeAction's, and it has no
+      // idea a dragon exists; the finale writes what actually happened to `S.duelResult`.
+      // (My first cut read `r.duelToHp`, a field I had invented. The payload trap, from the
+      // authoring side this time.)
+      // ⚠️ `S.duelResult` IS NOT WRITTEN YET when the reveal renders — the beat is displayed before
+      // it resolves, so reading it printed nothing. Ask the duel's OWN functions instead, which is
+      // also the `computeAction()` rule applied here: **resolution and display share one source,
+      // never a second copy.** `duelStrike()` and `duelCounter()` are pure, so calling them from a
+      // renderer computes the same numbers the resolution is about to.
+      const ds = S.dragonState || {};
+      const st = duelStrike(r);
+      const hpAfter = Math.max(0, (ds.hp || 0) - st.toHp);
+      const felled = hpAfter <= 0;
+      subs.push(`<div class="pv-sub good">🐉 ${S.dragon.name}: −${st.toHp} HP${felled ? ' — it falls' : ` → ${hpAfter} left`}</div>`);
+      if (st.evaded) subs.push(`<div class="pv-sub bad">🌀 it slipped the blow — halved</div>`);
+      // mirrors the resolution exactly: a dead dragon neither bites nor breathes
+      const dmgD = felled ? 0 : (r.early || 0) + duelCounter(hpAfter);
+      if (dmgD > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgD}</div>`);
+      return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
+        `${felled ? 'FELLED' : 'STRUCK'}</span>` +
+        `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+    }
     subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
+    // ✦ named where the verdict is, because it IS part of the verdict
+    if (r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
     const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
-    if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to soak: ${dmg}</div>`);
-    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
+    if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmg}</div>`);
+    // 🔴 NAME WHAT CHARGED IT (2026-08-28, found by Thomas in play: *"how did i get a drop from
+    // this one"* — and the ⏳ beside it was the stranger half). On a FIGHT the only source is the
+    // ⚠️ Hazards hardship, and the reveal printed the penalty with nothing saying why: a Time
+    // Penalty is a journey word, so on a creature it reads as a bug.
+    // 🔑 Exactly the 🧱 Guard fault again — *never state a rule about an object without marking
+    // the object*, at the moment the rule costs you something.
+    const tpWhy = r.timePenalty > 0
+      ? (r.type === 'fight' && r.hardship ? ` — ⚠️ ${r.hardship}`
+        : r.peril === 'Toll' ? ` — ⏳ Toll doubles it` : '')
+      : '';
+    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}${tpWhy}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
-    return `<div class="pv-stat pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>${subs.join('')}</div>`;
+    return `<div class="pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>` +
+      `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+  }
+  if (beat.carveBeat) {
+    // 🧰 THE CARVE IS NOT A STAT COLUMN. It used to render `<div class="pv-num">🧰</div>`, an
+    // EMOJI in the slot where every sibling beat shows a NUMBER — so the eye read it as a stat that
+    // was not one, and the warm box around it competed with the verdict beside it.
+    // 🔑 IT IS A LIST OF THINGS YOU GAINED, so it renders as chips on the verdict row instead.
+    const ids = Object.keys(r.drops || {});
+    // 🦴 ITS OWN SECTION, NOT A TAG ON THE VERDICT ROW (Thomas, 2026-08-26: *"it should be its
+    // own section, formatted cleanly and nicely, maybe it should be called like Drops"*).
+    // ⚠️ It has now been wrong twice in one day for the same reason: it was a stat column, then it
+    // was a chip beside the outcome pill — both times **wedged into a row that was about something
+    // else**. 🔑 What you WON and what it COST you are two different statements, and putting them on
+    // one line asks the reader to separate them. A heading does that for free.
+    // ✅ And it is called DROPS: *carved* is flavour, and this is a list of things you now own.
+    return `<div class="pv-drops${pop}">` +
+      `<div class="pv-drops-head">\u{1F9B4} DROPS</div>` +
+      `<div class="pv-drops-list">` +
+      ids.map(id => `<span class="mat-chip">${matDef(id).icon} ${matDef(id).name}` +
+        `${r.drops[id] > 1 ? `<b>\u00d7${r.drops[id]}</b>` : ''}</span>`).join('') +
+      `</div></div>`;
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
     `<div class="pv-label">${beat.label} ${beat.vs}</div>` +
@@ -3064,38 +6584,105 @@ function finishResolve() {
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   S.results[r.outcome]++;
   contractTick(r);   // 📜 a contract reads the turn the engine already resolved
+  // 💀 remember a clean elite kill; backToMap() pays it
+  if (S.map && S.map.pos) {
+    const here = S.map.floors[S.map.pos.f][S.map.pos.c];
+    // 💀 YOU HAVE TO KILL IT (Thomas 2026-08-24: *"getting a charm for not killing it just
+    // feels a bit weird, and easy?"*). A Narrow is `value >= half` — you WOUNDED it and walked
+    // away — and yet the boon screen said *"the dangerous thing is dead"* and the log line said
+    // *"off the thing you killed"*. 🔑 THE PRIZE TEXT WAS ASSERTING A KILL THAT DID NOT HAPPEN.
+    // ⚠️ This gate was tried twice before and failed BOTH times for the same reason — at ELITE_HP
+    // ×2.0 a kill fires on 1% (mage) / 3% (rogue) of elites, so it paid 0.02 charms a run, one
+    // every forty. 🔑 THE FAULT WAS NEVER THE GATE, IT WAS THAT THE KILL WAS ARITHMETICALLY OUT OF
+    // REACH — the 🧱 GUARD 2 shape, a rule gated on an outcome the maths forbids. ELITE_HP came
+    // down to ×1.15 in the same commit, which is what makes this line honest rather than dead.
+    // 🔑 AND THE TWO DIALS ARE INDEPENDENT: **HP decides whether you can WIN, ATK decides what it
+    // COSTS.** ELITE_ATK is untouched at +4, so an elite hits exactly as hard as it always did —
+    // measured 9.5–10.6 a hit for the mage at EVERY HP setting from ×2.0 to ×1.0. The dread did
+    // not move; only the win state appeared.
+    // 🔑 THE PRICE OF AN ELITE IS STILL THE DAMAGE. Walking away pays the coins and the materials
+    // (see rollDrops) — it is the CHARM that now costs a kill.
+    if (here && here.type === 'elite' && r.outcome === 'Complete') S.boonOwed = true;
+  }
   // 🎯 cleanup happens several steps after the reveal, so anything a rule-charm needs to know
   // about the turn just played has to be stashed here rather than recomputed from S.assign.
+  // ✦ the run's tally. `perfectChances` is the denominator: encounters where more than one card
+  // would have Completed — i.e. where being economical was a DECISION, not the only line.
+  if (r.perfectChance) S.stats.perfectChances = (S.stats.perfectChances || 0) + 1;
+  if (r.perfect) {
+    S.stats.perfect = (S.stats.perfect || 0) + 1;
+    log(`✦ <b>PERFECT KILL</b> — no smaller card would have done it. The part is certain.`, 'good');
+  }
   S.lastOutcome = r.outcome;
-  if (S.finalMode && S.finalPhase === 'lastmile') S.lastMileOutcome = r.outcome;
+  if (S.finalMode && S.finalPhase === 'lastmile') { S.lastMileOutcome = r.outcome; S.lastMileApproach = r.lastMile; }
   S.lastAttuned = !!r.enhUsed;
+  // 🗡️ ADVANCE THE CHAIN. Sits beside lastAttuned/lastOutcome because it is the same kind of thing:
+  // a breadcrumb the NEXT turn's class rule reads. The engine records it; only the rogue asks.
+  // 🗡️ COMMIT THE METER. compose() already worked out where it lands; cleanup only stores it,
+  // so the number the player was shown before Resolve is the number they get. Same discipline as
+  // 🗡️ Ghostblade reading the resolved turn rather than recomputing from the arrangement.
+  if (r.rogue) {
+    // 🗡️ Viper Strike / Sleight of Hand — the extra cards arrive with NEXT turn's hand.
+    // ⚠️ THE DRAW CANNOT HAPPEN NOW: the verb only fires because you committed this arrangement,
+    // and this turn's four cards are already spoken for. Drawing into a hand that has finished
+    // being played is where the card would have nowhere to sit.
+    S.drawExtra = r.rogue.verb === 'cycle2' ? 2 : (r.rogue.verb === 'draw' ? 1 : 0);
+  }
   // a Gray Pilgrim / Mirror Fen blessing covers a limited number of journeys — spend a charge
   if (r.type === 'journey' && (S.paceBless || 0) > 0) S.paceBless--;
   // in the finale's Approach, each journey-beat's outcome is banked (both Complete → crack a shield)
 
   // a journey you Complete or Narrow earns an Event at turn's end (the place you arrive) — never in the finale
-  else if (r.type === 'journey' && r.outcome !== 'Loss') S.pendingEvent = true;
+  // 🏕️ AN EVENT IS ITS OWN TURN, SCHEDULED BY THE REGION (2026-08-18, step 2).
+  // Thomas: *"lets do the encounter type change, i think thats how i envisioned it anyways."*
+  // 🔑 IT IS NO LONGER EARNED BY A JOURNEY AT ALL. An event used to be a RIDER: a journey
+  // resolved, and then a second screen appeared inside the same turn. That made a fight one screen
+  // and a journey three, and journeys are 54% of encounters - so the majority encounter type was a
+  // compound and the run had no beat that wasn't a question. Scheduling it per region instead
+  // makes both encounter types one screen each and gives the event a beat of its own.
+  // ⚠️ IT TAKES A TURN BUT NOT AN ENCOUNTER SLOT - `S.regionTurn` is NOT incremented on an
+  // event turn. That is deliberate and load-bearing: `REGION_ENCOUNTERS` is the accounting unit for
+  // the region clock, the `dry` check, dragon PAR, and 📜 quest-contract windows via `runLeft`.
+  // 🔑 Counting an event as an encounter would silently hand every contract a window a quarter
+  // of which cannot progress it - the *"never offer one without room to keep it"* trap, arriving
+  // through the back door. **An event costs you time, never cards, and never a card encounter.**
   if (r.banks) S.wakePending = r.bank;
   // 🕯️ a clean win keeps your footing; anything less costs it — and the dark takes it regardless
   if (!S.finalMode) {
     if (r.nightCaught) snuffCandle('the dark caught you on the road');
     else if (r.outcome === 'Complete') lightCandle('you come through cleanly');
+    else if (r.outcome === 'Narrow' && hasArmourRule('steadyflame')) log(`🛡️ Farseer's Circlet — your candle holds through the scrape.`, 'good');
     else snuffCandle(r.outcome === 'Narrow' ? 'you scraped through' : 'the encounter went badly');
   }
-  // 📊 CRAFT: could this hand have attuned at all, and did you find it? Availability is a
-  // property of the HAND (any same-element pair), so the stat measures your play, not your luck.
-  if (S.stats) {
-    const els = S.hand.map(c => elOf(c));
-    if (els.some((e, i) => els.indexOf(e) !== i)) S.stats.attuneAvail++;
-    if (r.enhUsed) S.stats.attuned++;
+  // 📊 CRAFT: was your class's source of power AVAILABLE in this hand, and did you find it?
+  // Availability is a property of the HAND, so the stat measures your play, not your luck.
+  //
+  // 🐛 THIS WAS A MAGE RULE SITTING IN THE ENGINE (found 2026-08-21, from a screenshot of a
+  // winning rogue run reading *"✦ craft — attuned 0 of 15 — 0/20"*). It asked "does this hand
+  // hold a same-element pair?", and a rogue card has NO element — so `elOf()` returned null for
+  // all four, `indexOf` found a "duplicate" every single turn, and she was credited with 15
+  // phantom chances to attune and scored ZERO for missing all of them.
+  // 🔑 IT IS NOT A COSMETIC BUG: craft is 20 of 100, so the rogue's ceiling was 80 and she could
+  // never earn an S on any stage — which quietly deletes [[The_Wall]], and the wall is the
+  // retention answer *stages × classes* was built on.
+  // ⚠️ THE CLASS SEAM AGAIN: the engine may ask *"was your power available, did you use it"*;
+  // only the CLASS may say what its power IS.
+  if (S.stats && CLASS.craft) {
+    if (CLASS.craft.avail(S.hand)) S.stats.craftAvail++;
+    if (CLASS.craft.found(r)) S.stats.craftFound++;
   }
   // 🪙 COINS CANNOT GO NEGATIVE (fixed 2026-07-29). ☠️ The Tithe takes 2 from every encounter, so a
   // low-XP one — the Approach pays 0 — drove the purse below zero and the Wheel offered prices
   // against a debt. A curse should take what you HAVE, never put you in the red: negative money
   // is a state with no way back, and it silently taxed every future encounter too.
   // The log also printed "+-2 coins", which is its own small lie about what happened.
+  // 🦴 CARVE FIRST, THEN THE PURSE — the same order the log reads.
+  S.encountersDone = (S.encountersDone || 0) + 1;
+  bankDrops(r.drops || rollDrops(S.encounter, r.outcome));
+  // ⭐ every encounter moves the bar, however it went
+  awardXP((XP_AWARD[r.outcome] || 0) * (S.encounterElite ? XP_AWARD.eliteMult : 1));
   if (r.outcome !== 'Loss') {
-    const g = e.xp + charmMod('coin') + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0);
+    const g = Math.round((e.xp + (r.outcome === 'Complete' ? COMPLETE_BONUS : 0)) * COIN_MULT) + charmMod('coin');
     const got = Math.max(g, -S.coins);          // it can empty your purse, never overdraw it
     S.coins = Math.max(0, S.coins + g);
     if (got >= 0) log(`+${got} coins${r.outcome === 'Complete' ? ` (${e.xp} + ${COMPLETE_BONUS} for the clean win)` : ''} (you now hold ${S.coins})`, 'good');
@@ -3104,28 +6691,1091 @@ function finishResolve() {
   let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
+  // ⚔️ THE LAST MILE — arriving loud. It goes through `damage` rather than getting its own
+  // mechanism, so the ordinary soak phase handles it and nothing new had to be built.
+  // ⚠️ AND IT MUST SIT ABOVE THE MOMENTUM BLOCK: ● the streak breaks on *any* damage, and being
+  // heard by the dragon is damage. That is correct and it is free — one rule, not a special case.
+  if (r.rouse > 0) {
+    damage += r.rouse;
+    log(`🐉 It heard you coming. The ${S.dragon.name} is already up as you reach the mouth, and takes the opening blow — <b>${r.rouse}</b> damage.`, 'bad');
+  }
   if (r.loseReserve) S.loseReserve = r.loseReserve;
   if (r.poison > 0) S.poison = r.poison;
   S.damageEl = null;   // dead since soak doubling was cut 2026-07-26; kept in the schema for old saves
-  if (r.timePenalty > 0) {
-    if (r.type === 'fight') log(`Hazards: ${r.timePenalty} Time Penalt${r.timePenalty === 1 ? 'y' : 'ies'} (early/combat damage suffered)`, 'bad');
-    const fromDeck = Math.min(r.timePenalty, S.deck.length);
-    const burned = S.deck.splice(0, fromDeck);
-    if (fromDeck > 0) {
-      S.discard.push(...burned);
-      log(`Time Penalty: discarded ${fromDeck} from top of deck (${burned.map(c => c.def.name).join(', ')})`, 'bad');
-    }
-    const overflow = r.timePenalty - fromDeck;
-    if (overflow > 0) {
-      damage += overflow;
-      log(`Deck is empty — remaining Time Penalty ${overflow} becomes damage`, 'bad');
-    }
+  // ⏳ TIME PENALTY = STOPS WITHOUT SHARPENING (2026-08-22). It used to move cards deck → discard,
+  // and the MAP DELETED THE CURRENCY THAT COST WAS DENOMINATED IN: nothing ends a region any more,
+  // band boundaries reshuffle everything back, and running dry reshuffles and continues. Measured:
+  // it landed on 19% of turns, burned 6.4 cards a run, and cost **0.11 points of damage** — the
+  // third phantom cost this project has found, and it was announced on the panel as a threat.
+  //
+  // 🔑 Thomas named the feel he wanted from the old rule: *"you have to end a region short and may
+  // not get to upgrade as much as you wanted."* **The consequence he named IS the mechanic now** —
+  // no cards are destroyed (*"trashed sounds pretty rough"*), you simply arrive too late to trade.
+  //
+  // ⚠️ A COUNTDOWN, NOT A METER, AND THE DISTINCTION IS THE WHOLE REASON HE REJECTED THE FIRST
+  // VERSION: *"i don't like that it has to fill up, kinda unintuitive."* A meter separates the cause
+  // from the cost — fail a journey now, lose a shop three turns later, against a threshold you had
+  // to learn. **A countdown puts the cause and the cost in the same event, and the number printed on
+  // the encounter says exactly how long it lasts.** Same fault the press-your-luck sneak was cut for.
+  //
+  // ✅ And it finally makes the NUMBER mean something: `Time Penalty 3` was identical to `2` while
+  // both did nothing. It also restores the second thing that separates a journey from a fight —
+  // a failed fight costs cards NOW, a failed journey costs GROWTH.
+  if (r.timePenalty > 0 && hasArmourRule('surefooted')) log(`🛡️ Quickstep Greaves — you ignore the Time Penalty.`, 'good');
+  else if (r.timePenalty > 0) {
+    S.delayed = (S.delayed || 0) + Math.max(1, Math.round(r.timePenalty * TIME_PENALTY_MULT));
+    log(`⏳ Time Penalty ${r.timePenalty} — the road ran long. No sharpening for your next ` +
+        `${S.delayed} encounter${S.delayed === 1 ? '' : 's'}.`, 'bad');
   }
   // ❌ the 🛡️ armour aim was CUT 2026-08-12 (chosen 2.3% of the time, and the one target the
   // candle cannot inform) — its absorption branch goes with it, in the same commit as the rule.
+  // ● THE STREAK, SETTLED HERE AND NOWHERE ELSE — because "untouched" is not knowable until every
+  // source of damage has been totalled. ⚠️ It must sit BELOW the Time Penalty block: that burns
+  // cards straight off the deck without ever passing through `damage`, and a turn that cost you
+  // cards is a turn that touched you whatever the variable is called.
+  tickMomentum(damage, r);
   S.damage = damage;
-  if (damage > 0) { log(`Damage to soak: ${damage}`, 'bad'); startSoak(); }
+  if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
   else startUpgrade();
+}
+
+// ============================================================
+// 🛡️ ARMOUR — the loadout you bring, spec in `08_Ideas/Armour_And_The_Workshop.md`.
+//
+// 🔑 IT IS THE ANSWER TO THE BUILD-DISCOVERY GAP, and it pays that debt without spending the
+// pillar: the 16 cards stay fixed, the deck still starts at 32 levels, nothing is acquired
+// mid-run. What changes is *what you walked in wearing* — a layer OUTSIDE the deck.
+//
+// 🔴 THE LOAD-BEARING RULE: ARMOUR IS ARMOUR. Its job is to take a hit your DECK would otherwise
+// take. Abilities are garnish. A piece whose effect is a number that is always on is the wrong
+// piece — four permanent passives is a difficulty curve that inverts the longer you play.
+// ✅ ENFORCED BY CONSTRUCTION IN V1: every ability triggers ON BLOCK (`onBlock`). There is no
+// field for an always-on effect, so a vertical piece cannot be written.
+//
+// 🔴 AND THE REASON IT MAY EXIST AT ALL: it is the first thing in the game that adds health from
+// OUTSIDE the deck. That is acceptable ONLY because it breaks. Deck-as-health dies the day a
+// piece stops running out. Every piece has `wear`, and the field row prints it as pips.
+//
+// 📦 PORT: `onBlock` is a STRING KEY dispatched by one named helper, deliberately NOT an arrow
+// function — this table is pure data and can move to data/*.json whole. Keep it that way.
+// ============================================================
+// ⚠️ THE PER-SLOT `job` LINE IS GONE FROM THE SCREEN (Thomas, 2026-08-25: *"lets remove the
+// text about, what you can see, what you can take. lets keep that hidden from players. lets not
+// limit our gear to it, lets use it as a guideline but not 100%"*).
+// 🔑 IT WAS A DESIGN NOTE WEARING A UI LABEL. *Head = what you can see* is an authoring heuristic
+// that kept the four zones from collapsing into four copies of "+block" - useful to write against,
+// and **a promise the moment it is printed.** Printed, it says every Head piece is about
+// information, so the first Head piece that is not reads as a mistake rather than as variety.
+// 🔑 SAME FAULT AS THE `arch` CHARM GATE, WHICH WAS DELETED FOR IT: FORCE/SPARK/FLOW/WARD is an
+// authoring tool printed nowhere, and the moment a rule NAMED it, the rule was doing invisible
+// arithmetic. Here it is the inverse - the heuristic was VISIBLE and therefore binding. Either way
+// the rule is the same: **an authoring heuristic and a player-facing promise are different
+// objects, and one must never be shipped as the other.**
+// ✅ The themes survive as a guideline in the comments over ARMOUR, where they belong.
+const ARMOUR_SLOTS = {
+  Head:  { icon: '🪖', label: 'Head' },
+  Chest: { icon: '🥋', label: 'Chest' },
+  Arms:  { icon: '🧤', label: 'Arms' },
+  Legs:  { icon: '👢', label: 'Legs' },
+};
+// how many slots you may fill. ⚠️ Thomas's call 2026-08-23: START AT TWO, earn the other two.
+// ⚠️ 2 → 4 (2026-08-23). This REVERSES the earlier *"let the armor start off with 2"*, and the
+// reason is his own later, more specific instruction: *"you start off with this full set"* — plus
+// a mockup drawn with four open zones, not two and two locks.
+// 🔴 AND THE LOCKS COULD NOT BE OPENED. Nothing in the game unlocks a slot; there is no
+// mechanism, so a new player met two zones marked 🔒 with no way to ever reach them. **A locked
+// thing you can see is a goal only if it can be won** — otherwise it is a button that lies, which
+// is the exact thing the Collection screen was written to avoid.
+// 📏 Measured, and it is why this is safe: the full set at block 1 takes 22-28% of blows and
+// moves the duel by +2. Wearing four is a bigger TEACHING surface at almost no power.
+// ✅ Slot count remains available as a progression later — it is just not one today, and pretending
+// otherwise cost nothing but honesty.
+let ARMOUR_SLOTS_OPEN = 4;
+// 🛡️ HOW MANY PIECES YOU WEAR. ⚠️ Kept as a function even though it now just reads the constant,
+// because every call site was already converted and a slot count is exactly the sort of thing that
+// wants a rule again later — but if it does, that rule belongs to the WORKSHOP and its materials,
+// not to the account ladder (Thomas, 2026-08-23).
+function armourSlotsOpen() { return ARMOUR_SLOTS_OPEN; }
+
+// 🔑 A PIECE HAS ONE NUMBER, AND TWO KINDS (Thomas, 2026-08-23):
+//   *"worn 2, blocks for 2, and then doesn't block for anything anymore."*
+//   *"shatter should still be there, basic armor pieces will just block once, and disappear.
+//    worn will atleast stick around if the armor has an ongoing ability, or an ability that could
+//    be used once every encounter."*
+//
+//     💥 SHATTER — blocks once, then it is GONE from the board. The basic piece.
+//     🩹 WORN    — blocks once, but STAYS, because it is still doing something.
+//
+// ⚠️ I had invented a second number (a block VALUE plus a separate USES count) and it made the
+// rule need a sentence: *"turns 4, then 4, then nothing"*. It needs one number.
+//   🛡️ Kilnplate — blocks 2. Once. Then it is gone.
+// ✅ *Rules text states the rule and nothing else* applies to a rule's SHAPE, not only its wording.
+// If it takes a sentence to say, the shape is wrong.
+//
+// 🔑 WORN HAS TO EARN ITS NAME. A piece that stays on the board with nothing left to do is
+// clutter, so `brk: 'worn'` is only legal alongside ONE of:
+//     • `ongoing`  — a rule that is live while you wear it
+//     • `every: 'encounter'` — its block comes back at every encounter
+//     • `uses` + `use` — charges of an activated ability
+//
+// ⚠️ `ongoing` IS THE ONE DANGEROUS FIELD, because it is the always-on effect this system spent
+// three revisions avoiding. It is allowed, under the bar already written for CHARMS and for the
+// same reason: 🔴 AN ONGOING ABILITY MUST CHANGE A RULE, NEVER ADD A NUMBER. *"Your candle is not
+// snuffed by a Narrow"* is a rule. *"+2 to your strike"* is power creep with a slot on it.
+//
+// ⚠️ BLOCK CAPS AT 2 FOR NOW — 3 is late gear (stage-4 tier), so the ceiling has somewhere to go.
+// 🛡️ And a piece may block nothing at all (`block: 0`): those are pure ability pieces.
+const ARMOUR = [
+  // ⚪ THE ADVENTURER'S SET — the gear you start in (2026-08-23, Thomas: *"name it like
+  // adventurer's hood, adventurer's tunic, gloves, and pants. you know like how an RPG would name
+  // their gear. it should have no abilities on it, it just blocks 1 each. and you start off with
+  // this full set"*).
+  // 🔑 IT REPLACES THE FOUR PLAIN COMMONS RATHER THAN JOINING THEM. Those four (Wayfarer's Hood,
+  // Kilnplate, Slagiron Vambrace, Roadworn Boots) were identical to each other except for the zone
+  // and to this set except for the name — filler nobody would ever wear once they owned anything
+  // else. Deleting them means **every craftable piece now has an ability**, which is a much
+  // cleaner ladder: you start in plain cloth and everything you forge DOES something.
+  // ⚠️ Blocks 1, no ability, no recipe. It is a teaching object: visible on one blow in seven and
+  // worth under a point of win rate. The lesson is the CHOICE, never the number.
+  { id: 'a_hood',   slot: 'Head',  name: "Adventurer's Hood",   block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_tunic',  slot: 'Chest', name: "Adventurer's Tunic",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_gloves', slot: 'Arms',  name: "Adventurer's Gloves", block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  { id: 'a_pants',  slot: 'Legs',  name: "Adventurer's Pants",  block: 1, brk: 'shatter', rarity: 'common', starter: true },
+  // ⚠️ THE ZONE THEMES BELOW ARE A GUIDELINE, NOT A RULE (Thomas, 2026-08-25: *"lets use it as a
+  // guideline but not 100%"*). They exist so four zones do not collapse into four copies of
+  // "+block", and they are the first thing to try when writing a new piece — but a piece that
+  // wants to break its zone is allowed to, and that is why the theme is no longer PRINTED.
+  // 🔑 A guideline you can depart from is a design tool; the same sentence on screen is a promise
+  // the next piece has to keep.
+  // 🕶️ HEAD — usually information. The candle's slot.
+  { id: 'visor',   slot: 'Head',  name: 'Emberglass Visor',   block: 2, brk: 'shatter', rarity: 'uncommon',
+    onBlock: 'relight', text: 'When it blocks, relight your candle.' },
+  { id: 'circlet', slot: 'Head',  name: "Farseer's Circlet",  block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'steadyflame', text: 'Your candle is not snuffed by a Narrow.' },
+  // 🧥 CHEST — usually what you can afford to lose.
+  { id: 'tithe',   slot: 'Chest', name: 'Tithe Harness',      block: 2, brk: 'shatter', rarity: 'uncommon',
+    onBlock: 'coins', text: 'When it blocks, gain 3 coins.' },
+  // 🟠 the one piece that measured as a different category of power, now labelled as one
+  { id: 'cuirass', slot: 'Chest', name: 'Anvil Cuirass',      block: 2, brk: 'worn', rarity: 'legendary',
+    every: 'encounter', text: 'It blocks again every encounter.' },
+  // 🧤 ARMS — usually the blow.
+  { id: 'bracers', slot: 'Arms',  name: 'Cinderfist Bracers', block: 2, brk: 'shatter', rarity: 'uncommon',
+    onBlock: 'strike', text: 'When it blocks, your next strike gets +4.' },
+  { id: 'wraps',   slot: 'Arms',  name: 'Emberfist Wraps',    block: 0, brk: 'worn', rarity: 'rare',
+    uses: 1, use: 'burst', text: 'Once a run: your strike gets +8 this turn.' },
+  // 🎯 The third home for granted multi-hit. ⚠️ On the ARMS zone because that is *usually the
+  // blow* - a guideline, not a rule, and this one keeps it.
+  // 🔴 IT SHIPPED AS `onBlock` AND THOMAS KILLED IT THE SAME HOUR: *"you get it on your next
+  // strike if you block? you wouldn't ever know."* He is right, and it is sharper than my own note
+  // that the timing was merely unchosen. 🔑 **THE SPLIT WOULD HAVE LANDED ON A DIFFERENT TURN FROM
+  // THE ONE THAT EARNED IT** - you cannot plan around a bonus you did not ask for, arriving after
+  // the decision it was supposed to inform. An `onBlock` that pays THIS turn (relight, +4 strike)
+  // is a reward; one that pays NEXT turn is a surprise, and a surprise fights *legible math always*.
+  // ✅ An active use fixes it completely, and it is the same fix the potion already embodies:
+  // **a lateral effect must be OPTIONAL, and the cheapest way to make it optional is to let the
+  // player press it.** Modelled on 🔥 Emberfist Wraps, the piece directly above.
+  { id: 'twinned', slot: 'Arms',  name: 'Twinned Bracers',    block: 0, brk: 'worn', rarity: 'rare',
+    uses: 1, use: 'split', text: 'Once a run: your strike splits in two this turn — better into 🧱 Guard, worse into 🛡️ Armour.' },
+
+  // ============================================================
+  // 🏹 NINE PIECES FOR THE NINE UNUSED QUARRIES (2026-08-27).
+  // 🔴 MEASURED: 7 of 16 quarries had a recipe. The other NINE dropped a signature part that
+  // **nothing in the game wanted** — it landed in the Stash and sat there forever. The quarry system
+  // exists to turn *"66 interchangeable stat blocks"* into *"50 fodder and 16 you remember"*, and
+  // nine of the sixteen were memorable creatures whose trophy was inert.
+  // ⚠️ AND ROAD 4 WAS THE THINNEST — one recipe of four, which is backwards: the hardest road had
+  // the least to earn from it. Three of these are Fathom quarries for exactly that reason.
+  // ⚠️ SLOTS WERE LOPSIDED TOO: Arms had 3 deep-hunt pieces, Head and Chest had 1 each. **Arms
+  // gets none of these**; Head, Chest and Legs get three apiece.
+  // 🔑 EVERY ONE CHANGES A RULE RATHER THAN A NUMBER — the charm pass measured rule-changers at the
+  // top of the value table and flat numbers at the bottom, and a hardcore TCG player reads filler
+  // instantly. ⚠️ And each names something the player can SEE: the candle, Initiative, a card's
+  // level, Nightfall, coins.
+
+  // 🕯️ HEAD — information
+  { id: 'dawncap',  slot: 'Head',  name: 'Dawnwatch Cap',      block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'dawnlit', text: 'Your 🕯️ candle is lit again at the start of every region.' },
+  { id: 'farhood',  slot: 'Head',  name: "Gorsewarden's Hood", block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'farsight', text: 'While your 🕯️ candle is lit, your 💨 Initiative is +2.' },
+  { id: 'deepglass', slot: 'Head', name: 'Deepglass Crown',    block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'everlit', text: 'Your 🕯️ candle never goes out.' },
+
+  // 🧥 CHEST — what you can afford to lose
+  { id: 'boarcoat', slot: 'Chest', name: 'Boarhide Coat',      block: 1, brk: 'worn', rarity: 'rare',
+    ongoing: 'softfall', text: 'A <b>Lv1</b> card that blocks is not destroyed — it goes to your discard instead.' },
+  { id: 'oxharness', slot: 'Chest', name: "Fen Ox Harness",    block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'ledger', text: 'When a card is destroyed, gain 🪙 <b>8 coins</b>.' },
+  { id: 'siltplate', slot: 'Chest', name: 'Siltcrawler Plate', block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'tidewall', text: 'Damage is <b>1 less</b> for every card you have already blocked with this encounter.' },
+
+  // 🎭 CLASS GEAR — two per class, and NOT on Arms (2026-08-27).
+  // ⚠️ There were only TWO class pieces in the game, ✦ Emberwake Band and 🗡️ Fangcord, and both
+  // were Arms, both legendary, both once-a-run actives. So a class's identity showed up in exactly
+  // one slot, at the far end of the hunt, in the one form the bot could not even measure.
+  // 🔑 EACH OF THESE KEYS OFF THE CLASS'S OWN RULE rather than a generic stat — the mage's is
+  // pairing and 🔥 the Emberwake, the rogue's is ● Momentum. That is the class seam expressed in
+  // equipment: the ENGINE owns the slot, the CLASS owns what fills it.
+  { id: 'wakecowl',  slot: 'Chest', name: 'Emberwake Cowl',   block: 2, brk: 'worn', rarity: 'rare', cls: 'mage',
+    ongoing: 'wakeguard', text: '🔥 While you hold an Emberwake, every card <b>blocks +2</b>.' },
+  { id: 'slowwick',  slot: 'Legs',  name: 'Slowwick Treads',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'mage',
+    ongoing: 'wakekeep', text: '🔥 Your Emberwake <b>does not expire</b> — it keeps until you spend it.' },
+  { id: 'bloodcord', slot: 'Chest', name: 'Bloodcord Vest',   block: 2, brk: 'worn', rarity: 'rare', cls: 'rogue',
+    ongoing: 'bloodpip', text: '● The <b>first card you block with</b> each encounter gains you a <b>pip</b>.' },
+  { id: 'quietstep', slot: 'Legs',  name: 'Quietstep Boots',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'rogue',
+    ongoing: 'steadymo', text: '● A <b>Narrow</b> costs you <b>one pip</b> instead of breaking your Momentum.' },
+
+  // 👢 LEGS — speed
+  { id: 'toadboots', slot: 'Legs', name: 'Anvil Toad Boots',   block: 1, brk: 'worn', rarity: 'rare',
+    uses: 1, use: 'firstlight', text: 'Once a run: you <b>win Initiative</b> this turn, whatever it is.' },
+  { id: 'grindshin', slot: 'Legs', name: 'Grindtooth Shins',   block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'nightwise', text: '🌙 Nightfall no longer takes your <b>Arsenal</b>.' },
+  { id: 'lanterngreave', slot: 'Legs', name: 'Lanternjaw Greaves', block: 2, brk: 'worn', rarity: 'legendary',
+    ongoing: 'swiftfoot', text: '🌙 Your <b>Pace</b> uses your <b>fastest card</b>, not your {slot:Element}.' },
+  // 🎭 THE FIRST CLASS ARMOUR. Both are Thomas's, both live in ARMS because both spend the class's
+  // own power source into the strike — which is exactly what that zone is for.
+  // 🔑 A CLASS PIECE MAY NAME THE CLASS'S RULE; a generic piece may not. Same seam as the charms
+  // and the grade: the ENGINE owns the slot, the CLASS owns the noun.
+  { id: 'wakeband', slot: 'Arms', name: 'Emberwake Band',     block: 0, brk: 'worn', rarity: 'legendary',
+    cls: 'mage', uses: 1, use: 'twinflame', consume: true,
+    text: 'Break it: this turn, what you channel is DOUBLED.' },
+  { id: 'fangcord', slot: 'Arms', name: 'Fangcord',           block: 0, brk: 'worn', rarity: 'legendary',
+    cls: 'rogue', uses: 1, use: 'quicken', consume: true,
+    text: 'Break it: your ● Momentum fills to full.' },
+  // 👞 LEGS — tempo.
+  { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter', rarity: 'uncommon',
+    onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
+  { id: 'greaves', slot: 'Legs',  name: 'Quickstep Greaves',  block: 2, brk: 'worn', rarity: 'rare',
+    ongoing: 'surefooted', text: 'You ignore Time Penalties.' },
+  // 🔋 A PIECE THAT REWARDS NOT NEEDING IT (Thomas). It is the first armour with a TIMER, which
+  // [[Board_State_And_Tokens]] specced and nothing had ever planted. ⚠️ Its payoff is a NUMBER,
+  // which this system otherwise bans — legal only because it is bounded to once per five
+  // encounters, which makes it potion-shaped rather than a passive.
+  // ⚠️ +6, not the +2 first suggested: five encounters is half a run, and a reward you wait half a
+  // run for has to be worth a turn's whole plan or the timer is just a wait.
+  { id: 'longkiln', slot: 'Legs', name: 'Slowburn Plate',      block: 0, brk: 'worn', rarity: 'legendary',
+    charge: 5, use: 'discharge',
+    text: 'Gains a mark each encounter. At 5, spend it for +6 strike or +6 Initiative.' },
+];
+// ⚒️ RECIPES — priced against the MEASURED drop rates, not by feel:
+//   🦴 Bone Shard 7.2/run · 🪶 Windquill 1.2 · 🪨 Slagplate 0.6 · 🔩 Prime Sinew 0.4 · 🧱 Wardhide 0.1
+//   🏆 a given great beast ~0.7/run when you go to its region · 🔆 Emberheart 0.1 · 💰 ~147 gold/run
+//
+// 🔑 THE TIERS ARE THE POWER CURVE MEASURED ON 2026-08-23: two 💥 shatter pieces moved the ladder
+// by +3/+0, two 🩹 worn pieces by +13/+24. So SHATTER IS CHEAP AND WORN IS THE HUNT — a worn piece
+// costs a named part from a specific region, which is the whole reason to go there.
+// ⚠️ RECIPE COST IS THE BALANCE DIAL, NOT BLOCK VALUE. Everything blocks 2; what a recipe buys is
+// PERSISTENCE, and persistence is what the measurement says is expensive.
+const RECIPE = {
+  // 💥 basic — one run's worth. The gear you have while you are still learning the road.
+  // ⚪ the four commons have NO recipe — you start with them. ⚠️ Deleted rather than left as
+  // unreachable prices: a cost you can never pay is dead data pretending to be a goal.
+  // 💥 with an ability — two or three runs, and it names a SHAPE, so the candle points at it
+  visor:    { mats: { shard: 14, quill: 2 } },
+  tithe:    { mats: { shard: 14, slag: 2 } },
+  bracers:  { mats: { shard: 14, slag: 2 } },
+  sandals:  { mats: { shard: 14, quill: 2 } },
+  // 🩹 worn — the hunt. Each names ONE great beast, so each is a reason to go somewhere.
+  circlet:  { mats: { shard: 20, quill: 3, 'p:Stormcrown Roc': 1 } },
+  // 🎯 a rare ARMS piece needs a rare hunt. ⚠️ Priced beside the other rares rather than cheap:
+  // granting a hit is the only `onBlock` in the game that changes the SHAPE of a blow instead of
+  // its size, and shape is the scarcer thing.
+  twinned:  { mats: { shard: 20, slag: 3 } },
+  // ⚠️ ALL NINE ARE RARE OR LEGENDARY, AND THAT IS A RULE NOW: **if a piece is gated on a named
+  // creature, it IS a rare.** Three of these shipped as `uncommon` for about ten minutes, and the
+  // economy probe caught it immediately - an uncommon measured at **40 runs**, because a quarry
+  // gate is a rare's cost whatever the label says.
+  // 🔑 THE TIERS MEAN SOMETHING NOW: uncommon = shards and shape parts, countable and cheap;
+  // rare and legendary = one named creature, which is the thing you go hunting for. **The rarity
+  // label follows the gate rather than fighting it.**
+  // 🏹 the nine — costed against the MEASURED rates (8.7 shard, 1.4 quill, 0.6 slag, 0.6 sinew,
+  // 0.2 hide a run), so the shard half lands inside the target band and the quarry part is the
+  // thing you actually go looking for. ⚠️ Hide is the scarcest at 0.22 a run: never ask for more
+  // than 2 of it.
+  // 🎭 class gear — priced as its tier, and gated on shape parts rather than a quarry so a class
+  // can actually reach its own identity without waiting on one named creature.
+  wakecowl:  { mats: { shard: 18, slag: 3 } },
+  slowwick:  { mats: { shard: 24, quill: 3, sinew: 2 } },
+  bloodcord: { mats: { shard: 18, quill: 3 } },
+  quietstep: { mats: { shard: 24, slag: 3, sinew: 2 } },
+  dawncap:   { mats: { shard: 14, 'p:Cairnstag': 1 } },
+  boarcoat:  { mats: { shard: 14, 'p:Ashen Boar': 1 } },
+  toadboots: { mats: { shard: 16, quill: 2, 'p:Anvil Toad': 1 } },
+  farhood:   { mats: { shard: 20, quill: 3, 'p:Gorse Lurcher': 1 } },
+  oxharness: { mats: { shard: 20, slag: 2, 'p:Fen Ox': 1 } },
+  grindshin: { mats: { shard: 20, hide: 1, 'p:Grindtooth': 1 } },
+  deepglass: { mats: { shard: 26, quill: 4, sinew: 2, 'p:Shoal Drifter': 1 } },
+  siltplate: { mats: { shard: 26, hide: 2, sinew: 2, 'p:Silt Crawler': 1 } },
+  lanterngreave: { mats: { shard: 26, quill: 4, sinew: 3, 'p:Lanternjaw': 1 } },
+  cuirass:  { mats: { shard: 24, slag: 4, sinew: 2, 'p:Pressureback': 1 } },
+  greaves:  { mats: { shard: 20, hide: 1, 'p:Scarp Ram': 1 } },
+  wraps:    { mats: { shard: 18, sinew: 2, 'p:Cinderjaw': 1 } },
+  // 🟠 legendary — each names a great beast AND wants the rarest thing in the game
+  wakeband: { mats: { shard: 26, heart: 1, 'p:Basalt Basilisk': 1 } },
+  fangcord: { mats: { shard: 26, heart: 1, 'p:Mirewyrm Elder': 1 } },
+  longkiln: { mats: { shard: 30, hide: 2, sinew: 3, 'p:Deepdelver': 1 } },
+};
+// 🔨 BREAKING DOWN — the release valve, and it pays in the same material every recipe eats.
+// 🔑 Monster Hunter needs one for the same reason we do: you will always own piles of things no
+// recipe names. Junk you can break down is a consolation; junk you cannot is a longer list.
+// ⚠️ It is BREAKING DOWN, not SELLING — there is no merchant in a workshop, and "sell" was the
+// last word left implying a second economy.
+const BREAK_INTO = { shape: 3, elite: 5, signature: 8, rare: 20, dragon: 10 };
+const breakValue = id => { const d = matDef(id); return d && d.tier !== 'common' ? (BREAK_INTO[d.tier] || 0) : 0; };
+
+// ⚒️ can this be made right now, and if not, WHAT is missing? ⚠️ Returns the shortfall rather than
+// a boolean — *a picker must never offer what it cannot act on*, and "you need 2 more Windquill"
+// is the difference between a disabled button and a disabled button that teaches.
+function craftCheck(pieceId) {
+  const r = RECIPE[pieceId]; if (!r) return { ok: false, missing: ['no recipe'] };
+  const st = loadStash();
+  const missing = [];
+  for (const m in r.mats) {
+    const have = st.mats[m] || 0;
+    if (have < r.mats[m]) missing.push(`${matDef(m).icon} ${r.mats[m] - have} more ${matDef(m).name}`);
+  }
+  return { ok: !missing.length, missing };
+}
+// ⚒️ WHAT THE NEXT STEP COSTS AND WHETHER YOU CAN PAY — shaped like craftCheck() on purpose:
+// it returns the SHORTFALL, because *"you need 2 more Prime Sinew"* is the difference between a
+// disabled button and a disabled button that teaches.
+function upCheck(pieceId) {
+  const d = armourDef(pieceId); const st = loadStash();
+  if (!d || d.starter) return { ok: false, missing: ['cannot be upgraded'], step: 0 };
+  if (!st.owned.includes(pieceId)) return { ok: false, missing: ['not forged'], step: 0 };
+  const step = ((st.up || {})[pieceId] || 0) + 1;
+  if (step > ARMOUR_UP_MAX) return { ok: false, missing: ['fully upgraded'], step: 0 };
+  const cost = ARMOUR_UP_COST[step - 1] || {};
+  const missing = [];
+  for (const m in cost) {
+    const have = st.mats[m] || 0;
+    if (have < cost[m]) missing.push(`${matDef(m).icon} ${cost[m] - have} more ${matDef(m).name}`);
+  }
+  return { ok: !missing.length, missing, step, cost };
+}
+function upgradePiece(pieceId) {
+  const chk = upCheck(pieceId); if (!chk.ok) return;
+  const st = loadStash();
+  for (const m in chk.cost) st.mats[m] -= chk.cost[m];
+  st.up = st.up || {}; st.up[pieceId] = chk.step;
+  saveStash(st);
+  render();
+}
+// ✍️ what a given step gives THIS piece, in words. 🔑 Derived from upEffects() rather than typed
+// out beside it, so the sentence cannot describe a rule the code does not apply.
+function upGrantText(d, step) {
+  const before = upEffects(d, step - 1), after = upEffects(d, step);
+  const parts = [];
+  if (after.wear > before.wear) parts.push(`turns aside <b>one more blow</b>`);
+  if (after.block > before.block) parts.push(`<b>+1 block</b>`);
+  if (after.uses > before.uses) parts.push(`<b>one more use</b>`);
+  if (after.charge < before.charge) parts.push(`<b>charges a beat sooner</b>`);
+  if (after.power > before.power) {
+    const key = ARMOUR_POWER[d.use] ? d.use : d.onBlock;
+    parts.push(`its ability grows to <b>${Math.ceil(ARMOUR_POWER[key] * after.power)}</b>`);
+  }
+  return parts.join(' · ') || 'nothing';
+}
+function craftPiece(pieceId) {
+  const r = RECIPE[pieceId]; if (!r || !craftCheck(pieceId).ok) return;
+  const st = loadStash();
+  if (st.owned.includes(pieceId)) return;      // one of each, for now
+  for (const m in r.mats) st.mats[m] -= r.mats[m];
+  st.owned.push(pieceId);
+  saveStash(st);
+  render();
+}
+function breakMat(id) {
+  const st = loadStash();
+  const worth = breakValue(id);
+  if (!(st.mats[id] > 0) || worth <= 0) return;
+  st.mats[id]--; st.mats.shard = (st.mats.shard || 0) + worth;
+  saveStash(st);
+  render();
+}
+// 🛡️ THE LOADOUT — what you walk in wearing. ⚠️ It lives in the STASH, not the run: it is chosen
+// between runs and survives them, which is the whole point of a loadout.
+function loadoutIds() {
+  const st = loadStash();
+  return (st.loadout || []).filter(id => armourDef(id) && armourFitsClass(armourDef(id)) && st.owned.includes(id)).slice(0, armourSlotsOpen());
+}
+// ⚠️ ONE PIECE PER SLOT. Equipping a Chest piece replaces the Chest piece you had, never the
+// Head one — the four zones are the whole reason the system has zones.
+function equipPiece(id) {
+  const d = armourDef(id); if (!d || !armourFitsClass(d)) return;
+  const st = loadStash();
+  if (!st.owned.includes(id)) return;
+  let cur = (st.loadout || []).filter(x => armourDef(x) && armourDef(x).slot !== d.slot && x !== id);
+  cur.push(id);
+  st.loadout = cur.slice(-ARMOUR_SLOTS_OPEN);
+  saveStash(st);
+  render();
+}
+function unequipPiece(id) {
+  const st = loadStash();
+  st.loadout = (st.loadout || []).filter(x => x !== id);
+  saveStash(st);
+  render();
+}
+
+const armourDef = id => ARMOUR.find(a => a.id === id) || null;
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW (2026-08-25). A top-level const is LEXICAL:
+// it never lands on the headless sandbox, so no instrument can build a piece to test one.
+// 🔑 That binding rule has now cost five probes in a single day — including one that reported a
+// variant as BIT-IDENTICAL to baseline, because overriding a const arrow is a silent no-op and
+// a silent no-op looks exactly like "no effect". **Prefer a function declaration for anything
+// an instrument might reasonably want to call.**
+// ============================================================
+// ⚒️ THE +N LADDER (2026-08-28) — spec in `08_Ideas/Equipment_Upgrades.md`
+//
+// 🔴 AND THAT SPEC'S §5 WAS WRONG, IN A WAY WORTH KEEPING ON RECORD. It said step +1 is
+// `shatter → worn`, and it argued for building 🩹 worn as a DECAY — *blocks 3, then 2, then 1*
+// — on the strength of a comment that used to sit on armourBlock(). ⚠️ **That comment was a
+// leftover of a shape Thomas had ALREADY REJECTED** (2026-08-23: *"i had invented a second number
+// and it made the rule need a sentence… it needs one number"*), so it described an ABANDONED
+// rule, not an unbuilt one.
+// 🔑 **I TREATED AN UNKEPT PROMISE AS A SPECIFICATION** — the identical mistake as the armour
+// SLOT gate, where `workshopHTML()` had advertised *"two more to earn"* for months and I read an
+// available gate as a correct one. **The fix for a stale comment is to DELETE it.**
+//
+// 🔑 AND THE TWO THINGS WERE NEVER THE SAME FIELD:
+//     `brk`  — what happens when a piece RUNS OUT.  💥 shatter → gone · 🩹 worn → it stays.
+//     `wear` — HOW MANY BLOWS it turns aside.       Hardcoded to 1 since the day it was written.
+//   Decay conflated them. **The ladder raises `wear`; `brk` keeps meaning exactly what he said it
+//   means.** ✅ It is also the axis the measurement already picked: `dev/armour-axis.js` had ×2
+//   USES beating ×2 POINTS on every column, and uses is the only one that moves the number that
+//   was actually wrong — *pieces able to block at the lair*, on record at **0.03**.
+//
+// ✅ AND IT MAKES `shatter → worn` FALL OUT FOR FREE INSTEAD OF COSTING A STEP. A piece holding
+// two blows MUST survive the first, so it stays on the board until `wear` hits 0 and only then
+// does `brk` decide. Strictly better than the spec's +1, which would have done nothing at all for
+// an `onBlock`-only piece and nothing whatsoever for a piece with no ability — 🔑 *a ladder whose
+// first rung is worth nothing on some pieces is not a ladder.*
+//
+// ⚠️ THE CEILING FROM §3 SURVIVES, AND IT IS WHY THIS VERTICAL AXIS IS SAFE: four pieces × a small
+// integer of blows is still a HARD CAP on what one run can absorb. **A pool scales continuously; a
+// consumable scales to a cap.** ❌ **Never let an upgrade grant a REFRESH** — that is the health
+// bar Thomas rejected, arriving through the back door under a different word.
+// ============================================================
+let ARMOUR_UP_MAX = 3;
+// ⚠️ START EXPENSIVE, TUNE DOWN. Card levels are on record as *hypersensitive past 3/5/7* and
+// this economy as *very sensitive*. 🦴 shards run 8.7 a run and 🔩 Prime Sinew 0.60, so +3 on one
+// piece is ~15 runs and a fully upgraded set is a long horizon — which is the point: this is the
+// sink that stops materials meaning nothing the moment the set is forged.
+// 🔑 Sinew is in it deliberately: [[Drop_Economy]] measured that **the shard cost binds almost
+// nothing**, so a shard-only ladder would be a timer rather than a hunt.
+let ARMOUR_UP_COST = [{ shard: 20 }, { shard: 35, sinew: 2 }, { shard: 55, sinew: 4 }];
+// 🔬 THE INSTRUMENT'S PIN. RUNSIM builds its loadout from the PLAYER'S stash, so without this a
+// sweep measures whatever Thomas happens to have forged that week. ⚠️ -1 means "read the real
+// stash"; anything ≥0 pins every piece to that step. Same lesson as XP_LEVEL_FORCE: **an
+// instrument that reads the player's progress is not an instrument.**
+// ⚠️ PRE-EXISTING AND NOT FIXED HERE: which pieces the bot WEARS is still whatever is equipped.
+let ARMOUR_UP_FORCE = -1;
+
+// 💪 THE EFFECTS THAT CARRY A NUMBER, and therefore the only ones step +2 can grow. Everything
+// else is a RULE — and the standing bar is *an ability must change a rule, never add a number* —
+// so a rule piece takes durability instead.
+// ⚠️ These bases are ALSO what the helpers below apply, so there is ONE number per effect rather
+// than one in this table and a different one three functions away.
+const ARMOUR_POWER = { coins: 3, strike: 4, dash: 5, pace: 3, discharge: 6, burst: 8 };
+
+// 🔑 ONE DEFINITION OF WHAT A STEP GIVES, read by the runtime AND by the Workshop's own text, so
+// the two cannot drift — the same rule that makes the sharpen preview run the real `cardHTML()`.
+function upEffects(d, up) {
+  const e = { wear: 0, block: 0, uses: 0, charge: 0, power: 1 };
+  if (!d || !(up > 0) || d.starter) return e;
+  if (up >= 1) e.wear += 1;
+  if (up >= 2) {
+    // ✦ step 2 is THE ABILITY — but which knob that means depends on what the piece has, so the
+    // Workshop prints the answer per piece instead of making you guess. *A picker must never
+    // offer what it cannot act on.*
+    if (d.charge) e.charge -= 1;                                      // 🔋 it charges a beat sooner
+    else if (d.use && d.uses) e.uses += 1;                            // one more use
+    else if (ARMOUR_POWER[d.use] || ARMOUR_POWER[d.onBlock]) e.power = 1.5;
+    else e.wear += 1;                                                 // a pure rule piece has no number to grow
+  }
+  if (up >= 3) e.block += 1;
+  return e;
+}
+// ⚠️ A `function` DECLARATION, like every other armour helper — a top-level const arrow never
+// lands on the headless sandbox, and overriding one is a SILENT no-op that reads as "no effect".
+function armourUpOf(id) {
+  // ⚪ THE TEACHING SET IS CHECKED FIRST, BEFORE THE PIN. With the order reversed, a measurement
+  // sweep pinned the starter set too — and then it would be measuring a game that cannot exist,
+  // which is the whole failure mode the pin was added to prevent. (upEffects() zeroes a starter
+  // anyway, so nothing was mispriced; what leaked was a "+2" badge on the rail for a piece that
+  // has no ladder.)
+  const d = armourDef(id); if (!d || d.starter) return 0;
+  if (ARMOUR_UP_FORCE >= 0) return ARMOUR_UP_FORCE;
+  return (loadStash().up || {})[id] || 0;
+}
+function newArmour(id) {
+  const d = armourDef(id), up = armourUpOf(id), e = upEffects(d, up);
+  return { id, up, wear: (d.block + e.block > 0 ? 1 + e.wear : 0),
+           uses: Math.max(0, (d.uses || 0) + e.uses), charge: 0 };
+}
+// how many blows this piece can turn aside in total — the pip CAP on the rail, and what an
+// `every: 'encounter'` refresh restores it to.
+function armourMaxWear(a) {
+  const d = armourDef(a.id); if (!d) return 0;
+  const e = upEffects(d, a.up || 0);
+  return d.block + e.block > 0 ? 1 + e.wear : 0;
+}
+// 🔋 how many beats this piece needs to charge, after upgrades
+function armourCharge(a) {
+  const d = armourDef(a.id); if (!d || !d.charge) return 0;
+  return Math.max(1, d.charge + upEffects(d, a.up || 0).charge);
+}
+// 💪 a numeric effect's value for THIS piece
+function armourPow(key, a) {
+  const base = ARMOUR_POWER[key] || 0;
+  if (!a) return base;
+  return Math.ceil(base * upEffects(armourDef(a.id), a.up || 0).power);
+}
+// 🎭 A CLASS PIECE IS ONLY WEARABLE BY ITS CLASS. ⚠️ Checked at the point of WEARING, not only in
+// the Workshop, because the loadout is stored between runs and you can change class between them.
+const armourFitsClass = d => !d || !d.cls || d.cls === CLASS.id;
+// 🔑 EVERY piece you brought, spent or not — a battered plate STAYS ON THE BOARD, because
+// blocking is only one of the things a piece does and you need to see why you have no plate left.
+const armourWorn = () => (S.armour || []);
+// what a piece turns aside RIGHT NOW.
+// ⚠️ THE COMMENT THAT WAS HERE DESCRIBED A DECAY — *"'worn' decays: a Worn 3 Kilnplate blocks 4,
+// then 3, then 2"* — which was never built and was never going to be: it is a leftover of the
+// two-number shape Thomas rejected. It sat above the function that did not implement it for three
+// months and then got quoted into a spec as if it were a plan. **A note that contradicts the rule
+// it sits on is worse than no note, because it is the version that gets quoted.**
+// 🔑 A piece blocks its FULL value every time it blocks. `wear` is how many times it can.
+function armourBlock(a) {
+  const d = armourDef(a.id); if (!d || a.wear <= 0) return 0;
+  return d.block + upEffects(d, a.up || 0).block;
+}
+function armourUsesLeft(a) { const d = armourDef(a.id); return d && d.use ? (a.uses || 0) : 0; }
+function armourEligible() { return armourWorn().filter(a => a.wear > 0 && armourBlock(a) > 0); }
+// 🔴 ONE LOOKUP FOR EVERY ONGOING RULE. Ask it by name at the site the rule is about — never
+// scatter `S.armour.some(...)` through the engine, which is how a rule ends up half-applied.
+function hasArmourRule(key) { return (S.armour || []).some(a => { const d = armourDef(a.id); return d && d.ongoing === key; }); }
+function armourMaxSoak() { return armourEligible().reduce((t, a) => t + armourBlock(a), 0); }
+
+// 🔑 ONE NAMED HELPER, dispatched by a string key — see the port note above. Every ability in the
+// game that fires when a piece blocks passes through here and nowhere else.
+// ⚠️ IT TAKES THE PIECE NOW, NOT ONLY ITS DEF — a +2 piece's numbers are bigger, and a helper
+// that could only see the def would print the printed value while paying the upgraded one.
+// *When a value gains a modifier, find every line that prints the unmodified one.*
+function applyArmourBlock(key, d, a) {
+  const n = armourPow(key, a);
+  if (key === 'relight') { lightCandle(`${d.name} blocks — your candle relights`); }
+  else if (key === 'coins') { S.coins += n; log(`🛡️ ${d.name} — gain ${n} coins. (you now hold ${S.coins})`, 'good'); }
+  else if (key === 'strike') { S.armourStrikePending = (S.armourStrikePending || 0) + n; log(`🛡️ ${d.name} — your next strike gets +${n}.`, 'good'); }
+  else if (key === 'dash') { S.armourPacePending = (S.armourPacePending || 0) + n; log(`🛡️ ${d.name} — your next turn gets +${n} Initiative.`, 'good'); }
+  else if (key === 'pace') { S.armourPacePending = (S.armourPacePending || 0) + n; log(`🛡️ ${d.name} — your next turn gets +${n} Initiative.`, 'good'); }
+}
+
+// 🛡️ THE OTHER HALF: A PIECE YOU USE RATHER THAN ONE THAT TAKES A HIT.
+// 🔑 A TOKEN YOU CAN ACT ON IS THE CONTROL — the same rule that deleted the Emberwake's aim row.
+// No new phase, no new button: the piece sits on the field and you tap it on the turn you want it.
+// ⚠️ Charges are per RUN, not per turn. That is what keeps a 0-block piece from being a passive.
+function armourReady(a) {
+  const d = armourDef(a.id); if (!d || !d.use) return false;
+  return d.charge ? (a.charge || 0) >= armourCharge(a) : armourUsesLeft(a) > 0;
+}
+function useArmour(aid, opt) {
+  const a = (S.armour || []).find(x => x.id === aid);
+  if (!a || !isAssignPhase() || !armourReady(a)) return;
+  const d = armourDef(a.id);
+  if (d.charge) a.charge = 0; else a.uses--;
+  applyArmourUse(d.use, d, opt, a);
+  // 🔨 "Break it" is literal — a consumed piece leaves the board, the way a shattered one does.
+  if (d.consume) S.armour = S.armour.filter(x => x !== a);
+  render();
+}
+function applyArmourUse(key, d, opt, a) {
+  const n = armourPow(key, a);
+  if (key === 'relight') lightCandle(`${d.name} shows you the road ahead`);
+  // 🔋 the battery, spent where this encounter actually needs it
+  else if (key === 'discharge') {
+    if (opt === 'init') { S.armourPace = (S.armourPace || 0) + n; log(`🛡️ ${d.name} — you spend the mark on speed: +${n} Initiative this turn.`, 'good'); }
+    else { S.armourStrike = (S.armourStrike || 0) + n; log(`🛡️ ${d.name} — you spend the mark on the blow: +${n} strike this turn.`, 'good'); }
+  }
+  // 🔥 mage — what you channel this turn is doubled. ⚠️ Read by bankValueOf(), so it lands on the
+  // Surge row, the reveal line and the Emberwake alike; a flag consumed anywhere else would show
+  // one number and pay another.
+  // 🎯 spent on the turn you choose - the whole reason this stopped being an `onBlock`.
+  else if (key === 'firstlight') { S.armourWinInit = true; log(`🛡️ ${d.name} — 💨 you take the initiative this turn, whatever it has.`, 'good'); }
+  else if (key === 'split') { S.splitPending = (S.splitPending || 0) + 1; log(`🛡️ ${d.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
+  else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — what you channel this turn is DOUBLED.`, 'good'); }
+  // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
+  // legendary-sized effect without being a number.
+  else if (key === 'quicken') { S.momentum = MOMENTUM_CAP; log(`🛡️ ${d.name} breaks — ● Momentum fills to ${MOMENTUM_CAP}.`, 'good'); }
+  // ⚠️ LIVE THIS TURN, not pending — you tapped it during assign, so it must land on the strike
+  // you are arranging right now. rollTurnTokens() wipes it at cleanup, which is exactly right.
+  else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + n; log(`🛡️ ${d.name} — your strike gets +${n} this turn.`, 'good'); }
+}
+
+// 🛡️ SOAK WITH A PIECE INSTEAD OF A CARD. ⚠️ INSTEAD, not before — that is the whole point.
+// A buffer that absorbs automatically would just be a bigger health bar; making it a PICK in the
+// same phase turns *which card do I least mind blunting* (a lookup — best plate 5.8 vs an average
+// hit of 4.6, so one card covered 72% of hits) into *break a piece, or blunt a card?*
+function soakWithArmour(aid) {
+  const a = (S.armour || []).find(x => x.id === aid);
+  if (!a || S.damage <= 0) return;
+  const d = armourDef(a.id); const blocked = armourBlock(a);
+  if (!d || blocked <= 0) return;
+  a.wear--;
+  // 🔴 FIXED 2026-08-28: this removed a shatter piece UNCONDITIONALLY, never asking whether
+  // `wear` had actually reached 0. It was harmless for exactly as long as `wear` was hardcoded to
+  // 1 — and the moment the +N ladder let a piece hold two blows, an upgraded shatter piece would
+  // have vanished with a block still on it. 🔑 **A latent bug is one that an unused field is
+  // hiding**, and the ladder's first act was to stop hiding this one.
+  const done = a.wear <= 0;
+  // 💥 the basic piece is GONE from the board, not dimmed. 🩹 a worn one stays, because it is
+  // still doing something — that is the whole difference between the two kinds.
+  if (done && d.brk === 'shatter') S.armour = S.armour.filter(x => x !== a);
+  log(`🛡️ ${d.name} blocks ${blocked}. ` +
+      (!done ? `It holds — ${a.wear} more block${a.wear === 1 ? '' : 's'} left.`
+             : d.brk === 'shatter' ? 'It shatters.' : 'It blocks nothing more this run.'), 'bad');
+  if (d.onBlock) applyArmourBlock(d.onBlock, d, a);
+  S.damage = Math.max(0, S.damage - blocked);
+  if (S.damage <= 0) { log(`All damage blocked.`); exitSoak(); return; }
+  log(`${S.damage} damage remaining.`, 'bad');
+  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
+  if (maxSoak < S.damage) knockOut(); else render();
+}
+
+// ============================================================
+// 🦴 MATERIALS AND DROPS — spec in `08_Ideas/Armour_And_The_Workshop.md`.
+//
+// 🔑 DROPS KEY OFF THE CREATURE'S **SHAPE**, NOT ITS NAME. Three reasons, and the third is the
+// one that matters:
+//   1. the shape is already in the data, so this needs no new content;
+//   2. 66 individual drop tables is unmaintainable, and hunting one creature out of 66 is a slot
+//      machine inside a slot machine;
+//   3. 🕯️ THE SHAPE IS ALREADY VISIBLE. The candle prints the next encounter's shape and the
+//      turn-1 reveal names it — so *"I need Evasion parts"* is a hunt you can actually run, using
+//      the mechanism Thomas identified: *"which also lends itself into why you want your candle
+//      lit, so you can find that monster you need."*
+//
+// ⚠️ RANDOM, BUT THE ODDS ARE PRINTED. Monster Hunter publishes its rates, and that is the whole
+// difference between a grind and a slot machine: *"I need 3 scales, I get one 60% of the time, so
+// that is about five encounters"* is a PLAN. A hidden table is a fruit machine with a 20-minute
+// pull. Every rate here is shown in the Stash and on the recipe.
+//
+// 🔑 AND THE OUTCOME MATTERS, which hands Complete/Narrow/Loss a THIRD consequence beyond coins
+// and the candle: a clean win carves the beast, a scrape gets you less, a loss gets you nothing.
+// ============================================================
+const MATERIALS = [
+  { id: 'shard',  icon: '🦴', name: 'Bone Shard',  tier: 'common',   from: 'any creature' },
+  { id: 'slag',   icon: '🪨', name: 'Slagplate',   tier: 'shape',    from: '🛡️ Armour creatures' },
+  { id: 'quill',  icon: '🪶', name: 'Windquill',   tier: 'shape',    from: '🌀 Evasion creatures' },
+  { id: 'hide',   icon: '🧱', name: 'Wardhide',    tier: 'shape',    from: '🧱 Guard creatures' },
+  { id: 'sinew',  icon: '🔩', name: 'Prime Sinew', tier: 'elite',    from: '💀 dangerous foes' },
+  { id: 'heart',  icon: '🔆', name: 'Emberheart',  tier: 'rare',     from: 'a felled dragon — rarely' },
+  { id: 'd1',     icon: '🔥', name: 'Cindermaw Scale',    tier: 'dragon', from: 'felling Cindermaw' },
+  { id: 'd2',     icon: '⚡', name: 'Skyrender Pinion',   tier: 'dragon', from: 'felling Skyrender' },
+  { id: 'd3',     icon: '🪨', name: 'Cragmourn Core',     tier: 'dragon', from: 'felling Cragmourn' },
+  { id: 'd4',     icon: '🌊', name: 'Fathomdread Pearl',  tier: 'dragon', from: 'felling Fathomdread' },
+];
+// 🏆 AND THE NAMED HALF — a SIGNATURE PART per creature. Thomas: *"i just thought it would be cool
+// to further tie into the candle, knowing what monsters you have out there, like you need a mist
+// crane wing, and you see that you can fight a mist crane because your candle is lit."*
+//
+// 🔴 I ARGUED AGAINST THIS AND THE ARGUMENT USED THE WRONG NUMBER. "Hunting one creature out of 66
+// is a slot machine" measured at 9% of runs — but a creature lives on ONE road and a run walks ONE
+// road, so 9% was really *"you were on the wrong road three times in four."*
+// 📏 On the RIGHT road it is 23–55% of runs, median 35%. The Mist Crane is on 55% of stage-1 runs.
+//
+// 🔑 SO THE STAGE IS THE QUEST BOARD. Picking stage 1 to hunt a Mist Crane is Monster Hunter's
+// quest select, and it was already built. The candle then says whether it is on your next node,
+// and the Stash says which road it lives on. Every piece of the hunt already existed.
+//
+// ⚠️ BOTH TIERS, WHICH IS ALSO WHAT MONSTER HUNTER DOES: Bone Shard and the shape materials are
+// its Monster Bone Small — they drop from dozens of things and fill the bulk of a recipe. A
+// signature part is its Rathalos Scale: one creature, and it is the reason you go there.
+//
+// 📦 Signature parts are NOT in MATERIALS. There are 66 of them and they are derived, not authored
+// — a table entry per creature would be 66 rows of data that the creature list already implies.
+// Their ids are `p:<creature name>`, and matDef() resolves them synthetically.
+// 🏆 ONE WORD PER GREAT BEAST, AUTHORED. Deriving the body word from the defence shape was the
+// right call at 66 creatures and the wrong one at 16: the biggest creature in a region is usually
+// an 🛡️ Armour creature, so 14 of the 16 came out "Plate" — Cairnstag Plate, Ashen Boar Plate,
+// Basalt Basilisk Plate. 🔑 CUTTING THE LIST TO 16 IS WHAT MADE HAND-WRITING IT CHEAP, and that is
+// the whole payoff of the great-beast tier: a roster that reads handmade instead of generated.
+// ⚠️ The shape-derived word stays as the FALLBACK, so a roster change can never leave a beast
+// nameless — it just reads blander until someone writes it a word.
+const BEAST_WORD = {
+  // 🕯️ The Ember Hollow
+  'Cairnstag': 'Antler', 'Ashen Boar': 'Tusk', 'Basalt Basilisk': 'Scale', 'Mirewyrm Elder': 'Coil',
+  // ⚡ The Stormreach
+  'Scarp Ram': 'Fleece', 'Gorse Lurcher': 'Claw', 'Anvil Toad': 'Hide', 'Stormcrown Roc': 'Talon',
+  // 🪨 The Fellgrind
+  'Fen Ox': 'Horn', 'Grindtooth': 'Fang', 'Deepdelver': 'Mandible', 'Cinderjaw': 'Jawbone',
+  // 🌊 The Sunless Fathom
+  'Shoal Drifter': 'Membrane', 'Silt Crawler': 'Carapace', 'Lanternjaw': 'Lure', 'Pressureback': 'Shell',
+};
+// 💎 RARITY (2026-08-23, Thomas: *"we should add rarity types to the armor, just so we can
+// classify them too"*).
+// 🔑 IT ALSO ANSWERS *"anvil cuirass seems a bit too good"* WITHOUT NERFING IT. A piece that blocks
+// again EVERY encounter measured at +13/+24 on the ladder — a different CATEGORY of power, not a
+// tier of it. Rarity is the word for that. The fix for an outlier is to make it RARE, not weak.
+// ⚠️ SO RARITY MUST DESCRIBE WHAT KIND OF THING A PIECE IS, NEVER JUST ITS PRICE — otherwise it is
+// a colour on a price tag. Each tier maps to a mechanical property:
+//   ⚪ common     — 💥 shatters, no ability. Starter gear, one run's shards.
+//   🟢 uncommon   — 💥 shatters, one ON-BLOCK ability.
+//   🔵 rare       — 🩹 worn: it stays, because an ONGOING RULE is live while you wear it.
+//   🟠 legendary  — it does something no other piece can, and it names a great beast.
+// ⚪ THE COMMONS ARE THE TEACHING SET (2026-08-23, Thomas: *"i think you should start off with
+// super basic armor. just 1 block on everything. so players can start learning about armor right
+// away"*).
+// 🔴 THE PROBLEM: the loadout started EMPTY, so a new player never met armour at all until they
+// had forged something — about a run's worth of shards. An entire mechanic, and the soak screen's
+// only real choice, was invisible for the whole of run one.
+// ✅ SO THE FOUR COMMONS ARE OWNED FROM THE START and two of them are already worn. You meet
+// "break a piece, or blunt a card?" on your first hit, before you know what a recipe is.
+// 🔑 AND THEY BLOCK 1, NOT 2 — which is what makes granting them safe. Two block-2 pieces measured
+// +3/+0 on the ladder; at block 1 that is under a point. **A teaching object should be visible and
+// almost free**, and the lesson here is the CHOICE, never the number.
+// ⚠️ Everything above common still blocks 2, so forging one is a real step up.
+// ⚠️ THE WHOLE SET, and worn in every slot that is OPEN — you start dressed, not shopping.
+const STARTER_PIECES = ['a_hood', 'a_tunic', 'a_gloves', 'a_pants'];
+
+const RARITY = {
+  common:    { label: 'Common',    icon: '⚪' },
+  uncommon:  { label: 'Uncommon',  icon: '🟢' },
+  rare:      { label: 'Rare',      icon: '🔵' },
+  legendary: { label: 'Legendary', icon: '🟠' },
+};
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'legendary'];
+const PART_WORD = { armour: 'Plate', evasion: 'Plume', guard: 'Hide' };
+// ⚠️ A creature with BOTH shapes takes the first — stage 4 stacks them, and a part named after two
+// body plans reads like a bug. Shapeless creatures give a Fang.
+function partWordFor(e) {
+  if (e && BEAST_WORD[e.name]) return BEAST_WORD[e.name];
+  const sh = (shapesOf(e) || [])[0];
+  return PART_WORD[sh] || 'Fang';
+}
+const partIdOf = name => 'p:' + name;
+const partNameOf = (name, word) => `${name} ${word}`;
+// 🔑 ONE RESOLVER. A signature part answers matDef() like anything else, so every consumer — the
+// haul, the Stash, and the recipes to come — needs no special case for it.
+function matDef(id) {
+  const m = MATERIALS.find(x => x.id === id);
+  if (m) return m;
+  if (typeof id === 'string' && id.startsWith('p:')) {
+    const name = id.slice(2);
+    const e = creatureByName(name);
+    const word = e ? partWordFor(e) : 'Fang';
+    return { id, icon: '🏆', name: partNameOf(name, word), tier: 'signature',
+             from: name, road: e ? e.road : null };
+  }
+  return null;
+}
+// where every creature lives — built once from the roads, so the Stash and the drop table can
+// never disagree about which road holds what.
+// 🏆 GREAT BEASTS — the 16 creatures that carry a signature part, one per region.
+//
+// 🔴 THE PROBLEM THIS SOLVES (Thomas, 2026-08-23): *"we have so many monsters though... i don't
+// know if we can come up with enough armor to utilize every single monster."* He is right. 66
+// signature parts against a realistic ~20 pieces of armour leaves forty kinds of junk, and junk
+// that no recipe names is just a longer list.
+//
+// 🔑 MONSTER HUNTER ALREADY ANSWERED THIS AND WE HAD THE STRUCTURE WITHOUT USING IT: small
+// monsters drop generic bits, LARGE monsters carry named parts. There are 4 creatures per region
+// and 16 regions, so the biggest in each region is the region's quarry — 16 named parts, which is
+// an authorable number of marquee recipes, and the other 50 creatures keep dropping the common and
+// shape materials that fill the bulk of every recipe.
+//
+// ✅ AND IT FIXES SOMETHING ELSE THAT WAS ALREADY WRONG: 66 interchangeable stat blocks becomes
+// 50 fodder and 16 you remember. The roster has no hierarchy today — every creature is a name on a
+// number. Mirewyrm Elder, Basalt Basilisk, Stormcrown Roc and Pressureback already read like
+// things you would go looking for; nothing in the game currently says they are worth more.
+//
+// ⚠️ DERIVED, NOT AUTHORED — the biggest `hp` in each region, so adding a creature cannot leave
+// the quarry list stale. ⚠️ Ties break on list order, deterministically.
+const CREATURE_INDEX = (() => {
+  const out = {};
+  for (const stage of [1, 2, 3, 4]) {
+    const road = roadFor(stage);
+    for (const region of road) {
+      const fights = (region.encounters || []).filter(e => e.type === 'fight');
+      let quarry = null;
+      for (const e of fights) if (!quarry || (e.hp || 0) > (quarry.hp || 0)) quarry = e;
+      for (const e of fights) {
+        if (!out[e.name]) out[e.name] = { ...e, road: stage, region: region.name, quarry: e === quarry };
+      }
+    }
+  }
+  return out;
+})();
+const isQuarry = name => !!(CREATURE_INDEX[name] && CREATURE_INDEX[name].quarry);
+const creatureByName = n => CREATURE_INDEX[n] || null;
+
+const SHAPE_MAT = { armour: 'slag', evasion: 'quill', guard: 'hide' };
+// the published rates. ⚠️ Keep these and the Stash's text in step — a rate the player cannot read
+// is the difference between a plan and a fruit machine.
+const DROP_RATE = { shape: 0.6, narrowShape: 0.3, heart: 0.2, signature: 1, narrowSignature: 0.4 };
+
+// 🪙 THERE IS ONLY ONE MONEY, AND IT DIES WITH THE RUN (2026-08-23).
+// Thomas: *"is it too confusing that you get gold during the run for card upgrades and stuff, but
+// also gold for progression"*. Yes — and the fix is deletion, not a rename.
+//
+// 🔴 THE TWO CURRENCIES DIFFERED ONLY IN A PROPERTY YOU COULD NOT SEE. Both were earned from
+// encounters, both were drawn as money, and the one distinction — that one survives the run — is
+// invisible at the moment you look at either number. Calling the second "scrip" or "cinders" would
+// have been a different word for the same confusion.
+//
+// 🔑 HADES IS THE MODEL HERE, NOT MONSTER HUNTER. It also has an in-run currency that dies
+// (obols), and its meta currencies are deliberately NOT money: Darkness, Keys, Nectar, Titan
+// Blood. A different KIND of thing cannot be mistaken for the thing that dies.
+//
+// ✅ AND WE ALREADY HAD ONE. 🦴 Bone Shard drops ~7 a run from everything and is what every recipe
+// wants in bulk — it was always the fee. The meta economy is MATERIALS, full stop: parts gate a
+// piece, shards pay for it, and 🪙 coins mean exactly one thing again.
+
+// ⭐ THE ACCOUNT LEVEL — meta-progression, and deliberately a THIRD KIND OF THING (2026-08-23).
+// Thomas: *"we should start building the charm meta progression stuff. i feel like we need to do
+// account wide exp for that or something. so like different charms unlocks at different levels…
+// i imagine you would get a certain amount of exp per kill, elite kill, boss kill, etc."*
+//
+// 🔑 A BAR, NEVER A PURSE. This is the same trap meta-gold fell into this morning, one step later:
+// two things you SPEND are two budgets, and the player cannot see which purse a number came from.
+// So the meta layer has exactly one shop and the level is not in it:
+//   🪙 coins      — earned and spent inside a run, then gone
+//   🦴 materials  — earned across runs, SPENT at the Workshop
+//   ⭐ level      — earned across runs, spent NOWHERE; it only widens what the game may offer
+// Reaching a level is not a decision, which is precisely why it cannot be confused with one.
+//
+// 🔑 AND THE REWARD IS THE NAMED CHARM, NOT THE NUMBER. `UNLOCKS` is an ordered table: one level,
+// one named thing. *"Cold Iron unlocked"* is a moment; *"you are level 7"* is a progress bar for
+// its own sake. It also buys [[Charm_Pools]]'s answer to the "basic and bad" slop problem for
+// free — the table is ordered **LEGIBLE → CONDITIONAL**, so early levels hand out charms you can
+// read at a glance and later ones hand out the rule-changers that ask you to aim them. Nothing in
+// the pool is ever bad; later charms simply ask more of you.
+//
+// ⚠️ ONE BAR FOR THE WHOLE ACCOUNT, NOT ONE PER CLASS — and the reason is [[Addiction_Loop]]'s
+// own retention bet: *you switch class because the problem told you to*. Per-class XP would mean
+// the class you switch TO is a thinner game than the one you left, punishing exactly the move the
+// design wants. A fresh rogue on a level-12 account gets her charms up to level 12 immediately.
+// Mastering a class is what [[The_Wall]] and the grade are for; do not build it twice.
+const XP_KEY = 'emberwick-xp-1' + KEY_NS;
+let XP_PER_LEVEL = 60;                 // flat, and flat on purpose: *legible math always*
+// 🔑 A LOSS MUST PAY, AND THIS IS THE RULE NOT THE GENEROSITY. [[Charm_Pools]]: *a player who is
+// losing must not get a thinner pool* — gating unlocks behind victories takes options away from
+// exactly the player who needs more of them, and turns a bad run into a worse next one.
+// ⚠️ So "exp per kill" is the one part of the brief I have not built literally: every encounter
+// pays, a clean one pays triple a lost one. Same shape `rollDrops` already uses for shards.
+// ⚠️ ELITES MULTIPLY RATHER THAN ADD, so that losing an elite can never out-earn winning an
+// ordinary fight — an additive bonus would have made 💀 Loss (1+5) beat ◇ Complete (3).
+const XP_AWARD = { Complete: 3, Narrow: 2, Loss: 1, eliteMult: 2, lair: 8, dragon: 15, dragonStep: 5 };
+// 🎭 AND A SECOND BAR, ONE PER CLASS (2026-08-23, Thomas: *"class level makes sense for class charm
+// unlocks, or do we just lump everything into the main account level?"*).
+//
+// 🔑 THE RULE IS ALREADY PRINTED ON THE CHARM: **a charm unlocks on whichever bar owns the rule it
+// names.** A generic charm touches an engine rule → the account level. A class charm touches the
+// class's own rule → that class's level. No new field, no table of exceptions — `charmUnlocked()`
+// just asks `c.cls`. It is the [[Charm_Pools]] split test doing a second job for free.
+//
+// ⚠️ THIS REVERSES MY OWN CALL FROM ONE BUILD AGO, and the reversal is the honest part. I argued
+// one bar on the grounds that per-class XP makes the class you switch TO a thinner game than the
+// one you left. **I never measured it.** Measured: a veteran on a level-12 account picking up an
+// untouched class loses **2 charms** (mage 18→16, rogue 14→12). That is noise, not an argument.
+//
+// 🔑 AND THE CASE ONE BAR CANNOT HANDLE, WHICH I HAD NOT CONSIDERED AT ALL: with one bar, **every
+// class after the first arrives FULLY UNLOCKED.** Ship the Illusionist to a maxed account and all
+// six of her charms appear the instant she does — no arc, no on-ramp, a dump. With eight classes
+// planned and *"the other planned classes"* stated as priority #1, that is the whole roster's
+// progression deleted in advance. The hybrid gives every future class its own small ladder for
+// free: **+1 class = ×N content** applies to the meta layer too, but only if the meta layer is
+// per class.
+//
+// ⚠️ THE CLASS LADDER IS AN ON-RAMP, NOT A GRIND — 4 rungs at a cheaper 50 xp, so it opens over
+// about five runs of that class. A new class should feel like it is blooming; starving it for
+// twenty runs would re-create the exact switching penalty the measurement just cleared.
+const CLASS_XP_KEY = cls => 'emberwick-xp-' + cls + '-1' + KEY_NS;
+let CLASS_XP_PER_LEVEL = 50;
+// 🔧 a sweep pins BOTH levels so a measurement is reproducible — see the band note in Balance_Log
+let XP_LEVEL_FORCE = 0;
+let CLASS_LEVEL_FORCE = 0;
+function loadXP() { try { const n = parseInt(localStorage.getItem(XP_KEY), 10); return n > 0 ? n : 0; } catch (e) { return 0; } }
+function saveXP(n) { try { localStorage.setItem(XP_KEY, String(n)); } catch (e) {} }
+// ⚠️ CACHED, not read per call — `charmUnlocked()` runs once per Wheel offer and RUNSIM rolls
+// thousands of them. The cache is refreshed at the one place the number can change.
+let ACCOUNT_XP = loadXP();
+// ⚠️ CACHED PER CLASS for the same reason the account bar is: `charmUnlocked()` runs once per Wheel
+// offer, and the Collection asks it for every charm of every class on one render.
+const CLASS_XP = {};
+function loadClassXP(cls) {
+  if (cls in CLASS_XP) return CLASS_XP[cls];
+  let n = 0;
+  try { const v = parseInt(localStorage.getItem(CLASS_XP_KEY(cls)), 10); if (v > 0) n = v; } catch (e) {}
+  return (CLASS_XP[cls] = n);
+}
+function saveClassXP(cls, n) { CLASS_XP[cls] = n; try { localStorage.setItem(CLASS_XP_KEY(cls), String(n)); } catch (e) {} }
+// ⚠️ CLAMPED AT THE CAP, and that is a design call not a tidy-up: a bar that keeps filling and
+// resetting while unlocking NOTHING is precisely the empty progress bar this system was built to
+// avoid. The number stops where the content stops.
+// 🔑 And the XP is not thrown away — it keeps banking. Add charms, the cap rises, and the levels
+// already earned are simply revealed. Nobody is ever punished for having played early.
+function levelFor(xp) { return Math.min(LEVEL_CAP, 1 + Math.floor(xp / XP_PER_LEVEL)); }
+function accountLevel() { return XP_LEVEL_FORCE || levelFor(ACCOUNT_XP); }
+// each class's ladder is only as tall as its own rungs — a bar must never outlast its content
+// ⚠️ A `function` DECLARATION, NOT A `const` ARROW, AND DELIBERATELY. A top-level `const` in a vm
+// script is lexical, so it never lands on the headless sandbox and every probe that needs it has
+// to be remembered in the EXPORTS list. A function declaration lands there by itself. **That is
+// the third time in two builds this binding rule has cost something** — prefer the declaration for
+// anything an instrument might reasonably want to ask.
+function classCap(cls) { return UNLOCKS.reduce((m, u) => unlockCls(u) === cls ? Math.max(m, u.level) : m, 1); }
+function classLevelFor(cls, xp) { return Math.min(classCap(cls), 1 + Math.floor(xp / CLASS_XP_PER_LEVEL)); }
+function classLevel(cls) { return CLASS_LEVEL_FORCE || classLevelFor(cls, loadClassXP(cls)); }
+function awardXP(n) { if (n > 0 && S) S.xpRun = (S.xpRun || 0) + n; }
+
+// 📦 THE STASH — everything that survives a run. Its own key, like the ladder and the grades.
+const STASH_KEY = 'emberwick-stash-1' + KEY_NS;
+function loadStash() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STASH_KEY) || 'null');
+    if (!d || typeof d !== 'object') throw 0;
+    // 🐛 EVERY FIELD MUST BE LISTED HERE OR IT IS SILENTLY DROPPED. `loadout` was written by
+    // equipPiece() and thrown away by the very next read, so equipping a second piece started from
+    // an empty loadout and a fresh run wore nothing — with no error anywhere.
+    // 🔑 A whitelisting reader is the right shape (it is what keeps a corrupt stash from
+    // crashing the menu), but it means ADDING A FIELD IS TWO EDITS, and the second one is silent.
+    // ⚒️ `up` is the +N ladder, { pieceId: step }. ⚠️ BOTH constructions below take it — this is
+    // the "adding a field is two edits, and the second one is silent" warning above, cashed in.
+    return seedStarter({ mats: d.mats || {},
+             owned: Array.isArray(d.owned) ? d.owned : [],
+             loadout: Array.isArray(d.loadout) ? d.loadout : [],
+             up: (d.up && typeof d.up === 'object') ? d.up : {},
+             seeded: !!d.seeded });
+  } catch (e) { return seedStarter({ mats: {}, owned: [], loadout: [], up: {}, seeded: false }); }
+}
+function saveStash(st) { try { localStorage.setItem(STASH_KEY, JSON.stringify(st)); } catch (e) {} }
+// ⚪ THE STARTER SET IS A FLOOR, NOT A ONE-TIME GIFT (fixed 2026-08-23).
+//
+// 🔴 THE BUG, reported in play: *"just started a new run, but i don't see the starting armor in my
+// slots, its empty."* Build 356 seeded the old commons (`kiln`/`hood`/`vambrace`/`boots`) and set
+// `seeded: true`. Build 361 DELETED those four pieces and replaced them with the Adventurer's set
+// — so an existing stash owned four ids that no longer resolve, `loadoutIds()` filtered every one
+// of them out, and the seeding that would have fixed it returned early because the flag said the
+// job was already done.
+// 🔑 A ONE-TIME MIGRATION FLAG IS A LOCK ON THE ONLY CODE THAT COULD REPAIR THE DATA. Whatever the
+// starter set becomes next, this must survive it — so ownership is now RESTATED every load rather
+// than granted once. It cannot go stale because it is not a memory, it is a floor.
+//
+// ⚠️ THE LOADOUT KEEPS ITS GUARD, and the distinction is the delicate part: an empty loadout
+// because the PLAYER stripped it must stay empty (otherwise deliberate choices get silently
+// undone), but an empty loadout because pieces were DELETED under them is damage and gets
+// repaired. `lostToMigration` is exactly that difference.
+function seedStarter(st) {
+  // 🧹 drop ids that no longer resolve, so a removed piece cannot linger as a ghost you own
+  const wornBefore = st.loadout.length;
+  st.owned = st.owned.filter(id => armourDef(id));
+  st.loadout = st.loadout.filter(id => armourDef(id));
+  const lostToMigration = st.loadout.length < wornBefore;
+
+  let changed = !st.seeded || lostToMigration;
+  for (const id of STARTER_PIECES) if (!st.owned.includes(id)) { st.owned.push(id); changed = true; }
+  if (!st.seeded || lostToMigration) {
+    if (!st.loadout.length) st.loadout = STARTER_PIECES.slice(0, ARMOUR_SLOTS_OPEN);
+  }
+  st.seeded = true;
+  if (changed) saveStash(st);
+  return st;
+}
+
+// 🦴 WHAT THIS ENCOUNTER DROPPED. Returns a { matId: qty } bag; the caller banks it.
+// ⚠️ PURE-ISH BY DESIGN — it reads the encounter and rolls, and touches no screen. The rules layer
+// stays detachable, which is the whole insurance policy for the Godot port.
+function rollDrops(e, outcome, perfect) {
+  const bag = {};
+  if (!e) return bag;
+  const add = (id, n) => { if (n > 0) bag[id] = (bag[id] || 0) + n; };
+  const clean = outcome === 'Complete';
+  if (e.dragon) {
+    // 🐉 the dragon is the hunt. Its part is certain; the rare is the thing you come back for.
+    const d = DRAGONS.find(x => x.name === e.name);
+    if (d) add('d' + d.stage, 2);
+    if (rnd() < DROP_RATE.heart) add('heart', 1);
+    return bag;
+  }
+  if (e.type !== 'fight') return bag;                // a road is walked, not carved
+  // 🔑 EVEN A LOSS CARVES ONE, and that single number carries the whole "a loss must pay"
+  // principle: if a bad run yields nothing, losing is wasted time and the grind punishes whoever
+  // needs it most. ⚠️ It is what replaces the flat per-run gold that used to guarantee a floor.
+  add('shard', clean ? 2 : 1);
+  if (outcome === 'Loss') return bag;                // ...but nothing else — no shape part, no trophy
+  // 🏆 the signature part — the reason to come to THIS region for THIS beast.
+  // 🔑 CERTAIN ON A CLEAN KILL, and that is the design, not generosity: there is one quarry per
+  // region, so *"I need 3 Mist Crane Plumes, so that is 3 clean kills"* is a COUNTABLE plan. A
+  // random roll on top of "did the beast even turn up" is two lotteries stacked, and the whole
+  // reason the rates are printed is that a plan beats a fruit machine.
+  const base = e.baseName || e.name;
+  if (isQuarry(base) && (clean || rnd() < DROP_RATE.narrowSignature)) add(partIdOf(base), 1);
+  const shapes = shapesOf(e) || [];
+  for (const sh of shapes) {
+    const mat = SHAPE_MAT[sh];
+    // ✦ A PERFECT KILL DOES NOT ADD A DROP — IT GUARANTEES ONE. The shape part rolls at 60% on a
+    // clean win; kill with nothing to spare and the roll becomes a certainty.
+    // 🔑 WHY THIS IS THE RIGHT REWARD: it prints no new currency, so it cannot move the Workshop
+    // economy the way a bonus material would — and **it removes a die roll by playing precisely**,
+    // which is what this game is about. Nothing else here lets skill delete randomness.
+    // ⚠️ Self-limiting: only shaped creatures, only a Complete, at most +0.4 over the base rate.
+    // 🔴 THE ROLL ALWAYS HAPPENS, EVEN WHEN THE GUARANTEE MAKES IT IRRELEVANT. Short-circuiting
+    // it (`(clean && perfect) || rnd() < rate`) SKIPS an `rnd()` call, which shifts the random
+    // stream for the whole rest of the run — so a same-seed A/B of this feature compared two
+    // different games and came back at **-0.3 materials**, an impossibility.
+    // 🔑 AN EFFECT THAT CHANGES AN OUTCOME MUST NOT CHANGE THE RANDOM STREAM. Same lesson as the
+    // snapshot work (*state AND rng position*), and it is correctness before it is instrumentation:
+    // in a game whose identity is deterministic and measurable, a rule that silently re-seeds
+    // everything downstream is a bug even when nobody is measuring.
+    const rolled = rnd() < (clean ? DROP_RATE.shape : DROP_RATE.narrowShape);
+    if (mat && ((clean && perfect) || rolled)) add(mat, 1);
+  }
+  // 💀 MATERIALS ARE THE SURVIVAL TIER, THE CHARM IS THE KILL TIER (2026-08-24). These stay on
+  // survival deliberately: gating Prime Sinew on Complete dropped it exactly zero times in twelve
+  // runs, and ⚠️ an accidental ultra-rare is worse than a designed one — it makes a recipe that
+  // names it uncraftable without anyone deciding that.
+  // 🔑 SO AN ELITE PAYS TWICE AND THE TIERS SAY DIFFERENT THINGS: **you walked away** → the coins
+  // (×2.5) and the materials · **you killed it** → one of three charms. That is the two-tier reward
+  // the survive-gate was flattening into one.
+  if (e.elite) { add('sinew', 1); add('shard', 1); }
+  return bag;
+}
+// 🎒 the run's haul, kept on S so the summary can show it and a LOSS still banks it.
+// ⚠️ TAKES AN ALREADY-ROLLED BAG. The reveal rolls it so the carve beat can show it, and this
+// banks that same bag — rolling again here would have shown you one haul and given you another.
+function bankDrops(bag) {
+  const got = [];
+  for (const id in bag) {
+    S.loot[id] = (S.loot[id] || 0) + bag[id];
+    got.push(`${matDef(id).icon} ${matDef(id).name} ×${bag[id]}`);
+  }
+  if (got.length) log(`🧰 Carved: ${got.join(' · ')}`, 'good');
+}
+// 💰 banked when the run ENDS, however it ends. ⚠️ Called from victory() and defeat() — the two
+// places a run can stop — never from cleanup, or a quit mid-run would pay nothing.
+function bankRun(won) {
+  if (S.runBanked) return;                            // a run banks exactly once
+  S.runBanked = true;
+  const st = loadStash();
+  for (const id in (S.loot || {})) st.mats[id] = (st.mats[id] || 0) + S.loot[id];
+  saveStash(st);
+  // ⭐ THE LEVEL BAR BANKS WHERE THE LOOT BANKS, and that is the whole reason it is safe: this
+  // function is already the single place a run pays out, already guarded to fire exactly once,
+  // and already called from BOTH victory() and defeat(). A second payout site is how the finale
+  // froze the Emberwake — a per-run total belongs in a function every ending calls.
+  if (won) awardXP(XP_AWARD.dragon + XP_AWARD.dragonStep * Math.max(0, (S.dragon && S.dragon.stage || 1) - 1));
+  S.xpBefore = ACCOUNT_XP;                            // so the summary can draw the bar moving
+  // 🔬 A PINNED LEVEL IS NOT A REAL ACCOUNT, so it neither reads nor writes one.
+  // 🔴 THE TRAP THIS CLOSES, and it would have been invisible: RUNSIM calls bankRun() on every
+  // single run, so a 200-run sweep would have climbed from level 1 to the cap *inside the
+  // measurement* — run 1 played a 9-charm pool and run 200 a 23-charm one, and the average would
+  // have described a game nobody plays. **An instrument that PROGRESSES is not an instrument.**
+  // ⚠️ It would also have written the bot's XP into the player's own bar in the browser.
+  // ⚠️ BOTH BARS BANK HERE, at the one site a run pays out. A second payout site is how the
+  // finale froze the Emberwake; a second bar is twice the chance of making that mistake again.
+  S.clsXpBefore = loadClassXP(CLASS.id);
+  if (XP_LEVEL_FORCE || CLASS_LEVEL_FORCE) return;   // a pinned bar is not a real account
+  ACCOUNT_XP += (S.xpRun || 0);
+  saveXP(ACCOUNT_XP);
+  saveClassXP(CLASS.id, S.clsXpBefore + (S.xpRun || 0));
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -3136,23 +7786,61 @@ function soakValue(card) {
   if (armor <= 0) return 0;
   const v = verbOf(card);
   const frost = v && v.name === 'Frostbite' ? 4 : 0;      // ✦ Frostbite soaks well beyond its plate
-  return armor + frost + charmMod('soak', card.def.element) + (S.potionFx ? S.potionFx.soak : 0);   // 🧪 Ironskin
+  // 🔥 Emberwake Cowl — the token you were saving for the blow also braces you for one.
+  const wakeGuard = (hasArmourRule('wakeguard') && (S.wake || 0) > 0) ? 2 : 0;
+  return armor + frost + wakeGuard + charmMod('soak', card.def.element) + (S.potionFx ? S.potionFx.soak : 0);   // 🧪 Ironskin
 }
 
 function soakEligible() { return S.hand.filter(c => !S.downgraded.has(c.id)); }
 
 function startSoak() {
   S.phase = 'soak';
-  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0);
+  // 🛡️ armour counts toward what you CAN cover, or a knock-out would fire while you still had
+  // a plate on. A rule the engine enforces only for cards is a rule the player cannot use.
+  const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
   if (maxSoak < S.damage) knockOut();
   else render();
 }
 
 function downgrade(card, why) {
   S.downgraded.add(card.id);
+  // ● Bloodcord Vest — what the road takes off you feeds the streak.
+  // 🔴 ONCE PER ENCOUNTER. Per-block measured **+6.7 road C / +35 win**, because a run blocks
+  // several times an encounter and the meter simply never emptied. ⚠️ `S.downgraded` is already
+  // per-encounter state, so "first" costs no new field - the same trick 🧱 Ironbound uses.
+  if (hasArmourRule('bloodpip') && CLASS.id === 'rogue' && S.downgraded.size === 1) {
+    S.momentum = Math.min(MOMENTUM_CAP, (S.momentum || 0) + 1);
+    log(`🛡️ <b>Bloodcord Vest</b> — ● the blow feeds the streak (${S.momentum}/${MOMENTUM_CAP}).`, 'good');
+  }
+  // 🧱 IRONBOUND - the deck can be bruised, never blunted.
+  // ⚠️ TWO EARLIER VERSIONS FAILED AND BOTH ARE INSTRUCTIVE. *Never destroyed* measured **+0.7
+  // road C**, i.e. inert: only a **Lv1** card is destroyed and a run destroys ~3.6 cards, so the
+  // rule named a real event that almost never happens. 🔑 **A charm must name something FREQUENT
+  // as well as something PRINTED** - the second half of that bar had never been written down.
+  // Then *the first soak each encounter is free* keyed off `S.downgraded.size`, which 🛡️ Brace
+  // silently broke - see the cut note on Brace. **This version holds no state at all**, which is
+  // also why it cannot be broken by a charm written next year.
+  // ✅ And it is denominated in LEVELS, the resource that actually predicts the duel.
+  if (hasCharm('ironbound') && card.level <= 2) {
+    log(`${card.def.name} takes the blow — 🧱 <b>Ironbound</b> holds it at Lv${card.level}`, 'good');
+    return;
+  }
   if (card.level <= 1) {
+    // 🧥 Boarhide Coat — a Lv1 card that blocks is not LOST, only spent. ⚠️ It still leaves your
+    // hand, so the encounter still costs you; what it does not do is take the card out of the run.
+    if (hasArmourRule('softfall')) {
+      S.hand = S.hand.filter(c => c.id !== card.id);
+      S.discard.push(card);
+      if (S.actionSetIds.includes(card.id)) S.actionSetIds = S.actionSetIds.filter(id => id !== card.id);
+      if (S.reserveId === card.id) S.reserveId = null;
+      log(`🛡️ <b>Boarhide Coat</b> — ${card.def.name} would have been lost; it goes to the discard instead.`, 'good');
+      return;
+    }
     S.hand = S.hand.filter(c => c.id !== card.id);
     S.trashed.push(card);
+    // 🧥 Fen Ox Harness — a destroyed card at least pays for itself. ⚠️ Coins die with the run, so
+    // this cannot compound into the meta layer; it buys you a charm on the way down.
+    if (hasArmourRule('ledger')) { S.coins += 8; log(`🛡️ <b>Fen Ox Harness</b> — 🪙 +8 coins for what you lost. (you hold ${S.coins})`, 'good'); }
     if (S.actionSetIds.includes(card.id)) S.actionSetIds = S.actionSetIds.filter(id => id !== card.id);
     if (S.reserveId === card.id) S.reserveId = null;
     log(`${card.def.name} was Lv1 → it LEAVES YOUR DECK for the rest of the run${why}`, 'bad');
@@ -3165,6 +7853,15 @@ function downgrade(card, why) {
 function soakWith(cardId) {
   const card = cardById(cardId);
   if (!card || S.downgraded.has(card.id) || S.damage <= 0) return;
+  // 🧥 Siltcrawler Plate — every card you have already fed makes the rest cheaper, so SPREADING
+  // the hit beats feeding one card. ⚠️ Deliberately the opposite of the designated-victim pattern
+  // the soak measurement found (best plate 5.8 vs an average hit of 4.6, WARD pays 74%).
+  if (hasArmourRule('tidewall') && S.downgraded.size > 0) {
+    const cut = Math.min(S.damage, S.downgraded.size);
+    S.damage -= cut;
+    log(`🛡️ <b>Siltcrawler Plate</b> — the blow spends itself: ${cut} less to block.`, 'good');
+    if (S.damage <= 0) { log(`All damage blocked.`); exitSoak(); return; }
+  }
   // ✦ Lv4 WARD verbs, all of them about KEEPING CARDS — the run-level currency
   const v = verbOf(card);
   const bulwark = v && v.name === 'Bulwark';             // soaks everything still coming
@@ -3175,16 +7872,16 @@ function soakWith(cardId) {
     S.downgraded.add(card.id);                            // spent for the encounter, but NOT blunted
     log(`✦ Emberguard — ${displayName(card)} takes ${soak} and holds its edge.`, 'good');
   } else {
-    downgrade(card, `, soaking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
+    downgrade(card, `, blocking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
   }
   if (v && v.name === 'Groundwire') { S.wakePending = (S.wakePending || 0) + 2; log(`✦ Groundwire — the blow earns you a 🔥 +2 Emberwake.`, 'good'); }
   S.damage = Math.max(0, S.damage - soak);
   if (S.damage <= 0) {
-    log(`All damage soaked.`);
+    log(`All damage blocked.`);
     exitSoak();
   } else {
     log(`${S.damage} damage remaining.`, 'bad');
-    const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0);
+    const maxSoak = soakEligible().reduce((t, c) => t + soakValue(c), 0) + armourMaxSoak();
     if (maxSoak < S.damage) knockOut();
     else render();
   }
@@ -3192,7 +7889,10 @@ function soakWith(cardId) {
 
 function knockOut() {
   // being knocked out mid-fight ENDS the fight — you're in no shape to keep swinging
-  log(`Cannot soak all the damage → KNOCKED OUT`, 'bad result');
+  log(`Cannot block all the damage → KNOCKED OUT`, 'bad result');
+  // 🛡️ the armour goes with it. A knock-out that leaves a plate intact reads as the game
+  // declining to use something you were wearing.
+  for (const a of armourEligible()) { const d = armourDef(a.id); a.wear = 0; log(`🛡️ ${d.name} — spent in the knock-out.`, 'bad'); }
   for (const card of soakEligible()) downgrade(card, ' (knock-out)');
   const n = Math.min(KO_DECK_DISCARD, S.deck.length);
   if (n > 0) {
@@ -3225,9 +7925,21 @@ const REROLL_COST = 3;
 function ownedCards() { return [...S.hand, ...S.deck, ...S.discard]; }
 function anyCardById(id) { return ownedCards().find(c => c.id === id) || null; }
 
+// 🔑 ONE LEVEL PER CARD PER VISIT (2026-08-18). Thomas: *"i usually upgrade a card straight
+// away to lvl 4, and it starts making the run feel easy. lvl 4 cards just have a lot of stats."*
+// Measured before this: the first Lv4 arrived on turn 5.9 of ~20, in 99% of runs, for BOTH classes.
+// ⚠️ THE FAULT WAS THAT NOTHING SPACED THE LEVELS OUT. Free choice replaced the Wheel's random
+// offers, and the note left at the time said the randomness had been *"a soft brake on always
+// sharpening your best card"* with nothing put back. With enough coins you could walk a single card
+// 1 -> 4 in one sitting, and [[Levelling_As_Sharpening]]'s whole premise - that a level is a
+// COMMITMENT, and knowing when to stop is the skill - never gets asked.
+// 🔑 A cap per VISIT is the smallest possible brake: it never takes the choice away (his rule
+// from the free-choice change), it only makes you come back. The cost curve is untouched.
+const sharpenedHere = id => !!(S.sharpenedVisit && S.sharpenedVisit.includes(id));
 function upgradable(card) {
   const cost = eff(card).cost;
-  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && cost != null && cost <= S.coins;
+  return card.level < MAX_LEVEL && !S.downgraded.has(card.id) && !sharpenedHere(card.id)
+    && cost != null && cost <= S.coins;
 }
 
 // build one offer; `rich` (camp) leans rarer
@@ -3237,11 +7949,11 @@ function upgradable(card) {
 // than "three random things": the shop sells POWER, and sharpening your own deck is not shopping.
 function rollOffer(rich) {
   const held = S.charms || [];
-  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && charmUnlocked(c) && (rich ? true : c.rarity !== 'rare'));
+  const charmPool = CHARMS.filter(c => !held.includes(c.id) && !c.curse && charmUnlocked(c) && charmFitsClass(c) && (rich ? true : c.rarity !== 'rare'));
   const potPool = potionPool();
   const roomForPotion = (S.potions || []).length < POTION_CAP;
   const mkCharm = () => { const c = rand(charmPool);
-    return { kind: 'charm', id: c.id, name: c.name, text: c.text, rarity: c.rarity, cost: c.cost }; };
+    return { kind: 'charm', id: c.id, name: c.name, text: classText(c.text), rarity: c.rarity, cost: c.cost }; };
   // 🥄 WEIGHTED: commons show up three times as often as rares, so the shelf reads like a
   // shop — mostly cheap things, occasionally something you actually want.
   const weight = p => p.rarity === 'common' ? 3 : p.rarity === 'uncommon' ? 2 : 1;
@@ -3249,7 +7961,7 @@ function rollOffer(rich) {
     const bag = [];
     for (const p of potPool) for (let k = 0; k < weight(p); k++) bag.push(p);
     const p = rand(bag);
-    return { kind: 'potion', id: p.id, name: p.name, text: p.text, rarity: p.rarity, cost: p.cost }; };
+    return { kind: 'potion', id: p.id, name: p.name, text: classText(p.text), rarity: p.rarity, cost: p.cost }; };
   // 📜 a contract only appears when you have none. ⚠️ IT NO LONGER NEEDS THE REGION-TIME GATE
   // — a contract carries its OWN window now and crosses region breaks, so "will it fit before the
   // region ends" is not a question any more. What replaced the gate is the check below: there must
@@ -3323,7 +8035,20 @@ function startUpgrade() {
   // charms are bad - because SHARPENING RAN FIRST and had no budget. A level costs 3-4 and is
   // always affordable, so the purse was always empty by the time the shop opened.
   // Opening the shop first makes the money a CHOICE: this charm, or three levels?
+  // 🗺️ with the shop as a map NODE, the per-encounter opening is what makes that node worthless -
+  // it hands you a screen you would have reached anyway after the next fight.
+  if (!WHEEL_PER_ENCOUNTER && S.map && !S.finalMode) { finishTurn(); return; }
   startWheel(false);
+  // ⚠️ A SHOP WHERE NOTHING IS AFFORDABLE IS NOT A DECISION, IT IS A CONFIRM BUTTON. The shop
+  // opening after every encounter is what keeps the deck growing (measured above), but it is also
+  // ~12 screens a run - and [[Tempo_And_The_Watch]] is explicit that *a weightless decision is not
+  // a rest, it is homework*. When you can afford nothing on the shelf AND nothing in hand, walk on.
+  // ⚠️ never in the tutorial: stage 0 has a lesson that rings the Wheel, and a screen that
+  // skips itself is a screen the lesson can never fire on.
+  if (!S.tutorial && S.phase === 'wheel' && wheelIsEmptyHanded()) {
+    log(`🛒 Nothing here you can afford — you walk on.`);
+    wheelDone();
+  }
 }
 // 🛒 ONE SHOP (2026-08-10, Thomas: *"lets make it be the upgrading at the same time too, so i
 // can spend all my money at once and see all my options at once"*).
@@ -3337,7 +8062,8 @@ function startUpgrade() {
 // ⚠️ The `'upgrade'` phase is kept, unentered, so a save written mid-forge by an older build
 // still loads. It is dead code the day save version 5 stops mattering.
 function startSharpen() { doneUpgrades(); }
-const canSharpenNow = () => S.phase === 'upgrade' || S.phase === 'wheel';
+// 🔼 ...and ⏳ A TIME PENALTY IS WHAT SHUTS IT (2026-08-22). See `delayed` in finishResolve.
+const canSharpenNow = () => (S.phase === 'upgrade' || S.phase === 'wheel') && !(S.delayed > 0);
 
 // 🔼 tap a card to see what it BECOMES; tap again to buy it
 function pickUpgrade(id) {
@@ -3351,12 +8077,13 @@ function buyUpgrade(id) {
   const cost = eff(card).cost;
   S.coins -= cost;
   card.level++;
+  (S.sharpenedVisit = S.sharpenedVisit || []).push(card.id);
   log(`🔼 ${card.def.name} sharpens to Lv${card.level} (−${cost} coins, ${S.coins} left).` +
       (card.level >= MAX_LEVEL && VERBS[card.def.name] ? ` ✦ It gains <b>${VERBS[card.def.name].name}</b>.` : ''), 'good result');
   S.upgradePick = null;
   render();
 }
-function doneUpgrades() { endTurn(); }
+function doneUpgrades() { S.sharpenedVisit = []; endTurn(); }
 
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
@@ -3388,11 +8115,47 @@ function wheelBuy(i) {
   render();
 }
 
+// ⚠️ "empty-handed" means BOTH halves of the screen are out of reach - the shelf and the forge.
+// Checking only one would skip a screen where the other still had something to offer.
+function wheelIsEmptyHanded() {
+  const offers = (S.wheel && S.wheel.offers) || [];
+  // ⚠️ `kind: 'none'` is an empty slot on the shelf, not a free item - counting it as buyable
+  // would keep the screen open on a shop with literally nothing in it.
+  const canBuy = offers.some(o => o && o.kind !== 'none' && !o.bought && o.cost != null && o.cost <= S.coins);
+  const canSharpen = S.hand.some(c => upgradable(c));
+  return !canBuy && !canSharpen;
+}
+
 function wheelDone() {
   const camp = S.wheel && S.wheel.rich;
+  // ⏳ THE COUNTDOWN TICKS HERE, AND FINDING OUT WHERE "HERE" IS TOOK TWO TRIES.
+  // 🐛 I moved it to nextTurn() on the strength of a probe that showed the delay never being
+  // spent — and nextTurn fires **ONCE PER RUN**, because the map replaced it. Instrumented:
+  // over a 14-encounter run, nextTurn 1 · wheelDone 14 · endTurn 14 · finishTurn 15.
+  // 🔑 A COUNTDOWN MUST TICK ON SOMETHING THAT HAPPENS EVERY ENCOUNTER, and on a map run that is
+  // wheelDone/endTurn, NOT nextTurn. ⚠️ The same class of mistake as the six-build cleanup bug:
+  // *a function whose name says "turn" stopped being the per-turn function when the map landed.*
+  if (S.delayed > 0) {
+    S.delayed--;
+    log(S.delayed > 0
+      ? `⏳ Still behind — ${S.delayed} more encounter${S.delayed === 1 ? '' : 's'} before you can sharpen.`
+      : `⏳ You have made the time back up. You can sharpen again.`, S.delayed > 0 ? 'bad' : 'good');
+  }
   S.wheel = null;
   S.upgradePick = null;
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
+  // 🐛 THIS BRANCH SKIPPED CLEANUP ENTIRELY AND SHIPPED FOR SIX BUILDS (fixed 2026-08-18).
+  // It read: `if (S.map) { backToMap(); return; }` - written when the Wheel was briefly a map NODE
+  // that ended a turn which never had an encounter. The node was cut the same day; the shortcut was
+  // not, and it bypassed doneUpgrades() -> endTurn(), which IS cleanup.
+  // ⚠️ CONSEQUENCE: on every map turn the Spell was never spent, the Catalyst and Surge never slid
+  // under the deck, and **THE HAND NEVER CHANGED BETWEEN ENCOUNTERS.** Measured after the fact:
+  // `endTurn` fired **0 times across 5 encounters**, and the deck lost one card in total - to a
+  // Time Penalty, not to play. Thomas found it from the outside: *"i see my whole hand"* - the hand
+  // was full because it was the SAME hand.
+  // 🔑 A SHORTCUT ADDED FOR A FEATURE MUST BE REMOVED WITH THAT FEATURE. Cutting the wheel node
+  // left a return path that quietly deleted the most important step in the turn.
+  // ⚠️ And every map measurement taken before this is suspect - they were played with a static hand.
   doneUpgrades();   // 🛒 sharpening happened right here; there is no second screen
 }
 
@@ -3408,15 +8171,109 @@ function doneUpgrading() { if (S.phase === 'upgrade') { doneUpgrades(); return; 
 // which cards the turn CONSUMES. Engine-side this is just "ask the class".
 function pouredIds() { return CLASS.spentIds(); }
 
-function endTurn() {
-  // 🔥 the token you banked this turn arrives now; the one you were holding expires, spent or not
+// 🔥 THE EMBERWAKE ROLLS OVER — what you banked arrives, what you were holding expires.
+//
+// 🔐 EXTRACTED 2026-08-22 BECAUSE THE FINALE IS A THIRD TURN LOOP AND NEVER RAN IT.
+// Thomas: *"i channeled +20 for next turn, but i only got 2 emberwake, what happened"*. Nothing
+// happened — that is the bug. `startLastMile()` and `startDuelBeat()` both carry the warning
+// *"THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too"*, and both
+// obeyed it. But this block lived in **endTurn()**, which the finale never calls either, and no
+// comment said so. Measured over 211 duel beats: the wake changed value **zero times**, and 14
+// Last Mile banks were still sitting in `wakePending` when the duel began.
+// So in the finale a channelled Emberwake was announced (*"+9 for next beat"*) and then silently
+// discarded, while whatever you walked in holding was spent free, every beat, forever.
+// ⚠️ THE INSTRUMENT COULD NOT HAVE CAUGHT THIS: solver.js states in its own comment that the
+// bot never banks — it scores one encounter, so channelling always reads as a loss. 0 banks in
+// 466 duel beats. *A number produced by an instrument that structurally cannot do the thing is not
+// a measurement of the thing* — the same trap, now twice on the same mechanic.
+// 🔑 THE RULE: a per-turn TOKEN belongs in a function all three turn loops call, never inline
+// in one of them. Anything added here is inherited by the road, the Last Mile and the duel at once.
+// ● THE STREAK IS JUDGED — did this turn cost you cards?
+// 🔑 ONE DEFINITION, THE SAME ONE THE HEALTH BAR USES. Extracted alongside rollWake() and for
+// the same reason: the finale is a third turn loop, and a class token that cannot move during the
+// boss fight is a token the boss fight does not have.
+function tickMomentum(damage, r) {
+  if (!r || !r.rogue) return;
+  // 🔑 WHAT COUNTS AS "TOUCHED" IS THE ONLY LEVER THAT CHANGES THE STREAK'S SHAPE.
+  // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
+  // a graze no longer breaks your rhythm but a real blow does — which is the one change that
+  // lifts p without touching how often you get hit.
+  // ⚠️ A TIME PENALTY NO LONGER BREAKS THE STREAK (2026-08-22), and the reason is this block's
+  // own stated definition: *did this turn cost you cards?* Since Time Penalty stopped touching
+  // the deck it costs GROWTH, not cards — so leaving it here would have been a rule outliving
+  // the thing it was about. ⚠️ It is a buff to her; measured alongside the change, not assumed.
+  // ● Quietstep Boots — only a LOSS breaks the streak. 🔑 Aimed squarely at her measured problem:
+  // losing Initiative breaks it 0-3% of the time and FAILING TO COMPLETE does it 77-92%, so this
+  // is the one piece that touches the thing actually shortening her streaks.
+  // 🔴 SHIPPED AS FULL IMMUNITY AND MEASURED **+14.0 road C / +25 win** - four times the
+  // strongest generic piece, and a straight buff to the class already ahead at three stages.
+  // 🔑 A FLOOR, NOT AN OFF SWITCH - the same correction 🗡️ Second Nature already carries. Immunity
+  // to the thing that breaks a streak 77-92% of the time is not a piece of gear, it is a different
+  // class.
+  const softened = hasArmourRule('steadymo') && r.outcome !== 'Loss';
+  const touched = damage >= MOMENTUM_BREAK;
+  const before = S.momentum || 0;
+  if (touched) {
+    // 🗡️ Second Nature catches you at 2 instead of 0 — a FLOOR, never an off switch.
+    S.momentum = softened ? Math.max(0, before - 1)
+      : hasCharm('secondnature') ? Math.min(before, 2) : 0;
+    if (before > 0) log(`● Momentum broken — ${before} → ${S.momentum}`, 'bad');
+  } else {
+    // 🗡️ Dead Hand doubles the step on a clean kill · 🗡️ Shadow Double's verb adds its burst.
+    // Read here, not in compose(), because THIS turn's outcome does not exist until now — the
+    // same reason ✦ Unspent reads S.lastOutcome instead of predicting it.
+    const step = MOMENTUM_STEP + (hasCharm('deadhand') && r.outcome === 'Complete' ? 1 : 0)
+                   + (r.rogue.verb === 'surge' ? 2 : 0);
+    S.momentum = Math.min(MOMENTUM_CAP, before + step);
+    if (S.momentum > before) log(`● Untouched — Momentum ${before} → ${S.momentum}`, 'good');
+  }
+}
+
+// 🛡️ ...and armour's on-block effects roll here too, for exactly the same reason. A piece that
+// says *"your next strike hits for 4 more"* is granted during SOAK, at the end of one turn, and
+// must survive into the next one — which is the same shape as the Emberwake and therefore the same
+// trap. Anything per-turn added here is inherited by the road, the Last Mile and the duel at once.
+function rollTurnTokens() {
+  S.armourTwin = false;   // 🔥 a doubled channel lasts exactly the turn you broke the band on
+  S.armourStrike = S.armourStrikePending || 0; S.armourStrikePending = 0;
+  // 🎯 granted multi-hit is a THIS-TURN token now (🛡️ Twinned Bracers is an active use, not an
+  // `onBlock`), so it is cleared here rather than rolled forward.
+  // ⚠️ A per-turn token must be cleared where EVERY turn loop reaches - this project has lost two
+  // mechanics to being reset in only one of the three (🔥 the Emberwake and ● Momentum both froze
+  // for an entire finale). Beside the effect it copies is how it stays found.
+  S.splitPending = 0;
+  S.armourWinInit = false;   // 👢 Anvil Toad Boots — this turn only, like every other turn token
+  // 🩹 a worn piece marked `every: 'encounter'` gets its block back. ⚠️ Here rather than in one
+  // turn loop, for the build-339 reason: the finale is a third turn loop and would have skipped it.
+  for (const a of (S.armour || [])) {
+    const d = armourDef(a.id);
+    // ⚠️ restores to the piece's OWN maximum, not to 1 — a refresh that reset an upgraded piece
+    // to the base figure would quietly make the +N ladder a DOWNGRADE on exactly these pieces.
+    if (d && d.every === 'encounter' && d.block > 0) a.wear = armourMaxWear(a);
+    if (d && d.every === 'encounter' && d.uses) a.uses = Math.max(0, d.uses + upEffects(d, a.up || 0).uses);
+    // 🔋 a charge piece gains a mark. ⚠️ HERE rather than in one turn loop, for the build-339
+    // reason: the finale is a third turn loop and would have skipped it entirely.
+    if (d && d.charge) a.charge = Math.min(armourCharge(a), (a.charge || 0) + 1);
+  }
+  S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
   if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
+  // 🔥 Slowwick Treads — it does not gutter. ⚠️ Hooked HERE, in rollTurnTokens(), which is the
+  // one function all three turn loops call: the Emberwake froze for an entire finale once because
+  // its rollover lived in endTurn() alone, and this piece would have inherited that bug exactly.
+  else if (S.wake > 0 && !S.wakeTarget && hasArmourRule('wakekeep')) {
+    S.wakePending = Math.max(S.wakePending || 0, S.wake);
+    log(`🛡️ <b>Slowwick Treads</b> — 🔥 your Emberwake holds.`, 'good');
+  }
   else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
   S.wakeDeep = verbLive('Wellspring', 'Boost') && banksNow();
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
   S.wakeTarget = null;
+}
+
+function endTurn() {
+  rollTurnTokens();
   let spentIds = pouredIds();
   // ✦ UNSPENT - a clean win costs you nothing. The Spell is the only card the turn CONSUMES, so
   // this is the biggest rule in the game to bend: it turns "what is my biggest card" into "what is
@@ -3534,17 +8391,31 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
   const down = returning.filter(c => !up.includes(c));
   if (up.length) S.deck.unshift(...up);
   if (down.length) S.deck.push(...down);
+  // 🗺️ THE HAND IS DEALT AFTER YOU CHOOSE THE ROAD, NOT BEFORE (2026-08-18).
+  // Thomas: *"i see my whole hand, and i see all 3 encounters and what they do. doesn't seem right
+  // that i have knowledge of my whole hand before picking an encounter."*
+  // 🔑 HE IS RIGHT AND IT WAS THE PILLAR AGAIN. Knowing your whole hand AND every road's contents
+  // makes routing a solved matching problem - *complete optimizable data*, the thing
+  // [[Game_Pillars]] forbids. Measured: **92% of map screens showed a full four-card hand.**
+  // ✅ AND IT IS THE BIGGEST JOB THE ✦ ARSENAL HAS EVER HAD. The card you carry is now the ONLY
+  // thing you know about yourself when you choose where to go - *what am I bringing into a decision
+  // I have not made yet*. [[The_Arsenal_Question]] records three failed attempts to make that slot
+  // matter from the inside; this makes it matter from the OUTSIDE, which is where forks have
+  // actually worked here.
+  // ⚠️ Only when a map is driving the run - the tutorial and the finale still deal at cleanup.
+  const holdDraw = !!S.map && !S.finalMode;
   const before = S.hand.length;
-  draw(HAND_SIZE - S.hand.length);
+  if (!holdDraw) draw(HAND_SIZE - S.hand.length);
   log(`Cleanup: ${spentCount} spent on the spell — gone. ` +
       (returning.length ? `${returning.map(c => displayName(c)).join(', ')} slide under the deck` +
         `${ordered && returning.length > 1 ? ' in your order' : ''}. ` : '') +
       (kept ? `Your Arsenal ${displayName(kept)} stays in hand. ` : '') +
-      `Drew ${S.hand.length - before} (deck ${S.deck.length}, discard ${S.discard.length})`);
+      (holdDraw ? `You will draw the rest once you have chosen your road.`
+                : `Drew ${S.hand.length - before} (deck ${S.deck.length}, discard ${S.discard.length})`));
 
   // Poison lands on the freshly drawn hand, before the next encounter
   if (S.poison > 0 && S.hand.length > 0) {
-    log(`Poison strikes the new hand: ${S.poison} damage to soak`, 'bad');
+    log(`Poison strikes the new hand: ${S.poison} damage to block`, 'bad');
     S.damage = S.poison;
     S.poison = 0;
     S.damageEl = null;
@@ -3559,9 +8430,50 @@ function finishCleanup(returning, spentCount, ordered, kept, topList) {
 function finishTurn() {
   // the finale runs its own beat sequencing (Approach beats → Duel), not region flow
   if (S.finalMode) { finaleAfterTurn(); return; }
-  // a completed/narrowed journey earns an EVENT (the place you arrive) before the turn ends
-  if (S.pendingEvent) { S.pendingEvent = false; startEvent(); return; }
-  finishRegionCheck();
+  backToMap();
+}
+
+// 🗺️ EVERY NODE ENDS BY RETURNING TO THE MAP. ⚠️ The old `regionTurn >= REGION_ENCOUNTERS`
+// clock is gone - the map IS the clock now, and the run ends when you step off its top floor.
+// 🔑 The `dry` check survives, because running out of cards must still end the road: the deck is
+// the health bar, and a map with floors left does not change that.
+function backToMap() {
+  const m = S.map;
+  if (!m) { finishRegionCheck(); return; }                    // tutorial / legacy runs
+  // 💀 a dangerous thing you KILLED gives up a charm. ⚠️ Paid HERE, at the one place every
+  // node returns through, rather than in the encounter branch - a boon owed after a soak or an
+  // event would otherwise be stepped over.
+  if (S.boonOwed) {
+    S.boonOwed = false;
+    const offers = rollBoon();
+    if (offers.length) { S.boon = offers; S.phase = 'eliteboon'; render(); return; }
+  }
+  // 🗺️ THE MAP IS THE CLOCK, SO ONLY THE TOP FLOOR ENDS THE ROAD.
+  // ⚠️ Running dry used to end a REGION, and the region break reshuffled your discard back in
+  // and carried on. Ported straight across it ended the whole RUN - a bad patch in band 2 would
+  // teleport you to the lair with eight floors unwalked, which is far harsher than the old rule
+  // and looks like a bug from the inside. Thomas spotted the shape of it: *"some regions could be
+  // short if you did bad."*
+  // 🔑 A CONDITION THAT USED TO END A CHAPTER MUST NOT BE PORTED AS ONE THAT ENDS THE BOOK.
+  // Going dry now does what a region break did: gather everything up and keep walking. The cost is
+  // already paid and permanent - the cards you LOST at Lv1 are gone, so the deck you reshuffle is
+  // thinner every time, which is the deck-as-health pressure doing its job without a cliff.
+  const dry = S.hand.length + S.deck.length < REGION_END_THRESHOLD;
+  const atTop = m.pos && m.pos.f >= mapFloors(m) - 1;
+  if (atTop) {
+    log(`The road runs out. THE ${S.dragon.name.toUpperCase()} AWAITS.`, 'result');
+    S.phase = 'summary';
+    render();
+    return;
+  }
+  if (dry && S.discard.length) {
+    const pool = shuffle([...S.deck, ...S.discard]);
+    S.deck = pool; S.discard = [];
+    if (S.hand.length < HAND_SIZE && S.deck.length) draw(HAND_SIZE - S.hand.length);
+    log(`You gather up what you have dropped and go on — ${S.deck.length + S.hand.length} cards left.`, 'bad');
+  }
+  S.phase = 'map';
+  render();
 }
 
 function finishRegionCheck() {
@@ -3763,7 +8675,7 @@ const EVENTS = [
           if (rnd() < 0.35 && S.hand.length > 1) { const dn = rand(S.hand.filter(c => c.id !== up.id)); lines.push('The flame takes its due — ' + evLevel(dn, -1)); }
           return lines; } },
       { label: 'Swear to tend it — take a CHARM, and a CURSE to carry with it', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && charmFitsClass(c) && !S.charms.includes(c.id));
           return [good.length ? evGrantCharm(rand(good).id) : 'The shrine has no gift left.', evTakeCurse()]; } },
       { label: 'Take the oil instead — 🪙 +6 coins, the shrine stays cold', need: 'none',
         apply: () => { S.coins += 6; return [`You pocket the oil — +6 coins (you now hold ${S.coins}).`]; } },
@@ -3796,7 +8708,7 @@ const EVENTS = [
     flavor: "A cartographer's mark scratched on a stone — someone buried something here, and warded it.",
     options: [
       { label: 'Dig it up — a charm lies buried, but the ward may cling to you', need: 'none',
-        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && !S.charms.includes(c.id));
+        apply: () => { const good = CHARMS.filter(c => !c.curse && charmUnlocked(c) && charmFitsClass(c) && !S.charms.includes(c.id));
           const lines = good.length ? [evGrantCharm(rand(good).id)] : evUpgradeRandom(2);
           if (rnd() < 0.4) lines.push(evTakeCurse());
           return lines; } },
@@ -3826,6 +8738,7 @@ const EVENTS = [
     flavor: "A slope of grey cinders where the mountain puts everything it has finished with. Somewhere in it is your handwriting.",
     options: [
       { label: 'Dig for the last thing you dropped — 🪙 −6, it returns at Lv1', need: 'none',
+        when: () => S.coins >= 6, whenNote: () => `you have only 🪙 ${S.coins} of 6`,
         apply: () => { if (S.coins < 6) return ['You have nothing to trade the ashfield, and it does not give on credit.'];
           S.coins -= 6; return [`You dig until your hands are black (−6 coins, ${S.coins} left).`, evRecoverCard('last')]; } },
       { label: 'Take back EVERYTHING you have lost — and a CURSE for the presumption', need: 'none',
@@ -3867,6 +8780,7 @@ const EVENTS = [
       { label: 'Cut through — a card you choose loses a level, but two others brighten', need: 'card', pick: c => c.level > 1, pickNote: 'already Lv1 — nothing to give up', 
         apply: ({ card }) => { const lines = ['You force the thorns — ' + evLevel(card, -1)]; lines.push('but win through to easier ground:', ...evUpgradeRandom(2, card.id)); return lines; } },
       { label: 'Pay the toll in coin — 🪙 −9 coins, pass untouched', need: 'none',
+        when: () => S.coins >= 9, whenNote: () => `you have only 🪙 ${S.coins} of 9`,
         apply: () => { if (S.coins < 9) return ['You cannot pay; the thorns let nothing through for free.'];
           S.coins -= 9; return [`You pay the bramble-keeper (−9 coins, ${S.coins} left) and pass untouched.`]; } },
       { label: 'Turn back, find another way — nothing lost, nothing gained', need: 'none', apply: () => ['You take the long way around, unscathed.'] },
@@ -3919,14 +8833,35 @@ function startEvent() {
   log(def.flavor);
   render();
 }
+// 🚧 WHY AN EVENT OPTION IS CLOSED TO YOU — or null if it is open. **One predicate, three
+// callers**: the buttons grey themselves with it, `eventChoose()` refuses with it, and the bot
+// picks with it.
+//
+// 🔴 IT EXISTED IN TWO PLACES AND THE BOT HAD NEITHER (found 2026-08-23 while checking the end
+// screen listed every material). `renderControls` computed availability inline to grey a button,
+// `eventChoose` re-checked only the card half, and `solver.js` just called `eventChoose(0)`.
+// On ⏳ The Toll of Thorns option 0 needs a card above Lv1 — so with an all-Lv1 hand the bot
+// chose it, could not complete it, cancelled, chose it again, and **spun until the turn guard
+// killed the run**. Measured at **1 run in 25**, and a stalled run banks NOTHING: no materials,
+// no xp, no grade. Every number quoted from a batch has been ~4% garbage.
+// 🔑 THE RULE THIS EARNS, and it is the arrangement-search lesson one screen over: **a predicate
+// the UI uses to DISABLE something is a rule, and the bot must ask the same one.** A button the
+// player cannot press must be a button the bot cannot choose — otherwise the instrument is playing
+// a game with different legal moves.
+function eventOptionBlocked(o) {
+  if (!o) return 'no such choice';
+  if (o.when && !o.when()) return o.whenNote ? o.whenNote() : 'you cannot afford this';
+  if (o.need === 'card' && !eventPickable(o).length)
+    return S.hand.length ? 'no card in hand can take this' : 'no cards in hand';
+  return null;
+}
 function eventChoose(i) {
   const opt = currentEventDef().options[i];
-  // never ask for a card you cannot possibly give - the player would be stuck on a picker with
+  // never ask for something you cannot possibly give — the player would be stuck on a picker with
   // nothing to pick and only a "back" button to explain it
-  if (opt.need === 'card' && !eventPickable(opt).length) {
-    log(S.hand.length
-      ? `Nothing in your hand can take that — that road is closed to you.`
-      : `You have no cards in hand to offer — that road is closed to you.`, 'bad');
+  const shut = eventOptionBlocked(opt);
+  if (shut) {
+    log(`${shut.charAt(0).toUpperCase()}${shut.slice(1)} — that road is closed to you.`, 'bad');
     render();
     return;
   }
@@ -3965,7 +8900,8 @@ function resolveEvent(opt, card, el) {
   S.event.step = 'done';
   render();
 }
-function eventContinue() { S.event = null; finishRegionCheck(); }
+// 🗺️ an event is a NODE now, so it hands you back to the road.
+function eventContinue() { S.event = null; if (S.map && !S.finalMode) { backToMap(); return; } finishRegionCheck(); }
 
 // ============================================================
 // rendering
@@ -4269,8 +9205,323 @@ try { addEventListener('resize', () => { if (typeof S !== 'undefined' && S && !i
 // ⚠️ The stages screen only ever worked because boot used to call freshGame() first, so `S`
 // always held a run even on a menu. Booting to a real menu broke that assumption immediately
 // (`renderStatus` reads `S.deck[0]`). Anything reachable before a run starts belongs in here.
-const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev'];
+// 🧰 WHAT YOU CARRIED OUT. ⚠️ Shown on a DEFEAT as loudly as on a victory — a loss that pays
+// is only worth anything if you can SEE that it paid, in the same breath as being told you died.
+// ⭐ ONE BAR, DRAWN IN ONE PLACE. The summary and the Collection show the same thing, so they ask
+// the same function — the `computeAction()` rule applied to a display: two copies drift.
+// ⚠️ ONE COMPONENT, TWO LADDERS — `cls` picks which. Writing a second bar function is how the two
+// would drift, and this screen's whole job is that the two bars read as the same KIND of thing.
+// `from` (optional) is where the bar STARTS. Given one, the bar renders at the old position and
+// carries the target in data-* for animateXPBars() to walk. Without one it just draws the truth.
+function xpBarHTML(cls, note, from) {
+  const xp = cls ? loadClassXP(cls) : ACCOUNT_XP;
+  const per = cls ? CLASS_XP_PER_LEVEL : XP_PER_LEVEL;
+  const cap = cls ? classCap(cls) : LEVEL_CAP;
+  const lv = cls ? classLevelFor(cls, xp) : levelFor(xp);
+  const into = xp % per, pct = Math.round(100 * into / per);
+  const capped = lv >= cap;
+  const up = capped ? [] : unlocksAt(lv + 1, cls);
+  const next = capped ? '' : (up.length ? `next: <b>${up.map(unlockName).join(', ')}</b>` : `next at level ${lv + 1}`);
+  // ⚠️ BOTH BARS SAY "LEVEL" AGAIN — REVERTED 2026-08-23 (Thomas: *"lets just change mastery back
+  // to level. might be too confusing being a different word"*), reversing his own suggestion of a
+  // few hours earlier and mine of implementing it.
+  // 🔑 AND THE REVERT IS CHEAP NOW FOR A REASON WORTH KEEPING: the rename was doing disambiguation
+  // work that **the two-screen split now does better**. When both bars sat on one page, only the
+  // noun told you they were different things. Now ⭐ Level lives on the account page and 🎭 Mage
+  // Level lives on hers, so the SCREEN says which one you are looking at and the word is free to
+  // be the plain, expected one.
+  // 🔑 **A word invented to carry structure can be retired once the structure carries itself.**
+  // ⚠️ The bars are still two different things and the hint text still says so in one line each —
+  // that is the part that must never be dropped, whatever the noun is.
+  const name = cls ? `${(CLASSES[cls] && CLASSES[cls].name) || cls} Level` : 'Level';
+  const end = capped ? 100 : pct;
+  // 🎞️ THE ONE PIECE OF PRESENTATION THIS PROTOTYPE BUILDS ON PURPOSE, and the exception is
+  // narrow enough to state: **here the movement IS the information.** A number (+47 xp) tells you
+  // the amount; a bar travelling from where you started to where you ended tells you *how much of
+  // a level that was*, which is the only question anyone asks at the end of a run. That is
+  // *legible math always* in the one place a still frame cannot say it.
+  // ⚠️ It is not a licence for juice generally — the portrait fade was correctly deleted twice.
+  // The test that separates them: **does it carry a fact you could not read otherwise?**
+  const anim = (from === undefined || from === xp) ? '' : (() => {
+    const fLv = cls ? classLevelFor(cls, from) : levelFor(from);
+    const fPct = (fLv >= cap) ? 100 : Math.round(100 * (from % per) / per);
+    return ` data-from="${fPct}" data-to="${end}" data-rolls="${Math.max(0, lv - fLv)}" data-lv="${fLv}"`;
+  })();
+  const startLv = anim ? (cls ? classLevelFor(cls, from) : levelFor(from)) : lv;
+  const startPct = anim ? Number(anim.match(/data-from="(\d+)"/)[1]) : end;
+  return `<div class="xp${cls ? ' is-cls' : ''}"><div class="xp-top">` +
+    `<b><span class="xp-lv">${cls ? '🎭' : '⭐'} ${name} ${startLv}</span></b>` +
+    `<span class="xp-num">${capped ? 'every charm unlocked' : `${into} / ${per} xp`}</span></div>` +
+    `<div class="xp-bar"${anim}><i style="width:${startPct}%"></i></div>` +
+    (note || next ? `<div class="xp-next">${note || next}</div>` : '') + `</div>`;
+}
+
+// 🎞️ WALK EVERY BAR THAT DECLARED A JOURNEY. A level-up is `data-rolls` fills to 100 followed by a
+// snap back to 0 — **the roll-over is the whole point**, because a bar that merely jumps to 30%
+// while the number quietly changes never shows you that you crossed anything.
+// ⚠️ prefers-reduced-motion jumps straight to the end. The file already honours it elsewhere.
+// ⚠️ Called from render()'s `finally`, so it runs even if a panel threw — same reasoning as
+// applyModal(): a half-drawn screen must not also be a half-animated one.
+function animateXPBars() {
+  const bars = document.querySelectorAll('.xp-bar[data-to]');
+  if (!bars.length) return;
+  let still = false;
+  try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  bars.forEach(bar => {
+    const fill = bar.querySelector('i'), to = +bar.dataset.to;
+    const rolls = +bar.dataset.rolls || 0;
+    const label = bar.parentNode.querySelector('.xp-lv');
+    let lv = +bar.dataset.lv;
+    bar.removeAttribute('data-to');                 // fire once, never on a re-render
+    if (still) { fill.style.width = to + '%'; if (label) label.textContent = label.textContent.replace(/\d+$/, lv + rolls); return; }
+    const bump = () => { if (label) label.textContent = label.textContent.replace(/\d+$/, ++lv); };
+    const steps = [];
+    for (let i = 0; i < rolls; i++) steps.push(100);
+    steps.push(to);
+    let i = 0;
+    // 🐛 setTimeout, NOT requestAnimationFrame — and this is a correctness fix, not a style one.
+    // **rAF DOES NOT FIRE IN A HIDDEN TAB.** Scheduled on rAF, a run finished on a backgrounded tab
+    // would leave the bar frozen at where it STARTED and the label showing the OLD level — the
+    // screen would be quietly lying about your progress until the next render.
+    // 🔑 AN ANIMATION MAY NEVER BE THE ONLY THING THAT WRITES THE TRUTH. setTimeout is throttled in
+    // a background tab but it still runs, so the last step always lands.
+    const next = () => {
+      if (i >= steps.length) return;
+      const v = steps[i++];
+      fill.style.width = v + '%';
+      setTimeout(() => {
+        if (v === 100 && i < steps.length) {
+          bump();
+          fill.style.transition = 'none'; fill.style.width = '0%';
+          // one tick with the transition off, so the snap back to empty is not itself animated
+          setTimeout(() => { fill.style.transition = ''; setTimeout(next, 30); }, 30);
+        } else next();
+      }, 620);
+    };
+    setTimeout(next, 40);   // one beat at the start position, so there is something to travel from
+  });
+}
+// 🔑 THE LEVEL-UP IS THE MOMENT, so it is NAMED. A run that ends "+47 xp" is a number; one that
+// ends "Cold Iron unlocked" is a reason to start another. ⚠️ Reads the span the run crossed, not
+// just the final level — a very good run can cross two.
+// 🔑 THE CLASS BAR IS SHOWN FIRST, because it is the one tied to what you just played — the run
+// was a mage run, so the mage's ladder is the closer story.
+// ⚠️ IT IS ITS OWN BLOCK ON THE END SCREEN NOW, not a footnote inside 🧰 CARRIED OUT. The xp is
+// the run's other reward and it was rendering below a list of bone shards.
+function xpGainedHTML(animate) {
+  const gained = S.xpRun || 0;
+  if (!gained) return '';
+  const opened = (before, cls) => {
+    const per = cls ? CLASS_XP_PER_LEVEL : XP_PER_LEVEL, out = [];
+    const at = x => cls ? classLevelFor(cls, x) : levelFor(x);
+    for (let lv = at(before) + 1; lv <= at(before + gained); lv++)
+      for (const u of unlocksAt(lv, cls)) out.push(`<span class="xp-got">🔓 ${unlockName(u)}</span>`);
+    return out;
+  };
+  const cls = CLASS.id;
+  const c = opened(S.clsXpBefore || 0, cls), a = opened(S.xpBefore || 0, null);
+  const cFrom = animate ? (S.clsXpBefore || 0) : undefined;
+  const aFrom = animate ? (S.xpBefore || 0) : undefined;
+  return xpBarHTML(cls, `<b>+${gained} xp</b>${c.length ? ' · ' + c.join(' ') : ''}`, cFrom) +
+         xpBarHTML(null, `<b>+${gained} xp</b>${a.length ? ' · ' + a.join(' ') : ''}`, aFrom);
+}
+// 🏁 THE END OF A RUN — ONE SCREEN, TWO ENDINGS (2026-08-23, Thomas: *"lets make sure we got a cool
+// like summary screen. have a nice window at the end, our grade and all those stats"*).
+//
+// 🔑 VICTORY AND DEFEAT WERE TWO SEPARATE BLOCKS OF MARKUP THAT HAPPENED TO AGREE. They are one
+// function now, because the only real difference between them is the headline and one paragraph —
+// and two copies of a screen drift exactly the way two copies of the arrangement search did. The
+// win got a card table the loss never had, and the loss got a reason-you-died line the win never
+// needed; both are `won ? … : …` here instead of two files' worth of divergence.
+//
+// 🔑 AND THE ORDER IS THE ARGUMENT: **verdict → what it cost you → what you take away.**
+//   ① the grade      — the judgement, and the biggest thing on screen
+//   ② the run        — turns, outcomes, what your deck lost
+//   ③ ⭐ the xp       — the bars, moving
+//   ④ 🧰 the haul     — materials, which are the OTHER thing you carry out
+//   ⑤ ⚒️ the door     — the Workshop, because *the instant you see the haul is the instant you
+//                       want to spend it* (Hades and Monster Hunter both put the meta screen
+//                       directly in the death flow, for this reason).
+// ⚠️ The xp block sits ABOVE the haul deliberately: materials are a shopping list, the bars are
+// the reward. The old screen had the bars underneath a list of bone shards.
+function runEndHTML(won) {
+  const survivors = [...S.hand, ...S.deck, ...S.discard];
+  const r = S.results;
+  const lost = S.trashed.length;
+  return `<div class="phase-label">${won ? `🏆 THE ${S.dragon.name.toUpperCase()} FALLS` : '💀 DEFEAT'}</div>` +
+    `<div class="runend">` +
+      gradeHTML(gradeRun(won), won) +
+      (won ? '' : `<p class="runend-why">${S.defeatMsg}</p>`) +
+      `<div class="runend-stats">` +
+        `<span><b>${S.turn}</b> turns</span>` +
+        `<span class="g-good"><b>${r.Complete}</b> clean</span>` +
+        `<span><b>${r.Narrow}</b> narrow</span>` +
+        `<span class="g-bad"><b>${r.Loss}</b> lost</span>` +
+        `<span><b>${survivors.length}</b> cards left</span>` +
+        `<span class="${lost ? 'g-bad' : ''}"><b>${lost}</b> destroyed</span>` +
+      `</div>` +
+      (lost ? `<p class="runend-lost">Gone for good: ${S.trashed.map(c => c.def.name).join(' · ')}</p>` : '') +
+      // 🗺️ the door this run opened — above the xp and the loot, because it is the biggest of the
+      // three and the only one that changes what you can do NEXT.
+      (won && S.stageOpened ? (S.stageOpened === 'all'
+        ? `<div class="runend-open"><b>🪜 Every stage stands open</b><span>take whichever you like</span></div>`
+        : `<div class="runend-open"><b>🗺️ Stage ${S.stageOpened.stage} — the ${S.stageOpened.name} — is open to you</b>` +
+          `<span>${S.stageOpened.brief}</span></div>`) : '') +
+      runXPHTML() +
+      haulHTML() +
+    `</div>` +
+    // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either becomes
+    // a player or closes the tab, and it used to end on the same generic stage picker a returning
+    // player gets. A picker is a question; what someone just taught needs is the NEXT THING, named.
+    // ⚠️ Not in the tutorial — that ending has one job and a second button is a question where a
+    // direction belongs.
+    ((won && S.tutorial) ? tutorialHandoffHTML()
+      : `<button class="primary" onclick="showWorkshop()">⚒️ The Workshop</button>` +
+        `<button onclick="showStages()">🗺️ ${won ? 'Choose your next stage' : 'Choose a stage'}</button>`);
+}
+
+// 🏁 the end-of-run xp block: a heading and the two bars, so it reads as a reward and not as an
+// appendix to the loot list.
+function runXPHTML() {
+  const inner = xpGainedHTML(true);
+  return inner ? `<div class="endxp"><div class="endxp-lab">⭐ WHAT THE ROAD TAUGHT YOU</div>${inner}</div>` : '';
+}
+
+function haulHTML() {
+  const ids = Object.keys(S.loot || {});
+  // ⚠️ The xp block is separate now (runXPHTML), so this may bail again when nothing was carved —
+  // a bad run still gets told it paid, just in its own block rather than inside the loot list.
+  if (!ids.length) return '';
+  const rows = ids.map(id => {
+    const m = matDef(id); if (!m) return '';
+    return `<span class="haul-mat">${m.icon} ${m.name} <b>×${S.loot[id]}</b></span>`;
+  }).join('');
+  return `<div class="haul"><div class="haul-lab">🧰 CARRIED OUT</div>` +
+    `<div class="haul-gold">${S.encountersDone} encounter${S.encountersDone === 1 ? '' : 's'} walked` +
+      `${S.phase === 'victory' ? ' · and the beast felled' : ''}</div>` +
+    (rows ? `<div class="haul-mats">${rows}</div>` : `<div class="haul-none">nothing carved</div>`) +
+    `<div class="haul-note">it is in your 📦 Stash</div></div>`;
+}
+
+const SHELL_PHASES = ['menu', 'collection', 'ladder', 'dev', 'stash', 'workshop', 'notes'];
 const isShell = () => SHELL_PHASES.includes(S && S.phase);
+
+// 🚪 WHICH PHASES TAKE THE MIDDLE OF THE SCREEN. A phase belongs here when it is a DECISION
+// you stop and make, rather than something you do to the cards in front of you.
+// ⚠️ 'assign' and 'soak' stay inline on purpose - they ARE the cards, and a dialog over them
+// would be a dialog about the thing it was covering.
+// ⚠️ phases that cannot exist without a map behind them
+const MAP_PHASES_NEEDING_MAP = ['map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon'];
+// 🚪 'reveal' JOINED THE LIST 2026-08-23 (Thomas: *"the resolving happens in another window, and
+// then the wheel comes up in another window. lets combine them"*). Resolving used to draw inline
+// while the Wheel popped up over it, so finishing an encounter threw you between two different
+// windows for one continuous moment. They are one panel now: strike → outcome → 🧰 carve → the
+// Wheel, all in the same frame.
+// ⚠️ It is safe here for the reason the panel is top-anchored in the first place: the reveal
+// animates the SLOT ROW (`beatFx`), and the modal never covers the hand.
+// 🐛 'victory' AND 'defeat' WERE MISSING (Thomas, 2026-08-25: *"the summary is still in the
+// corner, i wanted to take up the middle, kinda like how the map does it"*). `runEndHTML()` is a
+// full-page document - the grade, the run in numbers, both xp bars, the haul, the Workshop - and it
+// was rendering into `#controls-panel` at its normal size in the bottom-right corner, on a scene
+// with nothing left in it. 🔑 THE BIGGEST SCREEN IN THE GAME WAS IN THE SMALLEST BOX.
+// ⚠️ 'summary' was on this list and the end screen is NOT the summary - a phase whose NAME sounds
+// like another phase is how a list like this gets a hole in it.
+const MODAL_PHASES = ['reveal', 'wheel', 'event', 'setout', 'fork', 'summary', 'map', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'victory', 'defeat'];
+// 🔑 THE ONE PLACE THE HAND DOES NOT NEED PROTECTING. Every other modal is top-anchored so it
+// can never cover the cards, because pickers live ON them - but the run is OVER here and there is
+// nothing to read underneath. These get the whole layer.
+const END_PHASES = ['victory', 'defeat'];
+function isModalPhase() { return !isShell() && MODAL_PHASES.includes(S.phase); }
+
+// 🔑 THE CHEAPEST POSSIBLE IMPLEMENTATION, AND DELIBERATELY SO: renderControls() is not
+// touched at all. It writes the phase body where it always did, and this RELOCATES that markup
+// into the centred panel. Every handler in this codebase is an inline `onclick` string, so moving
+// innerHTML carries the behaviour with it - nothing has to be re-bound.
+// ⚠️ Which means a new modal phase needs NO render code: add it to MODAL_PHASES and it moves.
+function applyModal() {
+  const panel = $('modal-panel'), ctrl = $('controls-panel');
+  if (!panel || !ctrl) return;
+  if (!isModalPhase()) {
+    // ⚠️ ALWAYS CLEAR, not only when the class was still set. Guarding the clear behind the
+    // class meant a second render left the old dialog's markup sitting in a hidden layer - invisible
+    // to a player, but it makes every DOM assertion read the PREVIOUS screen.
+    document.body.classList.remove('modal-open');
+    if (panel.innerHTML) panel.innerHTML = '';
+    return;
+  }
+  document.body.classList.add('modal-open');
+  panel.innerHTML = ctrl.innerHTML;
+  ctrl.innerHTML = '';
+  sizeModal(panel);
+  drawMapEdges();
+}
+
+// 🗺️ Draw one line per edge, measured from the nodes as they actually landed.
+// ⚠️ Must run AFTER applyModal has moved the markup into the panel and AFTER sizeModal has set
+// the height - measuring before either gives positions from a box that is about to change.
+function drawMapEdges() {
+  const svg = document.querySelector('#modal-panel .mp-lines');
+  if (!svg || !S.map) return;
+  const wrap = svg.parentElement;
+  const box = wrap.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${Math.round(box.width)} ${Math.round(box.height)}`);
+  svg.setAttribute('width', Math.round(box.width));
+  svg.setAttribute('height', Math.round(box.height));
+  const centre = (f, c) => {
+    const el = wrap.querySelector(`[data-f="${f}"][data-c="${c}"]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+  };
+  const here = S.map.pos;
+  const parts = [];
+  for (let f = 0; f < mapFloors(S.map) - 1; f++) {
+    for (let c = 0; c < S.map.floors[f].length; c++) {
+      const n = S.map.floors[f][c]; if (!n) continue;
+      const a = centre(f, c); if (!a) continue;
+      for (const nc of n.next) {
+        const b = centre(f + 1, nc); if (!b) continue;
+        // 🔑 the roads you could take RIGHT NOW are lit; everything else is the shape of the map
+        const live = here && here.f === f && here.c === c;
+        parts.push(`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" ` +
+          `x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="${live ? 'mp-live' : 'mp-link'}"/>`);
+      }
+    }
+  }
+  svg.innerHTML = parts.join('');
+}
+
+// 📏 THE PANEL IS MEASURED, NOT GUESSED (2026-08-18, found in play).
+// Thomas: *"clicking something on the setting out page isn't doing anything."*
+// 🐛 It was the THIRD option. A fixed `max-height: 52vh` clipped it: the panel scrolled, nothing
+// on screen said so, and a tap on the half-visible option passed straight through to the card row
+// behind it - `elementFromPoint` on that button returned #slots-panel.
+// 🔑 A PANEL THAT SILENTLY CLIPS A BUTTON IS A BUTTON THAT DOES NOTHING. And it only appeared
+// with THREE offers; every test I ran had drawn two, which is why it shipped.
+// The cap is now the real constraint - *the distance to the top of the hand* - so the panel always
+// uses every pixel it may have, and says so when there is still more below.
+function sizeModal(panel) {
+  const layer = $('modal-layer'), slots = $('slots-panel');
+  if (!layer || !slots) return;
+  // ⚠️ measure from the PANEL's own top, not the layer's - the layer carries padding-top, so
+  // using its top overshot by exactly that padding and the panel overlapped the hand by 2px.
+  panel.style.maxHeight = '';
+  const top = panel.getBoundingClientRect().top;
+  // 🏁 an end screen measures to the bottom of the layer instead of the top of the hand.
+  const handTop = END_PHASES.includes(S.phase)
+    ? layer.getBoundingClientRect().bottom
+    : slots.getBoundingClientRect().top;
+  // ⚠️ the hand can sit ABOVE the layer's top on a stacked phone layout mid-scroll; never go
+  // negative, and never shrink below something readable.
+  const avail = Math.round(handTop - top - 14);
+  panel.style.maxHeight = Math.max(200, avail) + 'px';
+  // ⚠️ MEASURE WITH THE CUE OFF. The "▾ more below" cue is in flow, so it adds height - and a
+  // panel measured WITH it showing can be scrollable *because* of it. That is a self-fulfilling
+  // loop: the fork, with two branches and room to spare, was advertising more below itself.
+  // 🔑 An indicator that changes the thing it indicates has to be removed before you measure.
+  panel.classList.remove('is-scrollable');
+  panel.classList.toggle('is-scrollable', panel.scrollHeight > panel.clientHeight + 2);
+}
 
 function render() {
   if (isShell()) {
@@ -4279,8 +9530,11 @@ function render() {
     $('status-bar').innerHTML = '';
     $('encounter-panel').innerHTML = ''; $('encounter-panel').className = '';
     $('slots-panel').innerHTML = '';
+    renderField();          // 🎴 clears the board — a shell screen is outside any run
+    renderArmourRail();
     const sc = $('scene'); if (sc) sc.innerHTML = '';
     renderControls();
+    applyModal();    // 🚪 isShell() is false-y for modals, so this CLOSES one left open
     // ⚠️ the log belongs to a RUN. On the shell there may be no run at all, so show the last
     // one's entries if they exist and nothing if they don't — never assume the array is there.
     if (S.logEntries) renderLog(); else $('log').innerHTML = '';
@@ -4288,14 +9542,34 @@ function render() {
   }
   normalizeAssign();
   saveGame();
+  // ⚠️ NOTHING TO DRAW WITHOUT STATE. The Workshop and the Stash are SHELL screens whose
+  // buttons (forge, sell, wear) re-render — and they are reachable before any run exists. Boot
+  // happens to call freshGame() first, so `S` is non-null in practice, but a shell action that
+  // crashes when it is the first thing you touch is a bug waiting for a different boot order.
+  if (!S) return;
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
   $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`) + ` · build ${BUILD}`;
+  try {
   renderStatus();
   renderScene();
   renderEncounter();
   renderControls();
+  renderField();
+  renderArmourRail();
   renderSlots();
   renderLog();
+  } finally {
+    // 🔑 THE MODAL BOOKKEEPING RUNS EVEN IF A PANEL THREW. applyModal() used to be the LAST
+    // call in render(), so any exception above it left the dialog open over a half-updated screen -
+    // which is why a hard crash read as *"clicking does nothing"* instead of as a crash.
+    // ⚠️ The error is NOT swallowed; it still propagates. This only guarantees the UI ends in a
+    // consistent state on the way out.
+    // 🎓 BEFORE applyModal(), which RELOCATES the panel's markup into the centred dialog —
+    // inject afterwards and the row lands in an element that has just been emptied.
+    injectLesson($('controls-panel'));
+    applyModal();
+    animateXPBars();
+  }
   pointAtLesson();
 }
 
@@ -4337,20 +9611,208 @@ function pointAtLesson() {
 // - it means show the TERMS. Temporary blessings lived as bare counters and were just as invisible.
 // The NAME is flavour; the EFFECT is the maths. They're separate spans so a phone can drop the
 // name and still show you every term you're calculating against.
+// ============================================================
+// 🎴 THE FIELD — persistent state as OBJECTS instead of counters (2026-08-21, Thomas)
+//
+// > *"thats how i envisioned tokens, like emberwake, and momentum. they are token cards that stay
+// >  out on the field until removed. boardstate. and yeah i want to dive into more boardstate
+// >  stuff because it feels more boardgamey, and it can open up gameplay a lot."*
+//
+// 🔑 THE INSIGHT IS THAT WE ALREADY HAD BOARD STATE AND WERE DRAWING IT AS ARITHMETIC. 🔥 the
+// Emberwake, ● Momentum, an Ember Hollow shield, a Glimpse, a curse — every one is an object with
+// a lifetime: it appears, it persists, something removes it. They READ as numbers because they
+// were BUILT as numbers, one variable at a time, in five unrelated places.
+//
+// ⚠️ THIS CHANGES NO RULE, AND WAS CHECKED AS ONE: same seed, same run, turn by turn, before and
+// after (scratchpad/identity.js). 🔑 A PURE REFACTOR HAS NO NUMBER TO MOVE, so "the win rate did
+// not change" would have proved nothing at n=200 — the noise band is wider than most real changes.
+// The provable claim is *did the same seed play the same game*, and that is what the test asks.
+//
+// 🔑 WHY BUILD IT BEFORE ANY CLASS NEEDS IT: the Engineer's turret, the Forager's planted seed and
+// the Mason's standing work are ONE system with three fillings if the field exists, and three
+// bespoke features if it does not. See [[Board_State_And_Tokens]].
+//
+// 🔑 AND IT IS THE MOAT ARGUMENT EXACTLY — a counter is a number, a token is a THING, and things
+// can be animated, thrown, shattered and swept off a table. ⚠️ WHICH IS PRECISELY WHY NONE OF THAT
+// IS BUILT HERE. The row is deliberately plain: staging is the engine's job, and building juice in
+// the prototype is the one category that is 100% throwaway.
+//
+// ⚠️ THE RULE THAT MATTERS MOST: THE FIELD *REPLACES* carried()'s HALF OF THIS — IT MUST NEVER SIT
+// BESIDE IT. `carried()` exists because of the Mirror Fen bug: a run-long −2 Pace that was
+// invisible because only one screen drew it. Two ledgers for persistent state is that same bug in
+// a new coat, so everything that moved here came OUT of carried() in the same edit.
+//
+// THE LINE BETWEEN THE TWO: the field holds what a TURN creates and a turn consumes — one-shot,
+// expiring, breakable. The status bar keeps what you OWN for the run: charms, a contract, the
+// Standing. In board terms, tokens on the table versus cards in your play area.
+//
+// 🌱 DELIBERATELY NOT BUILT: timers and removal. `timer` is in the shape so a planted token FITS,
+// but nothing counts down and no creature can break anything, because nothing plants yet. Build
+// the machinery when a class needs it — speculative generality is how a seam rots.
+//
+// THE SHAPE OF A TOKEN:
+//   id     stable handle — the CSS/animation hook, and what a tutorial lesson points at
+//   icon   one glyph; the thing you actually recognise it by across the table
+//   name   what it is called
+//   count  optional number carried ON the token
+//   cap    optional — with a count, draws PIPS instead of a numeral (● Momentum)
+//   worth  what it is doing RIGHT NOW. ⚠️ THE TERMS, NEVER A VERDICT.
+//   note   what takes it away. 🔑 EVERY TOKEN SAYS HOW IT DIES — that is what makes it an object
+//          with a lifetime rather than a stat, and it is the half a bare counter never showed.
+//   bane   true when it is working against you
+//   tap    optional handler. 🔑 A TOKEN YOU CAN ACT ON *IS* THE CONTROL — see 🔥 below.
+//   timer  reserved. Nothing reads it yet.
+//
+// ⚠️ THE CLASS OWNS ITS OWN TOKENS (`CLASS.tokens()`); the ENGINE owns the rest and owns the row.
+// Same split that already works for compose(): the engine draws, saves and expires them, the class
+// decides what its tokens MEAN. A rogue must never inherit the mage's Emberwake by sharing an
+// array — that is the slot-③ mistake in a new place.
+// ============================================================
+function fieldTokens() {
+  const out = [];
+  if (CLASS && CLASS.tokens) { const t = CLASS.tokens(); if (t) out.push(...t.filter(Boolean)); }
+  // ---- ENGINE TOKENS: the one-shot boons and banes the road hands you ----
+  if (S.paceBless > 0) out.push({ id: 'glimpse', icon: '🌙', name: 'Glimpse',
+    worth: '<b>+2</b> Pace', note: 'on your next journey' });
+  if (S.emberShield) out.push({ id: 'hollow', icon: '🔥', name: 'Ember Hollow',
+    worth: 'your <b>Arsenal</b> survives Nightfall', note: 'once, then it is gone' });
+  if (S.curseNextFight) out.push({ id: 'followed', icon: '☠️', name: 'Followed', bane: true,
+    worth: 'your next <b>fight</b> carries a Hardship', note: 'until it lands' });
+  // ⏳ the countdown, on screen the whole time it runs. ⚠️ This is the token that makes it a
+  // COUNTDOWN rather than a hidden state — the cost has to be visible while you are paying it,
+  // or it is a punishment you only notice at the shop.
+  if (S.delayed > 0) out.push({ id: 'delayed', icon: '⏳', name: 'Delayed', bane: true,
+    count: S.delayed, timer: S.delayed,
+    worth: 'you cannot <b>sharpen</b>', note: `${S.delayed} more encounter${S.delayed === 1 ? '' : 's'}` });
+  return out;
+}
+
+const stripTags = s => String(s).replace(/<[^>]*>/g, '');
+// 🛡️ THE EQUIPMENT RAIL — Flesh and Blood's zone layout, which is worth copying exactly:
+//     HEAD across the top · CHEST and ARMS side by side · LEGS below.
+// 🔑 SEPARATE FROM #field ON PURPOSE, and the line is clean: the FIELD holds what a TURN creates
+// and a turn consumes; the RAIL holds what you WEAR for the whole run. Two clocks, two places.
+// ⚠️ That does NOT reintroduce the two-ledger bug the field was built to kill — armour moved
+// wholesale, it is not drawn in both. Nothing here is duplicated anywhere else.
+// ⚠️ A zone you have not unlocked reads LOCKED, never empty. A locked thing you can see is a goal;
+// an empty box is a bug you go looking for.
+const RAIL_ORDER = ['Head', 'Chest', 'Arms', 'Legs'];
+function renderArmourRail() {
+  const el = $('armour-rail');
+  if (!el) return;
+  if (isShell() || !S || !S.deck) { el.className = ''; el.innerHTML = ''; return; }
+  const worn = {};
+  for (const a of (S.armour || [])) {
+    const d = armourDef(a.id); if (d) worn[d.slot] = a;
+  }
+  const openSlots = armourSlotsOpen();
+  let i = 0;
+  el.className = 'has-rail';
+  el.innerHTML = RAIL_ORDER.map(slot => {
+    const sl = ARMOUR_SLOTS[slot], a = worn[slot], open = i++ < openSlots;
+    if (!open) return `<div class="eq eq-${slot.toLowerCase()} is-locked">` +
+      `<div class="eq-zone">${sl.label}</div><div class="eq-lock">🔒</div></div>`;
+    if (!a) return `<div class="eq eq-${slot.toLowerCase()} is-empty">` +
+      `<div class="eq-zone">${sl.label}</div></div>`;
+    const d = armourDef(a.id), live = armourBlock(a), charges = armourUsesLeft(a);
+    const charging = !!d.charge;
+    const canBlock = S.phase === 'soak' && S.damage > 0 && a.wear > 0 && live > 0;
+    const canUse = isAssignPhase() && armourReady(a);
+    // ⚒️ every figure on the rail comes from the piece, never from its def — an upgraded piece
+    // that printed the base number would show one value and pay another, which is the display bug
+    // this project has now shipped four times.
+    const e = upEffects(d, a.up || 0), maxW = armourMaxWear(a), bv = d.block + e.block;
+    const n = charging ? (a.charge || 0) : maxW > 0 ? a.wear : charges;
+    const cap = charging ? armourCharge(a) : maxW > 0 ? maxW : Math.max(0, (d.uses || 0) + e.uses);
+    const dis = armourPow('discharge', a);
+    const acts = (canUse && d.use === 'discharge')
+      ? `<div class="eq-acts"><button class="tok-act" onclick="useArmour('${a.id}','atk')">⚔️ +${dis}</button>` +
+        `<button class="tok-act" onclick="useArmour('${a.id}','init')">💨 +${dis}</button></div>` : '';
+    const tap = canBlock ? `soakWithArmour('${a.id}')` : (canUse && d.use !== 'discharge') ? `useArmour('${a.id}')` : null;
+    return `<div class="eq eq-${slot.toLowerCase()} rar-${d.rarity || 'common'}` +
+      `${tap ? ' is-ready' : ''}${(bv > 0 && a.wear <= 0 && !charging) ? ' is-spent' : ''}"` +
+      (tap ? ` onclick="${tap}" role="button" tabindex="0"` : '') +
+      ` title="${stripTags(d.name + ' — ' + (classText(d.text) || 'no ability'))}">` +
+      `<div class="eq-zone">${sl.label}</div>` +
+      `<div class="eq-name">${d.name}${(a.up || 0) ? ` <span class="eq-plus">+${a.up}</span>` : ''}</div>` +
+      `<div class="eq-block">${bv > 0 ? 'blocks <b>' + bv + '</b>' : '<span class="dim">no block</span>'}</div>` +
+      (cap ? `<div class="eq-pips">${pips(n, cap)}</div>` : '') +
+      (canBlock ? `<div class="eq-cue">tap to block</div>` : canUse && !acts ? `<div class="eq-cue">tap to use</div>` : '') +
+      acts +
+    `</div>`;
+  }).join('');
+}
+
+function renderField() {
+  const el = $('field');
+  if (!el) return;
+  // ⚠️ a shell screen has no run, so it has no board either — and S may be a stale run object.
+  const toks = (!isShell() && S && S.deck) ? fieldTokens() : [];
+  el.className = toks.length ? 'has-tokens' : '';
+  if (!toks.length) { el.innerHTML = ''; return; }
+  el.innerHTML = toks.map(t => {
+    const body = (t.cap != null && t.count != null)
+      ? `<span class="tok-pips">${pips(t.count, t.cap)}</span>`
+      : (t.count != null ? `<span class="tok-count">${t.count}</span>` : '');
+    return `<div class="tok tok-${t.id}${t.bane ? ' is-bane' : ''}${t.tap ? ' is-tappable' : ''}` +
+      `${t.armour ? ' is-armour' : ''}${t.spent ? ' is-spent' : ''}${t.ready ? ' is-ready' : ''}"` +
+      (t.tap ? ` onclick="${t.tap}" role="button" tabindex="0"` : '') +
+      ` title="${stripTags(t.name + ' — ' + t.worth + ' · ' + t.note)}">` +
+      `<div class="tok-head"><span class="tok-icon">${t.icon}</span>${body}</div>` +
+      `<div class="tok-name">${t.name}</div>` +
+      `<div class="tok-worth">${t.worth}</div>` +
+      `<div class="tok-note">${t.note}</div>` +
+      // 🔑 a token with more than one thing to do carries its own buttons. Same principle as one
+      // tap: a token you can act on IS the control — there is just more than one act.
+      (t.acts ? `<div class="tok-acts">` + t.acts.map(x =>
+        `<button class="tok-act" onclick="${x.call}">${x.label}</button>`).join('') + `</div>` : '') +
+    `</div>`;
+  }).join('');
+}
+
+// 🧾 WHAT YOU OWN FOR THE RUN — charms and a contract. ⚠️ Everything ONE-SHOT or breakable moved
+// to the field above; do not add it back here, and do not add a token there without taking it out
+// of here. Two ledgers is the Mirror Fen bug again.
 function carried() {
   const out = [];
-  for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: c.text }); }
-  if (S.wake > 0) out.push({ curse: false, name: 'Emberwake',
-    text: S.wakeTarget ? `🔥 +${S.wake} → ${WAKE_TARGETS[S.wakeTarget]}` : `🔥 +${S.wake} — unaimed` });
-  if (S.paceBless > 0) out.push({ curse: false, name: 'Glimpse', text: '🌙 +2 Pace, next journey' });
-  if (S.emberShield) out.push({ curse: false, name: 'Ember Hollow', text: '🔥 Arsenal survives Nightfall' });
-  if (S.curseNextFight) out.push({ curse: true, name: 'Followed', text: '⚠️ next fight carries a Hardship' });
+  for (const id of S.charms) { const c = charmById(id); if (c) out.push({ curse: !!c.curse, name: c.name, text: classText(c.text) }); }
   // 📜 a contract is a run-layer promise with a deadline — exactly the thing the 2026-07-29
   // rule says must be on screen every turn, with its PROGRESS, not just its name
   const ct = activeContract();
   if (ct) out.push({ curse: false, name: ct.name,
     text: `📜 ${S.contract.n}/${ct.need} · ${S.contract.left != null ? S.contract.left + ' left · ' : ''}pays 🪙 ${ct.reward}` });
   return out;
+}
+// 📋 EVERYTHING YOU ARE CARRYING, AS OBJECTS (2026-08-22). Thomas, on the event screen:
+// *"wish this could be more clear on what im getting, what i have or whatever."*
+//
+// 🐛 The old screen ran the whole inventory together as one prose sentence separated by "·", and
+// it left POTIONS OUT ENTIRELY — so an event could say *"Tallow Stub goes in your kit"* and then
+// print a "You now carry:" line that did not contain it. **You were told you gained a thing and
+// then shown a list without the thing in it.**
+//
+// 🔑 THE FIX IS THE FIELD'S LESSON APPLIED ONE SCREEN OVER: do not describe state in a sentence,
+// SHOW THE OBJECTS. Three labelled rows, each item its own chip, in the same visual language the
+// status bar already uses — so a charm looks like a charm wherever you meet it.
+// ⚠️ It reads carried() and S.potions rather than keeping its own list: two ledgers for the same
+// state is the Mirror Fen bug, and this screen is exactly where that would hide.
+function carriedPanelHTML(heading) {
+  const rows = [];
+  const kit = S.potions || [];
+  if (kit.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">🧪 Kit</span>` +
+    kit.map(x => { const d = potionById(x.id) || x;
+      return `<span class="carry-chip" title="${stripTags(classText(d.text) || '')}">${d.name}</span>`; }).join('') +
+    `<span class="dim carry-row-note">${kit.length}/${POTION_CAP} · one use each, the turn you drink it</span></div>`);
+  const items = carried();
+  const charms = items.filter(x => !x.text.startsWith('📜'));
+  const quest  = items.filter(x =>  x.text.startsWith('📜'));
+  if (charms.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">🎁 Charms</span>` +
+    charms.map(x => `<span class="carry-chip${x.curse ? ' is-curse' : ''}" title="${stripTags(x.text)}">` +
+      `${x.curse ? '☠️ ' : ''}${x.name}</span>`).join('') + `</div>`);
+  if (quest.length) rows.push(`<div class="carry-row"><span class="carry-row-lab">📜 Contract</span>` +
+    quest.map(x => `<span class="carry-chip">${x.name} <span class="dim">${stripTags(x.text).replace('📜 ', '')}</span></span>`).join('') + `</div>`);
+  if (!rows.length) return `<p class="event-carry">You carry nothing that changes your maths.</p>`;
+  return `<div class="carry-panel"><div class="carry-head">${heading}</div>${rows.join('')}</div>`;
 }
 const carryLine = x => `${x.curse ? '☠️' : '🎁'} ${x.name}: ${x.text}`;
 function carriedText() {
@@ -4385,7 +9847,7 @@ function standingText() {
   // and only pass judgement from region 4, where the numbers actually separate.
   const judge = S.finalMode || S.region >= 4;
   const cls = !judge ? '' : have >= par ? 'good' : have >= par - 4 ? '' : 'bad';
-  return `<span class="standing" title="Your deck's total card levels, against the total this dragon usually asks for by the lair. A target, not a prediction — measured over 2,000 runs. Levelling raises it; soaking lowers it.">` +
+  return `<span class="standing" title="Your deck's total card levels, against the total this dragon usually asks for by the lair. A target, not a prediction — measured over 2,000 runs. Levelling raises it; blocking lowers it.">` +
     `🃏 Deck <b class="${cls}">${have}</b> → <b>${par}</b> by the lair</span>`;
 }
 
@@ -4404,11 +9866,39 @@ function renderStatus() {
     carriedText();
 }
 
+// 🗡️ THE MOMENTUM METER — PIPS, NOT PROSE (2026-08-17).
+//
+// ⚠️ THIRD ATTEMPT AT EXPLAINING THIS CLASS, AND THE FIRST TWO WERE BOTH WORDS. Thomas, after
+// two rewrites of the slot hints: *"finisher says spend 1, spend 1 what?"* / *"i don't get what
+// builder vs finisher is at a glance"*.
+//
+// 🔑 THE PROBLEM WAS NEVER THE WORDING, IT WAS THAT THE RESOURCE HAD NO BODY. Momentum was a
+// number inside a sentence, sitting among other sentences — nothing to look at, nothing to count.
+// WoW puts combo points on the target as pips and never explains them in a tooltip, because you
+// COUNT them. So: one glyph, ●, used in the meter, on the cards, and in every hint. A card that
+// says "+1 ●" next to a bar reading "●●○○○" needs no sentence at all.
+//
+// ⚠️ AND NEVER PRINT A BARE NUMBER AGAIN. "spends 1" was literally unanswerable — one what?
+// Every quantity in this class is written with its glyph attached.
+const PIP_ON = '●', PIP_OFF = '○';
+function pips(n, cap) {
+  const full = Math.max(0, Math.min(cap, n | 0));
+  return `<span class="pip-on">${PIP_ON.repeat(full)}</span><span class="pip-off">${PIP_OFF.repeat(cap - full)}</span>`;
+}
+// 🎴 THE STATUS-BAR CHIP IS GONE (2026-08-21) — Momentum is a TOKEN now and lives on the field.
+// It was already most of the way there: the 2026-08-17 pips fix gave it a glyph and a body, which
+// is exactly what separated it from the 🔥 Emberwake (a number inside a sentence, in two places at
+// once). All that was left was to move it onto the table. See ROGUE.tokens().
+// ⚠️ Its chip was DELETED in the same edit rather than left beside the token — when a display
+// moves, the old one goes with it, or the next persistent modifier gets added to the wrong ledger.
+
 // 🕯️ what you can see of the road ahead — and, when the candle is out, that you cannot.
 function candleLine() {
   if (S.finalMode) return '';
   const n = nextEncounter();
   if (!S.candle) return `<div class="candle out">🕯️ <b>Your candle is out.</b> You cannot see what waits beyond this. <span class="dim">Complete an encounter to relight it.</span></div>`;
+  // 🗺️ with a map, what the candle buys is stated on the map itself, road by road
+  if (S.map) return `<div class="candle lit">🕯️ <b>Lit.</b> <span class="dim">On the map you can read what waits down each road you could take.</span></div>`;
   if (!n) return `<div class="candle lit">🕯️ <b>Lit.</b> <span class="dim">Nothing more on this road — the region ends after this.</span></div>`;
   const what = n.type === 'fight'
     ? `⚔️ <b>${n.name}</b> · ❤️ ${n.hp} · 💨 ${n.init} · ${n.shape === 'armour' ? `🛡️ Armour ${n.shapeV}` : n.shape === 'evasion' ? '🌀 Evasion' : 'unguarded'}`
@@ -4419,6 +9909,19 @@ function candleLine() {
 function renderEncounter() {
   const e = S.encounter;
   const panel = $('encounter-panel');
+  // 🏕️ ON AN EVENT TURN THERE IS NO ENCOUNTER. `S.encounter` still holds the LAST one, so
+  // the panel was presenting a live journey - MP, Nightfall, a Time Penalty - that you could not
+  // play and would never resolve. Found by looking at the screen, not by a test: every number on
+  // it was correct and every one of them was about a turn that had already happened.
+  // 🔑 A PANEL THAT DESCRIBES THE PREVIOUS TURN IS WORSE THAN AN EMPTY ONE.
+  // ⚠️ The SLOT ROW deliberately stays - event pickers live ON the cards, and it is the only
+  // place a card is ever drawn.
+  if (isEventTurn()) {
+    panel.innerHTML = `<div class="enc-title">❓ AN EVENT</div>` +
+      `<div class="enc-sub">Region ${S.region} · no encounter this turn</div>` +
+      `<div class="hint">You spend no cards here. Your hand carries on to the next encounter.</div>`;
+    return;
+  }
   if (S.finalMode && S.phase !== 'defeat' && S.phase !== 'victory') {
     const ds = S.dragonState;
     const hpPct = ds ? Math.max(0, Math.round(100 * ds.hp / ds.maxHp)) : 100;
@@ -4439,13 +9942,29 @@ function renderEncounter() {
     panel.className = 'journey';
     panel.innerHTML =
       `<div class="enc-type">⚔️ THE LAST MILE</div>` + dragonBar +
-      `<div class="enc-stats"><span>👣 MP <b>${LAST_MILE.mp}</b> (half ${Math.ceil(LAST_MILE.mp / 2)})</span></div>` +
+      // ⚔️ TWO RACES, STATED AS TWO. Both targets are printed as numbers, in the same grammar as
+      // every other encounter, because the whole point of the second race is that it is a race
+      // you can SEE yourself winning or losing while you arrange.
+      `<div class="enc-stats">` +
+        `<span>👣 MP <b>${LAST_MILE.mp}</b> (half ${Math.ceil(LAST_MILE.mp / 2)})</span>` +
+        `<span>💨 vs Init <b>${S.dragon.init}</b> (half ${Math.ceil(S.dragon.init / 2)})</span>` +
+      `</div>` +
       `<div class="enc-mod lastmile-deal">` +
-        `<b>Complete it</b> and you fall on the ${S.dragon.name} before it stands — it begins the duel <b>−${LAST_MILE.hpComplete} HP</b>.<br>` +
+        `<b>👣 How hard you arrive</b> — how hurt it starts.<br>` +
+        `<b>Complete it</b> and you fall on the ${S.dragon.name} before it stands — <b>−${LAST_MILE.hpComplete} HP</b>.<br>` +
         `<b>Fall short</b> (half MP) and you land one blow as it turns — <b>−${LAST_MILE.hpNarrow} HP</b>.<br>` +
         `<b>Fail</b> and it meets you whole.` +
       `</div>` +
-      `<div class="enc-hint">🔄 <b>Nothing here costs you cards.</b> Spent, stacked or kept — you gather your whole deck for the duel either way. <b>Hold nothing back.</b></div>`;
+      `<div class="enc-mod lastmile-deal">` +
+        `<b>💨 How quietly you arrive</b> — whether it is ready for you.<br>` +
+        `<b>Match its Initiative</b> and it never hears you — ${unseenPromise()}<br>` +
+        `<b>Below half</b> and it is already up: it takes the opening blow, <b>${Math.ceil(S.dragon.breath / 2)} damage</b>, and you block it with your deck.` +
+      `</div>` +
+      // ⚠️ THIS LINE USED TO SAY "NOTHING HERE COSTS YOU CARDS", FULL STOP, AND THAT IS NOW FALSE.
+      // 🔑 The promise it was making is still kept, though, and it is worth keeping precisely:
+      // what you PLAY costs nothing — every card comes back. Only FAILING costs. When a rule gains
+      // an exception, the line that states the rule has to gain it in the same edit.
+      `<div class="enc-hint">🔄 <b>Nothing you play here costs you cards.</b> Spent, stacked or kept — you gather your whole deck for the duel either way, so <b>hold nothing back</b>. Only arriving <i>loud</i> costs you: that blow is soaked, and blunted cards stay blunted.</div>`;
     return;
   }
   if (S.phase === 'intro' || S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory' || !e) { panel.innerHTML = ''; panel.className = ''; return; }
@@ -4453,7 +9972,7 @@ function renderEncounter() {
   const modLines =
     (e.ability ? `<div class="enc-mod">☠️ <b>${e.ability}</b> — ${ABILITIES[e.ability]}</div>` : '') +
     (e.peril ? `<div class="enc-mod">⛰️ <b>${e.peril}</b> — ${PERILS[e.peril]}</div>` : '') +
-    (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${HARDSHIPS[S.hardship]}</div>` : '');
+    (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${hardshipText(S.hardship)}</div>` : '');
   if (e.type === 'fight') {
     panel.innerHTML =
       `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
@@ -4474,13 +9993,183 @@ function renderEncounter() {
   }
 }
 
+// 🛤️ WHAT A BRANCH SHOWS. 🕯️ THE CANDLE DECIDES HOW MUCH YOU SEE - lit, you read what is IN
+// each road; out, you read only its SHAPE and choose on that.
+// 🔑 This is the candle's PROMOTION, not its replacement. Its old job (*"see the next
+// encounter"*) was measured to change the Spell only 7% of the time; deciding how much of a fork
+// you can read is worth far more, and it makes *keep the candle lit* a directional goal.
+// ⚠️ Even UNLIT a branch always states its shape, so the ✦ Arsenal always has something to aim
+// at - which is the whole reason the fork rescues that slot ([[The_Arsenal_Question]] §reopened).
+function forkBranchHTML(e, i) {
+  const lit = S.candle;
+  const isFight = e.type === 'fight';
+  const shape = shapeText(e);
+  const known = lit
+    ? (isFight ? `❤️ HP ${e.hp} · 💨 Init ${e.init} · ⚔️ Atk ${e.atk} · 🪙 ${e.xp}`
+               : `👣 MP ${e.mp} · 🌙 Nightfall ${e.nightfall} · ⏳ TP ${e.timePenalty} · 🪙 ${e.xp}`)
+    : `<span class="dim">by dark you can make out only its shape</span>`;
+  const extra = lit && (e.ability || e.peril)
+    ? `<div class="fork-extra">${e.ability ? `⚠️ ${e.ability}` : `⚠️ ${e.peril}`}</div>` : '';
+  return `<button class="fork-branch" onclick="takeFork(${i})">` +
+    `<span class="fork-kind">${isFight ? '⚔️ FIGHT' : '👣 JOURNEY'}</span>` +
+    `<span class="fork-name">${lit ? e.name : (isFight ? 'something in the way' : 'a road onward')}</span>` +
+    `<span class="fork-shape">${shape || '<span class="dim">unguarded</span>'}</span>` +
+    `<span class="fork-stats">${known}</span>${extra}</button>`;
+}
+
+// 🗺️ THE MAP, DRAWN AS FLOORS FROM THE TOP DOWN - the dragon is up there, so the map reads
+// upward the way the run does. ⚠️ Node TYPES only, never contents: that is what keeps a map on the
+// legal side of *"hints and direction, not complete optimizable data"*, and it is why the 🕯️ candle
+// still matters - it tells you what is INSIDE the step you are about to take.
+function mapHTML() {
+  const m = S.map; if (!m) return '';
+  const reach = mapChoices(m).map(n => n.f + ',' + n.c);
+  const rows = [];
+  // ⚠️ THE MAP'S OWN HEIGHT AND WIDTH, never the globals. The tutorial's map is 8x2 while
+  // MAP_FLOORS/MAP_COLS say 16x5 — reading the globals walked off the end of every row and threw
+  // before a single node was drawn. **Third reader of this same mistake in one session.**
+  for (let f = mapFloors(m) - 1; f >= 0; f--) {
+    const band = bandOf(f);
+    const cells = [];
+    for (let c = 0; c < m.floors[f].length; c++) {
+      const n = m.floors[f][c];
+      if (!n) { cells.push('<span class="mp-gap"></span>'); continue; }
+      const key = f + ',' + c;
+      const here = m.pos && m.pos.f === f && m.pos.c === c;
+      const can = reach.includes(key);
+      const past = m.taken.includes(key);
+      const cls = 'mp-node' + (here ? ' is-here' : '') + (can ? ' is-open' : '') + (past ? ' is-past' : '');
+      // ⚠️ data-f/data-c are what the edge layer measures against - the lines are drawn from the
+      // real rendered positions rather than computed geometry, so they cannot drift from the grid.
+      const at = `data-f="${f}" data-c="${c}"`;
+      // 🗺️ HOVER READS THE NODE. Thomas: *"is it possible to see the encounter info on the map
+      // on mouseover? instead of a list at the bottom of the map."*
+      // ⚠️ Hover does not exist on a phone, and this game is played on one daily - so on touch a
+      // tap SELECTS and the second tap moves. Not a workaround bolted on: the nodes are 30px and
+      // routing is irreversible, so a confirm step is worth having there anyway.
+      const hov = `onmouseenter="peekNode(${f},${c})" onfocus="peekNode(${f},${c})"`;
+      cells.push(can
+        ? `<button class="${cls}${isPeeked(f, c) ? ' is-peek' : ''}" ${at} ${hov} ` +
+          `onclick="tapNode(${f},${c})" title="${mapTitle(n)}">${mapIcon(n)}</button>`
+        : `<span class="${cls}" ${at} title="${mapTitle(n)}">${mapIcon(n)}</span>`);
+    }
+    // 🐛 THE BAND DIVIDER WAS ONE ROW TOO HIGH (fixed 2026-08-22, Thomas: *"why are the region
+    // lines not lining up with the region numbers"*). The rule was `f % MAP_BAND === 0`, which is
+    // true for floors 12/8/4/0 — but rows render TOP-DOWN, so those are the LAST floor of each
+    // band, and `border-top` then drew the line *inside* the band rather than between two.
+    // 🔑 The band changes between f and f-1 when `bandOf(f) !== bandOf(f-1)`, i.e. on the FIRST
+    // row of the lower band reading downward: floors 11/7/3. ⚠️ And never above the top row.
+    const bandStart = f % MAP_BAND === MAP_BAND - 1 && f !== MAP_FLOORS - 1;
+    rows.push(`<div class="mp-row${bandStart ? ' mp-band' : ''}">` +
+      `<span class="mp-f">${f === mapFloors(m) - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
+  }
+  // 🗺️ THE LINES ARE THE MAP. Without them this is a grid of icons where the game decides
+  // where you may go for reasons you cannot see - Thomas, pointing at an unreachable neighbour:
+  // *"why can't i go to the left node here?"* The node was real, his node simply did not link to
+  // it, and nothing on screen said so.
+  // 🔑 AND WITHOUT EDGES THERE IS NO ROUTING AT ALL. You cannot plan toward an elite three floors
+  // up if you cannot trace a path to it, which is the entire reason the map replaced the fork.
+  return `<div class="mp"><svg class="mp-lines" aria-hidden="true"></svg>${rows.join('')}</div>`;
+}
+
 function renderControls() {
   const c = $('controls-panel');
-  if (S.phase === 'assign' && S.diverting) {
+  if (S.phase === 'map') {
+    const opts = mapChoices(S.map);
     c.innerHTML =
-      `<div class="phase-label">PHASE 1 — CHALLENGE · DIVERT</div>` +
-      `<div class="hint">Choose a hand card to discard. The top of the deck (<b>${S.deck[0].def.name}</b>) burns with it, and a new encounter — of a <b>different type</b> (${S.encounter.type === 'fight' ? 'a journey' : 'a fight'}, if one remains) — is revealed.</div>` +
-      `<button onclick="cancelDivert()">Cancel — face ${S.encounter.name}</button>`;
+      `<div class="phase-label">🗺️ THE ROAD TO ${S.dragon.name.toUpperCase()}</div>` +
+      `<div class="hint">${S.map && S.map.pos ? 'Choose where to go next.' : 'Choose where to begin.'} ` +
+      `<b>You are carrying ${S.hand.length === 0 ? 'nothing' :
+        S.hand.map(c => displayName(c)).join(', ')}</b> — the rest of your hand is dealt once you set off. ` +
+      (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
+                : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
+      `</div>` + mapHTML() +
+      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ❓ an event · 🕯️ a hearth</div>` +
+      // 🔑 ONE line that follows the pointer, instead of a list of every road at once. A list
+      // states three things you did not ask about; a hover states the one you are considering.
+      `<div class="mp-detail" id="mp-detail">${peekHTML()}</div>` +
+      (opts.length ? '' : `<div class="hint">No road left — the lair is ahead.</div>`);
+    return;
+  }
+  if (S.phase === 'hearth') {
+    const forgeable = hearthForgeable();
+    // ⚠️ THE LAST HEARTH HAS NO ROAD AFTER IT, SO THE LIGHT HAS NOTHING TO SHOW. The top floor
+    // is always a hearth (StS's floor-15 rest), and the candle reveals the NEXT ENCOUNTER - after
+    // the top floor there is only the duel, and the dragon is fully revealed from turn 1 by design.
+    // 🔑 So the option is DISABLED AND SAYS WHY rather than quietly being a trap - the same rule
+    // as every other picker here. ⚠️ It is still a half-dead node: this makes the last hearth
+    // honest, it does not make it a decision. The real fix is a second option that means something
+    // on the eve of a duel (duel stamina and the dragon's opening HP are both already priced) -
+    // that is a design call, not a patch.
+    const lastHearth = !!(S.map && S.map.pos && S.map.pos.f >= MAP_FLOORS - 1);
+    c.innerHTML =
+      `<div class="phase-label">🕯️ A HEARTH</div>` +
+      `<div class="event-flavor">Someone kept this fire and moved on. The coals are still warm — warm enough ` +
+      `to take a wick from, or to work a blade in. Not both; they will be grey by morning.</div>` +
+      `<div class="event-opts">` +
+      `<button ${lastHearth ? 'disabled ' : ''}onclick="${lastHearth ? '' : 'hearthLight()'}">` +
+        `🕯️ <b>Take the light</b>` +
+        `<span class="opt-why">${lastHearth
+          ? 'there is no more road to read — only the dragon'
+          : (S.candle ? 'your candle is already lit — this does nothing for you'
+                      : 'see what waits at each step until it gutters')}</span></button>` +
+      `<button ${forgeable.length ? '' : 'disabled '}onclick="${forgeable.length ? 'startHearthPick()' : ''}">` +
+        `🔧 <b>Work the coals</b>` +
+        `<span class="opt-why">${forgeable.length ? 'sharpen one card a level, free'
+          : 'nothing in hand can be sharpened'}</span></button>` +
+      `<button ${S.trashed.length ? '' : 'disabled '}onclick="${S.trashed.length ? 'startMendPick()' : ''}">` +
+        `🧵 <b>Mend what you lost</b>` +
+        `<span class="opt-why">${S.trashed.length
+          ? `choose one of the ${S.trashed.length} card${S.trashed.length === 1 ? '' : 's'} damage took — it returns at Lv1`
+          : 'nothing of yours has been lost yet'}</span></button>` +
+      `</div>`;
+    return;
+  }
+  if (S.phase === 'eliteboon') {
+    const offers = (S.boon || []).map(id => charmById(id)).filter(Boolean);
+    c.innerHTML =
+      `<div class="phase-label">💀 SOMETHING WORTH TAKING</div>` +
+      `<div class="event-flavor">The dangerous thing is dead, and it was carrying something. ` +
+      `Whatever it was doing out here, it was not doing it unprepared.</div>` +
+      `<div class="setout">` +
+      offers.map(o => `<button class="setout-offer r-${o.rarity}" onclick="pickBoon('${o.id}')">` +
+        `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
+        (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
+      `</div>`;
+    return;
+  }
+  if (S.phase === 'mendpick') {
+    c.innerHTML =
+      `<div class="phase-label">🧵 MEND WHAT YOU LOST</div>` +
+      `<div class="hint">Everything damage has taken from you this run. One comes back — at <b>Lv1</b>, ` +
+      `at the bottom of your deck.</div>` +
+      `<div class="mend-row">${S.trashed.map(t => cardHTML(t)).join('')}</div>` +
+      `<button onclick="cancelMendPick()">← back to the hearth</button>`;
+    return;
+  }
+  if (S.phase === 'hearthpick') {
+    c.innerHTML =
+      `<div class="phase-label">🔧 WORK THE COALS</div>` +
+      `<div class="hint">Tap a card to sharpen it a level. ⚠️ The candle stays as it is.</div>` +
+      `<button onclick="cancelHearthPick()">← back to the hearth</button>`;
+    return;
+  }
+  if (S.phase === 'fork') {
+    const f = S.fork || [];
+    c.innerHTML =
+      `<div class="phase-label">🛤️ THE ROAD FORKS</div>` +
+      `<div class="hint">Choose where to go. ${S.candle
+        ? 'Your candle is lit — you can see what waits down each road.'
+        : '<b>Your candle is out</b> — you can read only the shape of what waits.'}</div>` +
+      `<div class="fork-row">${f.map((e, i) => forkBranchHTML(e, i)).join('')}</div>`;
+    return;
+  }
+  // ⚠️ A TURN WITHOUT AN ENCOUNTER IS A BUG, BUT IT MUST NOT BE A BLANK SCREEN. Reading
+  // `S.encounter.type` blind is what turned one sequencing slip into a frozen game.
+  if (S.phase === 'assign' && !S.encounter) {
+    c.innerHTML = `<div class="phase-label">⚠️ NO ENCOUNTER</div>` +
+      `<div class="hint">This turn has no encounter, which should not happen. ` +
+      `Use 📋 Report to copy the state, then ⟳ New Run.</div>`;
     return;
   }
   if (S.phase === 'assign') {
@@ -4506,10 +10195,20 @@ function renderControls() {
     const resolveBtn = duel
       ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
       : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>Resolve ${isFight ? 'Fight' : 'Journey'}</button>`;
-    // Divert only makes sense before the first blow is struck
-    const divertBtn = S.finalMode ? '' :
-      `<button onclick="beginDivert()" ${canDivert() ? '' : 'disabled'} title="Burn the top deck card + 1 hand card to swap this encounter for one of a different type">` +
-      `Divert to a ${S.encounter.type === 'fight' ? 'journey' : 'fight'} (${MAX_DIVERTS - S.divertsUsed} left${S.deck.length === 0 ? ' — deck empty' : ` — burns ${S.deck[0].def.name}`})</button>`;
+    // 👁️ WHAT YOU ARE FACING, RESTATED AT THE BUTTON (2026-08-18).
+    // Thomas: *"the encounter info also seems small in the top left. since my gaze is always at my
+    // hand, and the resolve button is near my hand. thats where im looking at, and i don't see the
+    // encounter info. and sometimes i click resolve journey without even seeing the encounter
+    // info."*
+    // 🔑 MEASURED, AND IT IS A LAYOUT FAULT RATHER THAN CARELESSNESS: the encounter panel
+    // centres at (156,221) in 11px type, the Resolve button at (543,388), the hand at (509,673).
+    // The information and the decision sit 422px apart in opposite corners, so you cannot read the
+    // terms while looking at the control you are about to press.
+    // 🔑 THE RULE: PUT THE TERMS WHERE THE DECISION IS - a restatement beside the button, not a
+    // bigger panel on the far side of the screen.
+    // ⚠️ TERMS ONLY, NEVER THE OUTCOME. Live preview was removed deliberately and stays removed:
+    // this says what the encounter DEMANDS, never what your arrangement would do about it.
+
     // the how-to text is tucked into a collapsed toggle at the bottom — out of the way each turn,
     // still one tap away. The actionable "you're not stuck" warning stays inline.
     // 🔥 AIM THE EMBERWAKE. It sits above Resolve because you bank BLIND and spend INFORMED —
@@ -4524,20 +10223,25 @@ function renderControls() {
     // 🧪 YOUR KIT. Potions are useless if you forget you have them, so they sit ON the turn
     // screen with their full text, not behind a menu.
     const kit = (S.potions || []).map(id => potionById(id)).filter(Boolean);
+    // ⚠️ THREE POTIONS DROPPED THE PHRASE ENTIRELY rather than take it mid-sentence: *"You win
+// Initiative WHEN USED, whatever it is"* and *"your Catalyst stays in hand WHEN USED instead of
+// going under the deck"* both read worse than what they replaced. 🔑 A CLARIFICATION THAT HAS TO
+// BE WEDGED INTO THE MIDDLE OF A SENTENCE IS NOT CLARIFYING IT - the kit line below carries the
+// rule for all of them, so a text that reads cleanly without it simply goes without.
+// ⚠️ THE DURATION IS STATED HERE, ONCE. Every potion lasts exactly the turn you drink it,
+    // so repeating that on all seventeen of them is noise in a shop - the card text says WHAT it
+    // does and that you choose when; this line says how long it lasts.
     const potionRow = kit.length
-      ? `<div class="kit-row">` + kit.map((p, i) =>
+      ? `<div class="kit-row"><div class="kit-lab">🧪 Your kit — tap one to drink it. ` +
+        `<span class="dim">Each is one use, and lasts only the turn you drink it.</span></div>` +
+        kit.map((p, i) =>
           `<button class="kit-potion${S.potionPick === p.id ? ' arming' : ''}" onclick="usePotion('${p.id}')">` +
-          `<b>🧪 ${p.name}</b><span class="kit-text">${p.text}</span></button>`).join('') +
+          `<b>🧪 ${p.name}</b><span class="kit-text">${classText(p.text)}</span></button>`).join('') +
         (S.potionPick ? `<div class="kit-ask">Tap a card to use the <b>${potionById(S.potionPick).name}</b> on it — ` +
           `<button onclick="cancelPotion()">cancel</button></div>` : '') +
         `</div>`
       : '';
-    const wakeRow = S.wake > 0
-      ? `<div class="wake-row"><span class="wake-lab">🔥 Emberwake <b>+${S.wake}</b> — aim it:</span>` +
-        Object.keys(WAKE_TARGETS).map(k =>
-          `<button class="wake-btn${S.wakeTarget === k ? ' on' : ''}" onclick="aimWake('${k}')">${WAKE_TARGETS[k]}</button>`).join('') +
-        `<span class="wake-note">spend it or lose it</span></div>`
-      : '';
+    // 🎴 the Emberwake's aim row is GONE — the token on the field is the control now (cycleWake).
     const howto =
       `<details class="howto"><summary>How to play</summary><div class="hint">` +
       `Your cards sit under the four roles — <b>Spell</b> (your action), <b>Catalyst</b> (casts it), <b>Surge</b> (fuel), <b>Arsenal</b> (the card you keep). <b>Position is the role</b>, so you rearrange by swapping: tap two cards to trade places, or tap a card then tap a role. (Desktop can drag too.)` +
@@ -4550,19 +10254,33 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      wakeRow +
       bankRowHTML() +
+      strikePromptHTML() +
       boostRow +
       resolveBtn +
-      divertBtn +
       howto;
   } else if (S.phase === 'reveal') {
     const beat = S.beats[S.beatIndex];
     c.innerHTML =
       `<div class="phase-label">RESOLVING — ${S.beatIndex + 1} / ${S.beats.length}</div>` +
-      `<div class="preview-bar beat-bar" onclick="advanceBeat()" title="click to continue">` +
-      S.beats.slice(0, S.beatIndex + 1).map((b, i) => beatDisplayHTML(b, i === S.beatIndex)).join('') +
-      `</div>` +
+      // 🔑 TWO ZONES, NOT ONE FLAT ROW. Every beat used to be an equal box in a single wrapping
+      // flex line, so the VERDICT — the one thing you are waiting for — was just the third card
+      // along. The arithmetic goes on top as a sequence; the verdict and what you gained get their
+      // own row underneath, separated by a rule. *Hierarchy is legibility, not decoration.*
+      (() => {
+        // 🔑 THREE ZONES: the working → the verdict → what you got. Each answers a different
+        // question, so each gets its own band rather than sharing a row.
+        const shown = S.beats.slice(0, S.beatIndex + 1);
+        const cell = (b) => beatDisplayHTML(b, b === S.beats[S.beatIndex]);
+        const work = shown.filter(b => !b.outcomeBeat && !b.carveBeat).map(cell).join('');
+        const verdict = shown.filter(b => b.outcomeBeat).map(cell).join('');
+        const drops = shown.filter(b => b.carveBeat).map(cell).join('');
+        return `<div class="preview-bar beat-bar" onclick="advanceBeat()" title="click to continue">` +
+          `<div class="pv-work">${work}</div>` +
+          (verdict ? `<div class="pv-verdict">${verdict}</div>` : '') +
+          (drops ? drops : '') +
+          `</div>`;
+      })() +
       (beat.final
         ? `<button class="primary" onclick="advanceBeat()">Continue</button>`
         : `<div class="hint">click to hurry…</div>`);
@@ -4589,13 +10307,13 @@ function renderControls() {
       // damage's colour advertised a rule that isn't there, exactly like the creature's `atkEl`
       // and the journey's `element`. Vocabulary fixed too: "Trashed" was retired for the plain
       // statement of what actually happens.
-      `<div class="hint">Damage to soak: <b style="color:#e08a7a">${S.damage}</b>` +
-      `. Tap a card to blunt it — it soaks its 🛡️ armour value. ` +
+      `<div class="hint">Damage to block: <b style="color:#e08a7a">${S.damage}</b>` +
+      `. Tap a card to block with — it blocks its 🛡️ number and drops a level. ` +
       `<b>A Lv1 card LEAVES YOUR DECK for the rest of the run.</b></div>`;
     } else if (S.phase === 'setout') {
     // 🔑 SHOW THE OBJECT. Same rule as every other picker in the game — the choice is between
     // three RULES, so all three rules are on screen in full, with what each one is FOR underneath.
-    const offers = (S.setout || []).map(id => charmById(id)).filter(Boolean);
+    const offers = (S.setout || []).map(o => ({ o, d: setoutById(o.k) })).filter(x => x.d);
     c.innerHTML =
       `<div class="phase-label">SETTING OUT</div>` +
       `<div class="setout">` +
@@ -4603,9 +10321,9 @@ function renderControls() {
       `Four regions of road, and then <b>${S.dragon.name}</b> at the end of them — ` +
       `everything you will have out there, you are carrying now.</p>` +
       `<p class="setout-ask">One last thing goes in the pack.</p>` +
-      offers.map(o => `<button class="setout-offer r-${o.rarity}" onclick="pickSetout('${o.id}')">` +
-        `<b>${o.name}</b><span class="setout-text">${o.text}</span>` +
-        (o.why ? `<span class="setout-why">${o.why}</span>` : '') + `</button>`).join('') +
+      offers.map(({ o, d }) => `<button class="setout-offer r-${SETOUT_RARITY[d.bucket]}" onclick="pickSetout('${d.id}')">` +
+        `<b>${d.name(o)}</b><span class="setout-text">${d.text(o)}</span>` +
+        `<span class="setout-why">${d.why(o)}</span></button>`).join('') +
       `</div>`;
   } else if (S.phase === 'upgrade') {
     const can = S.hand.filter(c => upgradable(c));
@@ -4657,7 +10375,7 @@ function renderControls() {
       `<button onclick="wheelReroll()" ${canReroll ? '' : 'disabled'}>🎲 Re-spin — 🪙 ${REROLL_COST}${canReroll ? '' : ' (short)'}</button>` +
       `<button class="primary" onclick="wheelDone()">${w.rich ? 'Break camp' : 'Move on'}</button>` +
       (S.charms.length ? `<div class="charm-tray">${S.charms.map(id => { const ch = charmById(id);
-        return `<span class="charm-chip r-${ch.rarity}" title="${ch.text}">${ch.name}</span>`; }).join('')}</div>` : '');
+        return `<span class="charm-chip r-${ch.rarity}" title="${stripTags(classText(ch.text))}">${ch.name}</span>`; }).join('')}</div>` : '');
   } else if (S.phase === 'event') {
     const def = currentEventDef();
     const ev = S.event;
@@ -4667,33 +10385,41 @@ function renderControls() {
       // both printed, and neither said they touched the same number - so working out that it had
       // cancelled was left to the player. An event must state where it LEFT you.
       const now = carried();
-      body = `<div class="summary">${ev.lines.map(l => `<p>${l}</p>`).join('')}` +
-        (now.length
-          ? `<p class="event-carry"><b>You now carry:</b> ${now.map(x => `<span class="${x.curse ? 'bad' : 'good'}">${carryLine(x)}</span>`).join(' · ')}</p>`
-          : `<p class="event-carry">You carry nothing that changes your maths.</p>`) + `</div>` +
+      // ⚠️ `now` is still read so the carried() call cannot drift out of this screen's dependencies.
+      body = `<div class="summary">` +
+        `<div class="event-outcome">${ev.lines.map(l => `<p>${l}</p>`).join('')}</div>` +
+        carriedPanelHTML('You are carrying') + `</div>` +
         `<button class="primary" onclick="eventContinue()">Continue</button>`;
     } else if (ev.step === 'pickCard') {
       // the choice is made ON the cards below — this panel just states the deal
       body = `<div class="hint"><b>${def.options[ev.opt].label}</b><br>Pick the card from your hand below — its stats are right there on it.</div>` +
         `<button onclick="eventCancelPick()">← back</button>`;
     } else {
-      // an OPTION may gate itself with when(), the same way a whole event can
+      // ⚠️ AN UNAFFORDABLE OPTION IS DISABLED AND SAYS WHY - IT IS NOT HIDDEN (2026-08-18).
+      // Thomas, on the Toll of Thorns: *"i didn't have enough to pay, so i guess it didn't do
+      // anything? confused"* - and he was right to be. The option was offered at full strength, he
+      // spent his one event choice on it, and `apply()` checked the price only AFTER committing.
+      // 🔑 SAME BUG AS THE 2026-08-05 PICKER FIX, IN A DIFFERENT CURRENCY. That one made
+      // ineligible CARDS stay visible and say why; the coin cost never got the same treatment.
+      // ⚠️ And `when` HID the option, which is worse than disabling for a price you might soon
+      // afford: you learn neither that the option exists nor that you were short. Hiding is right
+      // for a whole EVENT (a pool filter); it is wrong for one option on a screen you are reading.
       body = `<div class="event-flavor">${def.flavor}</div>` +
-        `<div class="event-opts">` + def.options.map((o, i) =>
-          (!o.when || o.when())
-            ? (() => { const blocked = o.need === 'card' && !eventPickable(o).length;
-                return `<button onclick="eventChoose(${i})"${blocked ? ` disabled title="${S.hand.length ? 'no card in hand can take this' : 'no cards in hand'}"` : ''}>${o.label}</button>`; })()
-            : '').join('') + `</div>`;
+        `<div class="event-opts">` + def.options.map((o, i) => {
+          // ⚠️ ASKS THE SAME FUNCTION THE RULE USES. This block held its own copy of the test,
+          // which is how the bot came to be allowed a move the button had greyed out.
+          const why = eventOptionBlocked(o);
+          return `<button onclick="eventChoose(${i})"${why ? ` disabled title="${why}"` : ''}>${o.label}` +
+            (why ? `<span class="opt-why">${why}</span>` : '') + `</button>`;
+        }).join('') + `</div>`;
     }
-    c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">You arrive somewhere as the journey ends.</div>` + body;
+    // ⚠️ THE LINE USED TO SAY "as the journey ends" AND THE RULE MOVED OUT FROM UNDER IT
+    // (2026-08-18). Events are scheduled by the region now and follow a FIGHT about half the time.
+    // 🔑 When a trigger changes, every sentence that described the old one is now a lie -
+    // the fifth time this exact shape has bitten in one day.
+    c.innerHTML = `<div class="phase-label">✦ EVENT — ${def.name}</div><div class="hint">The road gives you a moment. Nothing here costs you a card.</div>` + body;
   } else if (S.phase === 'defeat') {
-    const survivors = [...S.hand, ...S.deck, ...S.discard];
-    c.innerHTML =
-      `<div class="phase-label">💀 DEFEAT</div>` +
-      gradeHTML(gradeRun(false), false) +
-      `<div class="summary"><p>${S.defeatMsg}</p>` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · surviving cards <b>${survivors.length}</b>, lost from your deck <b>${S.trashed.length}</b></p></div>` +
-      `<button class="primary" onclick="showStages()">🗺️ Choose a stage</button>`;
+    c.innerHTML = runEndHTML(false);
   } else if (S.phase === 'intro') {
     const i = Math.min(S.introPage || 0, TUTORIAL.intro.length - 1), pg = TUTORIAL.intro[i];
     const last = i === TUTORIAL.intro.length - 1;
@@ -4724,42 +10450,125 @@ function renderControls() {
       // 📖 the tutorial gets its own door. It used to be the first button on the STAGES screen,
       // which meant a new player had to go looking for the thing that teaches them the game.
       `<button class="${(hasSave() || cleared) ? '' : 'primary '}menu-item" onclick="startStage(0)">` +
-        `<b>📖 Tutorial</b>${gradeBadge(0)}` +
+        `<b>📖 Tutorial</b>${gradeBadge(0, 'mage')}` +
         `<span>learn the game in one short run · always open</span></button>` +
-      `<button class="menu-item" onclick="showStages()"><b>🗺️ Stages</b>` +
-        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'the real thing — four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      // ⚔️ "NEW GAME", not "Stages" (2026-08-23, Thomas). It is the door into a RUN, and a menu
+      // should name what is behind a door in the player's words rather than the designer's. "Stages"
+      // is our word for how the content is organised; "New Game" is what you are about to do.
+      `<button class="menu-item" onclick="showStages()"><b>⚔️ New Game</b>` +
+        `<span>${cleared ? `${cleared} of ${DRAGONS.length} felled` : 'four dragons, one at a time'} · 🏆 ${w.graded}/${w.total} graded</span></button>` +
+      `<button class="menu-item" onclick="showWorkshop()"><b>⚒️ The Workshop</b>` +
+        `<span>${workshopLine()}</span></button>` +
+      `<button class="menu-item" onclick="showStash()"><b>📦 Stash</b>` +
+        `<span>${stashLine()}</span></button>` +
       `<button class="menu-item" onclick="showCollection()"><b>🎁 Collection</b>` +
         `<span>the charms and potions you can be offered</span></button>` +
       (DEV_ENABLED ? `<button class="menu-item quiet" onclick="showDev()"><b>🔧 Dev</b>` +
         `<span>jump straight to a dragon</span></button>` : '') +
       // 🏷️ the stamp. A playtester's bug report is worth far more when it names a build, and
       // the status bar's copy only appears once a run is underway — too late to read on a crash.
-      `<div class="menu-stamp">${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD}` +
-        `${CHANNEL === 'play' ? ' · <b>found a bug?</b> say what the build number was' : ''}</div>` +
+      `<div class="menu-stamp"><button class="pn-open" onclick="showNotes()">` +
+        `${CHANNEL === 'play' ? 'playtest build' : 'dev build'} ${BUILD} · 📋 what's new</button>` +
+        `${CHANNEL === 'play' ? '<div>· <b>found a bug?</b> say what the build number was</div>' : ''}</div>` +
       `</div>`;
+  } else if (S.phase === 'notes') {
+    c.innerHTML = notesHTML();
+  } else if (S.phase === 'workshop') {
+    c.innerHTML = workshopHTML();
+  } else if (S.phase === 'stash') {
+    c.innerHTML = stashHTML();
   } else if (S.phase === 'collection') {
-    // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — which is
-    // the only meta fact the player currently has — and says plainly that unlocking and banning
-    // are not built yet, rather than showing a button that lies.
-    const tierName = t => ['', 'stage 1+', 'stage 2+', 'stage 3+', 'stage 4'][t] || 'always';
-    const group = t => CHARMS.filter(x => !x.curse && (x.tier || 1) === t);
-    const rows = [1, 2, 3, 4].map(t => {
-      const list = group(t); if (!list.length) return '';
-      return `<div class="coll-tier"><h4>${tierName(t)} <span class="dim">· ${list.length}</span></h4>` +
-        list.map(x => `<div class="coll-row${x.mage ? ' is-mage' : ''}">` +
-          `<b>${x.name}</b>${x.mage ? '<span class="coll-tag">mage</span>' : ''}` +
-          `<span class="coll-text">${x.text}</span></div>`).join('') + `</div>`;
-    }).join('');
-    c.innerHTML =
-      `<div class="phase-label">🎁 COLLECTION</div>` +
-      `<div class="hint">Charms are offered by <b>stage</b> for now — a stand-in for unlocking them by play. ` +
-      `Deeper stages draw from a wider pool, so later dragons are met by a stronger mage.</div>` +
-      `<div class="coll">${rows}</div>` +
-      `<div class="coll-soon">🚧 <b>Not built yet:</b> unlocking charms by <b>runs played</b>, and the ` +
-      `🚫 <b>ban list</b> — one charm disabled per five unlocked, so you shape the pool without ` +
-      `pre-solving the run. Both wait on the real unlock system.</div>` +
-      `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
-      `<button class="primary" onclick="showMenu()">← Back</button>`;
+    // 🔑 THE COLLECTION IS AN HONEST SHELF. It shows what CAN be offered and when — and says
+    // plainly what is not built yet, rather than showing a button that lies.
+    //
+    // 🗂️ TWO SCREENS, NOT ONE SCROLL (2026-08-23, Thomas: *"lets have it show our account level and
+    // exp bar, generic charms we have unlocked. and then be able to click on our characters, which
+    // leads to a page where it shows our character level and exp bar, and charms we have unlocked
+    // for that character"*).
+    // 🔑 IT IS THE SAME SPLIT THE RULE ALREADY MAKES. One screen was showing three bars and four
+    // lists stacked, which reads as *"a lot of charms"* rather than as **two ladders that mean
+    // different things** — the very confusion renaming Mastery was meant to end. A screen per bar
+    // states the rule by its shape: ⭐ what is open to everyone here, 🎭 what is open to HER there.
+    // ⚠️ `S.collClass` is a SUB-STATE, not a new phase, deliberately — a new shell phase has to be
+    // remembered in SHELL_PHASES or it crashes before a run exists, and that has bitten once.
+    //
+    // ⚠️ LOCKED THINGS ARE SHOWN, WITH THEIR LEVEL (Thomas: *"probably so players know what to
+    // grind for"* — and he is right). It is this file's own rule: **a goal you cannot see is not a
+    // goal**, and a locked charm shows its FULL text because *a goal you cannot read* is not one
+    // either. This is the screen whose entire job is to be wanted.
+    // ⚠️ It does NOT contradict the map's *"printing every demand is complete optimizable data"* —
+    // that is about tactical information inside a run, which a player could solve against. A grind
+    // target is the opposite: it is only worth anything if you can see it.
+    const byId = id => CHARMS.find(x => x.id === id);
+    const charmRow = (x, at, open) => `<div class="coll-row${at && !open ? ' is-locked' : ''}">` +
+      `<b>${x.name}</b>` + (at && !open ? `<span class="coll-lock">${x.cls ? '🎭' : '⭐'} ${at}</span>` : '') +
+      `<span class="coll-text">${x.text}</span></div>`;
+    // ⚠️ A ROW MAY NOT BE A CHARM. `byId(u.id).cls` threw on the slot rungs the moment they were
+    // added — the list had silently assumed its own contents for exactly one build.
+    const rungs = cls => UNLOCKS.filter(u => unlockCls(u) === (cls || null)).map(u => {
+      const open = u.level <= (cls ? classLevel(cls) : accountLevel());
+      if (u.kind !== 'charm') return `<div class="coll-row is-boon${open ? '' : ' is-locked'}">` +
+        `<b>${u.label}</b>` + (open ? '' : `<span class="coll-lock">⭐ ${u.level}</span>`) +
+        `<span class="coll-text">${u.note || ''}</span></div>`;
+      return charmRow(byId(u.id), u.level, open);
+    });
+    const starters = cls => CHARMS.filter(x => !x.curse && !UNLOCK_AT[x.id] && (x.cls || null) === (cls || null));
+    const block = (head, list) => list.length
+      ? `<div class="coll-tier"><h4>${head} <span class="dim">· ${list.length}</span></h4>${list.join('')}</div>` : '';
+    // how many of a ladder you hold — the one number that says "keep going"
+    const tally = cls => {
+      const all = CHARMS.filter(x => !x.curse && (x.cls || null) === (cls || null));
+      return `<b>${all.filter(charmUnlocked).length}</b> of ${all.length}`;
+    };
+
+    if (S.collClass) {
+      // ── 🎭 A CHARACTER'S PAGE ────────────────────────────────────────────────
+      const k = S.collClass, cls = CLASSES[k], t = cls && cls.trait;
+      const open = classUnlocked(k);
+      c.innerHTML =
+        `<div class="phase-label">🎭 ${(cls && cls.name) || k}</div>` +
+        // 🖼️ same contract as everywhere else: found by NAME, and a miss removes itself
+        `<div class="coll-hero"><img alt="" src="art/classes/${k}.jpg?v=${BUILD}" onerror="this.remove()">` +
+          `<div class="coll-hero-txt">` +
+            (t ? `<b>${t.icon} ${t.name}</b><span>${t.text}</span>` : '') +
+            (open ? '' : `<span class="dim">🔒 fell a dragon to unlock her</span>`) +
+          `</div></div>` +
+        xpBarHTML(k) +
+        `<div class="hint">🎭 Her <b>level</b> rises only on runs you play as her. It opens the ` +
+        `charms that name <b>her own rule</b> — nobody else can use them. You hold ${tally(k)}.</div>` +
+        `<div class="coll">` +
+          block('hers from the start', starters(k).map(x => charmRow(x))) +
+          block('earned by playing her', rungs(k)) +
+        `</div>` +
+        `<button class="primary" onclick="showCollection()">← Collection</button>`;
+    } else {
+      // ── ⭐ THE ACCOUNT PAGE ──────────────────────────────────────────────────
+      // 🎭 the roster reads as a shelf of characters, and every one of them is a door.
+      const pickable = Object.keys(CLASSES).filter(k => rungs(k).length || starters(k).length);
+      c.innerHTML =
+        `<div class="phase-label">🎁 COLLECTION</div>` +
+        `<div class="hint">Every encounter you walk earns xp on <b>both</b> bars, win or lose.<br>` +
+        `⭐ <b>Level</b> opens the charms <b>any</b> class can use.<br>` +
+        `🎭 A <b>character's level</b> opens what <b>she</b> can do — tap a character to see hers.</div>` +
+        xpBarHTML(null) +
+        `<div class="coll-cast">` + pickable.map(k => {
+          const cls = CLASSES[k], t = cls && cls.trait, shut = !classUnlocked(k);
+          return `<button class="cast${shut ? ' locked' : ''}" onclick="showCollection('${k}')">` +
+            `<span class="cast-em">${(cls && cls.mark) || '✦'}</span>` +
+            `<b>${(cls && cls.name) || k}</b>` +
+            `<span class="cast-lv">🎭 ${classLevel(k)}<i>/${classCap(k)}</i></span>` +
+            `<span class="cast-n">${tally(k)} charms</span>` +
+            (shut ? `<span class="cast-lock">🔒 locked</span>` : '') + `</button>`;
+        }).join('') + `</div>` +
+        `<div class="coll">` +
+          block('yours from the start', starters(null).map(x => charmRow(x))) +
+          block('⭐ earned by playing at all', rungs(null)) +
+        `</div>` +
+        `<div class="coll-soon">🚧 <b>Not built yet:</b> the 🚫 <b>ban list</b> — one charm disabled ` +
+        `per five unlocked, so you shape the pool without pre-solving the run.</div>` +
+        `<div class="coll-soon">🧪 <b>${POTIONS.length} potions</b> in the shop pool, weighted toward the cheap ones.</div>` +
+        `<button class="primary" onclick="showMenu()">← Back</button>`;
+    }
   } else if (S.phase === 'dev') {
     const d = S.dev;
     const dragon = DRAGONS.find(x => x.stage === d.stage) || DRAGONS[0];
@@ -4778,32 +10587,176 @@ function renderControls() {
       `<div class="dev-row"><span>🕯️ Candle</span><div>` +
         pick('candle', 'true', 'Lit', d.candle) + pick('candle', 'false', 'Out', !d.candle) +
       `</div></div>` +
+      // ⭐ the charm pool the run will draw from. ⚠️ Applies immediately and persists — it is the
+      // real bar, not a pin, so a jump made here is the game a player at that level would get.
+      `<div class="dev-row"><span>⭐ Account</span><div>` +
+        [1, 3, 6, 9, LEVEL_CAP].map(n =>
+          `<button class="dev-pick${accountLevel() === n ? ' on' : ''}" onclick="devLevel(${n})">` +
+          `${n}${n === LEVEL_CAP ? ' (max)' : ''}</button>`).join('') +
+      `</div></div>` +
+      `<div class="dev-row"><span>🎭 ${CLASS.name}</span><div>` +
+        Array.from({ length: classCap(CLASS.id) }, (_, i) => i + 1).map(n =>
+          `<button class="dev-pick${classLevel(CLASS.id) === n ? ' on' : ''}" onclick="devClassLevel(${n})">` +
+          `${n}${n === classCap(CLASS.id) ? ' (max)' : ''}</button>`).join('') +
+      `</div></div>` +
+      // 🛡️ one row per OPEN slot. ⚠️ A dev tool, and dev tools port last if ever — the real
+      // picker is the Workshop, and this row is deleted the day it lands.
+      Array.from({ length: armourSlotsOpen() }, (_, i) =>
+        `<div class="dev-row"><span>🛡️ Slot ${i + 1}</span><div>` +
+        pick('arm' + i, '', 'empty', !d['arm' + i]) +
+        ARMOUR.map(x => pick('arm' + i, x.id, `${ARMOUR_SLOTS[x.slot].icon} ${x.name}`, d['arm' + i] === x.id)).join('') +
+        `</div></div>`).join('') +
       `<div class="dev-row"><span>Charm</span><div>` +
         pick('charm', '', 'none', !d.charm) +
-        CHARMS.filter(x => x.mage).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
+        CHARMS.filter(x => x.cls === CLASS.id).map(x => pick('charm', x.id, x.name, d.charm === x.id)).join('') +
       `</div></div>` +
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
+      devSlotsHTML() +
       `<button onclick="showMenu()">← Menu</button>` +
       `</div>`;
   } else if (S.phase === 'ladder') {
     const cleared = stagesCleared();
     c.innerHTML =
+      // ✍️ NO DESIGNER TALK ON A SCREEN THE PLAYER READS (2026-08-23, Thomas: *"no talk about
+      // questions or shapes or any of that please"*).
+      // 🔑 "Each stage is a different QUESTION, not simply a bigger number" and "the same dragon is
+      // a different PROBLEM" are things WE say to each other about why the game is built this way.
+      // They are the design's justification, not the player's information — and a menu is not the
+      // place to argue for the design. **The stages are a list; the list says what it is.**
+      // ⚠️ Same rule as the hardship rewrite: a rules string states the rule and nothing else.
+      // Flavour belongs where it is read once, and a menu is read every single session.
       `<div class="phase-label">🗺️ THE STAGES</div>` +
-      `<div class="summary"><p>Each stage is a different <b>question</b>, not simply a bigger number. ` +
-      `Beat one and the next opens — but every stage you have cleared stays open, so you can always go back.</p></div>` +
       (() => { const w = wallSummary();
-        return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} stages graded` +
-          (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') +
-          `<span class="dim"> — every stage keeps its best grade, win or lose</span></div>`; })() +
+        return `<div class="wall-line">🏆 <b>${w.graded}</b> of ${w.total} graded` +
+          (w.perfect ? ` · <b class="g-S">${w.perfect}</b> perfect` : '') + `</div>`; })() +
+      // 🗡️ WHO ARE YOU TAKING? Sits ABOVE the stages because it changes what every one of them
+      // means — the same dragon is a different problem to a different class, which is the whole
+      // economy: +1 class = ×N content.
+      // ⚠️ SHOWN FROM THE FIRST SECOND, even on a fresh account (2026-08-23, Thomas: *"even if its
+      // a fresh account or w/e, we should show the character selector"*). It used to be hidden
+      // entirely until the rogue was earned, on the reasoning that *a locked door you cannot read
+      // is a tease* — but that reasoning was wrong for the ROSTER, because the roster is the single
+      // best thing this game has to show a new player. Hiding it meant run one looked like a game
+      // with one character.
+      // 🔑 The Collection's own rule settles it: an HONEST SHELF beats an empty room. A locked class
+      // that tells you its source of power and how to unlock it is an advertisement; a hidden one
+      // is nothing at all.
+      (() => {
+        const picked = pickedClassId();
+        // ⚠️ THE ROGUE'S OLD LINE WAS FALSE: *"strikes chain — many small ones"*. Her compose()
+        // returns `hits: 1` - she lands ONE blow exactly like the mage. That text is left over from
+        // when she was planned as a multi-hit class, and it promised the one thing she cannot do.
+        // 🔑 A CLASS DESCRIPTION IS A PROMISE ABOUT THE RULES; this one would have sold a player
+        // the answer to 🧱 Guard, which is precisely what she does not have.
+        const row = (id, name, line) => {
+          const cls = CLASSES[id], t = cls && cls.trait, open = classUnlocked(id);
+          return `<button class="class-pick${picked === id ? ' on' : ''}${open ? '' : ' locked'}"` +
+            (open ? ` onclick="pickClass('${id}')"` : ' disabled') + `>` +
+            `<b>${name}</b>` +
+            // 🎭 HER OWN LADDER, ON HER OWN CARD. The picker is where you choose who to play, so it
+            // is the one screen where "how far along am I with her" is the deciding fact.
+            (open && classCap(id) > 1
+              ? `<span class="class-lv">🎭 ${classLevel(id)}<i>/${classCap(id)}</i></span>` : '') +
+            `<span class="class-line">${line}</span>` +
+            (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> ${t.text}</span>` : '') +
+            (open ? '' : `<span class="class-trait dim">🔒 fell a dragon to unlock her</span>`) +
+            `</button>`;
+        };
+        // 🎭 THE PLANNED ROSTER, SHOWN LOCKED (2026-08-23, Thomas: *"i also want to add the classes
+        // to our character selector, just to add some excitement about my ambitions for the future
+        // of the game"*).
+        // 🔑 EACH LINE IS ITS SOURCE OF POWER, because that is what a class IS here — the rule that
+        // unlocks a card's big value. Never a matchup, never a stat: three defence shapes only
+        // permit ~6 profiles, and a roster designed from its matchup table becomes reskins.
+        // ⚠️ AN HONEST SHELF, the same rule the Collection follows: it says plainly that these are
+        // not built rather than showing a button that lies. A locked thing you can SEE is a goal.
+        // ✍️ FLAVOUR, NOT MECHANICS (2026-08-23, Thomas: *"lets make the description cooler. no em
+        // dashes. straight to the point. like just give the flavor of the class, concise"*).
+        // 🔑 These lines used to name each class's SOURCE OF POWER — "retaliation", "foreknowledge",
+        // "declaration". That is the vocabulary from Class_System, and it is how WE tell the classes
+        // apart while designing them. It is not what makes someone want to play one.
+        // ⚠️ The old note said *a class description is a promise about the rules* (written after the
+        // rogue's line promised multi-hit she did not have). That still holds for the TRAIT row,
+        // which states the actual mechanic. A flavour line promises nothing, so it cannot lie.
+        // ⚠️ "not built yet" is gone at his request; the dimmed, dashed, disabled styling carries it.
+        // 🎭 the icon is its own element so the tile can lead with it — see .class-row.is-soon
+        const soon = (icon, name, line) =>
+          `<button class="class-pick locked" disabled><span class="soon-icon">${icon}</span>` +
+          `<b>${name}</b><span class="class-line">${line}</span></button>`;
+        // 🖼️ THE PORTRAIT — big, and it is the point of the screen.
+        // 🔑 SAME CONTRACT AS foeArt(): found by NAME, and NOTHING BREAKS WHILE THE FOLDER IS
+        // EMPTY. A miss removes itself and the frame falls back to the class emblem, so art never
+        // blocks design and the screen is finished before a single picture exists.
+        // ⚠️ The URL carries ?v=BUILD. An unversioned image cached once serves forever and looks
+        // exactly like a failed render — this project has lost time to a cache three times.
+        const hero = (() => {
+          const cls = CLASSES[picked], t = cls && cls.trait;
+          return `<div class="hero-art" id="hero-art">` +
+            // ⚠️ .jpg, not .png. Key art has a solid dark ground and needs no alpha, and the PNG
+            // was 2.2 MB against 197 KB for a JPEG at q90 — eleven times the weight for a channel
+            // nothing uses. The FOE plates stay PNG because their transparency is the whole point.
+            //
+            // 🐛 NO `onload` GATE HERE, AND THAT IS THE FIX. It used to add a `has-art` class that
+            // CSS faded the picture in with — and A CACHED IMAGE MAY NEVER FIRE `onload`, because
+            // it can already be complete by the time the handler is attached. Result: the art was
+            // fully downloaded, sitting at opacity 0, with the emblem showing over it. It worked
+            // the first time and broke on every revisit, which is the worst way for a bug to
+            // behave. (Same family as the 2026-08-12 scene flicker: a fade keyed to element
+            // creation is a lie the moment anything re-renders.)
+            // 🔑 THE PICTURE IS VISIBLE BY DEFAULT AND THE EMBLEM SITS BEHIND IT. A missing file
+            // still removes itself via `onerror`, so the emblem shows through exactly as before —
+            // the fallback is now a matter of STACKING, not of a class that has to be applied.
+            `<img class="hero-img" alt="" src="art/classes/${picked}.jpg?v=${BUILD}" ` +
+              `onerror="this.remove()">` +
+            `<div class="hero-fallback">${(CLASSES[picked] && CLASSES[picked].mark) || '✦'}</div>` +
+            `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
+            `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +
+          `</div>`;
+        })();
+        // 🖼️ ART LEFT, ROSTER RIGHT — the classic character-select layout, and the panel was already
+        // 1180px wide while the portrait sat at 313. Stacking them wasted two thirds of the screen
+        // on empty margin and made the art small, which is the one thing it must not be.
+        return `<div class="wall-line">🎭 <b>Character</b></div>` +
+          `<div class="picker-split">` + hero + `<div class="picker-list">` +
+          `<div class="class-row">` +
+          row('mage', '✦ The Mage', 'A travelling spellcaster who draws her power from the elements.') +
+          row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
+          `</div>` +
+          `<div class="class-row is-soon">` +
+          // 🔑 **TEN VISIBLE, AND THAT IS THE POINT** (Thomas, 2026-08-25). A roster is a promise,
+          // and a promise gets less credible the longer it runs — twelve names with two playable
+          // reads as a wish list, ten with two playable reads as a plan.
+          // ❌ CUT 2026-08-25, PARKED NOT KILLED: ⚖️ the Paladin (declaration) and 🕯️ the Warlock
+          // (sacrifice). Their source-of-power entries stay in [[Class_System]] — **the roster is a
+          // shipping list, the axis table is a design space, and they are allowed to differ.**
+          // ❌ 🧱 THE MASON IS GONE OUTRIGHT (Thomas: *"i don't know how the mason got into the
+          // classes"*). Fair — I added it off Euro_Classes two days ago, and it never passed the
+          // roster's own bar: *"a stoneworker whose work stays standing"* is 🏗️ the Engineer's
+          // constructions with a different noun. 🔑 A class must fill slots ①②③ differently, and
+          // if you cannot say how in one line each it is a re-skin. **Finding a name in a design
+          // doc is not the same as that name having earned a slot.**
+          // ❌ Euro_Classes' 🪵 Forager stays out for the same reason it always did — the doc calls
+          // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
+          // resource you hold and spend*.
+          soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
+          soon('⚗️', 'The Alchemist', 'A brewer who makes her own answers before she needs them.') +
+          soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
+          soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
+          soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
+          soon('🛡️', 'The Guardian', 'A heavy defender who turns every blow back on its owner.') +
+          soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
+          soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
+          `</div></div></div>`;
+      })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
 
       DRAGONS.map(d => {
         const open = stageUnlocked(d.stage), done = d.stage <= cleared;
         return `<button class="${d.stage === Math.min(DRAGONS.length, cleared + 1) ? 'primary' : ''} stage${open ? '' : ' locked'}"` +
           (open ? ` onclick="startStage(${d.stage})"` : ' disabled') + `>` +
-          `<b>${done ? '✔ ' : ''}Stage ${d.stage} — ${open ? d.name : '???'}</b>${open ? gradeBadge(d.stage) : ''}` +
+          `<b>${done ? '✔ ' : ''}Stage ${d.stage}: ${open ? d.name : '???'}</b>${open ? stageBadges(d.stage) : ''}` +
           // ❌ THE PICKER DOES NOT SPOIL THE DRAGON (2026-08-05, Thomas: *"lets remove what the
           // boss does, don't think we really need to show that off"*). It used to print the SHAPE
           // and the demand on every stage button.
@@ -4812,30 +10765,14 @@ function renderControls() {
           // twenty turns preparing for it. Printing the same facts on the menu spends the reveal
           // before the run exists, and turns choosing a stage into reading a stat block.
           // What the button says instead is about YOU — what you have done here, not what it does.
-          `<span class="stage-shape">${!open ? 'locked — clear stage ' + (d.stage - 1) + ' to open'
-            : done ? 'felled — go again for a better grade'
+          `<span class="stage-shape">${!open ? 'Clear stage ' + (d.stage - 1) + ' to open.'
+            : done ? 'Felled. Go again for a better grade.'
             : 'not yet felled'}</span>` +
           `</button>`;
       }).join('') +
       `<button class="dev-open" onclick="showMenu()">← Menu</button>`;
   } else if (S.phase === 'victory') {
-    const survivors = [...S.hand, ...S.deck, ...S.discard];
-    const score = survivors.reduce((t, c) => t + c.level, 0);
-    c.innerHTML =
-      `<div class="phase-label">🏆 THE ${S.dragon.name.toUpperCase()} FALLS — VICTORY</div>` +
-      gradeHTML(gradeRun(true), true) +
-      `<div class="summary">` +
-      `<p>Turns: <b>${S.turn}</b> — Complete <b>${S.results.Complete}</b> · Narrow <b>${S.results.Narrow}</b> · Loss <b>${S.results.Loss}</b> · Lost from your deck: <b>${S.trashed.length}</b>${S.trashed.length ? ` (${S.trashed.map(c => c.def.name).join(', ')})` : ''}</p>` +
-      `<table><tr><th>Card</th><th>Level</th></tr>` +
-      survivors.sort((a, b) => b.level - a.level).map(c => `<tr><td>${c.def.name}</td><td>Lv${c.level}</td></tr>`).join('') +
-      `</table></div>` +
-      // 📖 THE HANDOFF (2026-08-05). Finishing the tutorial is the moment a new player either
-      // becomes a player or closes the tab, and it used to end on the same generic stage picker a
-      // returning player gets. A picker is a question; what someone who has just been taught needs
-      // is the NEXT THING, named. So the tutorial's victory screen points at stage 1 by name, with
-      // the one demand it makes — the same briefing language the run itself uses.
-      (S.tutorial ? tutorialHandoffHTML()
-        : `<button class="primary" onclick="showStages()">🗺️ Choose your next stage</button>`);
+    c.innerHTML = runEndHTML(true);
   } else if (S.phase === 'summary') {
     const survivors = [...S.hand, ...S.deck, ...S.discard];
     const score = survivors.reduce((t, c) => t + c.level, 0);
@@ -4855,6 +10792,42 @@ function renderControls() {
         : `<button class="primary" onclick="nextRegion()">Enter ${RUN()[S.region].name} (Region ${S.region + 1}) — reshuffle, keep levels</button>` +
           `<button onclick="showStages()">Restart from scratch</button>`);
   }
+
+  // 🎓 THE LESSON ROW BELONGS TO EVERY PHASE, NOT JUST `assign` (fixed 2026-08-23).
+  //
+  // 🔴 IT WAS BUILT IN EXACTLY ONE BRANCH while **nine lessons are gated on other phases** —
+  // 🗺️ map, 🕯️ candle, 🦴 carve, soak, stack, wheel, charm, ⭐ levels and event. Every one
+  // of them passed `nextLesson()` and **never reached the screen**, because whatever was rendering
+  // at that moment did not draw a lesson row at all.
+  //
+  // 🔑 THIS IS *"A RULE THAT FIRES WITHOUT APPEARING"* — the same shape as the Guard reveal, the
+  // multi-hit card face and the Momentum split. And my own tutorial audit walked straight past it,
+  // because **it asked the RULE (does `nextLesson()` return something) and never asked the SCREEN.**
+  // An audit that checks the model and not the view finds exactly the bugs it was built to find,
+  // and no others.
+  //
+  // ⚠️ NOT CALLED HERE — see render(). This function has SEVEN early returns (map, hearth,
+  // eliteboon, mendpick, hearthpick, fork, and assign-without-an-encounter), and every one of them
+  // is a phase with a lesson. An injection at the bottom reaches none of them.
+  // 🔑 The fix belongs one level up, for the same reason applyModal() lives in render()'s
+  // `finally`: **a step that must happen for every phase cannot live inside a function that
+  // returns early for half of them.**
+}
+
+// 🎓 put the lesson under the phase label of whatever screen is showing.
+// ⚠️ Skips the shell (menu / Collection / Workshop): those exist outside a run, and a tutorial
+// tip on the main menu would be pointing at nothing.
+function injectLesson(c) {
+  if (!c || isShell() || (S && S.lessonsOff)) return;
+  if (c.querySelector && c.querySelector('.lesson-row')) return;   // the assign branch built its own
+  const L = nextLesson();
+  if (!L) return;
+  const row = `<div class="lesson-row"><span>🎓 ${L.text}</span>` +
+    `<span class="lesson-btns"><button class="primary" onclick="learned('${L.id}')">got it</button>` +
+    `<button onclick="S.lessonsOff=true;render()">hide tips</button></span></div>`;
+  const label = c.querySelector && c.querySelector('.phase-label');
+  if (label && label.insertAdjacentHTML) label.insertAdjacentHTML('afterend', row);
+  else c.innerHTML = row + c.innerHTML;
 }
 
 // hint shown under each zone label
@@ -4867,15 +10840,68 @@ function renderControls() {
 // one line, three places (fight / journey / duel). It names the card that ACTUALLY attuned, which
 // is the Catalyst normally, the Surge under ✦ Second Flame, and a non-matching Catalyst under
 // ✦ Loose Weave - where it says so, because a half bonus with no explanation reads as a bug.
+// 🗡️ THE ROGUE'S OWN ACTION LINES (2026-08-18). Found in play by Thomas, who screenshotted
+// a reveal reading *"Attack: 12 - unattuned (Viper Strike is null, not null)"* above a big
+// — 13 — and asked, reasonably: *"how did i do 13 dmg, why is it attuned, and what is viper
+// strike is null not null"*. Three separate faults in one panel:
+//   1. The whole beat was written in MAGE. `unattuned` interpolates ELEMENT names, and a rogue card
+//      has `element: null`, so it printed "is null, not null".
+//   2. `Surge: Viper Strike +0 → 12` - she has no ➕ Surge at all. Slot ③ is ENERGY and adds
+//      nothing; the line was pure noise reporting a mage stat she does not own.
+//   3. 🗡️ Whetstone silently added the missing +1. It appeared TWICE in 6,500 lines - its
+//      definition and the one place it is applied - and NOWHERE in the reveal.
+// 🔑 THE THIRD ONE IS THE REAL BUG: THE ARITHMETIC ON SCREEN DID NOT ADD UP TO THE NUMBER ON
+// SCREEN. *Legible math always* is the project's first pillar, and a hidden charm term breaks it
+// more completely than any wrong number would - a wrong number is a bug, an unexplained number is
+// a game you cannot learn.
+// ⚠️ The rule this earns: A CHARM THAT TOUCHES THE MATHS MUST APPEAR IN THE REVEAL. Same
+// discipline as the 🧾 status-bar chips - if it changes a term, it says so.
+function rogueActionLines(r, spell, L, verb) {
+  const out = [];
+  const rg = r.rogue || {};
+  const fed = rg.fuelName ? `${rg.fuelName} paid ⚡${rg.paid}` : 'nothing paid';
+  if (rg.full) out.push(L(`⚡ PAID — ${spell.def.name} strikes for its full ◆ ` +
+    `${eff(spell).attuned} (${fed} against ⚡${rg.cost})`, 'good'));
+  else out.push(L(`⚡ UNPAID — ${fed} against ⚡${rg.cost}, so ${spell.def.name} ` +
+    `strikes for only ⚔️ ${eff(spell).value}`, 'bad'));
+  if (rg.verbBonus) out.push(L(`🗡️ its combo adds +${rg.verbBonus}`, 'good'));
+  if (rg.streakDmg) out.push(L(`● Momentum ${rg.streakDmg} — +${rg.streakDmg} to the strike`, 'good'));
+  return out;
+}
+// 🐛 THIS LINE PRINTED A BREAKDOWN THAT DID NOT MATCH THE MATHS (found in play 2026-08-22).
+// Thomas: *"this doesn't seem right, i used a potion, i shouldve done 13 dmg."* The DAMAGE was
+// right — 10 — but the explanation read *"Atk 5 + 5 = 10"* when the real sum was **2 (card) + 2
+// (half of 5) + 6 (potion)**. Two faults in one line:
+//   1. it used `attBonus`, the bonus PRINTED ON THE CARD, even when ✦ Loose Weave had halved it;
+//   2. it folded the potion silently into the left-hand number, so +6 vanished from view.
+// 🔑 Both numbers were wrong and the total was right, which is the worst combination — the sum
+// checks out, so nothing looks broken, and *legible math always* quietly stops being true.
+// ⚠️ IT NOW ALWAYS ADDS UP BY CONSTRUCTION: anything the named terms do not account for is shown
+// as a remainder rather than hidden, so this can never silently drift again.
 function attunedLineText(r, spell, verb) {
   const src = r.attuner;
   const nm = src ? src.def.name : 'your Catalyst';
-  const sums = `${verb} ${r.base - r.attBonus} + ${r.attBonus} = ${r.base}`;
-  if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives half → ${sums}`;
+  const parts = [];
+  const cv = r.cardVal != null ? r.cardVal : (r.base - r.attBonus);
+  parts.push(`${cv}`);
+  if (r.attApplied) parts.push(`+ ${r.attApplied}` +
+    (r.loose ? ` <span class="dim">(half of ${r.attBonus})</span>` : ''));
+  if (r.added) parts.push(`+ ${r.added} <span class="dim">🧪</span>`);
+  const rest = r.base - cv - (r.attApplied || 0) - (r.added || 0);
+  if (rest) parts.push(`${rest > 0 ? '+' : '−'} ${Math.abs(rest)}`);
+  const sums = `${verb} ${parts.join(' ')} = ${r.base}`;
+  if (r.loose) return `✦ ATTUNED loosely — ${nm} is not ${r.spellEl}, so Loose Weave gives ${looseWord()} → ${sums}`;
   return `✦ ATTUNED — ${nm} is ${src ? elOf(src) : r.spellEl} like ${spell.def.name} → ${sums}`;
 }
+// 🔑 THE SLOT HINT IS THE MOST-READ TEXT IN THE GAME — it is the one line under each label that
+// says what THAT card will do THIS turn. It was written entirely in mage: the Combo slot offered to
+// attune, and the Momentum slot offered to bank an Emberwake. Found in play 2026-08-17: *"the combo
+// slot description doesn't make sense either, same with momentum"*.
+// ⚠️ SLOT VOCABULARY WAS ALWAYS PER CLASS; THE SLOT'S EXPLANATION HAS TO BE TOO. Renaming
+// Surge -> Momentum and leaving the sentence underneath is worse than not renaming it.
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
+  if (CLASS.id === 'rogue') return rogueZoneHint(zone, isFight);
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -4885,7 +10911,7 @@ function zoneHint(zone) {
       // ⚠️ the Catalyst may no longer be the thing that attuned — say who did
       const src = attunerCard(), here = cardById(S.assign.Element);
       if (!attunedNow()) return `Initiative — a ${elOf(sp)} card here would ATTUNE your Spell`;
-      if (looseOnly()) return `✦ ATTUNED loosely — half bonus · Initiative`;
+      if (looseOnly()) return `✦ ATTUNED loosely — ${looseWord()} bonus · Initiative`;
       if (src && here && src !== here) return `Initiative — your Surge attuned the Spell`;
       return `✦ ATTUNED — ${elOf(sp)} matches · Initiative`;
     }
@@ -4895,34 +10921,108 @@ function zoneHint(zone) {
       if (hasCharm('secondflame') && sc && spellCard() && attunerCard() === sc)
         return `✦ ATTUNES the Spell · +power now`;
       if (sc && S.bankArmed)
-        return `🔥 BANKS — +${bankValueOf(sc)} Emberwake next turn, ${bankCostPhrase(sc)}`;
+        return `🔥 CHANNELS — 🔥 ${bankValueOf(sc)} carried to next turn instead, ${bankCostPhrase(sc)}`;
       if (sc) return `+power now — or 🔥 bank it for next turn`;
       return '+power — returns to your deck';
     }
     case 'Reserve': return 'kept in hand for next turn';
   }
 }
+
+// 🗡️ The rogue's four lines. Every one names the MOMENTUM consequence, because that is the
+// only thing this class's turn is about — and the arithmetic is stated, never implied.
+function rogueZoneHint(zone, isFight) {
+  const st = spellCard();
+  const m = rogueMath();
+  switch (zone) {
+    case 'Spell': {
+      if (!st) return isFight ? 'your Attack' : 'your Move';
+      const e = eff(st);
+      const disc = m.streakDmg ? ` <span class="good">(+${m.streakDmg} from ●)</span>` : '';
+      return m.full
+        ? `PAID — strikes for its full <b>◆ ${e.attuned}</b>${disc} · spent, gone for the region`
+        : `costs <b>⚡ ${m.cost}</b>${disc}, paid <b>${m.paid}</b> — strikes for only <b>⚔️ ${e.value}</b>`;
+    }
+    case 'Element': {
+      if (!st) return 'your Initiative — returns to your deck';
+      // 🔑 name the VERB, not the fact that a verb happened. "PAIRED" tells you nothing.
+      if (m.verb) return `🗡️ COMBO — ${ROGUE_VERBS[m.verb]} · and your Initiative`;
+      return `your Initiative — <b>${st.def.combo}</b> here would fire its combo`;
+    }
+    case 'Boost': {
+      const fuel = cardById(S.assign.Boost);
+      if (!st) return 'a card here pays for your Strike';
+      if (m.cost === 0) return `nothing to pay — this card simply returns to your deck`;
+      if (!fuel) return `your Strike costs <b>⚡ ${m.cost}</b> — put a card here to pay it`;
+      // ⚠️ NAME THE LEVEL, because the level IS the rule now. A card pitches LESS as it sharpens,
+      // and a player not told that reads a low fuel number as a bad card rather than a sharp one.
+      // ⚠️ "gives", not "pitches" - the player-facing word is ⚡ energy everywhere now
+      const lvNote = ` <span class="dim">(Lv${fuel.level} · less energy as it sharpens)</span>`;
+      return m.full
+        ? `<b>⚡ ${m.paid}</b> energy — your Strike costs <b>${m.cost}</b>${lvNote} · returns to your deck`
+        : `only <b>⚡ ${m.paid}</b> energy — your Strike costs <b>${m.cost}</b>${lvNote} · returns to your deck`;
+    }
+    case 'Reserve': return hasCharm('twinblades')
+      ? 'kept — 🗡️ Twin Blades: it can pair too'
+      : 'kept in hand for next turn';
+  }
+}
+
 // 🔥 ARM THE BANK. It sits in the controls with the Emberwake's AIM row rather than on the Surge
 // card, so the whole mechanic reads in one place: arm it here, aim it here next turn.
 // ⚠️ It was drafted into the Surge slot's head first (the "decision belongs on the object" rule)
 // and pulled back out: `.slot-head` is a FIXED 46px on purpose — a taller head staggers the whole
 // four-slot row — so a button there needs a layout pass, not a guess. The Surge's slot hint still
 // states what will happen to that card, which is the part that must live on the object.
+// 🗡️ THE MOMENTUM ROW — the minigame, on screen.
+// ⚠️ WHAT BREAKS THE STREAK MUST BE STATED BEFORE YOU COMMIT or it is a trap rather than a puzzle.
+// Same treatment as the 🏃 Standing chip: show the TERMS and let the player do the arithmetic.
+// 🔑 It reads off rogueMath(), the same function the damage does, so the number you are shown and
+// the number you get cannot drift.
+// 🎴 WAS momentumRowHTML(). Everything it said about the streak — what it is worth and what takes
+// it away — is on the ● token now, so all that is left here is the PROMPT: the rogue's maths needs
+// a Strike before it can say anything at all.
+// ⚠️ RENAMED RATHER THAN GUTTED IN PLACE. A function still called momentumRowHTML that no longer
+// draws momentum is the "a comment that describes a system is not the system" trap, one level down.
+function strikePromptHTML() {
+  if (!CLASS.momentum || !isAssignPhase()) return '';
+  if (rogueMath()) return '';
+  return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
+}
+
 function bankRowHTML() {
-  if (!isAssignPhase()) return '';
+  if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
   if (!sc) return '';
-  const v = bankValueOf(sc);
+  // 🔑 SHOW BOTH TERMS. The whole point of channelling is that it pays MORE than it costs, and a
+  // trade whose two sides are not on screen together is not a decision — it is a guess.
+  // 🐛 This line used to print `+${bankValueOf(sc)} power now`, i.e. the BANKED figure labelled as
+  // the spent one. Harmless while the two were equal; the moment interest existed it would have
+  // been a straight lie about the cheaper half. *When a value gains a modifier, find every line
+  // that prints the unmodified one.*
+  const now = eff(sc).boost, later = bankValueOf(sc);
   const on = !!S.bankArmed;
   return `<div class="wake-row bank-row"><span class="wake-lab">🔥 Your <b>Surge</b> — ` +
-    (on ? `<b>banking +${v}</b> for next turn` : `+${v} power now`) + `</span>` +
+    (on ? `channelling: <b>+${later}</b> next turn <span class="dim">(instead of +${now} now)</span>`
+        : `<b>+${now}</b> now <span class="dim">— or <b>+${later}</b> channelled</span>`) + `</span>` +
     `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleBank()">` +
-    (on ? 'spend it now instead' : `bank it for next turn`) + `</button>` +
-    `<span class="wake-note">${on ? 'nothing this turn' : 'worth it when this turn is already decided'}</span></div>`;
+    (on ? 'spend it now instead' : `⟳ channel it`) + `</button>` +
+    // ⚠️ STATE THE RULE, NOT A COMPUTED RATIO. This read `worth ${later/now}×`, which prints
+    // "2.0×" on a Surge worth 1 (ceil rounds it up) and "1.5×" on a big one — technically true and
+    // exactly backwards as a teaching line, since the point of a proportional bonus is that the
+    // BIG Surge is the one worth channelling. The two numbers are already on screen above; this
+    // slot should say WHEN, not restate WHAT.
+    `<span class="wake-note">${on ? 'nothing this turn' : 'one bigger blow next turn — and 🛡️ Armour only subtracts once'}</span></div>`;
 }
 
 // a one-word mark of the card's fate, shown on the card itself during the action phase
-function fateOf(zone) {
+// ⚠️ ASK THE CLASS WHAT IT IS ABOUT TO EAT (2026-08-17). This read the ZONE alone, so a rogue's
+// ⚡ Energy card — which is burned to pay for the Strike — sat there promising "↻ returns" right
+// up until it was destroyed. 🔑 Never state a rule about an object without marking the object,
+// and never let the object state the WRONG rule about itself.
+function fateOf(zone, id) {
+  if (id != null && CLASS.spentIds && CLASS.spentIds().includes(id) && zone !== 'Spell')
+    return { cls: 'fate-spent', text: '🔥 burned' };
   if (zone === 'Spell') return { cls: 'fate-spent', text: '⊘ spent' };
   if (zone === 'Reserve') return { cls: 'fate-kept', text: '✋ kept' };
   if (zone) return { cls: 'fate-return', text: '↻ returns' };
@@ -4944,13 +11044,44 @@ function renderSlots() {
       (cards.length ? `<div class="pile">${cards.map(cardHTML).join('')}</div>`
                     : `<div class="slot-empty">— empty —</div>`) +
       `</div>`;
-  }).join('');
+  }).join('') + spareRowHTML();
+}
+
+// 🗡️ THE SPARE. With five cards and four slots, one card has no seat — and
+// `normalizeAssign` promises every card is "always slotted and visible", which it cannot keep.
+// ⚠️ AN INVISIBLE CARD IS A CARD YOU CANNOT CHOOSE, so the extra is shown here instead, and
+// tapping it swaps it into the row through the same path every other card uses.
+// 🔑 IT SLIDES UNDER THE DECK AT CLEANUP FOR FREE — `returning` already sweeps everything that
+// is not kept or held, so the spare needed no new rule at all.
+function spareRowHTML() {
+  if (!isAssignPhase()) return '';
+  const seated = new Set(ZONES.map(z => S.assign[z]).filter(Boolean));
+  const spare = S.hand.filter(c => !seated.has(c.id));
+  if (!spare.length) return '';
+  // ⚠️ SAY THE ACTUAL GESTURE. It read "tap to swap one in", but this is the row's usual TWO-tap
+  // swap: the drawn card, then the card it replaces. A label that describes a gesture the player
+  // does not have is the picker rule again - offering something you cannot act on.
+  return `<div class="spare-row"><div class="spare-lab">🗡️ drawn — tap one, then tap the card ` +
+    `it replaces · ${spare.length > 1 ? 'the rest slide' : 'the other slides'} under your deck</div>` +
+    `<div class="pile">${spare.map(cardHTML).join('')}</div></div>`;
 }
 
 // Per-card visual identity (2026-07-06): each card wears its own arcane SIGIL — a mage's mark,
 // magic-as-craft — as a faint watermark, tinted by the element it SEEKS to Attune (its aura hints
 // what it becomes when attuned). Witch Hat register: crafted wonder, restrained. See Card_Identity_And_Attachment.
+// 🗡️ the rogue's eight. ⚠️ Without these the watermark falls back to '✦' — the MAGE's attune
+// glyph — on every rogue card, which is a third of the reason Thomas asked "why is there still a
+// star". A default that belongs to one class is not a default.
 const SIGIL = {
+  'Viper Strike': '➤',
+  'Second Fang': '⋀',
+  'Venom Needle': '⌇',
+  'Lethal Dose': '◈',
+  'Slow Poison': '≈',
+  'Sleight of Hand': '⤨',
+  'Shadow Double': '⧉',
+  'Ghostblade': '◊',
+
   'Emberfall': '✷',
   'Firstlight': '☀',
   'Bellowsbreath': '≋',
@@ -5002,14 +11133,19 @@ function cardHTML(card) {
   // price the trade before you place anything. It lights up only on the pair that is live.
   const attV = eff(card).attuned;
   const attLive = attunedNow() && (zoneOf(card.id) === 'Spell' || zoneOf(card.id) === 'Element');
+  // 🐛 A LOOSE ATTUNE LOOKED EXACTLY LIKE A FULL ONE (found in play 2026-08-22). ✦ Loose Weave
+  // makes ANY Catalyst attune, so `attunedNow()` is true either way — and the card lit the same
+  // gold "✦ attuned!" glow whether you had earned the whole bonus or half of it.
+  // 🔑 Thomas: *"the stone and lightning color are too similar, i got that mixed up, i thought it
+  // was a full atune."* The colours are half the story; the other half is that **the game
+  // confirmed his misreading.** A signal that fires identically for two different outcomes is not
+  // a signal. Same class as 🧱 Guard having no reveal line — the rule fired, nothing marked it.
+  const looseLive = attLive && looseOnly();
   const enhLine = d.wild ? '🌈 Wild' : '';
   const forged = '';
 
   let action = '';
-  if (S.diverting) {
-    action = `<div class="card-action"><button onclick="divertWith(${card.id})">Discard (Divert)</button></div>`;
-
-    } else if (isAssignPhase() && S.potionPick) {
+  if (isAssignPhase() && S.potionPick) {
     // ⚠️ A PICKER MUST NEVER OFFER WHAT IT CANNOT ACT ON — same rule the event pickers learned.
     const p = potionById(S.potionPick);
     action = potionCan(p, card)
@@ -5037,10 +11173,21 @@ function cardHTML(card) {
     } else {
       action = `<div class="card-action muted">stays in hand</div>`;
     }
+  } else if (S.phase === 'mendpick') {
+    action = `<div class="card-action"><button class="primary" onclick="hearthMendPick(${card.id})">` +
+      `🧵 Take this one back</button></div>`;
+  } else if (S.phase === 'hearthpick') {
+    // 🔧 the hearth's forge. ⚠️ Same rule as every picker here: it lives ON the card, and a
+    // card that cannot take it stays VISIBLE and says why.
+    const can = card.level < MAX_LEVEL && !wasDowngraded;
+    action = can
+      ? `<div class="card-action"><button class="primary" onclick="hearthForge(${card.id})">` +
+        `🔧 Sharpen → Lv${card.level + 1}</button></div>`
+      : `<div class="card-action muted">${card.level >= MAX_LEVEL ? 'already at Lv' + MAX_LEVEL : 'softened this turn'}</div>`;
   } else if (S.phase === 'soak') {
     if (!wasDowngraded) {
       const soak = soakValue(card);
-      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Downgrade — soak ${soak}${card.level === 1 ? ' ⚠️ Lv1: LEAVES YOUR DECK' : ''}</button></div>`;
+      action = `<div class="card-action"><button onclick="soakWith(${card.id})">Block ${soak} — drops a level${card.level === 1 ? ' ⚠️ Lv1: LEAVES YOUR DECK' : ''}</button></div>`;
     } else {
       action = `<div class="card-action muted">already downgraded</div>`;
     }
@@ -5052,17 +11199,29 @@ function cardHTML(card) {
     action = eventCanPick(opt, card)
       ? `<div class="card-action"><button onclick="eventPickCard(${card.id})">Choose this one</button></div>`
       : `<div class="card-action muted">${opt.pickNote || 'not this one'}</div>`;
+  // ⏳ THE SHOP MUST SAY WHY IT IS SHUT. Without this the card simply offers no sharpen button at
+  // a Wheel and the player is left to guess — *never state a rule about an object without marking
+  // the object*, and a cost you cannot see being charged is the phantom problem in reverse.
+  } else if ((S.phase === 'upgrade' || S.phase === 'wheel') && S.delayed > 0) {
+    action = `<div class="card-action muted">⏳ you arrived too late to sharpen — ` +
+      `${S.delayed} more encounter${S.delayed === 1 ? '' : 's'}</div>`;
   } else if (canSharpenNow()) {
     // ⚠️ every number here reads off `real`, never the previewed copy — the cost of the NEXT
     // level is not the cost printed by the level you are looking at.
     if (real.level >= MAX_LEVEL) {
       action = `<div class="card-action muted">already at Lv${MAX_LEVEL}</div>`;
     } else if (S.downgraded.has(real.id)) {
-      action = `<div class="card-action muted">blunted this turn — can't sharpen</div>`;
+      action = `<div class="card-action muted">blocked this turn — cannot sharpen</div>`;
     } else {
       const cost = eff(real).cost;
       const ok = cost <= S.coins;
-      action = previewing
+      // ⚠️ A GATE MUST SAY WHY. One level per card per visit is invisible unless the card
+      // announces it - and a button that simply stops working reads as a bug, not a rule.
+      // Same discipline as the event pickers: ineligible stays VISIBLE and states its reason.
+      if (sharpenedHere(real.id)) {
+        action = `<div class="card-action"><button disabled>` +
+          `🔼 sharpened — one level per visit</button></div>`;
+      } else action = previewing
         ? `<div class="card-action"><button class="primary" onclick="buyUpgrade(${real.id})" ${ok ? '' : 'disabled'}>` +
           `Sharpen to Lv${real.level + 1} — 🪙 ${cost}${ok ? '' : ' (not enough)'}</button>` +
           `<button onclick="pickUpgrade(${real.id})">back</button></div>`
@@ -5070,31 +11229,96 @@ function cardHTML(card) {
     }
   }
 
+  // 🗡️ is THIS card's ✦ live right now? Only meaningful while it is the Strike.
+  const paidLive = !CLASS.pairs && zoneOf(card.id) === 'Spell' && (() => { const m = rogueMath(); return !!(m && m.full); })();
+  // ⚠️ DECLARED ABOVE ITS USE, DELIBERATELY. It was below, and `vals` reads it — a temporal dead
+  // zone that threw on every card render. Exactly the POTION_CAP bug: a `const` used earlier in the
+  // file than it is declared is not a warning, it is a blank screen.
   // Attack/Move centerpiece: always two rows, consistent across all cards.
   // Each stat is TAGGED so CSS can quiet whatever this encounter/slot doesn't use — the
   // numbers never leave (legible math), they just stop shouting all at once.
   // ONE value: the encounter decides whether it reads as damage or as progress.
   const valIcon = (S.encounter && S.encounter.type === 'journey') ? '👣' : '⚔️';
-  const vals = `<div class="card-val v-one">${valIcon} ${contributes}` +
-    `<span class="v-att${attLive ? ' att-live' : ''}" title="its value when the Catalyst shares its element">✦${attV}</span></div>`;
+  // ⚠️ THE ✦ ATTUNED NUMBER IS A MAGE FACT AND MUST NOT BE PRINTED FOR A CLASS THAT CANNOT
+  // ATTUNE (found in play 2026-08-17, Thomas: *"why is there still a attune number with a star"*).
+  // 🔑 I GATED THE RULE AND LEFT ITS DISPLAY BEHIND — exactly what "when a rule is cut, the same
+  // commit removes its display" exists to prevent. The rogue was showing a second number for a
+  // mechanic it does not have, which is worse than a missing number: it invites a wrong theory.
+  // A rogue card instead prints the one word that decides its whole turn.
+  // 🎯 A CARD THAT STRIKES TWICE HAS TO SAY SO. Sparkstrike has landed two blows since it was
+  // written and its face never mentioned it - a rule the card does not print, the same fault as the
+  // archetype-gated charms.
+  // ⚠️ Printed PER-HIT × COUNT, not total × count. The total is SPLIT, so "23×2" would promise
+  // 46; "11×2" is what actually lands - and it is the number that matters against 🛡️ Armour,
+  // because armour comes off each blow separately.
+  // 🔑 ASK THE CLASS HOW MANY BLOWS THIS CARD WOULD LAND, rather than reading `d.hits` off the def.
+  // ● a full Momentum meter splits the rogue's Strike in two, and reading the DEF meant that never
+  // appeared on the card — the rule fired and the face said nothing. Same class of bug as 🧱 Guard
+  // having no reveal line and the Surge row printing the banked figure: *a rule that fires without
+  // appearing.* ⚠️ The split applies only in the STRIKE slot, so the slot has to be passed in.
+  const isStrike = !!(S.assign && S.assign.Spell === real.id);
+  const nHits = CLASS.hitsOf ? CLASS.hitsOf(card, isStrike) : (d.hits || 1);
+  // 🔑 AND THE BONUSES LAND ON EACH BLOW, SO THE FACE MUST SAY SO. Thomas: *"if a card does 8x2,
+  // any added damage like a +4 potion, will make it 12x2."* That is a statement about what the
+  // CARD READS, so showing 8x2 while the maths does 12x2 would be the same bug as 🧱 Guard having
+  // no reveal line — a rule that fires without appearing, for the fourth time today.
+  const perAdd = (isStrike && SPLIT_ADDS_PER_HIT && CLASS.perHitBonus) ? CLASS.perHitBonus(card) : 0;
+  const per = n => nHits > 1 ? `${Math.floor(n / nHits) + perAdd}<span class="v-x">×${nHits}</span>` : `${n + perAdd}`;
+  const vals = `<div class="card-val v-one">${valIcon} ${per(contributes)}` +
+    (CLASS.pairs
+      // ⚠️ AND THE NUMBER MUST BE THE ONE THIS ARRANGEMENT ACTUALLY GIVES. It printed the card's
+      // full attuned value even while Loose Weave was halving it — so the card promised 13 and the
+      // charm quietly delivered 10, which is precisely the misread above.
+      ? `<span class="v-att${attLive ? ' att-live' : ''}${looseLive ? ' is-loose' : ''}" title="${looseLive
+            ? looseWord() + ' of the bonus — your Catalyst does not share its element (✦ Loose Weave)'
+            : 'its value when the Catalyst shares its element'}">✦${per(looseLive
+            ? v.value + Math.floor((attV - v.value) / 2) : attV)}</span>`
+      // ⚠️ ◆, NOT ✦. ✦ is the MAGE's attune star and it was doing rogue duty for "paid
+      // damage" - the same borrowed-vocabulary fault as the reveal printing "unattuned" at her.
+      // 🔑 ◆ is the DAMAGE you get once the energy is paid — a different kind of number from
+      // ⚡ itself, so it keeps its own mark. ✦ is the mage's again.
+      : (d.energy ? `<span class="v-att${paidLive ? ' att-live' : ''}" title="its damage when its ⚡ cost is paid in full">◆${per(v.attuned)}</span>` : '')) +
+    `</div>`;
 
   const slot = zoneOf(card.id);
   const verb = verbOf(card);
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
-  const fate = (isAssignPhase() && slot) ? fateOf(slot) : null;
-  // ⚖️🐌 name the barred card outright — "your heaviest" is not something you can read off a row
-  const barred = isAssignPhase() && S.hardship
-    ? (placementBan(card.id, 'Spell') ? '⚖️ too heavy for the SPELL'
-      : placementBan(card.id, 'Element') ? '🐌 too fast for the CATALYST' : null)
-    : null;
+  const fate = (isAssignPhase() && slot) ? fateOf(slot, card.id) : null;
+  // ⚖️🐌🌀 name the barred card outright — "your heaviest" is not something you can read off a row.
+  //
+  // 🐛 THIS SAID THE WRONG RULE, AND SAID IT ABOUT A CARD THAT WAS CORRECTLY PLACED (2026-08-22,
+  // found in play). It hard-coded 🐌 Mire's wording for ANY ban on the Catalyst — so under
+  // 🌀 Vertigo, which bars the fastest card from every slot EXCEPT the Spell, the card sitting
+  // happily in the Spell announced *"too fast for the CATALYST"*. Two faults at once:
+  //   1. it stated Mire's rule while Vertigo was the one in force, and
+  //   2. it warned about a card that was exactly where the hardship wanted it.
+  // 🔑 A MARKER EXISTS TO TELL YOU SOMETHING YOU NEED. One that fires on a correct placement reads
+  // as an error and teaches the player to ignore the label — worse than no label at all.
+  // ⚠️ So it asks which zones are ACTUALLY banned right now and phrases from that, rather than
+  // guessing the hardship from a single probe.
+  const barred = (() => {
+    if (!isAssignPhase() || !S.hardship) return null;
+    const banned = ZONES.filter(z => placementBan(card.id, z));
+    if (!banned.length) return null;
+    const here = zoneOf(card.id);
+    // pinned to one slot (🌀 Vertigo) — say nothing once it is there; there is nothing to warn about
+    const allowed = ZONES.filter(z => !banned.includes(z));
+    if (allowed.length === 1) return here === allowed[0] ? null : `🌀 must be your ${SLOT_LABEL[allowed[0]].toUpperCase()}`;
+    if (banned.includes('Spell')) return '⚖️ too heavy for the SPELL';
+    if (banned.includes('Element')) return `🐌 too fast for the ${SLOT_LABEL.Element.toUpperCase()}`;
+    return `⚠️ barred from the ${SLOT_LABEL[banned[0]].toUpperCase()}`;
+  })();
   const ctx = (S.encounter && S.encounter.type === 'journey') ? 'ctx-journey' : 'ctx-fight';
-  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? ' attuned-pair' : '') + (previewing ? ' card-preview' : '');
+  const isMate = pairMateId() === card.id;
+  const slotCls = (slot ? `in-${slot}` : '') + (attLive ? (looseLive ? ' attuned-pair is-loose' : ' attuned-pair') : '') +
+    (previewing ? ' card-preview' : '') + (isMate ? ' pair-mate' : '');
   const resoOn = false;   // resonance is gone - depth replaced it
   const boostPicker = '';
 
   const tint = d.wild ? 'card-el-wild' : shownEl ? `card-el-${shownEl}` : 'card-el-none';
   // sigil watermark + seek-element accent glow (wild gets its own prismatic aura via .card-el-wild)
-  const sigil = SIGIL[d.name] || '✦';
+  // 🗡️ a rogue card wears its PAIR's mark; a mage card keeps its own.
+  const sigil = (!CLASS.pairs && d.pair && PAIR_SIGIL[d.pair]) || SIGIL[d.name] || '✦';
   const accent = d.wild ? null : (ACCENT[enhElOf(card)] || '#cfc9ba');
   const sigilStyle = accent ? `--accent:${accent};` : '';
   // while fuse is armed, highlight the valid partners you can tap
@@ -5105,18 +11329,88 @@ function cardHTML(card) {
            `` : '') + `>` +
     `<div class="card-sigil" aria-hidden="true">${sigil}</div>` +
     `<div class="card-head"><span class="card-name">${displayName(card)}${forged}</span><span class="card-level">Lv${card.level}</span></div>` +
-    `<div class="el-identity">${elChip(shownEl)}</div>` +
+    // ⚠️ THE MAGE'S ELEMENT CHIP IS GONE FROM THE TOP - the type line at the foot now carries
+    // it, and printing it twice is the "symbol soup" the element-disclosure rule exists to stop.
+    // 🔑 `elChip` had NO slot logic: it rendered what the card IS, unconditionally, so it was
+    // saying exactly what the foot says. And the card's TINT already encodes the element, which is
+    // why the vault's note says the dimmed half is never deleted - the colour keeps carrying it.
+    (CLASS.pairs ? (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : '')
+                 // ⚠️ LABELLED, NOT JUST GLYPHED (2026-08-18). Thomas, reading a reveal:
+                 // *"how was second fang paid, it costs 3, viper strike has 2 energy to pay"* -
+                 // and he was reading the card exactly as it was written. ⚡2 is what Viper Strike
+                 // costs to STRIKE WITH; ◇4 is what it PAYS as fuel. Two bare numbers side by side
+                 // with no words, and 🔑 THE INTUITIVE READ IS THE WRONG ONE, because ⚡ is the
+                 // cost glyph everywhere else in the game, so it looks like the number that pays.
+                 // ⚠️ The old version explained itself in `title=` attributes. This is played daily
+                 // on a phone, WHERE TOOLTIPS DO NOT EXIST - so the explanation was invisible to the
+                 // only player it had. Three characters of label beat any hover text.
+                 // 🔑 DISCLOSURE BY POSITION - the rule this game already uses for the mage's two
+                 // element facts, applied to the rogue's two energy facts. Thomas: *"ah the energy
+                 // and pitch can't be 1 number?"* They cannot (the level tradeoff needs them moving
+                 // in opposite directions), but only ONE of them is ever being read:
+                 //   ① STRIKE  -> its COST is what matters. Dim the other.
+                 //   ③ ENERGY  -> its ENERGY is what matters. Dim the other.
+                 // ⚠️ COST / ENERGY, not NEEDS / GIVES (2026-08-18). Thomas asked for "energy" to
+                 // match the slot name and I invented a verb pair instead - which read as two new
+                 // words to learn rather than one word already on the screen. The slot is ENERGY,
+                 // so the number it reads is ENERGY, and the other one is what the card COSTS.
+                 // ⚠️ ONE GLYPH, ONE WORD (2026-08-18). Thomas: *"maybe it should be called energy
+                 // instead of fuel, the slot is called energy anyways, would make it match."*
+                 // 🔑 AND IT GOES FURTHER THAN A RENAME: IT IS NOT TWO RESOURCES, IT IS ONE
+                 // RESOURCE ASKED TWICE. ⚡ energy is what a card NEEDS to be struck with and what it
+                 // GIVES when fed. Printing them as ⚡ and ◇ taught two symbols for one thing, which
+                 // is the same vocabulary sprawl that had the rogue reading the mage's ✦.
+                 // That is also the honest answer to "can't it be 1 number?" - it IS one number.
+                 // ⚠️ DIMMED, NEVER DELETED - same as the element rule. The number is still there
+                 // when you go looking; it just stops competing for the glance.
+                 : (() => {
+                     const reads = slot === 'Boost' ? 'pitch' : slot === 'Spell' ? 'cost' : null;
+                     const cD = reads === 'pitch' ? ' num-dim' : '';
+                     const pD = reads === 'cost'  ? ' num-dim' : '';
+                     return `<div class="el-identity pair-identity">` +
+                       `<b class="rg-energy${cD}">⚡${d.energy}<span class="nlab">cost</span></b>` +
+                       `<b class="rg-pitch${pD}">⚡${pitchOf(card)}<span class="nlab">energy</span></b>`;
+                   })() +
+                   // ⚠️ the role moved to the TYPE LINE at the foot - it was appearing inline
+                   // here between the energy numbers and the pair, which is three different kinds
+                   // of fact in one run-on row.
+                   ` · pairs with <b>${d.combo || '—'}</b></div>`) +
+    // 🗡️ the verb is printed ON the card, and lights up when it is actually firing — the same
+    // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
+    (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : (isMate ? ' verb-offer' : '')}">` +
+      `<b>🗡️ ${isMate ? 'Move me to COMBO' : 'Combo'}</b><span>${ROGUE_VERBS[d.verb]}</span></div>` : '') +
     `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
-    `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
-    `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span></div>` +
+    // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
+    // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
+    (CLASS.boosts
+      ? `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
+        `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span>`
+      : '') + `</div>` +
     `<div class="card-vals">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
-      `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it soaks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
+      `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
     (fate ? `<div class="card-fate ${fate.cls}">${fate.text}</div>` : '') +
-    `<div class="card-row card-foot"><span class="card-enh">${enhLine}</span>` +
-    `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
+    `<div class="card-row card-foot">` +
+      `<span class="card-type">${typeLine(d)}</span>` +
+      (enhLine ? `<span class="card-enh">${enhLine}</span>` : '') +
+      `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
     action + `</div>`;
+}
+
+// 🏷️ THE TYPE LINE (2026-08-18). Thomas: *"card classification should go like on the bottom
+// somewhere, kinda like how other tcg's do it... mage fire cards should say fire in that
+// classification slot. our rogue cards would say tool or blade in that slot i guess."*
+// 🔑 EVERY CLASS ALREADY HAS A CLASSIFICATION - it was just printed in a different place, in a
+// different shape, per class: the mage's element sat in a coloured chip at the top, the rogue's
+// role was jammed inline between her energy numbers and her pair. One fixed slot, bottom-left,
+// same position on every card in the game, is what makes a card scannable at a glance.
+// ⚠️ Deliberately NOT the archetype (FORCE/SPARK/FLOW/WARD). Those are an authoring tool and
+// [[Market_And_Retention]] already recorded the cost of surfacing them: five charms shipped for
+// months gating on a word printed nowhere on the card.
+function typeLine(d) {
+  if (CLASS.pairs) return d.wild ? 'WILD' : (d.element || '').toUpperCase();
+  return d.role ? d.role.toUpperCase() : '';
 }
 
 function renderLog() {
@@ -5132,14 +11426,17 @@ function renderLog() {
 // Reuses the normal turn loop (computeAction / resolve / reveal / soak); see 03_Content/Dragons.md.
 // ============================================================
 function beginFinalBattle() {
+  // ⭐ arriving at the lair pays whether or not you leave it — reaching the dragon IS the run
+  awardXP(XP_AWARD.lair);
   S.finalMode = true;
   S.finalPhase = 'lastmile';
   S.duelBeat = 0;
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
   // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
   // the boon fields survive the Approach's deletion because the duel maths reads them.
+  const dhp = Math.max(10, S.dragon.hp + (DRAGON_HP_ADD[S.dragon.stage] || 0));
   S.dragonState = {
-    hp: S.dragon.hp, maxHp: S.dragon.hp,
+    hp: dhp, maxHp: dhp,
     // ⚠️ the clean-Approach boon is GONE with the Approach (2026-08-05). The fields stay at 0
     // because duelArmour()/duelStrike() read them; a future reward may fill them again.
     boon: { armourCut: 0, unseen: 0, calm: 0 },
@@ -5148,6 +11445,12 @@ function beginFinalBattle() {
   S.deck = S.tutorial ? [...S.deck, ...S.discard, ...S.hand] : shuffle([...S.deck, ...S.discard, ...S.hand]); // gather all non-trashed, keep levels
   S.hand = []; S.discard = [];
   draw(HAND_SIZE);
+  // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
+  // the extra arrives now and is put back at cleanup rather than being a blind exchange.
+  // 🔑 The slot row IS the picker: four slots, five cards, and the one you leave unseated slides
+  // under the deck. No new phase, no new UI language, and the bot needs teaching nothing — it
+  // already searches every arrangement, so it simply searches a bigger hand.
+  if (S.drawExtra) { draw(S.drawExtra); S.drawExtra = 0; }
   S.hardship = null;
   S.downgraded = new Set();
   S.damage = 0; S.poison = 0; S.loseReserve = null; S.afterSoak = 'upgrade';
@@ -5163,13 +11466,13 @@ function startLastMile() {
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Move';
   S.hardship = null; S.rangedDodge = false;
-  S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ THE LAST MILE —`);
@@ -5189,6 +11492,19 @@ function finishLastMile() {
       : `You arrive late, but not spent, and land one blow as it turns — <b>−${cut} HP</b>. ${S.dragonState.hp} of ${S.dragonState.maxHp} remain.`, 'good result');
   } else {
     log(`You come to the lair mouth with nothing left in you. The ${S.dragon.name} meets you whole.`, 'bad');
+  }
+  // 🌒 THE SECOND RACE PAYS INTO THE SHAPE, NOT INTO HP — two races, two currencies, so neither
+  // is a bigger version of the other. Arriving unheard means it is not set for you yet.
+  // ⚠️ The blow for arriving LOUD was already taken on the road (see r.rouse) — it went through
+  // the ordinary soak, so those levels are gone before the duel begins. Nothing to apply here.
+  if (S.lastMileApproach === 'unseen' && S.dragonState) {
+    const b = S.dragonState.boon, bits = [];
+    if (hasShape('armour'))     { b.armourCut = LAST_MILE.armourCut;  bits.push(`🛡️ its plate is not set — Armour <b>−${LAST_MILE.armourCut}</b>`); }
+    if (hasShape('evasion'))    { b.unseen    = LAST_MILE.unseenBeats; bits.push(`🌀 it has not seen you — Evasion sleeps <b>${LAST_MILE.unseenBeats}</b> beat${LAST_MILE.unseenBeats === 1 ? '' : 's'}`); }
+    if (hasShape('relentless')) { b.calm      = LAST_MILE.calmBeats;   bits.push(`⏳ it has not drawn breath — the breath holds <b>${LAST_MILE.calmBeats}</b> beat${LAST_MILE.calmBeats === 1 ? '' : 's'}`); }
+    // ⚠️ an unshaped dragon exists (stage 0), and a reward that silently pays NOTHING is worse
+    // than one that says so — never print a boon you did not actually grant.
+    if (bits.length) log(`🌒 You came up on it unheard: ${bits.join(' · ')}.`, 'good result');
   }
   startDuel();
 }
@@ -5210,10 +11526,32 @@ function duelArmour() {
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
   const quenched = !!(S.potionFx && S.potionFx.noShape);   // 🧪 Quenching Draught works on a dragon too
-  const armour = quenched ? 0 : duelArmour() + (duelFx().armour || 0);   // 🐉 Bank the Forge
+  const armour = quenched ? 0 : Math.max(0, duelArmour() + (duelFx().armour || 0) - (hasCharm('ironsplit') ? 2 : 0));   // 🐉 Bank the Forge · 🛡️ Ironsplitter
   // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
-  const evaded = !quenched && hasShape('evasion') && r.initLost && !(S.dragonState.boon.unseen > 0);
-  let toHp = Math.max(0, r.value - armour);
+  // 🌀 Windreader applies at the lair too - a dragon is where Evasion actually decides runs.
+  // ⚠️ The duel only knows initLost (a boolean), so the margin is re-read from the same terms
+  // computeAction used, rather than inventing a second notion of "close".
+  const evMargin = (S.dragon && S.dragon.init != null) ? (S.dragon.init - (r.init || 0)) : 99;
+  const evaded = !quenched && hasShape('evasion') && r.initLost
+                 && !(hasCharm('windreader') && evMargin <= 2)
+                 && !(S.dragonState.boon.unseen > 0);
+  // 🔴 THE FINALE NEVER APPLIED HIT COUNT (fixed 2026-08-28, found by Thomas in play).
+  // This was `Math.max(0, r.value - armour)` — the total, with the dragon's armour subtracted
+  // ONCE and `hits` never consulted at all. 🔑 So a multi-hit card was **strictly worse** at the
+  // lair than a single-hit card of the same value: measured 24 vs 25 on identical numbers, the
+  // split losing its rounding remainder and buying nothing back. ⚡ Sparkstrike's two hits,
+  // 🎯 Twinned Bracers and the rogue's full-meter split were all downside-only against a dragon.
+  //
+  // ⚠️ The road has always charged armour per blow — `(perHit - armorCut) * hits` — and the duel
+  // is the third turn loop that only ever got half of what the other two got. **Same formula now.**
+  // ⚠️ On its own this is a NERF into 🛡️ Armour, which is correct and is the whole point of
+  // multi-hit being LATERAL: many small blows lose to a flat cut, one big blow does not. What pays
+  // for it is 🔥 WAKE_PER_HIT, shipped in the same commit — the two were measured together
+  // because a nerf and a buff landing separately would each be tuned against the wrong baseline.
+  // 🧱 Guard is not handled here on purpose: no dragon has it, and inventing an untested branch
+  // for content that does not exist is how a rule ends up half-applied.
+  const per = Math.max(0, (r.perHit != null ? r.perHit : r.value) - armour);
+  let toHp = per * (r.hits || 1);
   if (evaded) toHp = Math.floor(toHp / 2);
   return { toHp, armour, evaded };
 }
@@ -5238,7 +11576,7 @@ function shapeStateText() {
 }
 
 // 🃏 YOUR HALF OF THE RACE. The dragon's bar is its HP; this is yours — the cards you have left.
-// No reshuffle in a duel, so every card you soak with is stamina you never get back.
+// No reshuffle in a duel, so every card you block with is stamina you never get back.
 // 🐉 WHAT IT IS DOING NOW, AND WHAT IT WILL DO NEXT. The telegraph is the whole point — an attack
 // you can see coming is a problem, one that arrives unannounced is a dice roll.
 function telegraph() {
@@ -5255,12 +11593,13 @@ function staminaBar() {
   const pct = S.duelStamina0 ? Math.max(0, Math.round(100 * left / S.duelStamina0)) : 100;
   return `<div class="stamina"><div class="stamina-fill" style="width:${pct}%"></div>` +
     `<span class="stamina-label">🃏 your cards — ${left} / ${S.duelStamina0}</span></div>` +
-    `<div class="stamina-note">🔑 <b>You lose when your cards run out</b> — every card you soak with is stamina you never get back.</div>`;
+    `<div class="stamina-note">🔑 <b>You lose when your cards run out</b> — every card you block with is stamina you never get back.</div>`;
 }
 
 function startDuel() {
   S.finalPhase = 'duel';
   S.duelBeat = 0;
+  rollTurnTokens();   // 🔥 the Last Mile was a turn too — collect what it banked before the deck is gathered
 
   // steel yourself at the lair's mouth: gather every card you still hold (spent-set and all)
   // into a fresh deck — this is your finite duel stamina. Only cards TRASHED on the approach
@@ -5305,7 +11644,6 @@ function startDuelBeat() {
     init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
-  S.divertsUsed = 0; S.diverting = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
   S.damage = 0; S.damageEl = null;
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there had to be reset here too.
@@ -5313,6 +11651,7 @@ function startDuelBeat() {
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
   S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
@@ -5362,6 +11701,8 @@ function resolveDuel() {
       log(`🐉 ${ds.active.name} takes ${displayName(gone)} — it is gone for the rest of the duel.`, 'bad');
     }
   }
+  // 🔥 the finale never reaches finishResolve(), so the bank is collected here instead.
+  if (r.banks) S.wakePending = r.bank;
   S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
@@ -5371,18 +11712,9 @@ function resolveDuel() {
   // --- staged reveal (mirrors the normal fight) ---
   const L = (text, cls = '') => ({ text, cls });
   const beats = [];
-  const b1 = [];
-  if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
-  else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`🔥 BANKED — ${boostC.def.name} is ${elOf(boostC)} like your Catalyst, ${bankCostPhrase(boostC)}: +${r.bank} Emberwake for next beat`, 'good'));
-  else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
-  if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
-  if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
-  if (st.evaded) b1.push(L(`🌀 Evasion: it saw you coming — half the blow finds nothing → ${toHp}`, 'bad'));
-  if (hasShape('evasion') && r.initLost && ds.boon.unseen > 0) b1.push(L(`🌀 It has not seen you yet — the blow lands whole despite your pace`, 'good'));
-  b1.push(L(`🐉 ${S.dragon.name}: ${hpBefore} → ${ds.hp} HP`, ds.hp < hpBefore ? 'good' : ''));
-  beats.push({ label: '⚔️ STRIKE', big: toHp, vs: `to HP · 🐉 ${hpBefore}→${ds.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
-
+  // 🔑 INITIATIVE FIRST HERE TOO — the duel mirrors the fight, so it must read in the same causal
+  // order: who moved first, then what the blow did. ⚠️ `kill` is computed above, so the beat's own
+  // !kill guard still works unmoved: kill the dragon and there was no bite to describe.
   if (!kill) {
     const b2 = [];
     if (r.initLost) b2.push(L(`Initiative: yours ${r.init} vs ${S.dragon.init} → the ${S.dragon.name} strikes first → Early Damage ${early}`, 'bad'));
@@ -5390,6 +11722,19 @@ function resolveDuel() {
     if (hasShape('relentless')) b2.push(L(`⏳ It draws a deeper breath — counterstrike ${counter}${S.duelBeat > 1 ? ` (was ${counter - RELENTLESS_STEP})` : ''}`, 'bad'));
     beats.push({ label: '💨 INITIATIVE', big: r.init, vs: `vs ${S.dragon.init}`, numCls: early ? 'bad' : 'ok', lines: b2 });
   }
+
+  const b1 = [];
+  if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
+  else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
+  else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
+  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into the next beat, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+  else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
+  if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
+  if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
+  if (st.evaded) b1.push(L(`🌀 Evasion: it saw you coming — half the blow finds nothing → ${toHp}`, 'bad'));
+  if (hasShape('evasion') && r.initLost && ds.boon.unseen > 0) b1.push(L(`🌀 It has not seen you yet — the blow lands whole despite your pace`, 'good'));
+  b1.push(L(`🐉 ${S.dragon.name}: ${hpBefore} → ${ds.hp} HP`, ds.hp < hpBefore ? 'good' : ''));
+  beats.push({ label: '⚔️ STRIKE', big: toHp, vs: `to HP · 🐉 ${hpBefore}→${ds.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
   beats.push({ outcomeBeat: true, final: true, duel: true, lines: [] });
 
@@ -5403,10 +11748,13 @@ function resolveDuel() {
 // runs when the duel reveal finishes (dispatched from advanceBeat)
 function finishDuel() {
   const dr = S.duelResult;
+  const rr = S.pendingR;
   S.pendingR = null; S.beats = null; S.beatIndex = -1;
   if (dr.kill) { victory(); return; }
+  // ● the streak is judged on the RAW blow, before you soak it — same order as the road
+  tickMomentum(dr.damage, rr);
   if (dr.damage <= 0) { log(`No counterstrike lands — press the assault.`); duelCleanupAndNext(); return; }
-  log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — soak it with your remaining cards.`, 'bad');
+  log(`The ${S.dragon.name} strikes back for ${dr.damage}${dr.early ? ` (Early ${dr.early} + Counter ${dr.counter})` : ''} — block it with your remaining cards.`, 'bad');
   S.damage = dr.damage;
   S.damageEl = null;   // dead — see above; a dragon's breath has no colour the maths reads
   S.downgraded = new Set();
@@ -5415,6 +11763,7 @@ function finishDuel() {
 }
 
 function duelCleanupAndNext() {
+  rollTurnTokens();   // 🔥 end of a beat IS end of a turn — before the set leaves the hand, so Deepwell can still read it
   const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
   S.discard.push(...setCards);
@@ -5426,6 +11775,9 @@ function defeat(msg) {
   log(`💀 DEFEAT — ${msg}`, 'bad result');
   // 🏆 a graded loss still goes on the wall — death is part of the game, not a blank
   if (S.dragon) recordGrade(S.dragon.stage, gradeRun(false), false);
+  // 🔴 A LOSS STILL PAYS. This is the whole point of the meta layer: if unlocks came only
+  // from winning, a lost run is wasted time and the grind punishes the players who need it most.
+  bankRun(false);
   S.defeatMsg = msg;
   S.phase = 'defeat';
   render();
@@ -5450,9 +11802,24 @@ function defeat(msg) {
 //     🃏 the deck you kept  ⚔️ how cleanly you solved hands  ✦ craft  🐉 the kill.
 // A perfect losing run still reaches ~75, which is a B — death is part of the game, not a zero.
 // ============================================================
+// 📦 SAVE MIGRATION for the craft stat (2026-08-21). The counters were named for the mage's rule
+// (`attuneAvail`/`attuned`); they are class-neutral now.
+function migrateStats(d) {
+  const base = { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 };
+  if (!d) return base;
+  return {
+    craftAvail: d.craftAvail != null ? d.craftAvail : (d.attuneAvail || 0),
+    craftFound: d.craftFound != null ? d.craftFound : (d.attuned || 0),
+    duelDmg: d.duelDmg || 0, duelBeats: d.duelBeats || 0,
+  };
+}
 const GRADE_BANDS = [[85, 'S'], [70, 'A'], [55, 'B'], [40, 'C'], [0, 'D']];
+// the grade names the mechanic in the CLASS's own word — 'attuned' for a mage, 'paid in full'
+// for a rogue. ⚠️ Never hard-code it here: a score line that describes the wrong mechanic is
+// how the rogue came to be told she had missed 15 attunes she was never offered.
+const craftLabel = () => (CLASS.craft && CLASS.craft.label) || 'found';
 function gradeRun(won) {
-  const st = S.stats || { attuneAvail: 0, attuned: 0, duelDmg: 0, duelBeats: 0 };
+  const st = S.stats || { craftAvail: 0, craftFound: 0, duelDmg: 0, duelBeats: 0 };
   const survivors = [...S.hand, ...S.deck, ...S.discard];
   const levels = survivors.reduce((t, c) => t + c.level, 0);
   const res = S.results, encounters = res.Complete + res.Narrow + res.Loss;
@@ -5461,8 +11828,10 @@ function gradeRun(won) {
   const deck = Math.round(30 * Math.min(1, levels / 40));
   // ⚔️ HOW CLEANLY YOU SOLVED HANDS — a Narrow counts, but only a third as much
   const exec = encounters ? Math.round(25 * Math.min(1, (res.Complete + res.Narrow / 3) / encounters)) : 0;
-  // ✦ CRAFT — of the hands that COULD attune, how many did you find? Measures play, not luck.
-  const craft = st.attuneAvail ? Math.round(20 * (st.attuned / st.attuneAvail)) : 0;
+  // ✦ CRAFT — of the hands where your CLASS's source of power was available, how many did you
+  // find? Measures play, not luck. ⚠️ Class-owned since 2026-08-21: it asked a mage question of
+  // every class, and a rogue scored a guaranteed 0/20 for failing to do a thing she cannot do.
+  const craft = st.craftAvail ? Math.round(20 * (st.craftFound / st.craftAvail)) : 0;
   // 🐉 THE KILL — felling it is most of it; felling it FAST is the rest (⏳ Relentless's demand)
   const kill = won ? 25 - Math.max(0, Math.min(8, (st.duelBeats - 3) * 2)) : 0;
 
@@ -5490,7 +11859,7 @@ function gradeHTML(g, won) {
     `<div class="g-rows">` +
     bar('🃏 the deck you kept', g.deck, 30) +
     bar('⚔️ hands solved', g.exec, 25) +
-    bar(`✦ craft <span class="dim">(attuned ${g.st.attuned} of ${g.st.attuneAvail})</span>`, g.craft, 20) +
+    bar(`✦ craft <span class="dim">(${craftLabel()} ${g.st.craftFound} of ${g.st.craftAvail})</span>`, g.craft, 20) +
     bar(won ? `🐉 the kill <span class="dim">(${g.st.duelBeats} beats)</span>` : '🐉 the kill', g.kill, 25) +
     `</div>` + (won ? '' : `<p class="g-diag">${lossDiagnosis()}</p>`) + `</div>`;
 }
@@ -5503,8 +11872,20 @@ function victory() {
   recordGrade(S.dragon.stage, gradeRun(true), true);
   const next = dragonForStage(S.dragon.stage + 1);
   log(`🏆 THE ${S.dragon.name.toUpperCase()} FALLS! Final score: ${score}`, 'good result');
-  if (next && S.dragon.stage > was) log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
-  else if (!next) log(`🪜 Every stage stands open — take whichever you like.`, 'good result');
+  // 🗺️ AND THE SCREEN HAS TO SAY IT, not just the log. Clearing a stage OPENS THE NEXT ONE, which
+  // is the largest thing a victory gives you — larger than any material — and it was living in a
+  // scrolling side panel while the summary listed bone shards.
+  // 🔑 Same rule the field row and the status chips were built on: **if it changed, it belongs on
+  // screen.** A reward announced only in the log is a reward most players never read.
+  if (next && S.dragon.stage > was) {
+    S.stageOpened = next;
+    log(`🗺️ Stage ${S.dragon.stage} cleared — STAGE ${next.stage}, the ${next.name}, is open to you. ${next.brief}`, 'good result');
+  }
+  else if (!next) { S.stageOpened = 'all'; log(`🪜 Every stage stands open — take whichever you like.`, 'good result'); }
+  // 🐉 the hunt's prize, and the run's pay. ⚠️ Both go through the same helpers the road uses,
+  // so a dragon is not a special case — it is an encounter with a better table.
+  bankDrops(rollDrops({ dragon: true, name: S.dragon.name, type: 'fight' }, 'Complete'));
+  bankRun(true);
   S.phase = 'victory';
   render();
 }

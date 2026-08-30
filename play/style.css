@@ -180,10 +180,10 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .card-enh { color: #9fd18a; }
 
 /* element tints — the whole card carries its element, not just the pill */
-.card.card-el-Fire      { background: linear-gradient(160deg, #33201a, #241a18); border-color: #7a4432; }
-.card.card-el-Water     { background: linear-gradient(160deg, #182735, #161d26); border-color: #33587a; }
-.card.card-el-Lightning { background: linear-gradient(160deg, #302b16, #221f16); border-color: #7a6b32; }
-.card.card-el-Stone    { background: linear-gradient(160deg, #2b2820, #1e1c17); border-color: #6b6350; }
+.card.card-el-Fire      { background: linear-gradient(160deg, #3a1e15, #261815); border-color: #a04328; }
+.card.card-el-Water     { background: linear-gradient(160deg, #16293c, #141d29); border-color: #3a6ea8; }
+.card.card-el-Lightning { background: linear-gradient(160deg, #38300d, #26210f); border-color: #b39a1e; }
+.card.card-el-Stone    { background: linear-gradient(160deg, #2f2e2b, #212120); border-color: #8a8378; }
 .card.card-el-wild      { background: linear-gradient(160deg, #2a2233 20%, #1a2430 80%); border-color: #7a6b9a; }
 .card.card-el-none      { background: #262b34; }
 .card-action { margin-top: 6px; }
@@ -191,10 +191,10 @@ label.radio { margin-right: 14px; cursor: pointer; }
 
 /* element chips */
 .el { padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: bold; }
-.el-Fire { background: #7a2e1c; color: #ffb59e; }
-.el-Water { background: #1c4a7a; color: #9ecfff; }
-.el-Lightning { background: #7a6a1c; color: #fff29e; }
-.el-Stone { background: #4a4438; color: #d8c9a8; }
+.el-Fire { background: #8f3016; color: #ffb59e; }
+.el-Water { background: #17518f; color: #9ecfff; }
+.el-Lightning { background: #8a7605; color: #fff8b0; }
+.el-Stone { background: #565452; color: #e2ded6; }
 .el-none { background: #3a3a3a; color: #bbb; }
 
 /* ---------- log ---------- */
@@ -227,6 +227,14 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .event-opts, .event-picks { display: flex; flex-direction: column; gap: 6px; align-items: stretch; margin: 6px 0; }
 .event-picks { flex-flow: row wrap; }
 .event-opts button { text-align: left; }
+/* 🕯️ THE OPTION NOTE WAS AN UNSTYLED INLINE SPAN, so it ran straight into the label:
+   "Take the lightyour candle is already lit". `.opt-why` had no rule anywhere.
+   🔑 A <span> with no style is not a neutral default, it is glued text. Same treatment as
+   .setout-text, which had the same job and got it right. */
+/* ⚠️ NOT flex-column on the button: the leading emoji is a bare text node, and in a flex
+   container every text node becomes its own anonymous item — which put the icon on a line of its
+   own, three lines per option. A block on the NOTE is all that was needed. */
+.opt-why { display: block; margin-top: 3px; font-size: 11.5px; color: #8a8577; font-weight: 400; line-height: 1.35; }
 .event-picks button { flex: 0 0 auto; }
 
 /* ---------- the Dragon Duel finale ---------- */
@@ -682,7 +690,14 @@ body.shell #scene { display: none; }
    POTENTIAL, not a fact - and it ignites only on the Spell+Catalyst pair that is actually live. */
 .v-att { font-size: .62em; margin-left: .35em; opacity: .45; letter-spacing: .02em; vertical-align: .12em; }
 .v-att.att-live { opacity: 1; color: #ffd98a; text-shadow: 0 0 10px rgba(255,190,90,.55); }
-.card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
+/* 🐛 THE FULL-ATTUNE GLOW NEVER SHOWED IN THE MAIN LAYOUT (found 2026-08-22). The immersive block
+   at the end of the file sets `.slot .card { box-shadow: ... }` — same specificity as
+   `.card.attuned-pair` but LATER, so it won every time. The one visual that says "this pair is
+   working" was silently overridden in the layout the game is actually played in, which is a large
+   part of why a loose pair and a full one were indistinguishable.
+   ⚠️ Fixed by specificity, not by moving the rule: the media queries must stay last in this file. */
+.card.attuned-pair,
+.slot .card.attuned-pair { box-shadow: 0 0 0 2px rgba(255,196,96,.75), 0 0 18px rgba(255,170,60,.35); }
 .card.attuned-pair .el-identity .el { background: rgba(255,196,96,.24); color: #ffe6b0; }
 
 
@@ -715,6 +730,464 @@ button.stage.locked .stage-shape { font-style: italic; }
 @media (max-width: 900px) { .carry-name { display: none; } .carry-chip { font-size: .76em; padding: 0 6px; } }
 
 
+/* ============================================================
+   🎴 THE FIELD — persistent state as tokens on the table, between the encounter and your hand.
+   ⚠️ DELIBERATELY PLAIN. A token is a THING and things can be thrown, shattered and swept off a
+   table — but none of that belongs in a bare HTML prototype. Staging is the engine's job, and
+   presentation is the one category of work here that is 100% throwaway. This is a legible object
+   with room around it; the juice gets built once, in Godot.
+   ============================================================ */
+#field { display: none; }
+#field.has-tokens {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+  margin: 0 0 10px;
+}
+.tok {
+  flex: 0 1 auto; min-width: 128px; max-width: 210px;
+  padding: 6px 10px 7px; border-radius: 10px;
+  border: 1px solid rgba(232,145,60,.42);
+  background: linear-gradient(180deg, rgba(232,145,60,.16), rgba(232,145,60,.06));
+  box-shadow: 0 3px 10px -4px rgba(0,0,0,.7);
+}
+.tok-head { display: flex; align-items: baseline; gap: 7px; }
+.tok-icon { font-size: 18px; line-height: 1; }
+.tok-count { font-size: 19px; font-weight: 700; color: #ffd9a0; line-height: 1; }
+.tok-pips { font-size: 15px; line-height: 1; }
+.tok-name { font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase;
+  color: #f0a86a; margin-top: 3px; }
+.tok-worth { font-size: 12.5px; color: #ecdfc8; margin-top: 2px; }
+/* 🔑 every token says how it DIES — that line is what makes it an object with a lifetime
+   rather than a stat, and it is the half a bare counter never showed. */
+.tok-note { font-size: 10.5px; opacity: .58; margin-top: 2px; }
+.tok.is-bane { border-color: rgba(220,110,110,.5);
+  background: linear-gradient(180deg, rgba(180,70,70,.20), rgba(180,70,70,.07)); }
+.tok.is-bane .tok-name { color: #f0b3b3; }
+/* a token you can act on IS the control — so it has to look touchable */
+.tok.is-tappable { cursor: pointer; border-color: #e8913c; }
+.tok.is-tappable:hover { background: linear-gradient(180deg, rgba(232,145,60,.28), rgba(232,145,60,.10)); }
+.tok.is-tappable:focus-visible { outline: 2px solid #ffd9a0; outline-offset: 2px; }
+
+/* 🛡️ ARMOUR — cool steel against the warm ember tokens, because it is the one thing on the field
+   that came from OUTSIDE the run. ⚠️ Inserted here, above the media query, not appended: the
+   responsive blocks have to stay last in this file. */
+.tok.is-armour { border-color: rgba(150,175,200,.45);
+  background: linear-gradient(180deg, rgba(140,165,195,.17), rgba(140,165,195,.05)); }
+.tok.is-armour .tok-name { color: #a8c4dd; }
+.tok.is-armour .tok-count, .tok.is-armour .tok-pips { color: #d7e6f3; }
+/* battered through: still worn, still visible, turns nothing. It has to READ as spent rather than
+   vanish — a piece that disappears looks like a bug, and you need to know why you have no plate. */
+.tok.is-armour.is-spent { opacity: .42; border-style: dashed; }
+/* during soak it is a live choice: break a piece, or blunt a card? */
+.tok.is-armour.is-ready { border-color: #7fd8ff; box-shadow: 0 0 0 1px rgba(127,216,255,.35), 0 0 16px -4px rgba(127,216,255,.5); }
+.tok.is-armour.is-ready:hover { background: linear-gradient(180deg, rgba(140,190,225,.30), rgba(140,190,225,.10)); }
+
+/* 🧰 THE HAUL — what you carried out, shown on a DEFEAT as loudly as on a victory. A loss that
+   pays is only worth something if you can SEE that it paid, in the same breath as being told
+   you died. ⚠️ Above the media queries: the responsive blocks stay last in this file. */
+.haul { margin: 14px 0 4px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(232,145,60,.34);
+  background: linear-gradient(180deg, rgba(232,145,60,.12), rgba(232,145,60,.03)); }
+.haul-lab { font-size: 11px; letter-spacing: 1.4px; color: #f0a86a; margin-bottom: 7px; }
+.haul-gold { font-size: 17px; color: #ffd9a0; margin-bottom: 8px; }
+.haul-mats { display: flex; flex-wrap: wrap; gap: 7px; }
+.haul-mat { font-size: 12.5px; padding: 4px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #ecdfc8; }
+.haul-none { font-size: 12.5px; opacity: .6; }
+.haul-note { font-size: 10.5px; opacity: .55; margin-top: 8px; }
+
+/* 📦 THE STASH. 🔑 The `from` line and the RATE are the point, not the counts — a printed rate is
+   what turns "keep playing and hope" into "about five more Evasion creatures". So a material you
+   own NONE of still gets a full card; it is dimmed, never hidden. */
+.stash { max-width: 780px; margin: 0 auto; }
+.stash-gold { font-size: 19px; color: #ffd9a0; margin-bottom: 14px; }
+.stash-tier { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: #f0a86a; margin: 16px 0 8px; border-bottom: 1px solid rgba(232,145,60,.22); padding-bottom: 4px; }
+.stash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 9px; }
+.stash-mat { padding: 9px 11px; border-radius: 10px;
+  border: 1px solid rgba(232,145,60,.3);
+  background: linear-gradient(180deg, rgba(232,145,60,.11), rgba(232,145,60,.03)); }
+.stash-mat.is-none { opacity: .46; border-style: dashed; }
+.stash-head { display: flex; align-items: baseline; justify-content: space-between; }
+.stash-icon { font-size: 19px; }
+.stash-n { font-size: 17px; font-weight: 700; color: #ffd9a0; font-variant-numeric: tabular-nums; }
+.stash-name { font-size: 12.5px; color: #ecdfc8; margin-top: 3px; }
+.stash-from { font-size: 10.5px; opacity: .62; margin-top: 3px; }
+.stash-rate { font-size: 10px; opacity: .5; margin-top: 2px; font-style: italic; }
+/* 🏆 the road tally — "6/16" is the bestiary's whole job in three characters */
+.stash-tier { display: flex; justify-content: space-between; align-items: baseline; }
+.stash-tally { font-size: 11px; letter-spacing: .5px; opacity: .7; font-variant-numeric: tabular-nums; }
+
+/* 💰 selling — the release valve, on the material itself */
+.stash-sell { margin-top: 7px; width: 100%; font-size: 10.5px; padding: 4px 6px; }
+
+/* ⚒️ THE WORKSHOP. ⚠️ Above the media queries — the responsive blocks stay last in this file. */
+.wk-loadout { margin-bottom: 6px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(150,175,200,.4);
+  background: linear-gradient(180deg, rgba(140,165,195,.15), rgba(140,165,195,.04)); }
+.wk-lab { font-size: 11px; letter-spacing: 1.4px; color: #a8c4dd; margin-bottom: 9px; }
+.wk-slots { display: flex; flex-wrap: wrap; gap: 9px; }
+.wk-slot { flex: 1 1 180px; padding: 9px 12px; border-radius: 9px; font-size: 13px; color: #ecdfc8;
+  border: 1px solid rgba(150,175,200,.42); background: rgba(140,165,195,.12); }
+.wk-slot .dim { display: block; font-size: 10.5px; margin-top: 2px; }
+.wk-slot.is-empty { border-style: dashed; opacity: .5; font-style: italic; text-align: center; }
+
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px; }
+.wk-piece { padding: 10px 12px; border-radius: 11px; display: flex; flex-direction: column;
+  border: 1px solid rgba(232,145,60,.26);
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); }
+/* owned reads warm, worn reads steel — the same split the field row uses */
+.wk-piece.is-owned { border-color: rgba(232,145,60,.5);
+  background: linear-gradient(180deg, rgba(232,145,60,.13), rgba(232,145,60,.03)); }
+.wk-piece.is-worn { border-color: #7fd8ff; box-shadow: 0 0 0 1px rgba(127,216,255,.28); }
+.wk-top { display: flex; align-items: baseline; gap: 7px; }
+.wk-icon { font-size: 16px; }
+.wk-name { font-size: 13px; color: #ecdfc8; flex: 1; }
+.wk-block { font-size: 12px; color: #ffd9a0; font-variant-numeric: tabular-nums; }
+.wk-kind { font-size: 10.5px; opacity: .6; margin-top: 3px; }
+.wk-text { font-size: 11.5px; color: #cfe0ee; margin-top: 5px; min-height: 2.4em; }
+.wk-text.dim { opacity: .4; font-style: italic; }
+.wk-foot { margin-top: auto; padding-top: 8px; }
+/* 🔑 the shortfall is the whole point of the disabled state — it says where to GO */
+.wk-cost { font-size: 10.5px; opacity: .72; margin-bottom: 6px; line-height: 1.5; }
+.wk-btn { width: 100%; font-size: 11.5px; padding: 6px 8px; }
+.wk-btn.craft { border-color: #e8913c; color: #ffd9a0; }
+.wk-btn.on { border-color: #7fd8ff; color: #cfe9ff; }
+.wk-btn[disabled] { opacity: .5; cursor: not-allowed; font-size: 10.5px; }
+.wk-none { font-size: 10.5px; opacity: .5; font-style: italic; }
+
+/* 💎 RARITY. 🔑 A restrained left rail, not a full recolour — the pieces still have to read as one
+   shelf, and the tier is a classification, not a mood. ⚠️ Above the media queries. */
+.wk-piece { border-left-width: 3px; }
+.wk-piece.rar-common    { border-left-color: rgba(190,190,190,.45); }
+.wk-piece.rar-uncommon  { border-left-color: rgba(120,200,140,.7); }
+.wk-piece.rar-rare      { border-left-color: rgba(110,175,235,.8); }
+.wk-piece.rar-legendary { border-left-color: #f0a030;
+  box-shadow: inset 3px 0 14px -8px rgba(240,160,48,.85); }
+.wk-rar { letter-spacing: .4px; }
+.wk-piece.rar-legendary .wk-name { color: #ffd9a0; }
+/* another class's gear is SHOWN, never hidden — you should see what the rogue gets before you have her */
+.wk-piece.is-locked { opacity: .45; }
+
+/* 🔋 a token with more than one thing to do carries its own buttons */
+.tok-acts { display: flex; gap: 5px; margin-top: 6px; }
+.tok-act { flex: 1; font-size: 10.5px; padding: 4px 5px; border-color: #7fd8ff; color: #cfe9ff; }
+
+/* 🎬 THE RESOLVE PANEL — two zones, not one flat row (rebuilt 2026-08-26).
+   Thomas: *"i don't like the layout of this, make it nicer looking, the carve part also looks
+   weird."*  Three faults, all structural:
+     1. every beat was an equal box in one wrapping flex line, so the VERDICT — the thing you are
+        actually waiting for — was just the third card along;
+     2. 🧰 the carve rendered an EMOJI in `.pv-num`, the slot where every sibling shows a NUMBER,
+        so the eye read it as a stat that was not one;
+     3. its warm box sat beside the outcome pill, two highlighted objects competing when one of
+        them is a footnote.
+   🔑 Now: the arithmetic reads across the top as a sequence, and the verdict gets its own row
+   under a rule — the pill on the left, what you GAINED on the right, what it COST beneath.
+   ⚠️ Above the media queries. */
+.beat-bar { flex-direction: column; gap: 0; align-items: stretch; }
+.pv-work { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; padding: 2px 0 10px; }
+
+.pv-verdict {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  border-top: 1px solid #2b313c; padding-top: 10px;
+}
+.pv-result { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pv-result-subs { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+/* 🏹 the hunt line on a recipe — where the quarry that gates it actually walks. */
+.wk-hunt { font-size: 11px; color: #9fc0d1; margin-top: 4px; line-height: 1.35; }
+.wk-hunt b { color: #cfe4ef; }
+
+/* ⚒️ THE +N LADDER on a forged piece — a second block under the Wear button, ruled off from it,
+   because they are two different transactions and a run-on reads as one control.
+   ⚠️ `.wk-upnext` is `display: block` for the reason `.opt-why` had to be: an inline note beside
+   an inline label butts straight against it and you get "⚒️ +1turns aside one more blow". */
+.wk-up { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2f2a22; }
+.wk-up.dim { border-top-color: #262119; font-size: 10.5px; opacity: .55; }
+.wk-up.done { font-size: 11px; color: #e8c07a; }
+.wk-upnext { display: block; font-size: 11px; color: #d9c7a4; line-height: 1.4; margin-bottom: 5px; }
+.wk-upnext b { color: #ffd9a0; }
+/* the +N badge. It rides the NAME, in both places a piece is named — the Workshop card and the
+   in-run rail — so an upgraded piece is recognisable at a glance in the place you actually use it,
+   not only in the place you bought it. */
+.wk-plus, .eq-plus { font-size: 10px; color: #ffd9a0; border: 1px solid #7a5a2e;
+  border-radius: 4px; padding: 0 3px; vertical-align: middle; }
+.eq-plus { font-size: 9px; }
+
+/* 🦴 DROPS — its own band under the verdict, with a heading.
+   ⚠️ This was wrong twice in one day: first a stat column (an emoji in the number slot), then a
+   chip tagged onto the verdict row. Both times it was wedged into a row that was about something
+   else. 🔑 What you WON and what it COST you are two different statements; a heading separates
+   them for free. */
+.pv-drops { border-top: 1px solid #2b313c; padding-top: 10px; margin-top: 10px; }
+.pv-drops-head { font-size: 10px; letter-spacing: 1.5px; color: #f0a86a; margin-bottom: 7px; }
+.pv-drops-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.mat-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: #f0c89a;
+  background: rgba(232,145,60,.12); border: 1px solid rgba(232,145,60,.42);
+  border-radius: 999px; padding: 3px 10px;
+}
+.mat-chip b { color: #ffd9a8; }
+
+/* ══ 🛡️ THE EQUIPMENT RAIL ══════════════════════════════════════════════════
+   Flesh and Blood's own zone layout, copied because it is genuinely the right shape:
+       HEAD    across the top
+       CHEST   ARMS     side by side
+       LEGS    below
+   🔑 It reads as a BODY, which is what makes four abstract slots memorable — you never have to
+   ask which box is which. ⚠️ Above the media queries; the responsive blocks stay last. */
+#armour-rail { display: none; }
+#armour-rail.has-rail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: "head  ." "chest arms" "legs  .";
+  gap: 7px;
+  width: 218px;
+  margin: 0 0 8px;
+}
+.eq-head  { grid-area: head; }
+.eq-chest { grid-area: chest; }
+.eq-arms  { grid-area: arms; }
+.eq-legs  { grid-area: legs; }
+
+.eq {
+  min-height: 74px; padding: 7px 9px; border-radius: 9px;
+  border: 1px solid rgba(150,175,200,.4);
+  background: linear-gradient(180deg, rgba(140,165,195,.15), rgba(140,165,195,.04));
+  display: flex; flex-direction: column; gap: 1px;
+}
+.eq-zone { font-size: 9px; letter-spacing: 1.3px; text-transform: uppercase; color: #a8c4dd; }
+.eq-name { font-size: 11.5px; color: #ecdfc8; line-height: 1.15; }
+.eq-block { font-size: 10.5px; color: #d7e6f3; margin-top: auto; }
+.eq-pips { font-size: 11px; color: #d7e6f3; line-height: 1; }
+.eq-cue { font-size: 9.5px; color: #7fd8ff; letter-spacing: .3px; }
+.eq-acts { display: flex; gap: 4px; margin-top: 3px; }
+.eq-acts .tok-act { font-size: 9.5px; padding: 2px 3px; }
+
+/* 🔑 A ZONE YOU HAVE NOT UNLOCKED READS LOCKED, NEVER EMPTY. A locked thing you can see is a goal;
+   an empty box is a bug you go looking for. */
+.eq.is-locked { border-style: dashed; opacity: .3; align-items: center; justify-content: center; }
+.eq.is-locked .eq-lock { font-size: 15px; }
+.eq.is-empty  { border-style: dashed; opacity: .5; }
+/* a spent plate STAYS VISIBLE — you need to know why you have no block left */
+.eq.is-spent { opacity: .42; }
+.eq.is-ready { border-color: #7fd8ff; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(127,216,255,.32), 0 0 14px -4px rgba(127,216,255,.5); }
+.eq.is-ready:hover { background: linear-gradient(180deg, rgba(140,190,225,.28), rgba(140,190,225,.09)); }
+
+/* 💎 the same restrained rarity rail the Workshop uses, so a piece looks the same in both places */
+.eq { border-left-width: 3px; }
+.eq.rar-common    { border-left-color: rgba(190,190,190,.45); }
+.eq.rar-uncommon  { border-left-color: rgba(120,200,140,.7); }
+.eq.rar-rare      { border-left-color: rgba(110,175,235,.8); }
+.eq.rar-legendary { border-left-color: #f0a030; }
+
+/* 🎭 THE ROSTER AHEAD — A GRID THAT WRAPS, NOT A ROW THAT SQUEEZES (2026-08-23).
+   🔴 It inherited `.class-row`'s `display: flex` with `.class-pick { flex: 1 }`, which was written
+   when the row held TWO cards. At ten it divided 756px into 80px columns — one word per line, and
+   869px of content scrolling inside a 756px box. 🔑 A LAYOUT TUNED FOR TWO ITEMS IS NOT A LAYOUT,
+   IT IS A COINCIDENCE: a flex row with no wrap has no failure mode, it just keeps dividing.
+   ✅ auto-fill rather than a fixed column count, because this list only ever grows — the roster
+   went 7 → 10 the same day, and a hard `repeat(5, …)` would have to be re-picked every time.
+   🔑 AND THE ROWS STRETCH TO FILL THE LANE, which is the actual fix to the dead space: the portrait
+   is a 3:4 standing figure and therefore TALL, while a locked entry is three lines of text and
+   therefore SHORT, so the two columns could never agree by accident. Rather than shrink the art
+   (it is the point of the screen) the tiles take the slack and become what they should have been —
+   a character-select grid, big glyph centred, reading as a roster rather than as dimmed buttons. */
+.class-row.is-soon { display: grid; gap: 8px; opacity: .55;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-auto-rows: minmax(84px, 1fr); align-content: stretch; flex: 1 1 auto; }
+.class-row.is-soon .class-pick { padding: 10px; gap: 4px;
+  align-items: center; justify-content: center; text-align: center; }
+.class-row.is-soon .class-pick b { font-size: .95em; line-height: 1.25; }
+.class-row.is-soon .class-line { line-height: 1.35; }
+/* the emblem does the identifying at a glance; the sentence is for whoever leans in */
+.soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
+.class-pick.locked { cursor: default; border-style: dashed; }
+.class-pick.locked:hover { background: inherit; }
+
+/* 🖼️ THE HERO PORTRAIT — big, because the character is the biggest identity carrier in the game
+   and the roster is the best thing this screen has to show. ⚠️ Above the media queries.
+   🔑 It is finished before any art exists: the emblem shows through until an image loads, and a
+   missing file removes itself. Art never blocks design. */
+/* ⚠️ 3:4 PORTRAIT, matched to the art rather than guessed. The frame was 3:2 landscape before any
+   picture existed, and `object-fit: cover` on a 3:4 illustration would have cropped her head and
+   boots off to fill it — the classic "the frame was decided before the content" bug.
+   🔑 Sized by HEIGHT (a max-height with an auto width), because a standing figure is height-limited:
+   capping the width would have let it grow taller than the screen on a narrow panel. */
+.hero-art { position: relative; height: min(520px, 58vh); aspect-ratio: 3 / 4;
+  width: auto; margin: 10px auto 14px; border-radius: 14px; overflow: hidden;
+  border: 1px solid rgba(201,162,74,.34);
+  background: radial-gradient(120% 90% at 50% 20%, #2a221a 0%, #17140f 70%, #100e0a 100%);
+  display: flex; align-items: center; justify-content: center; }
+/* 🔑 THE PICTURE IS VISIBLE BY DEFAULT AND THE EMBLEM SITS BEHIND IT (fixed 2026-08-23).
+   The old version faded in on a `has-art` class added by the img's `onload` — and a CACHED image
+   may never fire onload, so the art downloaded fine and sat at opacity 0 with the emblem over it.
+   It worked on the first load and broke on every revisit.
+   ⚠️ The fallback is a matter of STACKING now, not of a class that has to be applied: a missing
+   file removes itself via `onerror` and the emblem is simply revealed. The fade is a CSS animation
+   on the element itself, so it plays on load without anything having to notice. */
+/* ⚠️ NO FADE. I tried a CSS keyframe here and it stuck at opacity 0 — computed style said the
+   animation was defined, filled `both` and `running`, and it still never reached its end state.
+   🔑 I stopped chasing it, and that is the correct call rather than a shrug: **a fade-in on a
+   portrait is PRESENTATION**, which is the one category the standing rule says not to build in
+   this prototype — it is exactly what the engine is for. Two failed attempts at fading this
+   picture in (an `onload` class, then a keyframe) is two more than it was ever worth.
+   The picture is simply visible. */
+.hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  object-position: top center; z-index: 1; }
+/* the emblem stands in until there is a picture — deliberately large and quiet */
+.hero-fallback { font-size: 92px; opacity: .18; line-height: 1; z-index: 0; }
+.hero-cap { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 26px 14px 11px;
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  background: linear-gradient(to top, rgba(8,7,6,.92), rgba(8,7,6,.55) 55%, transparent); }
+.hero-cap b { font-size: 17px; color: #f0d9a8; letter-spacing: .02em; }
+.hero-cap span { font-size: 12px; color: #b9ae9a; }
+
+/* 🖼️ ART LEFT, ROSTER RIGHT. The portrait is the anchor and gets a fixed lane; the list flexes. */
+/* ⚠️ `stretch`, NOT `flex-start` — flex-start is what left the roster lane 167px short of the
+   portrait beside it. The portrait keeps its own explicit height (an item with a set cross-size is
+   never stretched), so this costs the art nothing and hands the leftover to the grid. */
+.picker-split { display: flex; gap: 20px; align-items: stretch; margin: 10px 0 14px; }
+.picker-split .hero-art { margin: 0; flex: 0 0 auto; height: min(560px, 62vh); }
+.picker-list { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.picker-list .class-row { margin: 0; }
+/* ⚠️ stacks under 820px — below that the two lanes fight and the portrait wins by shrinking */
+@media (max-width: 820px) {
+  .picker-split { flex-direction: column; align-items: center; }
+  .picker-split .hero-art { height: min(420px, 46vh); }
+  .picker-list { width: 100%; }
+}
+@media (max-width: 700px) { .hero-art { height: min(400px, 52vh); } .hero-fallback { font-size: 64px; } }
+@media (max-width: 640px) {
+  #field.has-tokens { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .tok { flex: 0 0 auto; min-width: 118px; }
+}
+
+/* ⭐ THE LEVEL BAR — one component, used by the run summary and the Collection.
+   ⚠️ Deliberately plain. It is a readout, not a celebration; the celebration is the named charm
+   next to it, and staging a level-up is the engine's job, not this prototype's. */
+.xp { margin: 10px 0; padding: 9px 11px; border-radius: 10px;
+  background: rgba(20,17,13,.55); border: 1px solid #453a2c; }
+.xp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.xp-top b { color: #f0d9a8; font-size: 15px; }
+.xp-num { font-size: 12px; color: #b9ae9a; font-variant-numeric: tabular-nums; }
+.xp-bar { height: 7px; margin: 6px 0 0; border-radius: 4px; overflow: hidden;
+  background: rgba(0,0,0,.45); border: 1px solid #3a3128; }
+.xp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c9a24a, #f0c060); }
+.xp-next { margin-top: 6px; font-size: 12px; color: #b9ae9a; }
+.xp-next b { color: #f0d9a8; }
+/* a charm the run just opened — the thing the level is actually for */
+.xp-got { display: inline-block; margin: 3px 4px 0 0; padding: 1px 7px; border-radius: 999px;
+  background: rgba(201,162,74,.18); border: 1px solid rgba(201,162,74,.5); color: #f0d9a8; }
+/* 🎭 the class's own ladder, worn on her card in the picker */
+.class-lv { position: absolute; top: 10px; right: 12px; font-size: 12px; color: #f0d9a8;
+  font-variant-numeric: tabular-nums; }
+.class-lv i { font-style: normal; opacity: .55; }
+.class-pick { position: relative; }
+/* the class bar reads as the same KIND of thing as the account bar, one shade warmer */
+.xp.is-cls .xp-bar i { background: linear-gradient(90deg, #7fb0c4, #a9d8ea); }
+
+/* 🏁 THE END OF A RUN. One card, read top to bottom: the verdict, what it cost, what you take
+   away. The block exists so the four pieces read as ONE window instead of four stacked panels. */
+.runend { margin: 4px 0 14px; padding: 14px 14px 4px; border-radius: 14px;
+  background: rgba(20,17,13,.5); border: 1px solid #453a2c; }
+.runend-why { margin: 8px 2px 0; color: #d9b0a0; font-size: 13px; }
+/* the run in one line of numbers. tabular so the digits sit still between runs */
+.runend-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 2px 0;
+  font-size: 12px; color: #b9ae9a; font-variant-numeric: tabular-nums; }
+.runend-stats b { color: #e8dcc8; font-size: 15px; margin-right: 3px; }
+.runend-stats .g-good b { color: #9fd6a0; }
+.runend-stats .g-bad b { color: #d99a8a; }
+.runend-lost { margin: 8px 2px 0; font-size: 12px; color: #d99a8a; }
+
+/* 🗺️ the door this run opened — the loudest thing on a victory screen */
+.runend-open { margin: 14px 0 4px; padding: 11px 12px; border-radius: 11px;
+  display: flex; flex-direction: column; gap: 3px;
+  background: rgba(127,200,230,.10); border: 1px solid rgba(127,200,230,.42); }
+.runend-open b { color: #a9d8ea; font-size: 15px; }
+.runend-open span { font-size: 12px; color: #b9ae9a; }
+
+/* ⭐ the xp block — the run's other reward, given its own frame above the loot */
+.endxp { margin: 14px 0 4px; padding: 10px 11px 2px; border-radius: 11px;
+  background: rgba(201,162,74,.07); border: 1px solid rgba(201,162,74,.28); }
+.endxp-lab { font-size: 11px; letter-spacing: .10em; color: #c9a24a; margin-bottom: 4px; }
+.endxp .xp { margin: 6px 0; background: rgba(12,10,8,.5); }
+
+/* 🎞️ THE FILL. The ONE animation in the prototype, and it earns its place because the
+   movement is the information: how much of a level did that run buy?
+   ⚠️ `width` is the animated property on purpose — a transform-based bar would need a wrapper
+   and a counter-transform, and this is a 7px strip, not a hero moment. */
+.xp-bar i { transition: width .6s cubic-bezier(.25,.8,.35,1); }
+@media (prefers-reduced-motion: reduce) { .xp-bar i { transition: none; } }
+
+/* 🎭 THE CAST — the roster as a shelf of doors, on the Collection's account page.
+   ⚠️ auto-fill, not a fixed column count: the same lesson the locked-class roster paid for one
+   build ago — this list only ever grows, and a hard column count has to be re-picked every time. */
+.coll-cast { display: grid; gap: 8px; margin: 12px 0;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cast { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 12px 10px; border-radius: 10px; cursor: pointer; text-align: center;
+  background: rgba(20,17,13,.55); border: 1px solid #453a2c; color: #e8dcc8; font: inherit; }
+.cast:hover { background: rgba(201,162,74,.14); border-color: #c9a24a; }
+.cast.locked { opacity: .6; border-style: dashed; }
+.cast-em { font-size: 26px; line-height: 1; }
+.cast b { color: #f0d9a8; font-size: 14px; }
+.cast-lv { font-size: 12px; color: #a9d8ea; font-variant-numeric: tabular-nums; }
+.cast-lv i { font-style: normal; opacity: .55; }
+.cast-n { font-size: 11px; color: #b9ae9a; }
+.cast-lock { font-size: 11px; color: #b9ae9a; }
+
+/* 🖼️ the character page's banner. The portrait is a WIDE CROP here, not the tall 3:4 plate the
+   picker uses — this screen is a list of charms and a full standing figure would push the actual
+   content off the fold. Same art file, different job. */
+.coll-hero { position: relative; display: flex; align-items: flex-end; min-height: 128px;
+  margin: 10px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(201,162,74,.34);
+  background: radial-gradient(120% 140% at 50% 10%, #2a221a 0%, #17140f 70%, #100e0a 100%); }
+.coll-hero img { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 50% 22%; z-index: 0; }
+.coll-hero-txt { position: relative; z-index: 1; width: 100%; padding: 22px 12px 10px;
+  display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #b9ae9a;
+  background: linear-gradient(to top, rgba(8,7,6,.94), rgba(8,7,6,.6) 60%, transparent); }
+.coll-hero-txt b { color: #f0d9a8; font-size: 14px; }
+
+/* a rung that is not a charm — an armour slot reads as a different KIND of reward */
+.coll-row.is-boon b { color: #a9d8ea; }
+
+/* 🔒 a locked charm is dimmed but fully readable — a goal you cannot read is not a goal */
+.coll-row.is-locked { opacity: .55; }
+.coll-lock { margin-left: 6px; font-size: 11px; color: #c9a24a; white-space: nowrap; }
+
+/* 📋 WHAT YOU CARRY — objects in rows, not a prose run-on. Same chip language as the status bar,
+   so a charm looks like a charm wherever you meet it. */
+.carry-panel { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.13); }
+.carry-head { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: #a89c7e; margin-bottom: 6px; }
+.carry-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 4px 0; }
+.carry-row-lab { flex: 0 0 84px; font-size: 11.5px; opacity: .72; }
+.carry-row-note { font-size: 11px; margin-left: 4px; }
+.carry-panel .carry-chip { margin-left: 0; }
+.event-outcome p { margin: 6px 0; }
+
+/* ✦ A LOOSE ATTUNE MUST NOT LOOK LIKE A FULL ONE (2026-08-22).
+   Loose Weave makes ANY Catalyst attune, so the card lit the same gold glow whether you had
+   earned the whole bonus or half of it — and it confirmed a misread instead of correcting one.
+   A signal that fires identically for two different outcomes is not a signal. */
+.card.attuned-pair.is-loose,
+.slot .card.attuned-pair.is-loose { box-shadow: 0 0 0 2px rgba(150,170,190,.55), 0 0 12px rgba(130,150,175,.22); }
+.card.attuned-pair.is-loose .el-identity .el { background: rgba(150,170,190,.20); color: #cfe0ee; }
+.v-att.is-loose { opacity: .85; }
+.v-att.is-loose::after { content: " half"; font-size: .72em; opacity: .7; letter-spacing: .3px; }
+
+/* 💾 DEV SAVE SLOTS — dev menu only, deliberately plain. */
+.dev-slots { margin: 10px 0 6px; }
+.dev-slot { display: flex; align-items: center; gap: 6px; margin: 4px 0;
+  padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(201,162,74,.22);
+  background: rgba(255,255,255,.03); font-size: 12.5px; }
+.dev-slot-lab { flex: 1 1 auto; min-width: 0; }
+.dev-slot button { padding: 2px 8px; font-size: 11.5px; min-height: 26px; }
+
 /* 🔥 the Emberwake — banked blind last turn, aimed now with the encounter in front of you */
 .wake-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px;
   padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(232,145,60,.45);
@@ -727,6 +1200,97 @@ button.stage.locked .stage-shape { font-style: italic; }
 /* 🔥 ARM THE BANK — same row treatment as the aim, so arming and aiming read as one mechanic.
    Dimmer border while unarmed: it is an option every turn, not an alert. */
 .bank-row { border-color: rgba(232,145,60,.28); background: rgba(232,145,60,.06); }
+
+/* 🗡️ THE PARTNER GLOW — the card that would complete the pair with whatever is in STRIKE.
+   Points at the answer rather than labelling a category, so nothing has to be read or decoded. */
+.card.pair-mate { outline: 2px solid #9fd6e8; outline-offset: 3px;
+  box-shadow: 0 0 0 3px rgba(159,214,232,.18), 0 0 18px 3px rgba(159,214,232,.35); }
+.card-verb.verb-offer { color: #9fd6e8; opacity: 1; }
+.card-verb.verb-offer b { color: #d6f0fa; }
+@media (prefers-reduced-motion: reduce) { .card.pair-mate { box-shadow: 0 0 0 4px rgba(159,214,232,.3); } }
+
+/* ⚡ a card that forks. Marked on its face because the hit COUNT is what the shapes read. */
+.fork-tag { margin-left: 6px; font-size: 10.5px; color: #b9d8ea; }
+
+.rg-blade { color: #f0a86a; }   /* heavy, slow, expensive — it belongs in ① */
+.rg-tool  { color: #9fd6e8; }   /* light, fast, cheap — it belongs in ② */
+
+/* 🗡️ THE SPARE ROW — cards drawn past the four slots. Deliberately set apart from the row
+   rather than squeezed into it: these are not seated, and a card that looks seated but is not is
+   worse than one that is plainly waiting. */
+/* ⚠️ IT MUST SPAN THE WHOLE ROW. #slots-panel is a 4-column grid, so without this the tray
+   becomes a FIFTH GRID ITEM and lands in one quarter-width column - measured at 126px of a 528px
+   panel, with the drawn cards crushed to 51px against a slot card's 140px. That is the "messes up
+   the UI pretty bad" Thomas hit the moment a draw verb fired.
+   🔑 A CARD YOU CANNOT READ IS A CARD YOU CANNOT CHOOSE, which is the same failure as the
+   invisible card this tray was built to fix - just wearing different clothes.
+   ⚠️ It stays LAST in the DOM on purpose: the immersive layout fans the row with
+   `#slots-panel .slot:nth-child(1..4)`, and putting the tray first would shift every one of those
+   onto the wrong slot. */
+.spare-row { grid-column: 1 / -1; margin: 8px 0 0; padding: 7px 9px; border-radius: 9px;
+  border: 1px dashed rgba(232,145,60,.45); background: rgba(232,145,60,.06); }
+.spare-lab { font-size: 11px; color: #f0a86a; margin-bottom: 5px; }
+/* the drawn cards sit at slot width so they read as the same OBJECT as the cards in the row -
+   they are the same cards, and one tap moves them there. */
+.spare-row .pile { display: flex; gap: 8px; flex-wrap: wrap; }
+.spare-row .pile .card { flex: 0 1 150px; max-width: 170px; }
+
+/* 🗡️ THE MOMENTUM METER. Pips are the whole point — you count them, you do not read them.
+   🎴 The status-bar chip is gone (2026-08-21); the pips live on the ● token on the field now.
+   .pip-on/.pip-off stay — the token draws with the same helper. */
+/* ⚡ cost and ◇ pitch sit side by side on a rogue card, because as it levels they move in
+   OPPOSITE directions - showing one without the other hides the whole trade. */
+/* ⚠️ BOTH NUMBERS ARE ⚡ ENERGY - one resource, asked twice: what a card NEEDS to be struck
+   with, and what it GIVES when fed. They wear the same glyph on purpose. Colour and the tiny
+   verb carry the difference, and the slot dims whichever one is not being read. */
+.rg-pitch { margin-left: 10px; color: #9fd18a; }
+/* ⚠️ THE NUMBERS CARRY WORDS. ⚡cost and ◇fuel move in opposite directions as a card levels,
+   and two bare numbers side by side had the intuitive reading backwards - ⚡ is the cost glyph
+   everywhere else, so it looked like the one that pays. This is played on a phone, where the old
+   `title=` tooltips did not exist at all. */
+.nlab { font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .62;
+  margin-left: 2px; font-weight: 400; }
+/* ⚠️ DIM, NOT HIDDEN. The slot the card sits in decides which of its two energy numbers is
+   being read - ① STRIKE reads ⚡ cost, ③ ENERGY reads ◇ fuel - so the other recedes. Same rule
+   the mage's two element facts already follow; deleting it would just move the confusion. */
+.num-dim { opacity: .34; font-weight: 400; }
+/* 🏷️ THE TYPE LINE - one fixed slot at the foot of every card, same position in every class.
+   The mage prints her element there, the rogue prints TOOL or BLADE. Both used to live somewhere
+   different and shaped differently, which is what stopped a card being scannable at a glance. */
+.card-type { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700;
+  color: #b9b4a5; opacity: .85; margin-right: auto; }
+.card-el-Fire .card-type      { color: #e08a5a; }
+.card-el-Water .card-type     { color: #7fb0c4; }
+.card-el-Lightning .card-type { color: #f0d84e; }
+.card-el-Stone .card-type     { color: #b9b5ae; }
+
+/* ❌ THE FACING BAR IS GONE (2026-08-23, Thomas: *"lets remove the 2nd encounter info from the
+   phase box, think it just makes our screen too busy now, lets just keep the one in the top left"*).
+   ⚠️ KEEPING THE HISTORY, because it was not decoration: this bar existed to fix a real bug he
+   reported — the encounter panel sat across the stage from the Resolve button and *"Thomas kept
+   resolving journeys without reading them"*. The duplicate was the cheap fix.
+   🔑 IF THAT COMES BACK, THE ANSWER IS TO MAKE THE TOP-LEFT PANEL LOUDER, NOT TO PRINT IT
+   TWICE. Two copies of one fact is what made the screen busy enough to be worth removing. */
+.fc .dim  { color: #8a8577; font-weight: 400; }
+.pip-on  { color: #f0a86a; letter-spacing: 1px; }
+.pip-off { color: #4a4436; letter-spacing: 1px; }
+.mo-spend { color: #ffd9a0; font-weight: bold; }
+
+/* 🗡️ BUILDER / FINISHER sits where the mage's ✦ attuned number sits — the card's second fact.
+   A finisher is the loud one because it is the turn you were setting up. */
+.v-type { font-size: 11px; font-weight: bold; letter-spacing: .04em; opacity: .85; }
+.v-type-builder { color: #9fb6a4; }
+.v-type-finisher { color: #f0a86a; }
+.pair-identity { font-size: 10.5px; color: #8a8577; }
+.pair-identity b { color: #cfc9ba; }
+
+/* 🎭 CLASS PICKER on the stages screen. Two wide buttons, each stating what the class IS rather
+   than naming it — "the rogue" means nothing before you have played one. */
+.class-row { display: flex; gap: 8px; margin: 0 0 10px; }
+.class-pick { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 11px; text-align: left; border-radius: 9px; }
+.class-pick .class-line { font-size: 11px; opacity: .72; font-weight: normal; }
+.class-pick.on { background: rgba(127,200,230,.16); border-color: #7fb0c4; color: #eaf6fb; }
 
 
 /* ❌ the Prism's styles were deleted with the rule, 2026-08-05 — a cut rule loses its display in
@@ -903,6 +1467,30 @@ button.stage.locked .stage-shape { font-style: italic; }
 .menu-stamp { margin-top: 16px; text-align: center; font-size: .72rem; letter-spacing: .07em;
   text-transform: uppercase; color: #6b6152; }
 .menu-stamp b { color: #c9a227; }
+/* the stamp is the door to the notes, so it has to LOOK tappable without becoming a menu row */
+.pn-open { background: none; border: 0; padding: 2px 6px; font: inherit; letter-spacing: inherit;
+  color: inherit; cursor: pointer; border-bottom: 1px dotted #6b5c3a; }
+.pn-open:hover { color: #e8c07a; border-bottom-color: #c9a227; }
+
+/* 📋 WHAT'S NEW. ⚠️ `.pn-row` and `.pn-lab` are `display: block` for the `.opt-why` reason: an
+   inline label beside inline text butts straight against it and reads as one run-on sentence. */
+.notes { display: flex; flex-direction: column; gap: 14px; }
+.pn-stale { border: 1px solid #7a4a2e; background: #241a12; border-radius: 6px;
+  padding: 8px 10px; font-size: 12px; color: #e8b98a; line-height: 1.5; }
+.pn-entry { border: 1px solid #2f2a22; border-radius: 8px; padding: 10px 12px; background: #191510; }
+.pn-entry.is-latest { border-color: #7a5a2e; background: #1e1811; }
+.pn-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.pn-head b { color: #ecdfc8; font-size: 13.5px; }
+.pn-build { font-size: 10px; letter-spacing: .06em; color: #ffd9a0; border: 1px solid #7a5a2e;
+  border-radius: 4px; padding: 1px 5px; }
+.pn-date { margin-left: auto; font-size: 10.5px; opacity: .5; }
+.pn-warn { font-size: 11.5px; color: #e8b98a; margin: 4px 0 6px; line-height: 1.5; }
+.pn-sec { margin-top: 6px; }
+.pn-lab { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  opacity: .55; margin-bottom: 3px; }
+.pn-row { display: block; font-size: 12px; line-height: 1.55; color: #cbbb9d; padding-left: 10px;
+  text-indent: -10px; }
+.pn-row b { color: #ecdfc8; }
 
 /* 📋 the fallback box, for when the clipboard says no */
 #report-box { position: fixed; inset: 0; z-index: 90; background: rgba(10,10,12,.82);
@@ -983,6 +1571,201 @@ button.stage.locked .stage-shape { font-style: italic; }
    along the bottom, controls above them on the right. Because the scene and the UI
    share the same space instead of stacking, small screens gain the most.
    ============================================================ */
+/* ============================================================
+   🚪 THE MODAL LAYER (2026-08-18)
+   Thomas: *"i want it to feel more like a game UI. instead of this prototypey stuff. like we can
+   have big popup windows that pop up in the middle of the screen for the wheel or anything else."*
+
+   🔑 THIS IS STRUCTURE, NOT JUICE. Every phase used to render into #controls-panel - a strip
+   at the BOTTOM of the column, under the cards - so the Wheel, an event and the region summary all
+   appeared in the least-looked-at part of the screen. That is the same complaint as *"i click
+   resolve journey without even seeing the encounter info"*: the eye is on the hand, and everything
+   that mattered was rendering away from it.
+   ⚠️ No transitions, no easing, no staging - those stay Godot's job. A centred panel is layout,
+   and layout ports; a tween does not.
+
+   🔑 THE HAND STAYS LIT AND CLICKABLE ON PURPOSE. Event and soak pickers live ON the cards, and
+   *the slot row is the only place a card is ever drawn* - so #slots-panel is lifted ABOVE the
+   backdrop rather than dimmed behind it. That is also how card games stage a dialog: the decision
+   in the middle, your hand still readable at the bottom.
+   ============================================================ */
+/* ⚠️ ABSOLUTE, not fixed - it is scoped to #left-col so it covers the GAME and not the log. */
+#modal-layer { position: absolute; inset: 0; z-index: 40; display: none; }
+/* 🔑 THE PANEL NEVER COVERS THE HAND. It is flex-anchored to the TOP of the screen with a
+   height cap, so the slot row below stays lit and clickable. Found by measuring
+   `elementFromPoint` over the slot row and getting #modal-panel back - a centred dialog sat right
+   on top of the cards.
+   ⚠️ This is not a nicety. Event and soak pickers live ON the cards, and the FORK is a choice
+   you make BY READING YOUR HAND - *"which problem do I want, given what I am holding"*. A dialog
+   that hides the hand is a dialog about the thing it is covering. */
+/* ⚠️ THE LAYER MUST NOT CAPTURE CLICKS - only the panel does. #left-col turns out to ISOLATE,
+   so a z-index lift on #slots-panel can never escape it and the backdrop always won the hit test.
+   🔑 Lifting the hand ABOVE an overlay is the fragile fix; making the overlay INTANGIBLE is the
+   robust one - it cannot be defeated by a stacking context anywhere in the tree. */
+body.modal-open #modal-layer { display: flex; align-items: flex-start; justify-content: center;
+  padding: 5vh 12px 0; pointer-events: none; }
+#modal-panel { pointer-events: auto; }
+
+/* 🔑 THE DIM IS A GRADIENT THAT FADES OFF THE HAND. Flat dimming made the cards unreadable,
+   and the fork is a choice you make BY reading them. Strong behind the dialog, gone by the card
+   row - it reads as a spotlight rather than a curtain. */
+#modal-backdrop { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom,
+    rgba(8,7,6,.84) 0%, rgba(8,7,6,.78) 40%, rgba(8,7,6,.30) 64%, rgba(8,7,6,.06) 100%); }
+
+#modal-panel {
+  position: relative;
+  width: min(760px, calc(100vw - 24px));
+  /* ⚠️ max-height is set in JS by applyModal(), measured against where the HAND starts.
+     A fixed vh cap CLIPPED THE THIRD OPTION on the Setting Out screen: the panel scrolled, nothing
+     said so, and a tap on the half-visible option hit the card row behind it.
+     🔑 A PANEL THAT SILENTLY CLIPS A BUTTON IS A BUTTON THAT DOES NOTHING. */
+  overflow-y: auto; overscroll-behavior: contain;
+  background: linear-gradient(#232019, #17150f);
+  border: 1px solid #574a39; border-radius: 16px;
+  box-shadow: 0 26px 70px rgba(0,0,0,.66), 0 0 0 1px rgba(255,220,160,.06) inset;
+  padding: 20px 22px 22px;
+}
+/* the panel owns its own phase label - bigger than the inline strip's, because it is a title now */
+#modal-panel .phase-label {
+  font-size: 1.02em; letter-spacing: .10em; margin: 0 0 10px;
+  color: #f0d9a8; border-bottom: 1px solid #453a2c; padding-bottom: 9px;
+}
+#modal-panel .hint { margin-bottom: 12px; }
+#modal-panel button { font-size: 1em; padding: 11px 14px; }
+
+/* 🚪 SHELL SCREENS ARE A BIG PANEL, not a narrow strip (2026-08-23, Thomas: *"we can also make
+   these windows bigger, for the stash and workshop and stuff. make it popup kinda like the map
+   layer pop up"*).
+   🔑 A SHELL SCREEN HAS NO HAND TO PROTECT, which is the entire reason #modal-panel is top-anchored
+   and height-capped. Outside a run there are no cards underneath, so these can take the screen —
+   the Stash holds 74 cards and the Workshop 15, and both were being poured through a column sized
+   for three buttons.
+   ⚠️ CSS ONLY, no render changes: every shell phase (menu · stash · workshop · collection ·
+   ladder · dev) already draws into #controls-panel, so they all widen at once. */
+/* 🐛 AND THE TURN LOG GETS OUT OF THE WAY (Thomas: *"the main menu overlaps the turn log"*).
+   #controls-panel lives inside #left-col, which is 62% of the stage — so a 1180px panel simply
+   grew out of its own column and over the log in the other one.
+   🔑 THE RIGHT FIX IS TO REMOVE THE COLUMN, NOT TO SHRINK THE PANEL. The log belongs to a RUN;
+   render() says so in its own comment ("on the shell there may be no run at all"). A menu, a Stash
+   and a Workshop have nothing to log, and defeat/victory are NOT shell phases — so the one screen
+   where last-run history matters keeps it. Nothing is lost and the panel gets the whole stage. */
+body.shell #right-col { display: none; }
+body.shell #left-col { flex: 1 1 100%; }
+body.shell #controls-panel {
+  width: min(1180px, calc(100vw - 28px));
+  margin: 2.5vh auto;
+  max-height: 92vh; overflow-y: auto; overscroll-behavior: contain;
+  background: linear-gradient(#232019, #17150f);
+  border: 1px solid #574a39; border-radius: 16px;
+  box-shadow: 0 26px 70px rgba(0,0,0,.66), 0 0 0 1px rgba(255,220,160,.06) inset;
+  padding: 22px 26px 26px;
+}
+body.shell #controls-panel .phase-label {
+  font-size: 1.02em; letter-spacing: .10em; margin: 0 0 14px;
+  color: #f0d9a8; border-bottom: 1px solid #453a2c; padding-bottom: 9px;
+}
+/* ⚠️ the inner wrappers were capped for the narrow column and would have kept it narrow */
+body.shell .stash { max-width: none; }
+/* 🗂️ THE COLLECTION BOX HOLDS ITS SIZE (2026-08-23, Thomas: *"when you click on a character, lets
+   not have it collapse the box, lets keep the box the same size"*).
+   🔑 The account page is ALREADY at the 92vh ceiling and scrolls inside it; a character page is
+   ~150px shorter, so tapping a character shrank the panel under your finger and the whole screen
+   jumped. **A container that resizes to its contents turns navigation into motion** — you lose your
+   place between two views that are meant to read as the same shelf.
+   ✅ Pinning min to the same 92vh the max already uses makes it one fixed box, so moving between
+   the two pages changes only what is INSIDE it. Safe with the `* { box-sizing: border-box }` reset
+   at the top of this file — min and max measure the same edges, so they cannot fight.
+   ⚠️ Scoped to the Collection on purpose. The menu and the Stash are content-sized and short, and
+   a 92vh box around four buttons is a different bug. */
+body.phase-collection #controls-panel { min-height: 92vh; }
+@media (max-width: 700px) {
+  body.shell #controls-panel { width: 100%; margin: 0; max-height: none;
+    border: 0; border-radius: 0; box-shadow: none; padding: 14px 12px 18px; }
+}
+
+/* ⚠️ NO z-index LIFT ON THE HAND - it was tried and it cannot work (see #modal-layer above).
+   The overlay is intangible instead, so the hand is reachable without touching stacking at all. */
+/* the empty strip must not hold space while its contents are in the modal */
+body.modal-open #controls-panel:empty { display: none; }
+
+/* 🛤️ THE FORK - two roads, side by side, each stating what it is before what it costs */
+.fork-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fork-branch {
+  display: flex; flex-direction: column; gap: 5px; text-align: left;
+  padding: 14px 15px; min-height: 116px;
+  background: linear-gradient(#2a2519, #1d1a13); border: 1px solid #5b4c38; border-radius: 12px;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.fork-branch:hover, .fork-branch:focus-visible { border-color: #d8b06a; background: linear-gradient(#332c1d, #221e15); }
+.fork-kind  { font-size: .74em; letter-spacing: .12em; color: #b9ab8c; }
+.fork-name  { font-size: 1.06em; font-weight: 600; color: #f2e2bd; }
+.fork-shape { font-size: .92em; }
+.fork-stats { font-size: .84em; color: #b9ad96; margin-top: auto; }
+.fork-extra { font-size: .8em; color: #e0a678; }
+
+/* 🔑 SAY SO WHEN THERE IS MORE BELOW. The clipped-option bug was really an INFORMATION bug -
+   the panel scrolled and nothing on screen admitted it. */
+#modal-panel.is-scrollable { border-bottom-color: #d8b06a; }
+#modal-panel.is-scrollable::after {
+  content: '▾ more below'; position: sticky; bottom: -2px; display: block;
+  margin: 6px -22px -22px; padding: 5px 0 7px; text-align: center;
+  font-size: .76em; letter-spacing: .08em; color: #e8cd93;
+  background: linear-gradient(rgba(23,21,15,0), #17150f 55%);
+}
+
+/* 🗺️ THE EDGES. Drawn behind the nodes, from their real measured positions. */
+.mp { position: relative; }
+.mp-lines { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+.mp-lines .mp-link { stroke: #4a3f30; stroke-width: 2; }
+.mp-lines .mp-live { stroke: #d8b06a; stroke-width: 2.5; }
+.mp-row { position: relative; z-index: 1; }
+
+/* 🗺️ THE MAP. Floors read from the top down because the dragon is up there.
+   ⚠️ Icons only - a node states its TYPE, never its contents. */
+.mp { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; }
+.mp-row { display: grid; grid-template-columns: 22px repeat(5, 1fr); align-items: center; gap: 4px; }
+.mp-row.mp-band { border-top: 1px dashed #4a3f30; padding-top: 4px; }
+.mp-f { font-size: .66em; color: #7d7160; text-align: right; padding-right: 2px; }
+.mp-gap { display: block; height: 30px; }
+.mp-node {
+  display: flex; align-items: center; justify-content: center;
+  height: 30px; border-radius: 8px; font-size: 15px; line-height: 1;
+  background: #1c1913; border: 1px solid #332c22; color: inherit; opacity: .38;
+}
+.mp-node.is-past { opacity: .72; border-color: #5b4c38; background: #2a2418; }
+.mp-node.is-here { opacity: 1; border-color: #e8cd93; background: #3a3020; box-shadow: 0 0 0 2px rgba(232,205,147,.25); }
+/* 🔑 only a REACHABLE node looks like a button - the rest of the map is information, not offers */
+button.mp-node.is-open { opacity: 1; cursor: pointer; border-color: #d8b06a; background: linear-gradient(#332c1d, #241f16); }
+button.mp-node.is-open:hover, button.mp-node.is-open:focus-visible { background: #4a3d26; border-color: #f2d9a4; }
+.mp-legend { font-size: .72em; color: #9a8e79; text-align: center; margin-top: 2px; }
+
+/* 🧵 THE MEND WINDOW - the one place cards outside your hand are shown, so they get their own
+   row rather than borrowing the slot row's layout. */
+.mend-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.mend-row .card { width: calc(50% - 4px); min-width: 0; }
+
+/* 🎯 a card that strikes more than once says so, right on the number */
+.v-x { font-size: .78em; color: #e8cd93; margin-left: 1px; }
+
+/* 🎭 the class's signature fork, named on the screen where you choose */
+.class-trait { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid #453a2c;
+  font-size: .82em; line-height: 1.35; color: #c3b79f; }
+.class-trait b { color: #f0d9a8; }
+
+/* 🗺️ the one detail line, and the ring on the node it is describing */
+.mp-detail { min-height: 2.6em; font-size: .84em; color: #c9bda6; padding: 6px 8px; margin-top: 4px;
+  border-left: 2px solid #6a5a41; background: rgba(0,0,0,.18); border-radius: 0 6px 6px 0; }
+.mp-node.is-peek { box-shadow: 0 0 0 2px rgba(232,205,147,.55); }
+
+/* 🕯️ what a lit candle shows about the roads you can take right now */
+.mp-peek { font-size: .82em; color: #c9bda6; padding: 4px 6px; border-left: 2px solid #6a5a41; margin: 4px 0; }
+.mp-peek b { color: #f0dcb2; }
+.mp-dem { color: #e8cd93; }
+
+/* 🧪 the one place a potion's DURATION is stated - the cards themselves say what they do */
+.kit-lab { width: 100%; font-size: .78em; color: #b3a68f; margin: 0 0 4px; }
+
 @media (min-width: 901px) {
   body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   main { flex: 1 1 auto; min-height: 0; overflow: hidden; align-items: stretch; }
@@ -1061,7 +1844,11 @@ button.stage.locked .stage-shape { font-style: italic; }
     /* the explicit column is REQUIRED: without it, `-1` in #scene's grid-area resolves
        back to line 1 and the scene collapses to a zero-width sliver */
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr auto;
+    /* 🎴 FOUR rows now: hud · the flexing middle · the field · the hand.
+       ⚠️ #scene spans 1/-1 so it does not care how many rows there are, but #slots-panel is
+       pinned by NUMBER and had to move 3 -> 4. A row inserted above a pinned child silently
+       stacks two sections on top of each other. */
+    grid-template-rows: auto 1fr auto auto;
     min-height: 0;
     isolation: isolate;
   }
@@ -1073,11 +1860,60 @@ button.stage.locked .stage-shape { font-style: italic; }
     border-radius: 12px;
   }
   /* lift the UI above the scene. Target these by ID only — a `#left-col > section`
-     selector outranks `#scene` and would knock the scene out of position:absolute. */
-  #hud, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+     selector outranks `#scene` and would knock the scene out of position:absolute.
+     ⚠️ #field MUST be in this list: a new section left out of it renders BEHIND the art.
+     🛡️ #armour-rail joined it 2026-08-23 — and it is exactly the trap that note warns about. */
+  #hud, #field, #armour-rail, #slots-panel, #controls-panel { position: relative; z-index: 2; }
+
+  /* 🛡️ THE RAIL — left of the stage, on the art, under the enemy panel.
+     ⚠️ It is ABSOLUTELY POSITIONED rather than given a grid row, deliberately: #slots-panel is
+     pinned by row NUMBER, and the comment above says a row inserted above a pinned child silently
+     stacks two sections on top of each other. Taking the rail out of flow means the grid is
+     untouched and that trap cannot fire.
+     ⚠️ The mage stands lower-left, so the rail hugs the top and stays narrow. */
+  /* 🛡️ BOTTOM-LEFT OF THE FLEXING MIDDLE ROW — a real grid child, not an absolute guess.
+     🔴 THE FIRST VERSION HARDCODED `top: 96px` AND LANDED ON THE ENEMY PANEL. The panel's height
+     changes with its contents (an elite and a dragon draw taller), so ANY fixed offset is wrong
+     for some encounters — it just happens to look right for the one you tested.
+     ✅ Row 2 is the row that flexes, and `align-self: end` pins the rail to the bottom of it: it
+     sits under whatever the enemy panel turns out to be and above the cards, at every height.
+     ⚠️ It shares row 2 with #controls-panel, which is `justify-self: end` — one lane each, and the
+     grid keeps them apart without either knowing about the other.
+     ⚠️ NOT a new row: #slots-panel is pinned by row NUMBER, and inserting one above it silently
+     stacks two sections on top of each other (the note on grid-template-rows says so). */
+  #armour-rail.has-rail {
+    /* 🔴 `grid-column: 1` IS LOAD-BEARING, and leaving it off cost a build. #controls-panel is
+       also in row 2, so two items with no explicit column made the grid AUTO-PLACE the second one
+       into an implicit COLUMN 2 — measured `116.359px 648.719px`. #hud's `width: min(34%, 400px)`
+       then resolved against a 116px track, collapsed to 40px, and the whole left column stacked
+       into a 1112px tower.
+       🔑 This is the phantom-column trap the top of this file already warns about, arriving from a
+       different direction: last time from a selector, this time from auto-placement. **Two children
+       sharing an explicit ROW must also share an explicit COLUMN**, or the grid invents one. */
+    grid-row: 2; grid-column: 1; justify-self: start; align-self: end;
+    width: 190px; margin: 0 0 6px 10px;
+  }
+  #armour-rail.has-rail .eq { pointer-events: auto; backdrop-filter: blur(4px);
+    background: linear-gradient(180deg, rgba(14,18,24,.82), rgba(10,13,18,.72)); }
+  /* under 1100px the art is tight and the rail would sit on the mage — shrink it rather than
+     move it, so it never changes side and you never lose it */
+  #armour-rail.has-rail .eq { min-height: 52px; padding: 5px 8px; }
+  @media (max-width: 1100px) {
+    #armour-rail.has-rail { width: 148px; }
+    #armour-rail.has-rail .eq { min-height: 46px; padding: 4px 6px; }
+    #armour-rail.has-rail .eq-name { font-size: 10px; }
+    #armour-rail.has-rail .eq-block { font-size: 9.5px; }
+  }
+
+  /* 🎴 the field sits just above the hand, aligned with it — board state is in front of YOU,
+     not floating over the enemy. It collapses to nothing when you hold no tokens. */
+  #field.has-tokens { grid-row: 3; margin: 0 8px 6px 30%; }
 
   /* enemy vitals — floating TOP-LEFT on the art (moved 2026-07-29, Thomas). The mage is cropped
      at the waist now, so the top-left is empty sky; the foe gets the whole top-right instead. */
+  /* ⚠️ STAYS TOP-LEFT (a 2026-07-29 call). I moved it right for one build to clear the equipment
+     rail and it simply traded one collision for another — the controls panel owns the right lane,
+     and the panel landed on it. Measured both ways; left is correct and the RAIL had to move. */
   #hud {
     grid-row: 1; justify-self: start;
     position: static; width: min(34%, 400px); margin: 10px 0 0 10px;
@@ -1097,7 +1933,7 @@ button.stage.locked .stage-shape { font-style: italic; }
 
   /* controls — bottom-right, just above the cards */
   #controls-panel {
-    grid-row: 2; align-self: end; justify-self: end;
+    grid-row: 2; grid-column: 1; align-self: end; justify-self: end;
     width: min(40%, 460px); margin: 0 10px 8px 0;
     background: rgba(10, 8, 6, .74);
     border-color: rgba(201, 162, 74, .3);
@@ -1109,7 +1945,7 @@ button.stage.locked .stage-shape { font-style: italic; }
   /* the hand — narrower cards, pushed further right so the mage's outstretched arm has the
      space to its left instead of being occluded by the row. */
   #slots-panel {
-    grid-row: 3;
+    grid-row: 4;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 0 8px 8px 30%;
     gap: 8px;
@@ -1133,6 +1969,7 @@ button.stage.locked .stage-shape { font-style: italic; }
   #left-col { height: calc(100vh - 74px); }
   #hud { width: 46%; margin: 6px 6px 0 0; }
   #controls-panel { width: 46%; margin: 0 6px 6px 0; }
+  #field.has-tokens { margin: 0 6px 4px 13%; }
   #slots-panel { margin: 0 6px 6px 13%; gap: 6px; }
   .slot-hint { display: none; }   /* tight row — the label alone carries it */
 }
@@ -1151,6 +1988,13 @@ button.stage.locked .stage-shape { font-style: italic; }
   .el { font-size: 10px; padding: 0 5px; }
   .slot-head { padding: 2px 6px 3px; }
   .slot-name { font-size: 9.5px; letter-spacing: 1.4px; }
+  /* 🎴 a phone on its side has ~375px of height — the token keeps its icon, count and worth,
+     and drops the how-it-dies line. ⚠️ It is the first thing to go and the LAST thing to cut
+     anywhere taller: it is the half that makes a token an object rather than a stat. */
+  .tok { min-width: 106px; padding: 4px 8px 5px; }
+  .tok-icon { font-size: 15px; } .tok-count { font-size: 16px; }
+  .tok-name { font-size: 9.5px; } .tok-worth { font-size: 11px; }
+  .tok-note { display: none; }
   #controls-panel { padding: 6px 9px; max-height: 38vh; }
   #controls-panel .howto { display: none; }   /* reachable on desktop; pure cost here */
   #controls-panel .hint { font-size: 11.5px; margin-bottom: 5px; }
@@ -1162,4 +2006,21 @@ button.stage.locked .stage-shape { font-style: italic; }
   .enc-stats span { font-size: 11px; padding: 1px 5px; }
   .dragon-hp { height: 20px; }
   .dragon-hp-label { line-height: 20px; font-size: 11.5px; }
+}
+
+/* 🛤️ THE FORK STACKS ON A PHONE. Side by side at 375px gives each road 141px, which wraps
+   the stat line to three lines - readable but cramped, and this is played on a phone daily.
+   ⚠️ MUST STAY AT THE END OF THE FILE with the other responsive rules (cascade-order bug,
+   documented in Prototype_V1.md). */
+@media (max-width: 560px) {
+  /* ⚠️ ONE LOST CARD PER ROW. Two-up gives each 156px and the card's own text clips - and the
+     entire reason this window shows CARDS instead of names is so you can read them. */
+  .mend-row .card { width: 100%; }
+  .fork-row { grid-template-columns: 1fr; gap: 9px; }
+  .fork-branch { min-height: 0; padding: 12px 13px; }
+  body.modal-open #modal-layer { padding-top: 2vh; }
+  /* ⚠️ NO max-height here - JS measures it. A vh cap clipped the third Setting Out option. */
+  #modal-panel { padding: 14px 15px 16px; }
+  .setout-offer { padding: 10px 12px; }
+  .setout-story { font-size: .88em; }
 }
