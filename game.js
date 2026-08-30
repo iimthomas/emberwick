@@ -497,10 +497,10 @@ const REGIONS = [
   { name: 'Verdant Edge', hardshipChance: 0, hardships: [], encounters: [
     { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
     { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 5 },
-    { type: 'fight', name: 'Mist Crane', hp: 16,  init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4,
+    { type: 'fight', name: 'Mist Crane', hp: 16,  init: 6, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4,
       par: 2, attacks: [{ a: 'circle', name: 'Wingbeat' }, { a: 'lunge', name: 'Stoop' }, { a: 'quicken', name: 'Rising Air' }] },
-    { type: 'fight', name: 'Cairnstag',  hp: 22, init: 1, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6,
-      par: 3, attacks: [{ a: 'harden', name: 'Stonehide' }, { a: 'set', name: 'Antlers Down' }, { a: 'windup', name: 'Bellow' }] },
+    { type: 'fight', name: 'Cairnstag',  hp: 22, init: 5, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6,
+      par: 3, attacks: [{ a: 'harden', name: 'Stonehide' }, { a: 'set', name: 'Antlers Down' }, { a: 'circle', name: 'Bellow' }] },
     { type: 'journey', name: 'Highland Pass',  mp: 12, timePenalty: 1, element: 'Lightning', nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Fern Crossing',  mp: 8,  timePenalty: 2, element: 'Water',     nightfall: 3, xp: 2 },
     { type: 'journey', name: 'Sunwarm Trail',  mp: 11, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
@@ -510,10 +510,10 @@ const REGIONS = [
   { name: 'Wilding Marches', hardshipChance: 0.35, hardships: ['Ambush', 'Mire', 'Night Travel'], encounters: [
     { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 4, ability: 'Ranged' },
     { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3 },
-    { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 1, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6,
+    { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 5, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6,
       par: 3, attacks: [{ a: 'windup', name: 'Tusk Charge' }, { a: 'harden', name: 'Cinder Crust' }, { a: 'quicken', name: 'Blood Up' }] },
-    { type: 'fight', name: 'Frostbark Elder', hp: 22, init: 4, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze',
-      par: 3, attacks: [{ a: 'harden', name: 'Rimeplate' }, { a: 'circle', name: 'Drift' }, { a: 'windup', name: 'Deep Freeze' }] },
+    { type: 'fight', name: 'Frostbark Elder', hp: 22, init: 5, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze',
+      par: 3, attacks: [{ a: 'harden', name: 'Rimeplate' }, { a: 'circle', name: 'Drift' }, { a: 'lunge', name: 'Deep Freeze' }] },
     { type: 'journey', name: 'Mirefen Road',    mp: 10, timePenalty: 1, element: 'Fire',      nightfall: 5, xp: 3, peril: 'Treacherous' },
     { type: 'journey', name: 'Drowned Meadow',  mp: 13, timePenalty: 2, element: 'Water',     nightfall: 4, xp: 5 },
     { type: 'journey', name: 'Stormwash',       mp: 11, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
@@ -521,9 +521,9 @@ const REGIONS = [
   ]},
   // 🕳️ Deepdark Hollows — close, lightless, smothering: it is about things not WORKING
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
-    { type: 'fight', name: 'Basalt Basilisk', hp: 28, init: 4, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6,
+    { type: 'fight', name: 'Basalt Basilisk', hp: 28, init: 5, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 3,    xp: 6,
       par: 4, attacks: [{ a: 'harden', name: 'Stoneskin' }, { a: 'set', name: 'Coil Tight' }, { a: 'lunge', name: 'Gaze' }] },
-    { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 2, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6,
+    { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 5, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6,
       par: 3, attacks: [{ a: 'set', name: 'Coil' }, { a: 'circle', name: 'Second Head' }, { a: 'lunge', name: 'Snap' }] },
     { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
     { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
@@ -2941,6 +2941,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 427, date: '2026-08-30', title: 'Initiative decides everything',
+    changed: [
+      "💨 <b>Beat its Initiative and nothing gets through.</b> Lose the race and its attack lands, in full, at the end of your turn. That is the whole rule.",
+      "There is no more <b>Early Damage</b> — it was a second way of saying the same thing.",
+      "A fight is measured in <b>turns</b> now, not beats. A creature has a life bar and you play turns until one of you falls.",
+      "⚔️ Some attacks <b>ignore your speed</b> for a turn. Those are the ones to fear once you have solved the race.",
+    ] },
+
   { build: 426, date: '2026-08-30', title: 'Beats stop reporting a verdict',
     fixed: [
       "A beat no longer says <b>LOSS</b>. It was saying that after every beat the creature survived — there is no verdict now until it falls or you do.",
@@ -5707,16 +5715,21 @@ const FOE_ATTACKS = {
   // first cut had only `tell`, so the live attack announced itself as *"Armour +2 NEXT beat"*
   // while it was already applying. 🔑 A telegraph and a state read differently even when they
   // describe the same rule, and using one string for both makes the game lie in the present tense.
-  harden: { icon: '🛡️', tell: 'its plate is thickening — <b>Armour +2</b> next beat',
+  harden: { icon: '🛡️', tell: 'its plate is thickening — <b>Armour +2</b> next turn',
             now: 'its plate is thick — <b>Armour +2</b>', fx: { armour: 2 } },
   windup: { icon: '💢', tell: 'it draws back — its next blow is <b>doubled</b>',
             now: 'it swings with everything — its blow is <b>doubled</b>', fx: { atkMult: 2 } },
-  circle: { icon: '💨', tell: 'it starts to circle — it <b>takes Initiative</b> next beat',
+  circle: { icon: '💨', tell: 'it starts to circle — it <b>takes Initiative</b> next turn',
             now: 'it has your flank — it <b>takes Initiative</b>', fx: { initTake: true } },
   set:    { icon: '🧱', tell: 'it is setting itself — your <b>first blow will be halved</b>',
             now: 'it is set — your <b>first blow is halved</b>', fx: { guard: 1 } },
-  lunge:  { icon: '⚔️', tell: 'it coils — <b>Early Damage</b> next beat even if you are faster',
-            now: 'it lunges — <b>Early Damage</b> whatever your speed', fx: { earlyAlways: true } },
+  // 🔴 REWRITTEN THE MOMENT INITIATIVE BECAME THE DAMAGE GATE. This used to set `Ranged` to
+  // force Early Damage — a concept that no longer exists, so the attack silently did NOTHING.
+  // 🔑 Under one rule (*beat its Initiative and nothing gets through*) the interesting attack is
+  // the one that SUSPENDS the rule for a turn. It is the creature's answer to a player who has
+  // solved the race, and every creature needs some way to threaten one.
+  lunge:  { icon: '⚔️', tell: 'it coils — next turn it strikes <b>however fast you are</b>',
+            now: 'it lunges — your speed <b>will not save you</b>', fx: { unstoppable: true } },
   quicken:{ icon: '⏳', tell: 'it is quickening — its <b>Initiative climbs</b>',
             now: 'it is quick now — its <b>Initiative has climbed</b>', fx: { initStep: 3 } },
 };
@@ -5770,7 +5783,7 @@ function beginEncounter(e) {
     // stats, so without a pristine copy the modifiers would compound: a creature that hardened
     // twice would be at Armour +4 forever.
     S.foeBase = e;
-    S.foeState = { hp: e.hp, maxHp: e.hp, beat: 0, par: e.par || 3,
+    S.foeState = { hp: e.hp, maxHp: e.hp, turn: 0, par: e.par || 3,
                    atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0 };
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
@@ -5806,12 +5819,28 @@ function beginEncounter(e) {
 }
 
 // ⚔️ ONE BEAT OF A FIGHT. Deliberately shaped like startDuelBeat(): draw back to a full hand,
-// an empty hand is a developed loss, last beat's telegraph becomes this beat's reality, and the
+// an empty hand is a developed loss, last turn's telegraph becomes this turn's reality, and the
 // creature is re-published as a synthetic encounter carrying THIS beat's stats.
 // 🔑 THE ATTACK IS EXPRESSED AS THE CREATURE'S STATS FOR ONE BEAT, which is why nothing inside
 // computeAction() had to change: the existing maths reads armour, init and atk off the encounter
 // and does not care that they moved.
-// ⚔️ WHAT IT HITS YOU FOR THIS BEAT.
+// ⚔️ WHAT IT HITS YOU FOR THIS TURN — and the rule is one line (Thomas, 2026-08-30):
+//
+//     💨 **BEAT ITS INITIATIVE AND NOTHING GETS THROUGH. LOSE, AND ITS ATTACK LANDS.**
+//
+// 🔑 THIS REPLACES TWO PATCHES AND A CONCEPT. It replaces my "half force if you struck first",
+// which was not a rule anybody would design — it was me papering over the fact that the old
+// Initiative rules assume the fight ENDS in that exchange. And it dissolves **Early Damage** as a
+// separate idea: there is no longer a bite for losing the race PLUS a counterstrike for failing to
+// kill, there is just one question asked every turn.
+//
+// ✅ AND IT IS THE FORK THIS PROJECT HAS BEEN CHASING FOR MONTHS, finally paid every turn rather
+// than once an encounter: a fast Catalyst is a weaker Spell, so playing safe makes the fight
+// LONGER, which hands the creature more turns to take Initiative back off you (💨 circles,
+// ⏳ quickens). **The safe line and the fast line are both real, and the creature attacks the
+// choice itself.**
+// ⚠️ WATCH: if Initiative becomes reliably winnable, you take nothing all fight and
+// deck-as-health never fires. That is the number to measure first.
 // 🔴 Thomas: *"not sure why its damaging me every turn when i beat its initiative."* He was
 // taking the full `atk` on every beat regardless — because `combatDmg` is gated on
 // `outcome !== 'Complete'`, and a beat fight's outcome is **always Loss** thanks to the hp 9999
@@ -5822,11 +5851,11 @@ function beginEncounter(e) {
 // still reeling when it answers — half force. Lose the race and you take the early bite as well.
 // ⚠️ This is the dial to turn if beats feel too cheap or too brutal; it is deliberately ONE
 // number rather than a new system.
-function foeCounter(r, hpAfter) {
-  const base = (S.encounter && S.encounter.atk) || 0;
-  const struckFirst = !r.initLost;
-  const swing = struckFirst ? Math.ceil(base / 2) : base;
-  return Math.max(0, (r.early || 0) + swing);
+function foeCounter(r) {
+  const fx = foeFx();
+  // ⚔️ a lunge lands whatever your speed — the one attack that suspends the gate
+  if (!r.initLost && !fx.unstoppable) return 0;
+  return Math.max(0, (S.encounter && S.encounter.atk) || 0);
 }
 
 // ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
@@ -5837,8 +5866,8 @@ function foeResolveBeat(r) {
   st.hp = Math.max(0, st.hp - dealt);
   log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
   if (st.hp <= 0) {
-    const pace = st.beat <= st.par ? 'clean' : 'slow';
-    log(`🏆 <b>${base.name} falls</b> — ${st.beat} beat${st.beat === 1 ? '' : 's'} ` +
+    const pace = st.turn <= st.par ? 'clean' : 'slow';
+    log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
         `(par ${st.par}, ${pace}).`, 'good result');
     return false;
   }
@@ -5846,7 +5875,7 @@ function foeResolveBeat(r) {
   // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
   // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
   // is a sentinel's lie. The beat computes its own, from a rule.
-  const damage = foeCounter(r, st.hp);
+  const damage = foeCounter(r);
   tickMomentum(damage, r);
   S.damage = damage; S.damageEl = null;
   S.afterSoak = 'foeNext';
@@ -5864,8 +5893,8 @@ function startFoeBeat() {
     defeat(`Your cards are spent — the ${base.name} still stands at ${st.hp} of ${st.maxHp} HP.`);
     return;
   }
-  st.beat++;
-  // 🎲 beat 1 is deliberately plain: you have not been given a chance to react to anything yet.
+  st.turn++;
+  // 🎲 turn 1 is deliberately plain: you have not been given a chance to react to anything yet.
   st.active = st.next || null;
   st.next = foeBagDraw();
   if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
@@ -5874,7 +5903,7 @@ function startFoeBeat() {
   // chips a pool and `foeResolveBeat()` decides. That sentinel is the one that leaked to the
   // screen as "LOSS" in the duel, so it is kept OFF every display here.
   const fx = (st.active && st.active.fx) || {};
-  const climb = (fx.initStep || 0) * (st.beat - 1);
+  const climb = (fx.initStep || 0) * (st.turn - 1);
   S.encounter = Object.assign({}, base, {
     hp: 9999, beatFight: true,
     init: fx.initTake ? 99 : base.init + climb,
@@ -5882,7 +5911,7 @@ function startFoeBeat() {
     shape: fx.armour ? 'armour' : base.shape,
     shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
     guard: fx.guard || base.guard || 0,
-    ability: fx.earlyAlways ? 'Ranged' : base.ability,
+    ability: base.ability,
   });
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack';
@@ -5896,7 +5925,7 @@ function startFoeBeat() {
   S.bankArmed = false; S.moTarget = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
-  logHeader(`— ⚔️ ${base.name} · beat ${st.beat} —`);
+  logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
   log(`${base.name}: ${st.hp}/${st.maxHp} HP` + (st.next ? ` · next: ${st.next.icon} <b>${st.next.name}</b> — ${stripTags(st.next.tell)}` : ''));
   render();
 }
@@ -6786,7 +6815,7 @@ function beatDisplayHTML(beat, isNew) {
       const after = Math.max(0, st.hp - dealt);
       const felled = after <= 0;
       subs.push(`<div class="pv-sub good">⚔️ ${S.foeBase.name}: −${dealt} HP${felled ? ' — it falls' : ` → ${after} left`}</div>`);
-      const dmgB = felled ? 0 : foeCounter(r, after);
+      const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
         `${felled ? `${S.foeBase.name.toUpperCase()} FALLS` : 'STRUCK'}</span>` +
@@ -6869,8 +6898,8 @@ function finishResolve() {
   // ⚔️ A BEAT CHIPS A POOL. It must intercept BEFORE the once-per-encounter bookkeeping below
   // — coins, drops, the candle, the craft tally, contracts, the elite boon — or a five-beat
   // fight would pay five times and light the candle five times.
-  // 🔑 The creature dying is what turns the last beat into an ENCOUNTER result; every earlier
-  // beat is damage and a counterstrike and nothing else.
+  // 🔑 The creature dying is what turns the last turn into an ENCOUNTER result; every earlier
+  // turn is damage and nothing else.
   if (S.foeState && isBeatFight(S.foeBase) && e && e.beatFight) {
     if (foeResolveBeat(r)) return;      // it survived — the beat took over
     // it fell: this beat IS the encounter's result, so fall through as a Complete.
@@ -10281,7 +10310,7 @@ function renderEncounter() {
       // soak, and the only thing that makes that a mistake rather than a mugging is having been
       // told a beat early.
       (S.foeState ? `<div class="enc-stats"><span>❤️ HP <b>${S.foeState.hp}</b>/${S.foeState.maxHp}</span>` +
-        `<span>⚔️ beat <b>${S.foeState.beat}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
+        `<span>⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
         `<span>💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
         `<span>🪙 <b>${e.xp}</b></span></div>` +
         (S.foeState.active ? `<div class="foe-now">${S.foeState.active.icon} <b>${S.foeState.active.name}</b> — ${S.foeState.active.now}</div>` : '') +

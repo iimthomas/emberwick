@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 427 — Initiative decides everything
+*2026-08-30*
+
+**Changed**
+- 💨 **Beat its Initiative and nothing gets through.** Lose the race and its attack lands, in full, at the end of your turn. That is the whole rule.
+- There is no more **Early Damage** — it was a second way of saying the same thing.
+- A fight is measured in **turns** now, not beats. A creature has a life bar and you play turns until one of you falls.
+- ⚔️ Some attacks **ignore your speed** for a turn. Those are the ones to fear once you have solved the race.
+
 ## build 426 — Beats stop reporting a verdict
 *2026-08-30*
 
