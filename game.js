@@ -2941,6 +2941,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 431, date: '2026-08-30', title: 'Every creature has a life bar',
+    changed: [
+      "❤️ <b>Creatures that die in one hand have the bar too</b> — with a mark on it showing <b>half</b>. Reach the mark and it is a Narrow; clear the bar and it is a Complete. Same fact the old text said, in a place you can read at a glance.",
+    ] },
+
   { build: 430, date: '2026-08-30', title: 'Perfect Kills, and a fight that survives a reload',
     warn: "If you reloaded the page in the middle of a fight, that fight was quietly running on the old one-hand rules for the rest of it. Fixed — no action needed, and saves still load.",
     changed: [
@@ -5810,7 +5815,17 @@ function isBeatFight(e) { return !!(FIGHT_BEATS && e && e.type === 'fight' && !e
 // the real width, so a render with no follow-up still states the truth — the ghost is what
 // lingers at the old width and catches down. *An animation may never be the only thing that
 // writes the truth*, learned when the xp bar froze in a hidden tab and lied about a level.
-function foeHpBar(st, name) {
+// ❤️ EVERY CREATURE GETS ONE, not just the multi-turn ones (2026-08-30, Thomas on a Spark Kit:
+// *"what happened to the hp bar"*). It first shipped gated on `foeState`, so a one-hand creature
+// kept the old text chip and the roster looked like two different games.
+// 🔑 AND THE ONE-HAND BAR IS NOT DECORATION EITHER — it carries the ✂️ HALF MARK, which is the
+// number that whole fight turns on: clear the notch and it is a Narrow, clear the bar and it is
+// a Complete. The chip printed "(half 4)" and left you to picture where 4 sat inside 7. A notch
+// makes *am I over the line* a glance instead of arithmetic — **legible math always means show
+// the TERMS**, and a position is a better term than a number here.
+// ⚠️ The half mark is deliberately absent on a multi-turn fight: there is no Narrow there
+// (*"you beat it or you die"*), so a line promising one would be a rule that no longer exists.
+function foeHpBar(st, name, half) {
   const pct = h => Math.max(0, Math.min(100, Math.round(100 * h / Math.max(1, st.maxHp))));
   const now = pct(st.hp);
   // `shownHp` is what the bar was last DRAWN at. A repaint mid-turn redraws the same numbers, so
@@ -5819,7 +5834,9 @@ function foeHpBar(st, name) {
   return `<div class="foe-hp">` +
     (was > now ? `<div class="foe-hp-ghost" id="foe-hp-ghost" style="width:${was}%"></div>` : '') +
     `<div class="foe-hp-fill" style="width:${now}%"></div>` +
-    `<span class="foe-hp-label">❤️ ${name} — ${st.hp} / ${st.maxHp} HP</span></div>`;
+    (half > 0 ? `<div class="foe-hp-half" style="left:${pct(half)}%" title="half — clear this much for a Narrow"></div>` : '') +
+    `<span class="foe-hp-label">❤️ ${name} — ${st.hp} / ${st.maxHp} HP` +
+    (half > 0 ? ` <span class="dim">· half ${half}</span>` : '') + `</span></div>`;
 }
 // ⚠️ setTimeout, NOT requestAnimationFrame — rAF does not fire in a hidden tab. This one is
 // cosmetic either way (the fill is already correct), but the habit is what matters: the xp bar
@@ -10500,7 +10517,9 @@ function renderEncounter() {
         (S.foeState.next ? `<div class="foe-tell">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '')
       : '') +
       (S.foeState ? '' :
-      `<div class="enc-stats"><span>❤️ HP <b>${e.hp}</b> (half ${Math.ceil(e.hp / 2)})</span>` +
+      // ❤️ the same bar, with the half mark on it — one creature, one way of reading its health
+      foeHpBar({ hp: e.hp, maxHp: e.hp, shownHp: e.hp }, e.name, Math.ceil(e.hp / 2)) +
+      `<div class="enc-stats">` +
       `<span>💨 Init <b>${e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
       `<span>${shapeText(e)}</span>` +
 
