@@ -2941,6 +2941,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 426, date: '2026-08-30', title: 'Beats stop reporting a verdict',
+    fixed: [
+      "A beat no longer says <b>LOSS</b>. It was saying that after every beat the creature survived — there is no verdict now until it falls or you do.",
+      "💨 <b>Winning Initiative matters every beat.</b> Strike first and it is still reeling when it answers — <b>half force</b>. Lose the race and you take the opening bite as well. It used to hit you for full whatever you did.",
+    ] },
+
   { build: 425, date: '2026-08-30', title: 'Fights have beats · a shorter road',
     warn: "Runs in progress from build 422 will not load — fights changed shape. Your stages, grades, equipment and materials are all safe.",
     added: [
@@ -5805,6 +5811,24 @@ function beginEncounter(e) {
 // 🔑 THE ATTACK IS EXPRESSED AS THE CREATURE'S STATS FOR ONE BEAT, which is why nothing inside
 // computeAction() had to change: the existing maths reads armour, init and atk off the encounter
 // and does not care that they moved.
+// ⚔️ WHAT IT HITS YOU FOR THIS BEAT.
+// 🔴 Thomas: *"not sure why its damaging me every turn when i beat its initiative."* He was
+// taking the full `atk` on every beat regardless — because `combatDmg` is gated on
+// `outcome !== 'Complete'`, and a beat fight's outcome is **always Loss** thanks to the hp 9999
+// sentinel. 🔑 **THE GATE WAS BEING FED A LIE, so the counterattack was an accident rather than
+// a rule anybody designed.**
+//
+// ✅ Now it is explicit, and 💨 INITIATIVE BUYS SOMETHING EVERY BEAT: strike first and it is
+// still reeling when it answers — half force. Lose the race and you take the early bite as well.
+// ⚠️ This is the dial to turn if beats feel too cheap or too brutal; it is deliberately ONE
+// number rather than a new system.
+function foeCounter(r, hpAfter) {
+  const base = (S.encounter && S.encounter.atk) || 0;
+  const struckFirst = !r.initLost;
+  const swing = struckFirst ? Math.ceil(base / 2) : base;
+  return Math.max(0, (r.early || 0) + swing);
+}
+
 // ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
 // has taken over the turn; FALSE if it fell and the caller should finish the encounter.
 function foeResolveBeat(r) {
@@ -5820,7 +5844,9 @@ function foeResolveBeat(r) {
   }
   // it lives, so it answers. ⚠️ Uses the SAME terms computeAction already produced — no second
   // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
-  const damage = (r.early || 0) + (r.combatDmg || 0);
+  // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
+  // is a sentinel's lie. The beat computes its own, from a rule.
+  const damage = foeCounter(r, st.hp);
   tickMomentum(damage, r);
   S.damage = damage; S.damageEl = null;
   S.afterSoak = 'foeNext';
@@ -6743,7 +6769,29 @@ function beatDisplayHTML(beat, isNew) {
     // ✅ A duel beat reports what a duel beat actually is: how much you took off it, and what it
     // gives back. Coins are dropped too — a beat pays none, and *a term shown doing nothing teaches
     // the player the number does not matter.*
+    // ⚔️ A BEAT IS NOT WON OR LOST — not in the duel, and not in a road fight either.
+    // 🔴 Thomas: *"its reporting a loss every time we finish a beat because the monster isn't
+    // dead. it shouldn't be reporting or anything until the very end."* He is right, and it is the
+    // SAME CAUSE both times: a beat fight publishes `hp: 9999` so the road's kill logic cannot
+    // fire, which makes `half` 5000 and `outcome` **Loss on every beat by construction**.
+    // 🔑 THAT SENTINEL HAS NOW DRIVEN THREE SEPARATE WRONG THINGS ON SCREEN IN ONE DAY — the
+    // duel's LOSS, the duel's placeholder atk, and this. **A value that exists to suppress a rule
+    // has to be caught at every reader, not just the one that complained.**
     const inDuel = !!(S.finalMode && S.finalPhase === 'duel');
+    const inBeat = !!(S.foeState && e && e.beatFight);
+    if (inBeat) {
+      // no verdict, no coins, no grade — just what happened. The encounter's result arrives on
+      // the beat that kills it, and nowhere before.
+      const st = S.foeState, dealt = Math.max(0, r.value || 0);
+      const after = Math.max(0, st.hp - dealt);
+      const felled = after <= 0;
+      subs.push(`<div class="pv-sub good">⚔️ ${S.foeBase.name}: −${dealt} HP${felled ? ' — it falls' : ` → ${after} left`}</div>`);
+      const dmgB = felled ? 0 : foeCounter(r, after);
+      if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
+      return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
+        `${felled ? `${S.foeBase.name.toUpperCase()} FALLS` : 'STRUCK'}</span>` +
+        `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+    }
     if (inDuel) {
       // ⚠️ READ THE DUEL'S OWN RESULT, not the road payload. `r` is computeAction's, and it has no
       // idea a dragon exists; the finale writes what actually happened to `S.duelResult`.

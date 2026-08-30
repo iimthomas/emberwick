@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 426 — Beats stop reporting a verdict
+*2026-08-30*
+
+**Fixed**
+- A beat no longer says **LOSS**. It was saying that after every beat the creature survived — there is no verdict now until it falls or you do.
+- 💨 **Winning Initiative matters every beat.** Strike first and it is still reeling when it answers — **half force**. Lose the race and you take the opening bite as well. It used to hit you for full whatever you did.
+
 ## build 425 — Fights have beats · a shorter road
 *2026-08-30*
 
