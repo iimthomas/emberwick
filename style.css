@@ -238,7 +238,15 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .event-picks button { flex: 0 0 auto; }
 
 /* ---------- the Dragon Duel finale ---------- */
-.dragon-hp {
+/* ❤️ THE HP BAR — the dragon's, and (2026-08-30) every multi-turn creature's.
+   🔑 THIS IS INFORMATION, NOT JUICE, which is the only reason it is built here rather than
+   deferred to Godot. A creature used to die in one hand, so a bar had nothing to say; over five
+   turns the one question every turn is *how close am I*, and the DROP answers a second one a
+   number cannot — how big that hit was against the whole. Same test the xp bar passed: does the
+   movement carry a fact you could not read otherwise?
+   ⚠️ ONE definition, two users. A second copy of a bar drifts the way two copies of the
+   arrangement search did; only the fill colour and the height differ. */
+.dragon-hp, .foe-hp {
   position: relative;
   height: 26px;
   background: #2a1418;
@@ -247,12 +255,29 @@ label.radio { margin-right: 14px; cursor: pointer; }
   overflow: hidden;
   margin: 4px 0 8px;
 }
-.dragon-hp-fill {
+.dragon-hp-fill, .foe-hp-fill {
   position: absolute; inset: 0 auto 0 0;
   background: linear-gradient(90deg, #7a2e1c, #c04a2a);
   transition: width .5s ease;
 }
-.dragon-hp-label {
+/* ⚠️ THE GHOST IS THE ANIMATION, AND IT IS PURELY ADDITIVE. The real fill always renders at
+   the TRUE width, so if the catch-down never runs — hidden tab, reduced motion, another render
+   landing first — the bar still states the truth and you simply do not see the drop.
+   🔑 *An animation may never be the only thing that writes the truth* — learned when the xp
+   bar froze at its starting value in a backgrounded tab and quietly lied about a level. */
+.foe-hp-ghost {
+  position: absolute; inset: 0 auto 0 0;
+  background: rgba(255, 170, 120, .38);
+  transition: width .45s ease .12s;
+  pointer-events: none;
+}
+.foe-hp { background: #1c1a14; border-color: #4a4436; height: 22px; margin: 2px 0 6px; }
+.foe-hp-fill { background: linear-gradient(90deg, #6a5a1e, #b9962f); }
+@media (prefers-reduced-motion: reduce) {
+  .foe-hp-ghost { display: none; }
+  .dragon-hp-fill, .foe-hp-fill { transition: none; }
+}
+.dragon-hp-label, .foe-hp-label {
   position: relative;
   display: block;
   line-height: 26px;
@@ -262,6 +287,9 @@ label.radio { margin-right: 14px; cursor: pointer; }
   color: #fff;
   text-shadow: 0 1px 2px #000;
 }
+/* ⚠️ AFTER the shared rule, never before: same specificity, so source order is the whole
+   argument. Placed above it this silently lost and the creature's label sat at 26px in a 22px bar. */
+.foe-hp-label { line-height: 22px; font-size: 12px; }
 .dragon-shields { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .dshield { border: 1px solid rgba(255,255,255,.25); }
 .dshield.broken { opacity: .4; text-decoration: line-through; border-style: dashed; }
