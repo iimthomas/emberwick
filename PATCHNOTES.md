@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 421 — The reveal names what charged you
+*2026-08-28*
+
+**Fixed**
+- A ⏳ **Time Penalty** in a **fight** now says what caused it. Only the ⚠️ **Hazards** hardship can charge one there, and the reveal used to print the penalty with nothing explaining why.
+
 ## build 420 — Cards speak your class
 *2026-08-28*
 

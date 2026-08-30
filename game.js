@@ -2905,6 +2905,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 421, date: '2026-08-28', title: 'The reveal names what charged you',
+    fixed: [
+      'A ⏳ <b>Time Penalty</b> in a <b>fight</b> now says what caused it. Only the ⚠️ <b>Hazards</b> hardship can charge one there, and the reveal used to print the penalty with nothing explaining why.',
+    ] },
+
   { build: 420, date: '2026-08-28', title: 'Cards speak your class',
     changed: [
       "Charms, potions and equipment now use <b>your</b> slot names. The rogue reads <b>Strike</b>, <b>Combo</b> and <b>Energy</b> where the mage reads Spell, Catalyst and Surge.",
@@ -6454,7 +6459,17 @@ function beatDisplayHTML(beat, isNew) {
     if (r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
     const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
     if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmg}</div>`);
-    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}</div>`);
+    // 🔴 NAME WHAT CHARGED IT (2026-08-28, found by Thomas in play: *"how did i get a drop from
+    // this one"* — and the ⏳ beside it was the stranger half). On a FIGHT the only source is the
+    // ⚠️ Hazards hardship, and the reveal printed the penalty with nothing saying why: a Time
+    // Penalty is a journey word, so on a creature it reads as a bug.
+    // 🔑 Exactly the 🧱 Guard fault again — *never state a rule about an object without marking
+    // the object*, at the moment the rule costs you something.
+    const tpWhy = r.timePenalty > 0
+      ? (r.type === 'fight' && r.hardship ? ` — ⚠️ ${r.hardship}`
+        : r.peril === 'Toll' ? ` — ⏳ Toll doubles it` : '')
+      : '';
+    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}${tpWhy}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
     return `<div class="pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>` +
