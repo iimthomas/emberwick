@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 432 — Fights resolve like a normal card game
+*2026-08-30*
+
+**Changed**
+- ⚔️ **No more step-by-step resolving in a fight.** The blow lands, the health bar drops, and that is it. One window at the end telling you it fell and what it dropped.
+- Everything the old walkthrough showed you — Initiative, the strike, the Surge, its Armour — is in the **turn log** on the right, where you can read it when you want it.
+- 👣 Journeys still resolve step by step. Complete, Narrow and Loss is a three-way call and it happens in one hand.
+
 ## build 431 — Every creature has a life bar
 *2026-08-30*
 

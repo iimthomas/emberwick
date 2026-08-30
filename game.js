@@ -2941,6 +2941,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 432, date: '2026-08-30', title: 'Fights resolve like a normal card game',
+    changed: [
+      "⚔️ <b>No more step-by-step resolving in a fight.</b> The blow lands, the health bar drops, and that is it. One window at the end telling you it fell and what it dropped.",
+      "Everything the old walkthrough showed you — Initiative, the strike, the Surge, its Armour — is in the <b>turn log</b> on the right, where you can read it when you want it.",
+      "👣 Journeys still resolve step by step. Complete, Narrow and Loss is a three-way call and it happens in one hand.",
+    ] },
+
   { build: 431, date: '2026-08-30', title: 'Every creature has a life bar',
     changed: [
       "❤️ <b>Creatures that die in one hand have the bar too</b> — with a mark on it showing <b>half</b>. Reach the mark and it is a Narrow; clear the bar and it is a Complete. Same fact the old text said, in a place you can read at a glance.",
@@ -5956,7 +5963,15 @@ function foeCounter(r) {
 
 // ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
 // has taken over the turn; FALSE if it fell and the caller should finish the encounter.
-function foeResolveBeat(r) {
+// ⚔️ THE BLOW LANDS FIRST, AND ONLY THEN IS ANYTHING REPORTED (2026-08-30, Thomas: *"it should
+// do the damage first, and then the popup shows up, telling you that you killed it... kinda like
+// a normal game now"*). Splitting these two is what makes that order possible: `foeApplyBlow()`
+// chips the pool so the ❤️ bar drops on the very next render, and `foeAfterBlow()` is what the
+// creature does about it — which only happens if it is still standing.
+// 🔑 IT WAS ONE FUNCTION BECAUSE THE REVEAL USED TO RUN FIRST. The staged reveal owned the
+// moment, so damage had to wait until it finished; with the staging gone the natural order is
+// simply the real one. **A helper's shape is usually a fossil of the flow that needed it.**
+function foeApplyBlow(r) {
   const st = S.foeState, base = S.foeBase;
   const dealt = Math.max(0, r.value || 0);
   st.hp = Math.max(0, st.hp - dealt);
@@ -5965,8 +5980,12 @@ function foeResolveBeat(r) {
     const pace = st.turn <= st.par ? 'clean' : 'slow';
     log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
         `(par ${st.par}, ${pace}).`, 'good result');
-    return false;
+    return true;
   }
+  return false;
+}
+function foeAfterBlow(r) {
+  const st = S.foeState;
   // it lives, so it answers. ⚠️ Uses the SAME terms computeAction already produced — no second
   // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
   // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
@@ -5978,11 +5997,10 @@ function foeResolveBeat(r) {
   S.afterSoak = 'foeNext';
   if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
   else foeCleanupAndNext();
-  return true;
 }
 
 // ⚡ THIS TURN'S CREATURE, DERIVED FROM `foeBase` + the active attack. ⚠️ hp 9999 so
-// computeAction() never judges the kill — the turn chips a pool and `foeResolveBeat()` decides.
+// computeAction() never judges the kill — the turn chips a pool and `foeApplyBlow()` decides.
 // 🔴 EXTRACTED FROM startFoeBeat() 2026-08-30 BECAUSE **A MID-FIGHT RELOAD LOST IT**. The save
 // stores the encounter BY NAME and rebuilds it from the region list (which is what makes an elite
 // reloadable), so `S.encounter` came back as the PRISTINE creature: no `beatFight`, real HP, base
@@ -6871,32 +6889,51 @@ function resolve() {
   // turn, a clean kill, carved 1 shard and **no signature part**. 🔴 Every region-1 quarry part
   // was unreachable, which quietly deletes *"I need 3 Plumes, so that is 3 clean kills"* — the
   // countable plan the whole drop table exists to make possible.
+  // 🚪 ⚔️ A FIGHT DOES NOT NARRATE ITSELF ANY MORE (2026-08-30, Thomas: *"it should do the
+  // damage first, and then the popup shows up, telling you that you killed it, and tell you what
+  // drops you got. kinda like a normal game now. no more step by step resolving, we can keep all
+  // that info in the turn log"*).
+  // 🔑 THE STAGED REVEAL WAS TEACHING A LESSON THE PLAYER HAS ALREADY LEARNED. Walking the
+  // arithmetic one term at a time — Initiative, then the strike, then the verdict — is an
+  // onboarding device, and it was firing on every encounter forever. The maths still has to be
+  // legible, but *legible* and *narrated* are different things: the log holds the terms and you
+  // read them when you want them, instead of being read to.
+  // ⚠️ THE ORDER IS THE POINT, AND IT IS NOW THE REAL ONE: the blow lands, the ❤️ bar drops,
+  // and only then does anything pop up — and only if the encounter actually ended.
+  // 👣 JOURNEYS KEEP THE STAGING, deliberately. Complete / Narrow / Loss is a three-way verdict
+  // that resolves in one hand, so the staging IS the encounter; and it is one of the few things
+  // still separating a road from a fight, which [[Blow_And_Distance]] failed three times to do.
   const beatSt = beatPool();
-  r.drops = (beatSt && !beatFells(r, beatSt)) ? {}
-    : rollDrops(S.encounter, beatSt ? 'Complete' : r.outcome, r.perfect);
-  if (Object.keys(r.drops).length) {
-    beats[beats.length - 1].final = false;
-    beats.push({ carveBeat: true, final: true, lines: [] });
-  }
-
-  // 🚪 ⚔️ A TURN THAT SETTLES NOTHING GETS NO MODAL (2026-08-30, Thomas: *"after every
-  // turn we shouldn't have this pop up, its disruptive to gameplay. lets keep it to the turn
-  // log"*). A one-hand encounter earns a modal because the modal IS the encounter's verdict; a
-  // five-turn fight was throwing five of them, four of which said STRUCK and waited for a click.
-  // 🔑 SAME SENTENCE AS THE VERDICT AND THE CARVE, NOW APPLIED TO THE INTERRUPTION ITSELF:
-  // nothing reports until the creature falls or you do. Third consumer of that one rule.
-  // ⚠️ THE INFORMATION IS NOT DROPPED, IT MOVES — *legible math always* is not negotiable, so
-  // every line the modal would have shown is written to the log instead, in order. What is
-  // removed is the INTERRUPTION, not the arithmetic.
-  if (beatSt && !beatFells(r, beatSt)) {
+  if (e.type === 'fight' && !S.finalMode) {
     for (const b of beats) {
       if (b.carveBeat || b.outcomeBeat) continue;
       if (b.label) log(`${b.label} <b>${b.big}</b> ${stripTags(b.vs || '')}`);
       for (const ln of (b.lines || [])) log(ln.text, ln.cls);
     }
-    S.pendingR = r; S.beats = null; S.beatIndex = -1;
-    finishResolve();
+    if (beatSt) {
+      r.felled = foeApplyBlow(r);   // ⚔️ the pool is chipped HERE, before anything is shown
+      render();                     // ❤️ …so the bar has already dropped when the popup arrives
+      if (!r.felled) {
+        // nothing ended, so nothing reports. Straight on to what it does back.
+        S.pendingR = r; S.beats = null; S.beatIndex = -1;
+        foeAfterBlow(r);
+        return;
+      }
+    }
+    // it is over — ONE popup: what happened, and what you got.
+    r.drops = rollDrops(S.encounter, beatSt ? 'Complete' : r.outcome, r.perfect);
+    S.pendingR = r;
+    S.beats = [{ outcomeBeat: true, withDrops: true, final: true, summary: true, lines: [] }];
+    S.beatIndex = -1;
+    S.phase = 'reveal';
+    advanceBeat();
     return;
+  }
+
+  r.drops = rollDrops(S.encounter, r.outcome, r.perfect);
+  if (Object.keys(r.drops).length) {
+    beats[beats.length - 1].final = false;
+    beats.push({ carveBeat: true, final: true, lines: [] });
   }
 
   S.pendingR = r;
@@ -6975,6 +7012,20 @@ function advanceBeat() {
   beatFx(beat);   // after render, so the slots exist to animate
 }
 
+// 🦴 ONE definition, two callers — the journey's own carve step and the fight's
+// single summary. ⚠️ Extracted rather than copied: two copies of a display drift exactly
+// the way two copies of the arrangement search did, and the wrong one is the one people quote.
+function dropsHTML(r, pop) {
+  const ids = Object.keys((r && r.drops) || {});
+  if (!ids.length) return '';
+  return `<div class="pv-drops${pop || ''}">` +
+    `<div class="pv-drops-head">\u{1F9B4} DROPS</div>` +
+    `<div class="pv-drops-list">` +
+    ids.map(id => `<span class="mat-chip">${matDef(id).icon} ${matDef(id).name}` +
+      `${r.drops[id] > 1 ? `<b>\u00d7${r.drops[id]}</b>` : ''}</span>`).join('') +
+    `</div></div>`;
+}
+
 function beatDisplayHTML(beat, isNew) {
   const pop = isNew ? ' beat-pop' : '';
   const r = S.pendingR, e = S.encounter;
@@ -7018,7 +7069,8 @@ function beatDisplayHTML(beat, isNew) {
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
         `${felled ? `${S.foeBase.name.toUpperCase()} FALLS` : 'STRUCK'}</span>` +
-        `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+        `<div class="pv-result-subs">${subs.join('')}</div></div>` +
+        (beat.withDrops ? dropsHTML(r) : '');
     }
     if (inDuel) {
       // ⚠️ READ THE DUEL'S OWN RESULT, not the road payload. `r` is computeAction's, and it has no
@@ -7062,7 +7114,8 @@ function beatDisplayHTML(beat, isNew) {
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
     return `<div class="pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>` +
-      `<div class="pv-result-subs">${subs.join('')}</div></div>`;
+      `<div class="pv-result-subs">${subs.join('')}</div></div>` +
+      (beat.withDrops ? dropsHTML(r) : '');
   }
   if (beat.carveBeat) {
     // 🧰 THE CARVE IS NOT A STAT COLUMN. It used to render `<div class="pv-num">🧰</div>`, an
@@ -7077,12 +7130,7 @@ function beatDisplayHTML(beat, isNew) {
     // else**. 🔑 What you WON and what it COST you are two different statements, and putting them on
     // one line asks the reader to separate them. A heading does that for free.
     // ✅ And it is called DROPS: *carved* is flavour, and this is a list of things you now own.
-    return `<div class="pv-drops${pop}">` +
-      `<div class="pv-drops-head">\u{1F9B4} DROPS</div>` +
-      `<div class="pv-drops-list">` +
-      ids.map(id => `<span class="mat-chip">${matDef(id).icon} ${matDef(id).name}` +
-        `${r.drops[id] > 1 ? `<b>\u00d7${r.drops[id]}</b>` : ''}</span>`).join('') +
-      `</div></div>`;
+    return dropsHTML(r, pop);
   }
   return `<div class="pv-stat${pop}"><div class="pv-num ${beat.numCls}">${beat.big}</div>` +
     `<div class="pv-label">${beat.label} ${beat.vs}</div>` +
@@ -7100,7 +7148,9 @@ function finishResolve() {
   // 🔑 The creature dying is what turns the last turn into an ENCOUNTER result; every earlier
   // turn is damage and nothing else.
   if (S.foeState && isBeatFight(S.foeBase) && e && e.beatFight) {
-    if (foeResolveBeat(r)) return;      // it survived — the beat took over
+    // ⚠️ THE BLOW HAS ALREADY LANDED — resolve() applies it before anything is shown, so this
+    // reads the verdict rather than producing it. Double-applying here would chip the pool twice.
+    if (!r.felled) { foeAfterBlow(r); return; }   // it survived — the fight took over
     // it fell: this beat IS the encounter's result, so fall through as a Complete.
     // ⚠️ NARROW IS GONE FROM FIGHTS (Thomas, 2026-08-30): *"you beat it or you die."* The
     // three-way outcome survives on JOURNEYS, which is one more way the two stop being the
@@ -10808,7 +10858,9 @@ function renderControls() {
   } else if (S.phase === 'reveal') {
     const beat = S.beats[S.beatIndex];
     c.innerHTML =
-      `<div class="phase-label">RESOLVING — ${S.beatIndex + 1} / ${S.beats.length}</div>` +
+      // ⚠️ a one-beat summary has no steps to count, and "RESOLVING — 1 / 1" reads like a
+      // progress bar for something already finished
+      `<div class="phase-label">${beat.summary ? 'RESULT' : `RESOLVING — ${S.beatIndex + 1} / ${S.beats.length}`}</div>` +
       // 🔑 TWO ZONES, NOT ONE FLAT ROW. Every beat used to be an equal box in a single wrapping
       // flex line, so the VERDICT — the one thing you are waiting for — was just the third card
       // along. The arithmetic goes on top as a sequence; the verdict and what you gained get their
