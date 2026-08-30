@@ -495,8 +495,10 @@ const PERILS = {
 const REGIONS = [
   // 🌿 Verdant Edge — no hardships at all; it is where the game teaches itself
   { name: 'Verdant Edge', hardshipChance: 0, hardships: [], encounters: [
-    { type: 'fight',   name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
-    { type: 'fight',   name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 5 },
+    { type: 'fight', name: 'Spark Kit',  hp: 7,  init: 4, atk: 1, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3,
+      par: 1, attacks: [{ a: 'circle', name: 'Skitter' }, { a: 'lunge', name: 'Pounce' }, { a: 'windup', name: 'Spark Burst' }] },
+    { type: 'fight', name: 'Cinder Ape', hp: 11, init: 2, atk: 2, atkEl: 'Fire',            xp: 5,
+      par: 2, attacks: [{ a: 'windup', name: 'Overhand' }, { a: 'flurry', name: 'Ash Fury' }, { a: 'blur', name: 'Cinder Haze' }] },
     { type: 'fight', name: 'Mist Crane', hp: 16,  init: 6, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1,     xp: 4,
       par: 2, attacks: [{ a: 'circle', name: 'Wingbeat' }, { a: 'lunge', name: 'Stoop' }, { a: 'quicken', name: 'Rising Air' }] },
     { type: 'fight', name: 'Cairnstag',  hp: 22, init: 5, atk: 3, atkEl: 'Stone',    shape: 'armour', shapeV: 1,    xp: 6,
@@ -508,8 +510,10 @@ const REGIONS = [
   ]},
   // 🏹 Wilding Marches — open country full of ambushers and archers: it is about being CAUGHT
   { name: 'Wilding Marches', hardshipChance: 0.35, hardships: ['Ambush', 'Mire', 'Night Travel'], encounters: [
-    { type: 'fight',   name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 4, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3 },
+    { type: 'fight', name: 'Flintwisp',     hp: 9,  init: 4, atk: 2, atkEl: 'Stone',    shape: 'evasion', shapeV: 1,    xp: 4, ability: 'Ranged',
+      par: 1, attacks: [{ a: 'circle', name: 'Wisp Away' }, { a: 'lunge', name: 'Flare Out' }, { a: 'windup', name: 'Kindled Blow' }] },
+    { type: 'fight', name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3,
+      par: 2, attacks: [{ a: 'windup', name: 'Bellow Slam' }, { a: 'flurry', name: 'Thunderclap' }, { a: 'blur', name: 'Stormskin' }] },
     { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 5, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6,
       par: 3, attacks: [{ a: 'windup', name: 'Tusk Charge' }, { a: 'harden', name: 'Cinder Crust' }, { a: 'quicken', name: 'Blood Up' }] },
     { type: 'fight', name: 'Frostbark Elder', hp: 22, init: 5, atk: 3, atkEl: 'Water',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze',
@@ -525,8 +529,10 @@ const REGIONS = [
       par: 4, attacks: [{ a: 'harden', name: 'Stoneskin' }, { a: 'set', name: 'Coil Tight' }, { a: 'lunge', name: 'Gaze' }] },
     { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 5, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6,
       par: 3, attacks: [{ a: 'set', name: 'Coil' }, { a: 'circle', name: 'Second Head' }, { a: 'lunge', name: 'Snap' }] },
-    { type: 'fight',   name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison' },
-    { type: 'fight',   name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
+    { type: 'fight', name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison',
+      par: 2, attacks: [{ a: 'circle', name: 'Sidle' }, { a: 'lunge', name: 'Snap' }, { a: 'windup', name: 'Fume Burst' }] },
+    { type: 'fight', name: 'Storm Prowler',  hp: 9,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged',
+      par: 1, attacks: [{ a: 'circle', name: 'Pad Around' }, { a: 'lunge', name: 'Spring' }, { a: 'windup', name: 'Storm Rake' }] },
     { type: 'journey', name: 'Sunken Causeway', mp: 14, timePenalty: 1, element: 'Water',     nightfall: 6, xp: 5, peril: 'Steep' },
     { type: 'journey', name: 'Echo Basin',      mp: 12, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Cinder Ravine',   mp: 10, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Treacherous' },
@@ -534,10 +540,14 @@ const REGIONS = [
   ]},
   // 🐉 The Dragon's Shadow — everything is heavier here: it is about your own strength failing you
   { name: "The Dragon's Shadow", hardshipChance: 0.65, hardships: ['Dead Weight', 'Dead Air', 'Ambush', 'Hazards', 'Storm'], encounters: [
-    { type: 'fight',   name: 'Cairntide Warden', hp: 8, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison' },
-    { type: 'fight',   name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged' },
-    { type: 'fight',   name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze' },
-    { type: 'fight',   name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6 },
+    { type: 'fight', name: 'Cairntide Warden', hp: 8, init: 5,  atk: 2, atkEl: 'Stone',    shape: 'guard', shapeV: 1,    xp: 5, ability: 'Poison',
+      par: 1, attacks: [{ a: 'set', name: 'Brace' }, { a: 'lunge', name: 'Halberd' }, { a: 'blur', name: 'Tide Veil' }] },
+    { type: 'fight', name: 'Flarecaller',      hp: 9,  init: 5, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,                             xp: 4, ability: 'Ranged',
+      par: 1, attacks: [{ a: 'circle', name: 'Wheel Round' }, { a: 'quicken', name: 'Rising Cry' }, { a: 'windup', name: 'Flare' }] },
+    { type: 'fight', name: 'Stormcrown Stag',  hp: 14, init: 5,  atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1,  xp: 6, ability: 'Freeze',
+      par: 2, attacks: [{ a: 'circle', name: 'Circle Wide' }, { a: 'quicken', name: 'Gather Speed' }, { a: 'windup', name: 'Antler Sweep' }] },
+    { type: 'fight', name: 'Mirewyrm Elder',   hp: 17, init: 5,  atk: 5, atkEl: 'Water',     shape: 'armour', shapeV: 4,    xp: 6,
+      par: 2, attacks: [{ a: 'dig', name: 'Bed Down' }, { a: 'quicken', name: 'Uncoil' }, { a: 'windup', name: 'Coil Strike' }] },
     { type: 'journey', name: 'Drowned Vale',   mp: 14, timePenalty: 1, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'Stoneward Road', mp: 13, timePenalty: 2, element: 'Stone',    nightfall: 6, xp: 4 },
     { type: 'journey', name: 'Emberfall Path', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
@@ -571,10 +581,14 @@ const ROAD_STORMREACH = [
   // 🍃 Windward Steps — no hardships: the same teaching grace stage 1 opens with. High, open,
   // and mercifully empty; what it teaches is that up here things are FASTER than you.
   { name: 'Windward Steps', hardshipChance: 0, hardships: [], encounters: [
-    { type: 'fight',   name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3 },
-    { type: 'fight',   name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4 },
-    { type: 'fight',   name: 'Rill Otter',   hp: 10, init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 4 },
-    { type: 'fight',   name: 'Scarp Ram',    hp: 14, init: 2, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
+    { type: 'fight', name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3,
+      par: 1, attacks: [{ a: 'circle', name: 'Wheel' }, { a: 'lunge', name: 'Stoop' }, { a: 'windup', name: 'Talon' }] },
+    { type: 'fight', name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4,
+      par: 2, attacks: [{ a: 'windup', name: 'Kick' }, { a: 'flurry', name: 'Bolt' }, { a: 'blur', name: 'Duststreak' }] },
+    { type: 'fight', name: 'Rill Otter',   hp: 10, init: 4, atk: 2, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 4,
+      par: 2, attacks: [{ a: 'circle', name: 'Slip Past' }, { a: 'lunge', name: 'Lunge' }, { a: 'windup', name: 'Tail Slap' }] },
+    { type: 'fight', name: 'Scarp Ram',    hp: 14, init: 2, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5,
+      par: 2, attacks: [{ a: 'harden', name: 'Set Horns' }, { a: 'lunge', name: 'Charge' }, { a: 'windup', name: 'Ram Home' }] },
     { type: 'journey', name: 'Kestrel Stair',   mp: 11, timePenalty: 1, element: 'Lightning', nightfall: 4, xp: 4, peril: 'Updraft' },
     { type: 'journey', name: 'Whistling Gap',   mp: 9,  timePenalty: 2, element: 'Water',     nightfall: 3, xp: 2 },
     { type: 'journey', name: 'Sunlit Terrace',  mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
@@ -583,10 +597,14 @@ const ROAD_STORMREACH = [
   // 🦅 The Shrike Downs — hunting country. Everything here reaches you first, and 🌀 Vertigo
   // arrives to take the one card that could have answered that.
   { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
-    { type: 'fight',   name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged' },
-    { type: 'fight',   name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'fight',   name: 'Quillback',      hp: 7, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear' },
-    { type: 'fight',   name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'fight', name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged',
+      par: 1, attacks: [{ a: 'circle', name: 'Ring Round' }, { a: 'quicken', name: 'Dive' }, { a: 'windup', name: 'Impale' }] },
+    { type: 'fight', name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5,
+      par: 2, attacks: [{ a: 'harden', name: 'Thornhide' }, { a: 'lunge', name: 'Snag' }, { a: 'windup', name: 'Haul In' }] },
+    { type: 'fight', name: 'Quillback',      hp: 7, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear',
+      par: 1, attacks: [{ a: 'set', name: 'Quills Up' }, { a: 'lunge', name: 'Barb' }, { a: 'blur', name: 'Bristle Haze' }] },
+    { type: 'fight', name: 'Thistle Drake',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze',
+      par: 2, attacks: [{ a: 'circle', name: 'Bank' }, { a: 'lunge', name: 'Dart In' }, { a: 'windup', name: 'Frost Breath' }] },
     { type: 'journey', name: 'Harrow Ride',      mp: 13, timePenalty: 1, element: 'Fire',      nightfall: 5, xp: 4, peril: 'Updraft' },
     { type: 'journey', name: 'Longbarrow Track', mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
     { type: 'journey', name: 'Gorsewind Run',    mp: 12, timePenalty: 3, element: 'Lightning', nightfall: 5, xp: 4 },
@@ -595,10 +613,14 @@ const ROAD_STORMREACH = [
   // ⚡ Thunderhead Reach — the storm itself. ⚡ Squall lives here: your cards hold together only
   // if you were fast enough, which is Skyrender's whole demand rehearsed one encounter at a time.
   { name: 'Thunderhead Reach', hardshipChance: 0.5, hardships: ['Squall', 'Storm', 'Night Travel', 'Vertigo'], encounters: [
-    { type: 'fight',   name: 'Levinbeast',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
-    { type: 'fight',   name: 'Anvil Toad',      hp: 18, init: 2, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6 },
-    { type: 'fight',   name: 'Fulgurite Wolf',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
-    { type: 'fight',   name: 'Skylash Serpent', hp: 13, init: 4, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
+    { type: 'fight', name: 'Levinbeast',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear',
+      par: 2, attacks: [{ a: 'circle', name: 'Prowl' }, { a: 'quicken', name: 'Charge Up' }, { a: 'windup', name: 'Levin Bolt' }] },
+    { type: 'fight', name: 'Anvil Toad',      hp: 18, init: 2, atk: 4, atkEl: 'Stone',     shape: 'armour', shapeV: 3, xp: 6,
+      par: 2, attacks: [{ a: 'harden', name: 'Anvil Skin' }, { a: 'lunge', name: 'Tongue' }, { a: 'windup', name: 'Dead Drop' }] },
+    { type: 'fight', name: 'Fulgurite Wolf',  hp: 13, init: 4, atk: 3, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison',
+      par: 2, attacks: [{ a: 'circle', name: 'Flank' }, { a: 'lunge', name: 'Run Down' }, { a: 'windup', name: 'Glass Fang' }] },
+    { type: 'fight', name: 'Skylash Serpent', hp: 13, init: 4, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged',
+      par: 2, attacks: [{ a: 'circle', name: 'Coil Round' }, { a: 'lunge', name: 'Whip Out' }, { a: 'windup', name: 'Skylash' }] },
     { type: 'journey', name: 'Thunder Stair',  mp: 13, timePenalty: 1, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Updraft' },
     { type: 'journey', name: 'Static Flats',   mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Rainshadow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
@@ -606,10 +628,14 @@ const ROAD_STORMREACH = [
   ]},
   // 🐉 The Riven Sky — under its wings. Everything is faster than you and the ground is gone.
   { name: 'The Riven Sky', hardshipChance: 0.65, hardships: ['Squall', 'Vertigo', 'Ambush', 'Storm', 'Dead Weight'], encounters: [
-    { type: 'fight',   name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear' },
-    { type: 'fight',   name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'fight',   name: 'Riven Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 6 },
-    { type: 'fight',   name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze' },
+    { type: 'fight', name: 'Riven Hatchling', hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Windshear',
+      par: 2, attacks: [{ a: 'circle', name: 'Scramble' }, { a: 'quicken', name: 'Fledge' }, { a: 'windup', name: 'Shard Spray' }] },
+    { type: 'fight', name: 'Stormcrown Roc',  hp: 14, init: 5, atk: 4, atkEl: 'Water',     shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged',
+      par: 2, attacks: [{ a: 'circle', name: 'Circle High' }, { a: 'quicken', name: 'Stoop' }, { a: 'windup', name: 'Talon Fall' }] },
+    { type: 'fight', name: 'Riven Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 6,
+      par: 2, attacks: [{ a: 'set', name: 'Shieldwall' }, { a: 'lunge', name: 'Spear' }, { a: 'blur', name: 'Shard Mist' }] },
+    { type: 'fight', name: 'Tempest Lynx',    hp: 13, init: 5, atk: 4, atkEl: 'Fire',      shape: 'evasion', shapeV: 1, xp: 6, ability: 'Freeze',
+      par: 2, attacks: [{ a: 'circle', name: 'Stalk' }, { a: 'quicken', name: 'Pounce' }, { a: 'windup', name: 'Rime Claw' }] },
     { type: 'journey', name: 'Skyfall Verge',   mp: 14, timePenalty: 1, element: 'Water',     nightfall: 6, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Riven Stair', mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 4, peril: 'Steep' },
     { type: 'journey', name: 'Cloudbreak Run',  mp: 13, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
@@ -629,10 +655,14 @@ const ROAD_STORMREACH = [
 // card the wrong card, which is the single most-solved decision we have measured.
 const ROAD_FELLGRIND = [
   { name: 'The Sloughs', hardshipChance: 0, hardships: [], encounters: [
-    { type: 'fight',   name: 'Sump Toad',     hp: 10, init: 3, atk: 2, atkEl: 'Water', xp: 4 },
-    { type: 'fight',   name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5 },
-    { type: 'fight',   name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash' },
-    { type: 'fight',   name: 'Fen Ox',        hp: 16, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 6 },
+    { type: 'fight', name: 'Sump Toad',     hp: 10, init: 3, atk: 2, atkEl: 'Water', xp: 4,
+      par: 2, attacks: [{ a: 'windup', name: 'Belly Slam' }, { a: 'flurry', name: 'Croaking Fit' }, { a: 'blur', name: 'Bog Haze' }] },
+    { type: 'fight', name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5,
+      par: 2, attacks: [{ a: 'harden', name: 'Peat Skin' }, { a: 'lunge', name: 'Long Reach' }, { a: 'windup', name: 'Heave' }] },
+    { type: 'fight', name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash',
+      par: 1, attacks: [{ a: 'circle', name: 'Sidestep' }, { a: 'lunge', name: 'Stab' }, { a: 'windup', name: 'Reed Strike' }] },
+    { type: 'fight', name: 'Fen Ox',        hp: 16, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 6,
+      par: 2, attacks: [{ a: 'harden', name: 'Mudplate' }, { a: 'lunge', name: 'Gore' }, { a: 'windup', name: 'Trample' }] },
     { type: 'journey', name: 'The Slow Ford',   mp: 12, timePenalty: 1, element: 'Water',     nightfall: 4, xp: 4 },
     { type: 'journey', name: 'Turfcutter Way',  mp: 10, timePenalty: 2, element: 'Stone',     nightfall: 4, xp: 3 },
     { type: 'journey', name: 'Reedlight Path',  mp: 11, timePenalty: 3, element: 'Fire',      nightfall: 4, xp: 3 },
@@ -649,29 +679,40 @@ const ROAD_FELLGRIND = [
       par: 3, attacks: [{ a: 'harden', name: 'Slag Crust' },
                         { a: 'windup', name: 'Set Jaw' },
                         { a: 'circle', name: 'Run Down' }] },
-    { type: 'fight',   name: 'Millstone Crab', hp: 11, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
-    { type: 'fight',   name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6 },
-    { type: 'fight',   name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison' },
+    { type: 'fight', name: 'Millstone Crab', hp: 11, init: 2, atk: 3, atkEl: 'Water', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'set', name: 'Shell Down' }, { a: 'lunge', name: 'Pincer' }, { a: 'blur', name: 'Grit Cloud' }] },
+    { type: 'fight', name: 'Grindtooth',     hp: 14, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 2, xp: 6,
+      par: 2, attacks: [{ a: 'harden', name: 'Grindplate' }, { a: 'lunge', name: 'Bite Down' }, { a: 'windup', name: 'Millstone' }] },
+    { type: 'fight', name: 'Slagmoth',       hp: 11, init: 5, atk: 3, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 5, ability: 'Poison',
+      par: 2, attacks: [{ a: 'circle', name: 'Flutter' }, { a: 'quicken', name: 'Rise' }, { a: 'windup', name: 'Ash Beat' }] },
     { type: 'journey', name: 'The Whetway',     mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4, peril: 'Toll' },
     { type: 'journey', name: 'Ashfall Steps',   mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Cold Furrow',     mp: 11, timePenalty: 3, element: 'Water',     nightfall: 5, xp: 3 },
     { type: 'journey', name: 'The Iron Cut',    mp: 14, timePenalty: 2, element: 'Lightning', nightfall: 5, xp: 5, peril: 'Steep' },
   ]},
   { name: 'The Unquiet Deep', hardshipChance: 0.5, hardships: ['Rationed', 'Dead Air', 'Night Travel', 'Dead Weight'], encounters: [
-    { type: 'fight',   name: 'Deepdelver',     hp: 18, init: 3, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6 },
-    { type: 'fight',   name: 'Cavern Shrike',  hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged' },
-    { type: 'fight',   name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash' },
-    { type: 'fight',   name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7 },
+    { type: 'fight', name: 'Deepdelver',     hp: 18, init: 3, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 6,
+      par: 2, attacks: [{ a: 'harden', name: 'Burrow In' }, { a: 'lunge', name: 'Claw Out' }, { a: 'windup', name: 'Cave-In' }] },
+    { type: 'fight', name: 'Cavern Shrike',  hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Ranged',
+      par: 2, attacks: [{ a: 'circle', name: 'Ring' }, { a: 'quicken', name: 'Stoop' }, { a: 'windup', name: 'Skewer' }] },
+    { type: 'fight', name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'circle', name: 'Drift' }, { a: 'lunge', name: 'Alight' }, { a: 'windup', name: 'Wing Beat' }] },
+    { type: 'fight', name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7,
+      par: 2, attacks: [{ a: 'harden', name: 'Hollowplate' }, { a: 'lunge', name: 'Horn' }, { a: 'windup', name: 'Stampede' }] },
     { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
     { type: 'journey', name: 'The Winding Cut', mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5 },
     { type: 'journey', name: 'Emberdown',       mp: 12, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 4 },
   ]},
   { name: "Cragmourn's Shoulder", hardshipChance: 0.6, hardships: ['Exacting', 'Rationed', 'Dead Weight', 'Storm', 'Ambush'], encounters: [
-    { type: 'fight',   name: 'Scree Warden',   hp: 12, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
-    { type: 'fight',   name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
-    { type: 'fight',   name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze' },
-    { type: 'fight',   name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
+    { type: 'fight', name: 'Scree Warden',   hp: 12, init: 3, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7,
+      par: 2, attacks: [{ a: 'set', name: 'Screewall' }, { a: 'lunge', name: 'Pike' }, { a: 'blur', name: 'Dust Screen' }] },
+    { type: 'fight', name: 'Fault Lurker',   hp: 14, init: 5, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'circle', name: 'Shift' }, { a: 'quicken', name: 'Slip' }, { a: 'windup', name: 'Fault Line' }] },
+    { type: 'fight', name: 'Cinderjaw',      hp: 17, init: 4, atk: 5, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 7, ability: 'Freeze',
+      par: 2, attacks: [{ a: 'dig', name: 'Slag Crust' }, { a: 'quicken', name: 'Stoke' }, { a: 'windup', name: 'Jaw Snap' }] },
+    { type: 'fight', name: 'Stonewake Elk',  hp: 15, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear',
+      par: 2, attacks: [{ a: 'circle', name: 'Wide Turn' }, { a: 'quicken', name: 'Bound' }, { a: 'windup', name: 'Stone Antler' }] },
     { type: 'journey', name: 'The Grinding Pass', mp: 14, timePenalty: 2, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Shoulderfall',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 6, xp: 5, peril: 'Steep' },
     { type: 'journey', name: 'The Last Furrow',   mp: 14, timePenalty: 3, element: 'Water',     nightfall: 7, xp: 5 },
@@ -690,40 +731,56 @@ const ROAD_FELLGRIND = [
 // shape and a stat enforcing the same thing multiply.
 const ROAD_FATHOM = [
   { name: 'The Tidewrack', hardshipChance: 0, hardships: [], encounters: [
-    { type: 'fight',   name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6 },
-    { type: 'fight',   name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5 },
-    { type: 'fight',   name: 'Barnacle Ox',    hp: 12, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight', name: 'Wrackling',      hp: 10, init: 4, atk: 3, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 5,
+      par: 2, attacks: [{ a: 'windup', name: 'Lash' }, { a: 'flurry', name: 'Thrash' }, { a: 'blur', name: 'Weedcoat' }] },
+    { type: 'fight', name: 'Shoal Drifter',  hp: 15, init: 3, atk: 3, atkEl: 'Water', shape: 'armour', shapeV: 3, xp: 6,
+      par: 2, attacks: [{ a: 'harden', name: 'Silt Coat' }, { a: 'lunge', name: 'Sweep' }, { a: 'windup', name: 'Roll Over' }] },
+    { type: 'fight', name: 'Glass Eel',      hp: 12, init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 5,
+      par: 2, attacks: [{ a: 'circle', name: 'Weave' }, { a: 'quicken', name: 'Surge' }, { a: 'windup', name: 'Glass Lash' }] },
+    { type: 'fight', name: 'Barnacle Ox',    hp: 12, init: 2, atk: 4, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 6, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'set', name: 'Crust Up' }, { a: 'lunge', name: 'Butt' }, { a: 'blur', name: 'Brine Haze' }] },
     { type: 'journey', name: 'The Wrackline',   mp: 13, timePenalty: 1, element: 'Water',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Saltmarsh Road',  mp: 12, timePenalty: 2, element: 'Stone',     nightfall: 5, xp: 4 },
     { type: 'journey', name: 'Lantern Shallows',mp: 14, timePenalty: 3, element: 'Fire',      nightfall: 5, xp: 5, peril: 'Updraft' },
     { type: 'journey', name: 'The Ebb Path',    mp: 11, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 4 },
   ]},
   { name: 'Drowned Kell', hardshipChance: 0.35, hardships: ['Riptide', 'Vertigo', 'Rationed', 'Night Travel'], encounters: [
-    { type: 'fight',   name: 'Kell Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 6 },
-    { type: 'fight',   name: 'Silt Crawler',   hp: 17, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7 },
-    { type: 'fight',   name: 'Drowned Piper',  hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged' },
-    { type: 'fight',   name: 'Anchorback',     hp: 16, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash' },
+    { type: 'fight', name: 'Kell Warden',    hp: 12, init: 4, atk: 4, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 1, xp: 6,
+      par: 2, attacks: [{ a: 'windup', name: 'Haft Blow' }, { a: 'flurry', name: 'Onslaught' }, { a: 'blur', name: 'Kelp Shroud' }] },
+    { type: 'fight', name: 'Silt Crawler',   hp: 17, init: 2, atk: 4, atkEl: 'Stone', shape: 'armour', shapeV: 3, xp: 7,
+      par: 2, attacks: [{ a: 'harden', name: 'Siltplate' }, { a: 'lunge', name: 'Reach' }, { a: 'windup', name: 'Bear Down' }] },
+    { type: 'fight', name: 'Drowned Piper',  hp: 12, init: 5, atk: 4, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Ranged',
+      par: 2, attacks: [{ a: 'circle', name: 'Circle Close' }, { a: 'quicken', name: 'Keening' }, { a: 'windup', name: 'Drowned Note' }] },
+    { type: 'fight', name: 'Anchorback',     hp: 16, init: 3, atk: 4, atkEl: 'Fire',  shape: 'armour', shapeV: 3, xp: 6, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'harden', name: 'Anchor Down' }, { a: 'lunge', name: 'Chain Lash' }, { a: 'windup', name: 'Heave To' }] },
     { type: 'journey', name: 'The Kell Stair',  mp: 14, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Bell Causeway',   mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Steep' },
     { type: 'journey', name: 'Weedlight Reach', mp: 12, timePenalty: 3, element: 'Fire',      nightfall: 6, xp: 4 },
     { type: 'journey', name: 'The Undertow',    mp: 15, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
   ]},
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
-    { type: 'fight',   name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
-    { type: 'fight',   name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear' },
-    { type: 'fight',   name: 'Coldvein Worm',  hp: 12, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7 },
-    { type: 'fight',   name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash' },
+    { type: 'fight', name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
+      par: 2, attacks: [{ a: 'windup', name: 'Overhead' }, { a: 'flurry', name: 'Cascade' }, { a: 'blur', name: 'Silt Cloud' }] },
+    { type: 'fight', name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear',
+      par: 2, attacks: [{ a: 'circle', name: 'Glide Round' }, { a: 'quicken', name: 'Sweep Up' }, { a: 'windup', name: 'Mantle Blow' }] },
+    { type: 'fight', name: 'Coldvein Worm',  hp: 12, init: 2, atk: 5, atkEl: 'Stone', shape: 'guard', shapeV: 1, xp: 7,
+      par: 2, attacks: [{ a: 'set', name: 'Coil Tight' }, { a: 'lunge', name: 'Bore' }, { a: 'blur', name: 'Cold Vein' }] },
+    { type: 'fight', name: 'Lanternjaw',     hp: 14, init: 4, atk: 4, atkEl: 'Fire',  shape: 'evasion', shapeV: 1, xp: 6, ability: 'Backlash',
+      par: 2, attacks: [{ a: 'circle', name: 'Circle Dark' }, { a: 'lunge', name: 'Snap To' }, { a: 'windup', name: 'Lure and Bite' }] },
     { type: 'journey', name: 'The Shelf Road',  mp: 14, timePenalty: 2, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Nightcurrent',    mp: 13, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Sounding',    mp: 14, timePenalty: 3, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
     { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 5 },
   ]},
   { name: "Fathomdread's Trench", hardshipChance: 0.6, hardships: ['Riptide', 'Exacting', 'Squall', 'Vertigo', 'Dead Weight', 'Rationed'], encounters: [
-    { type: 'fight',   name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7 },
-    { type: 'fight',   name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear' },
-    { type: 'fight',   name: 'Pressureback',   hp: 19, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7, ability: 'Backlash' },
-    { type: 'fight',   name: 'The Pale Herald',hp: 14, init: 5, atk: 5, atkEl: 'Fire',  shapes: ['armour', 'evasion'], shapeV: 1, xp: 7, ability: 'Freeze' },
+    { type: 'fight', name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
+      par: 2, attacks: [{ a: 'windup', name: 'Guard Blow' }, { a: 'flurry', name: 'Rout' }, { a: 'blur', name: 'Trench Murk' }] },
+    { type: 'fight', name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear',
+      par: 2, attacks: [{ a: 'circle', name: 'Coil About' }, { a: 'quicken', name: 'Race Down' }, { a: 'windup', name: 'Deep Strike' }] },
+    { type: 'fight', name: 'Pressureback',   hp: 19, init: 3, atk: 5, atkEl: 'Stone', shape: 'armour', shapeV: 4, xp: 7, ability: 'Backlash',
+      par: 3, attacks: [{ a: 'harden', name: 'Bear Weight' }, { a: 'lunge', name: 'Crush' }, { a: 'windup', name: 'Sounding' }] },
+    { type: 'fight', name: 'The Pale Herald',hp: 14, init: 5, atk: 5, atkEl: 'Fire',  shapes: ['armour', 'evasion'], shapeV: 1, xp: 7, ability: 'Freeze',
+      par: 2, attacks: [{ a: 'windup', name: 'Pronouncement' }, { a: 'flurry', name: 'Chorus' }, { a: 'blur', name: 'Pale Shroud' }] },
     { type: 'journey', name: 'The Trench Road', mp: 14, timePenalty: 2, element: 'Water',     nightfall: 7, xp: 6, peril: 'Toll' },
     { type: 'journey', name: 'Deadlight Deep',  mp: 14, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 5, peril: 'Treacherous' },
     { type: 'journey', name: 'The Long Descent',mp: 14, timePenalty: 3, element: 'Stone',     nightfall: 7, xp: 5, peril: 'Steep' },
@@ -1991,15 +2048,19 @@ const TUTORIAL = {
     brief: 'A young thing, barely scaled — but the scale it has will turn a weak blow. Put your weight behind one strike and it will not hold.' },
   regions: [
     { name: 'The Chandlery Road', hardshipChance: 0, hardships: [], encounters: [
-      { type: 'fight',   name: 'Wick Moth',   hp: 5,  init: 1, atk: 1, xp: 4 },
+      { type: 'fight', name: 'Wick Moth',   hp: 5,  init: 1, atk: 1, xp: 4,
+        par: 1, attacks: [{ a: 'windup', name: 'Flutter Off' }, { a: 'flurry', name: 'Dart In' }, { a: 'blur', name: 'Wingdust' }] },
       { type: 'journey', name: 'Lamplit Lane', mp: 5,  nightfall: 1, timePenalty: 1, xp: 4 },
-      { type: 'fight',   name: 'Tallow Vole', hp: 6,  init: 2, atk: 1, shape: 'armour', shapeV: 1, xp: 4 },
+      { type: 'fight', name: 'Tallow Vole', hp: 6,  init: 2, atk: 1, shape: 'armour', shapeV: 1, xp: 4,
+        par: 1, attacks: [{ a: 'harden', name: 'Waxhide' }, { a: 'lunge', name: 'Nip' }, { a: 'windup', name: 'Barge' }] },
       { type: 'journey', name: 'The Long Meadow', mp: 6, nightfall: 2, timePenalty: 2, xp: 5 },
     ] },
     { name: 'The Ember Hollow', hardshipChance: 0, hardships: [], encounters: [
-      { type: 'fight',   name: 'Sootling',    hp: 8,  init: 4, atk: 1, shape: 'evasion', shapeV: 0, xp: 5 },
+      { type: 'fight', name: 'Sootling',    hp: 8,  init: 4, atk: 1, shape: 'evasion', shapeV: 0, xp: 5,
+        par: 1, attacks: [{ a: 'circle', name: 'Scamper' }, { a: 'lunge', name: 'Nip' }, { a: 'windup', name: 'Soot Puff' }] },
       { type: 'journey', name: 'Kilnsmoke Path', mp: 7, nightfall: 3, timePenalty: 3, xp: 5 },
-      { type: 'fight',   name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6 },
+      { type: 'fight', name: 'Cinder Hound', hp: 10, init: 3, atk: 2, shape: 'armour', shapeV: 2, xp: 6,
+        par: 2, attacks: [{ a: 'harden', name: 'Ashcoat' }, { a: 'lunge', name: 'Snap' }, { a: 'windup', name: 'Bowl Over' }] },
       { type: 'journey', name: 'The Last Rise', mp: 8, nightfall: 3, timePenalty: 2, xp: 6 },
     ] },
   ],
@@ -2941,6 +3002,18 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 433, date: '2026-08-30', title: 'Every creature fights back',
+    warn: "The road can kill you now. Runs in progress will still load, but the creature you are standing in front of has changed shape.",
+    changed: [
+      "⚔️ <b>Every creature has a life bar and takes several turns to kill.</b> All 64 of them, plus the four in the tutorial — not just the six you had met so far.",
+      "⚔️ <b>Each one has three named attacks</b> it telegraphs a turn ahead. A Fen Ox plants itself and tramples; a Kite Hawk wheels and stoops. You will learn them.",
+      "❌ <b>No more Narrow in a fight.</b> You kill it or it kills you. Journeys keep all three outcomes — getting most of the way down a road is a real place to end up; half-killing something is not.",
+      "🃏 Your deck does not come back mid-fight. A long fight is one you pay for.",
+    ],
+    added: [
+      "🪨🌪️🌀 <b>Three new things creatures can do</b> — plant themselves for heavy Armour, rush you for Initiative <i>and</i> a harder blow, or blur so your hit is halved unless you strike first.",
+    ] },
+
   { build: 432, date: '2026-08-30', title: 'Fights resolve like a normal card game',
     changed: [
       "⚔️ <b>No more step-by-step resolving in a fight.</b> The blow lands, the health bar drops, and that is it. One window at the end telling you it fell and what it dropped.",
@@ -5776,6 +5849,19 @@ const FOE_ATTACKS = {
             now: 'it lunges — your speed <b>will not save you</b>', fx: { unstoppable: true } },
   quicken:{ icon: '⏳', tell: 'it is quickening — its <b>Initiative climbs</b>',
             now: 'it is quick now — its <b>Initiative has climbed</b>', fx: { initStep: 3 } },
+  // ➕ ADDED 2026-08-30 WITH THE ROSTER. Six rules across 64 creatures reads as one creature
+  // wearing sixty-four names. ⚠️ Each is still only a one-turn change to a stat the engine
+  // already reads — nothing here teaches computeAction() a new concept, which is exactly why the
+  // POOL is the cheap thing to grow and the creature list is not.
+  dig:    { icon: '🪨', tell: 'it is planting itself — <b>Armour +4</b> next turn',
+            now: 'it is planted — <b>Armour +4</b>', fx: { armour: 4 } },
+  flurry: { icon: '🌪️', tell: 'it is winding up to rush — it <b>takes Initiative</b> and hits <b>half again</b>',
+            now: 'it rushes — it <b>has Initiative</b> and hits <b>half again</b>', fx: { initTake: true, atkMult: 1.5 } },
+  // 🌀 a creature with no Evasion of its own, borrowing it for a turn — which is why it is
+  // never given to one that already has the shape: an attack that changes nothing is worse than
+  // no attack at all, because the telegraph promised something and then nothing happened.
+  blur:   { icon: '🌀', tell: 'it is blurring — next turn your blow is <b>halved unless you strike first</b>',
+            now: 'it is hard to hit — your blow is <b>halved unless you strike first</b>', fx: { evade: true } },
 };
 // 🎲 A SHUFFLED BAG, NOT A DIE (Thomas's call). Pure random can roll *harden* three beats
 // running and then the creature never shows you the two things that make it itself. A bag
@@ -6021,7 +6107,7 @@ function publishFoeTurn() {
     hp: 9999, beatFight: true,
     init: fx.initTake ? 99 : base.init + climb,
     atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
-    shape: fx.armour ? 'armour' : base.shape,
+    shape: fx.evade ? 'evasion' : fx.armour ? 'armour' : base.shape,
     shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
     guard: fx.guard || base.guard || 0,
     ability: base.ability,
@@ -6063,6 +6149,10 @@ function startFoeBeat() {
 
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
 function foeCleanupAndNext() {
+  // ⚠️ THE GUARD, not just the caller. Three things route here (a soak exiting, a turn with no
+  // damage, and the fight loop itself) and only one of them knows whether the creature is still
+  // alive. A loop that can be re-entered from several places has to check its own precondition.
+  if (!S.foeState || S.foeState.hp <= 0) { S.afterSoak = 'upgrade'; return; }
   rollTurnTokens();
   const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
@@ -7151,6 +7241,14 @@ function finishResolve() {
     // ⚠️ THE BLOW HAS ALREADY LANDED — resolve() applies it before anything is shown, so this
     // reads the verdict rather than producing it. Double-applying here would chip the pool twice.
     if (!r.felled) { foeAfterBlow(r); return; }   // it survived — the fight took over
+    // 🔴 AND THE FIGHT'S SOAK EXIT HAS TO BE STOOD DOWN. `startFoeBeat()` points `afterSoak` at
+    // 'foeNext' every turn, so the KILLING turn's soak still routed back into the fight loop —
+    // `foeCleanupAndNext()` → `startFoeBeat()` on a corpse, which drew a fresh hand, found none,
+    // and killed the run with *"your cards are spent — the Cairnstag still stands at 0 of 22 HP"*.
+    // 🔑 A PER-TURN EXIT POINTER MUST BE CLEARED BY WHATEVER ENDS THE LOOP, not just re-set by
+    // whatever continues it. It only surfaced when every creature became multi-turn: with six of
+    // them it was a rare tail, with sixty-four it ended most runs.
+    S.afterSoak = 'upgrade';
     // it fell: this beat IS the encounter's result, so fall through as a Complete.
     // ⚠️ NARROW IS GONE FROM FIGHTS (Thomas, 2026-08-30): *"you beat it or you die."* The
     // three-way outcome survives on JOURNEYS, which is one more way the two stop being the
@@ -12023,7 +12121,17 @@ function renderLog() {
 // → THE DUEL (one-set fight-beats vs a persistent HP+shields dragon).
 // Reuses the normal turn loop (computeAction / resolve / reveal / soak); see 03_Content/Dragons.md.
 // ============================================================
+// 🔴 THE LAIR HAS TO STAND THE ROAD FIGHT DOWN. `S.foeState` is only cleared by
+// beginEncounter(), and the finale builds its encounter directly — so a run that went
+// fight → hearth → lair carried a dead creature's pool into the duel, and a soak there could
+// route back through `foeCleanupAndNext()` and report *"the Cindermaw still stands at 11 of 6 HP"*.
+// 🔑 Harmless while six creatures were multi-turn; with all sixty-four it ended runs. **A
+// leak that needs two rare things to line up becomes a common bug the moment one of them is
+// always true.**
+function clearFoeFight() { S.foeState = null; S.foeBase = null; }
+
 function beginFinalBattle() {
+  clearFoeFight();
   // ⭐ arriving at the lair pays whether or not you leave it — reaching the dragon IS the run
   awardXP(XP_AWARD.lair);
   S.finalMode = true;

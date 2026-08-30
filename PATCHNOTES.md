@@ -6,6 +6,20 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 433 — Every creature fights back
+*2026-08-30*
+
+> ⚠️ The road can kill you now. Runs in progress will still load, but the creature you are standing in front of has changed shape.
+
+**Added**
+- 🪨🌪️🌀 **Three new things creatures can do** — plant themselves for heavy Armour, rush you for Initiative and a harder blow, or blur so your hit is halved unless you strike first.
+
+**Changed**
+- ⚔️ **Every creature has a life bar and takes several turns to kill.** All 64 of them, plus the four in the tutorial — not just the six you had met so far.
+- ⚔️ **Each one has three named attacks** it telegraphs a turn ahead. A Fen Ox plants itself and tramples; a Kite Hawk wheels and stoops. You will learn them.
+- ❌ **No more Narrow in a fight.** You kill it or it kills you. Journeys keep all three outcomes — getting most of the way down a road is a real place to end up; half-killing something is not.
+- 🃏 Your deck does not come back mid-fight. A long fight is one you pay for.
+
 ## build 432 — Fights resolve like a normal card game
 *2026-08-30*
 
