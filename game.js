@@ -2941,6 +2941,16 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 430, date: '2026-08-30', title: 'Perfect Kills, and a fight that survives a reload',
+    warn: "If you reloaded the page in the middle of a fight, that fight was quietly running on the old one-hand rules for the rest of it. Fixed — no action needed, and saves still load.",
+    changed: [
+      "✦ <b>PERFECT KILL is a real achievement now.</b> Two conditions, both across the whole fight: the killing blow deals <b>exactly</b> the health it had left, and <b>nothing got through</b> on any turn — you never lost a card to it.",
+    ],
+    fixed: [
+      "✦ It no longer happens on journeys. It is a kill; nothing dies on a road.",
+      "🔁 <b>Reloading mid-fight no longer breaks the fight.</b> The creature came back with its real health bar and the turn structure gone — a verdict after every turn, and a bone shard carved each time.",
+    ] },
+
   { build: 429, date: '2026-08-30', title: 'Fights stop interrupting themselves',
     changed: [
       "⚔️ <b>No more pop-up after every turn of a fight.</b> The turn plays out in the log and you keep going. The window only opens when the creature falls — or you do.",
@@ -3331,6 +3341,15 @@ function loadGame(key) {
       S.encounter = { type: 'journey', name: 'The Last Mile', lastMile: true, finale: true,
         mp: LAST_MILE.mp, timePenalty: 0, nightfall: 0, xp: 0 };
     }
+    // ⚔️ AND SO IS A BEAT FIGHT'S. Exactly the same case as the two above and it was missed:
+    // the save keeps the PRISTINE creature (by name, so an elite reloads) plus the pool, and
+    // everything between them — the `beatFight` flag, the 9999 sentinel, this turn's atk/init/
+    // shape modifiers — is `publishFoeTurn()`'s output. Restored without it, the panel still knew
+    // it was a beat fight while the reveal ran the one-hand path: real HP, a `half`, a LOSS
+    // verdict every turn, a modal every turn, and a shard carved each time.
+    // 🔑 DERIVED STATE MUST BE RE-DERIVED ON LOAD. If a function computes it, load calls that
+    // function — it never assumes the value survived the round trip.
+    else if (S.foeState && S.foeBase) publishFoeTurn();
     render();
     return true;
   } catch (err) { return false; }
@@ -5841,7 +5860,9 @@ function beginEncounter(e) {
     // stats, so without a pristine copy the modifiers would compound: a creature that hardened
     // twice would be at Armour +4 forever.
     S.foeBase = e;
-    S.foeState = { hp: e.hp, maxHp: e.hp, turn: 0, par: e.par || 3,
+    // ❤️ `untouched` is the fight-long half of ✦ PERFECT KILL: it starts true and one point of
+    // damage getting through kills it for good. It lives on foeState so it travels in the save.
+    S.foeState = { hp: e.hp, maxHp: e.hp, turn: 0, par: e.par || 3, untouched: true,
                    atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0 };
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
@@ -5934,12 +5955,42 @@ function foeResolveBeat(r) {
   // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
   // is a sentinel's lie. The beat computes its own, from a rule.
   const damage = foeCounter(r);
+  if (damage > 0) st.untouched = false;   // ❤️ gone for the rest of this fight
   tickMomentum(damage, r);
   S.damage = damage; S.damageEl = null;
   S.afterSoak = 'foeNext';
   if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
   else foeCleanupAndNext();
   return true;
+}
+
+// ⚡ THIS TURN'S CREATURE, DERIVED FROM `foeBase` + the active attack. ⚠️ hp 9999 so
+// computeAction() never judges the kill — the turn chips a pool and `foeResolveBeat()` decides.
+// 🔴 EXTRACTED FROM startFoeBeat() 2026-08-30 BECAUSE **A MID-FIGHT RELOAD LOST IT**. The save
+// stores the encounter BY NAME and rebuilds it from the region list (which is what makes an elite
+// reloadable), so `S.encounter` came back as the PRISTINE creature: no `beatFight`, real HP, base
+// atk, none of this turn's modifiers. `foeState` was restored perfectly beside it, so the panel
+// still said *"turn 1 · par 3"* while the reveal ran the one-hand path — real HP, a `half`, a
+// LOSS verdict, Early Damage, a modal every turn and a shard carved each time.
+// 🔑 THE RULE: **DERIVED STATE MUST BE RE-DERIVED ON LOAD, NEVER ASSUMED TO HAVE SURVIVED.**
+// The save deliberately keeps only the pristine creature + the pool; everything between them is
+// this function's output, so load has to call it. ⚠️ And RUNSIM never saves or loads, so the
+// instrument is structurally blind to this whole class — it took a screenshot to find, like the
+// map that was never in the save. **Anything a save reconstructs needs a hand-driven probe.**
+function publishFoeTurn() {
+  const st = S.foeState, base = S.foeBase;
+  if (!st || !base) return;
+  const fx = (st.active && st.active.fx) || {};
+  const climb = (fx.initStep || 0) * (st.turn - 1);
+  S.encounter = Object.assign({}, base, {
+    hp: 9999, beatFight: true,
+    init: fx.initTake ? 99 : base.init + climb,
+    atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
+    shape: fx.armour ? 'armour' : base.shape,
+    shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
+    guard: fx.guard || base.guard || 0,
+    ability: base.ability,
+  });
 }
 
 function startFoeBeat() {
@@ -5957,20 +6008,7 @@ function startFoeBeat() {
   st.next = foeBagDraw();
   if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
 
-  // ⚡ this beat's creature. ⚠️ hp 9999 so computeAction() never judges the kill — the beat
-  // chips a pool and `foeResolveBeat()` decides. That sentinel is the one that leaked to the
-  // screen as "LOSS" in the duel, so it is kept OFF every display here.
-  const fx = (st.active && st.active.fx) || {};
-  const climb = (fx.initStep || 0) * (st.turn - 1);
-  S.encounter = Object.assign({}, base, {
-    hp: 9999, beatFight: true,
-    init: fx.initTake ? 99 : base.init + climb,
-    atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
-    shape: fx.armour ? 'armour' : base.shape,
-    shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
-    guard: fx.guard || base.guard || 0,
-    ability: base.ability,
-  });
+  publishFoeTurn();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack';
   S.loseReserve = null; S.afterSoak = 'foeNext';
@@ -6618,37 +6656,42 @@ function computeAction(reserve) {
 // other is not, the ungated half is lying**, and the loud half is the one the player believes.
 // ⚠️ And it fired on **0 of 31** beat-fight kills, because a beat fight's outcome is the
 // sentinel's lie — so the one place it belongs was the one place it was dark.
+// ✦ PERFECT KILL — REWRITTEN 2026-08-30 TO THOMAS'S RULE: *"it should only show up when you
+// kill a monster with perfect life and perfect damage."* Two conditions, both about the WHOLE
+// fight, both aimable:
+//   ⚔️ PERFECT DAMAGE — the killing blow deals EXACTLY the health it had left. Nothing wasted.
+//   ❤️ PERFECT LIFE   — nothing got through, on any turn of the fight. You never soaked a card.
+// 🔴 THIS REVERSES THE OLD RULE, AND THE OLD RULE'S OWN ARGUMENT IS WHAT EXPIRED. It read:
+// *"NOT exact-lethal: hitting HP precisely with four cards is mostly luck, and a reward you
+// cannot aim for is a slot machine."* That was TRUE of a one-hand encounter — one blow, one
+// draw, take what you are given. It is false the moment a fight runs several turns: you can see
+// it has 6 left and choose the card that deals 6. 🔑 **Multi-turn combat made exact lethal an
+// AIM instead of a coincidence**, which is the same reason the whole rebuild was allowed — check
+// whether the premise of an old decision still holds before quoting its conclusion.
+// ✅ And it retires the alternative-arrangement search entirely (swapping S.assign and putting
+// it back — *the instrument that perturbs what it measures*, and the reason the old one had to
+// be documented as synchronous-and-restored-in-a-finally). The new rule reads two integers.
+// ⚠️ On a creature that still resolves in ONE hand there is nothing to aim with, so exact
+// lethal there is luck. That is not a reason to soften it — it is a reason those creatures get
+// turns too. Do not add a fallback that makes it easier where it means less.
 function perfectKillInfo(r) {
   const none = { perfect: false, contested: false };
   const e = S.encounter;
-  if (!e || e.type !== 'fight' || !S.hand) return none;
-  // ⚔️ ONE QUESTION, TWO WAYS TO ANSWER IT. A beat fight asks the pool; an ordinary fight still
-  // asks computeAction. The alternatives below are then judged by the SAME predicate the real
-  // arrangement was, which is the `computeAction()` rule again: never a second notion of winning.
+  // ❌ NEVER ON A JOURNEY. It is a KILL — nothing dies on a road (Thomas, twice: *"this isn't a
+  // perfect kill"*, *"it isn't something you kill"*). `rollDrops()` already knew: *a road is
+  // walked, not carved*, so the announcement paid nothing exactly where it fired most — measured
+  // 31 journeys to 13 fights over 40 runs.
+  if (!e || e.type !== 'fight') return none;
   const st = beatPool();
-  const wins = st ? (x => beatFells(x, st)) : (x => x && x.outcome === 'Complete');
-  if (!wins(r)) return none;
-  const a = S.assign, curId = a.Spell, cur = cardById(curId);
-  if (!cur) return none;
-  const ZONES = ['Spell', 'Element', 'Boost', 'Reserve'];
-  const curVal = eff(cur).value;
-  let smallerWorks = false, anyOtherWorks = false;
-  for (const c of S.hand) {
-    if (c.id === curId) continue;
-    const zone = ZONES.find(z => a[z] === c.id);
-    if (!zone || zone === 'Spell') continue;
-    const prevSpell = a.Spell;
-    try {
-      a.Spell = c.id; a[zone] = prevSpell;
-      const alt = computeAction(cardById(a.Reserve));
-      if (alt && wins(alt)) {
-        anyOtherWorks = true;
-        if (eff(c).value < curVal) smallerWorks = true;
-      }
-    } catch (err) { /* an illegal arrangement is simply not an alternative */ }
-    finally { a[zone] = c.id; a.Spell = prevSpell; }
+  const dealt = Math.max(0, (r && r.value) || 0);
+  if (st) {
+    if (dealt !== st.hp) return none;                 // ⚔️ overkill or short — not perfect damage
+    if (!st.untouched) return none;                   // ❤️ something got through earlier in the fight
+    return { perfect: true, contested: true };
   }
-  return { perfect: !smallerWorks, contested: anyOtherWorks };
+  // a one-hand creature: the same two questions, with the fight one turn long
+  if (r.outcome !== 'Complete') return none;
+  return { perfect: dealt === e.hp, contested: true };
 }
 
 function resolve() {
@@ -6952,7 +6995,8 @@ function beatDisplayHTML(beat, isNew) {
       const felled = after <= 0;
       subs.push(`<div class="pv-sub good">⚔️ ${S.foeBase.name}: −${dealt} HP${felled ? ' — it falls' : ` → ${after} left`}</div>`);
       // ✦ named on the beat that kills it, and nowhere before — same rule as the verdict itself
-      if (felled && r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
+      // ✦ name BOTH halves — a prize whose condition you cannot read is a prize you cannot aim for
+      if (felled && r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — exactly lethal, and it never touched you</div>`);
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
@@ -7075,7 +7119,7 @@ function finishResolve() {
   if (r.perfectChance) S.stats.perfectChances = (S.stats.perfectChances || 0) + 1;
   if (r.perfect) {
     S.stats.perfect = (S.stats.perfect || 0) + 1;
-    log(`✦ <b>PERFECT KILL</b> — no smaller card would have done it. The part is certain.`, 'good');
+    log(`✦ <b>PERFECT KILL</b> — exactly enough damage, and not a card lost all fight. The part is certain.`, 'good');
   }
   S.lastOutcome = r.outcome;
   if (S.finalMode && S.finalPhase === 'lastmile') { S.lastMileOutcome = r.outcome; S.lastMileApproach = r.lastMile; }
