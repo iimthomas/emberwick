@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 434 — The dragons hit back harder
+*2026-08-30*
+
+**Changed**
+- 🐉 **Every dragon has more health.** Cindermaw, Skyrender and Cragmourn by a little, Fathomdread by a little more — about ten points harder to fell, each.
+- ⭐ **Your account level is meant to be the answer.** A first run is supposed to be brutal; the charms and gear you unlock are what make the ladder climbable.
+
 ## build 433 — Every creature fights back
 *2026-08-30*
 
