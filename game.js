@@ -2999,6 +2999,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 442, date: '2026-08-30', title: 'The ladder climbs again',
+    changed: [
+      "🗺️ <b>Every stage is the same length now — twelve floors.</b> Stage 1 was eight and the rest were sixteen, so you reached the first dragon on half the supplies. That is why it was the hardest fight in the game.",
+      "🐉 <b>The dragons were re-tuned so the ladder actually climbs.</b> Cindermaw is the on-ramp; Skyrender, Cragmourn and Fathomdread each ask for more than the last.",
+      "⚠️ Their health was set back when the approach handed them to you wounded. With that gone, they needed it back.",
+    ] },
+
   { build: 441, date: '2026-08-30', title: 'Straight to the dragon',
     changed: [
       "🐉 <b>The Last Mile is gone.</b> It was the final journey — you walked the approach and the dragon started hurt. Now you reach the lair and the fight begins.",
@@ -4717,7 +4724,16 @@ let COIN_MULT = 1.0;
 // the meta ladder roughly doubles the win rate at the hard stages, and that is now the whole
 // reason a run gets winnable. Quote a stage number WITH the level it was taken at or it means
 // nothing.
-let DRAGON_HP_ADD = { 1: 5, 2: 4, 3: 4, 4: 4 };
+// 🐉 AND THE DRAGONS CARRY THE SHAPE. 📏 Swept at 12 floors: 5:4:4:4 → win [31,45,22,38]
+// (no order at all) · 5:12:10:24 → [33,32,12,11] · 6:16:12:30 → [31,30,18,8] · **4:18:13:30 →
+// [30,20,14,6]**, the first clean descent with real separation between every rung.
+// 🔑 WHAT THE NUMBERS REVEAL: total dragon HP now runs **64 / 78 / 81 / 80**. The bases
+// (60/60/68/50) were tuned when the ⚔️ Last Mile handed every dragon over 14 HP down with its
+// shape softened — Fathomdread's 50 was deliberately cut to pay for its double shape. With the
+// approach gone those bases describe a ladder that does not climb, and this is the correction.
+// ⚠️ ⭐1, a FRESH ACCOUNT — the hardest the game ever is. The meta ladder roughly doubles the win
+// rate at the hard stages. Quote a stage number with the level it was taken at or it means nothing.
+let DRAGON_HP_ADD = { 1: 4, 2: 18, 3: 13, 4: 30 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
@@ -5200,7 +5216,17 @@ let MAP_FLOORS = 16;          // 4 region bands of 4 - the band decides which po
 // the retention hole [[Market_And_Retention]] named. There is no dial for it (`WHEEL_PER_ENCOUNTER`
 // is a boolean and the shop already fires every encounter); a richer shelf, stage-1 coins, or
 // starting charms are all NEW mechanisms. Thomas's call, after he has felt this.
-const STAGE_FLOORS = { 1: 8 };    // 7 encounters and the hearth on top
+// 🗺️ EVERY STAGE IS THE SAME LENGTH (2026-08-30). Thomas: *"stage 1 being the hardest is
+// weird"* — and it was, because **the ladder ran backwards because the MAP did.** Stage 1 was 8
+// floors against everyone else's 16, so it reached its dragon on half the income: Cindermaw was
+// killing 59% of runs while Fathomdread killed 12%. That was never a dragon problem.
+// ⚠️ 16 was set when half of all encounters were one-hand journeys. With journeys cut every stop
+// is a fight, so the same map became roughly twice the run — 12 puts it back at ~21.8 turns,
+// which is what the game was tuned around.
+// 📏 Measured at equal floors: 8 → win [21,29,14,24], 12 → [31,40,30,46], 16 → [45,64,38,57].
+// 🔑 **Longer road = higher win rate**, because more encounters is more charms and levels at the
+// lair — so the floor count is the HEIGHT of the ladder and the dragons are its SHAPE.
+const STAGE_FLOORS = { 1: 12, 2: 12, 3: 12, 4: 12 };
 function floorsForStage(n) { return STAGE_FLOORS[n] || 16; }
 let MAP_COLS   = 5;           // StS uses 6; we are on a phone and the map is a dialog
 let MAP_PATHS  = 6;           // paths walked upward. More paths = wider, more connected map
