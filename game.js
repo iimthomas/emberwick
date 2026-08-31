@@ -3002,6 +3002,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 434, date: '2026-08-30', title: 'The dragons hit back harder',
+    changed: [
+      "🐉 <b>Every dragon has more health.</b> Cindermaw, Skyrender and Cragmourn by a little, Fathomdread by a little more — about ten points harder to fell, each.",
+      "⭐ <b>Your account level is meant to be the answer.</b> A first run is supposed to be brutal; the charms and gear you unlock are what make the ladder climbable.",
+    ] },
+
   { build: 433, date: '2026-08-30', title: 'Every creature fights back',
     warn: "The road can kill you now. Runs in progress will still load, but the creature you are standing in front of has changed shape.",
     changed: [
@@ -4636,7 +4642,28 @@ let COIN_MULT = 1.0;
 // 🐉 PER-STAGE HP OFFSET — the instrument for the SHAPE of the ladder, where COIN_MULT is the
 // instrument for its HEIGHT. 🔑 1 dragon HP ≈ 2 points of win rate (measured), so this is the
 // finest dial in the game. Read at beginFinalBattle(), so a sweep never edits the data table.
-let DRAGON_HP_ADD = { 1: 0, 2: 0, 3: 0, 4: 0 };
+// 🐉 THE BOSSES ARE TEN POINTS HARDER (2026-08-30, Thomas: *"still want to make it harder —
+// the meta progression should be why you will be able to progress easier — i want the bosses
+// being all 10% more failing"*).
+// 🔑 THE ASK IS ABOUT THE BOSSES, SO THE DIAL HAS TO BE BOSS-ONLY. Coins are the recorded
+// difficulty dial and they are the WRONG one here: coins move the whole run, and a lever that
+// also changes the road answers a question nobody asked. Dragon HP touches exactly the fight named.
+// ⚠️ A FLAT ADD IS NOT A FLAT EFFECT. The same +4 took Cindermaw down 15 points and Skyrender 8,
+// because each dragon converts HP into win rate at its own rate — so "all ten points harder"
+// needs FOUR numbers. Fathomdread is the outlier and needed its own: +7 moved it 7 points, +10
+// moved it 21.
+// 📏 SHIPPED: n=200 per stage. ⭐1 goes 20/41/37/39 → 13/24/27/33, Δ −7/−17/−10/−6, avg −12.
+// ⚠️ AND THE LADDER NOW RUNS BACKWARDS — 13/24/27/33 ASCENDS, so Cindermaw is the hardest fight
+// in the game and Fathomdread the easiest. That is NOT this change: stage 1 is six floors while
+// 2-4 are sixteen, so you reach the first dragon on a third of the income. It was 20/41/37/39
+// before, which was already wrong; −12 across the board just made it impossible to ignore.
+// ⚠️ AND THE NOISE BAND IS ±5 AT THIS SAMPLE SIZE — identical configs read Cragmourn at −6, +1
+// and +3 across three runs. These are directions, not decimals; do not chase single points here.
+// ⚠️ ⭐1 ONLY. Every number above is a FRESH ACCOUNT, which is the hardest the game ever is —
+// the meta ladder roughly doubles the win rate at the hard stages, and that is now the whole
+// reason a run gets winnable. Quote a stage number WITH the level it was taken at or it means
+// nothing.
+let DRAGON_HP_ADD = { 1: 5, 2: 4, 3: 4, 4: 4 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
