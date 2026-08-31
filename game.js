@@ -3002,6 +3002,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 435, date: '2026-08-30', title: 'A longer first road',
+    changed: [
+      "🗺️ <b>Stage 1 is eight floors instead of six.</b> Two more stops means two more shops — you reach Cindermaw with a build instead of an almost untouched starting deck.",
+      "⚠️ It is not a gift: a longer road is more chances to lose cards. The first stage stops being *stroll, then hit a wall* and starts costing you on the way.",
+    ] },
+
   { build: 434, date: '2026-08-30', title: 'The dragons hit back harder',
     changed: [
       "🐉 <b>Every dragon has more health.</b> Cindermaw, Skyrender and Cragmourn by a little, Fathomdread by a little more — about ten points harder to fell, each.",
@@ -5122,7 +5128,31 @@ let MAP_FLOORS = 16;          // 4 region bands of 4 - the band decides which po
 // ⚠️ `bandOf()` and `mapFloors()` already read the BUILT map's height rather than this global, so
 // a short road divides into its region bands correctly with no further change.
 // ⚠️ Set per stage in startStage(), never read directly after a map exists.
-const STAGE_FLOORS = { 1: 6 };    // 5 encounters and the hearth on top
+// 🗺️ STAGE 1 IS EIGHT FLOORS (2026-08-30, was 6). Thomas: *"i think i like the other
+// numbers but why is the first one so hard"* — stage 1 was failing **88%** against 67-76% for
+// the rest, and it was the FIRST stage.
+// 🔴 THE CAUSE WAS NOT A WEAKER DECK, WHICH IS WHAT I ASSERTED THREE TIMES BEFORE MEASURING IT.
+// Stage 1 arrives with the BEST deck in the game — 30.1 total levels against 24.0/24.2/22.4, more
+// cards left, the same spread of Lv3s and Lv4s. The short road PROTECTS the deck.
+// 🔑 IT WAS CHARMS: **2.5 at the lair against 10.0 / 10.9 / 11.7.** The Wheel is per encounter,
+// so eight encounters buys a quarter of the build seventeen does. Stage 1 was not a harder run,
+// it was a run with **no build layer** — and it showed straight through the blow: base 5.4 vs
+// 9.6, attune rate 31% vs ~53% (her pairing charms are part of what makes her attune), and then
+// 🛡️ Cindermaw's Armour 4 ate **53%** of what was left, the worst ratio of any dragon.
+// *Flat reduction is regressive, and the dragon whose whole demand is HIT BIG is the one you
+// reached least able to hit big.*
+// ⚠️ **FLOORS DO NOT REDUCE FAILURE, THEY MOVE IT.** Measured 6/8/10/12/16: charms climb 2.7 →
+// 10.3 and the dragon stops being the problem (77% → 16% of runs), but the road picks up almost
+// exactly what the dragon puts down (11% → 56%), so total failure only goes 88% → 72% across a
+// nearly 3× map. **More floors buys a build and charges for it in deck damage.**
+// 📏 8 is where the SHAPE matches the rest of the ladder: fail 79% (stage 2 is 76%), the
+// dragon's share of the killing 77% → 66%, the road still gentle at 13%, stage 1 still shortest.
+// ⚠️ **NOT FIXED, DELIBERATELY: charms only reach 3.9.** Stage 1 still has about a third of the
+// build layer, which is the newest player getting the least interesting version of the game —
+// the retention hole [[Market_And_Retention]] named. There is no dial for it (`WHEEL_PER_ENCOUNTER`
+// is a boolean and the shop already fires every encounter); a richer shelf, stage-1 coins, or
+// starting charms are all NEW mechanisms. Thomas's call, after he has felt this.
+const STAGE_FLOORS = { 1: 8 };    // 7 encounters and the hearth on top
 function floorsForStage(n) { return STAGE_FLOORS[n] || 16; }
 let MAP_COLS   = 5;           // StS uses 6; we are on a phone and the map is a dialog
 let MAP_PATHS  = 6;           // paths walked upward. More paths = wider, more connected map

@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 435 — A longer first road
+*2026-08-30*
+
+**Changed**
+- 🗺️ **Stage 1 is eight floors instead of six.** Two more stops means two more shops — you reach Cindermaw with a build instead of an almost untouched starting deck.
+- ⚠️ It is not a gift: a longer road is more chances to lose cards. The first stage stops being *stroll, then hit a wall* and starts costing you on the way.
+
 ## build 434 — The dragons hit back harder
 *2026-08-30*
 
