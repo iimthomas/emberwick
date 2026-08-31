@@ -6,6 +6,16 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 439 — You can see the fight again
+*2026-08-30*
+
+**Changed**
+- ⚔️ **Win Initiative and you drive forward first**; the creature rocks back and flashes red as it takes it. Lose it and the creature comes at you instead. The two now look as different as they play.
+- 🃏 **Your new hand deals in** — four cards rising into their slots, so you can tell a fresh hand from a screen that did not change.
+
+**Fixed**
+- 💥 **The hit animations are back.** They had stopped playing entirely a few builds ago when the step-by-step resolution was removed — the whole impact set was hanging off it. Fights had gone silent and still.
+
 ## build 438 — Lose the race and it hits you first
 *2026-08-30*
 

@@ -3002,6 +3002,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 439, date: '2026-08-30', title: 'You can see the fight again',
+    fixed: [
+      "💥 <b>The hit animations are back.</b> They had stopped playing entirely a few builds ago when the step-by-step resolution was removed — the whole impact set was hanging off it. Fights had gone silent and still.",
+    ],
+    changed: [
+      "⚔️ <b>Win Initiative and you drive forward first</b>; the creature rocks back and flashes red as it takes it. Lose it and the creature comes at you instead. The two now look as different as they play.",
+      "🃏 <b>Your new hand deals in</b> — four cards rising into their slots, so you can tell a fresh hand from a screen that did not change.",
+    ] },
+
   { build: 438, date: '2026-08-30', title: 'Lose the race and it hits you first',
     changed: [
       "💨 <b>Losing Initiative now decides the ORDER, not just the damage.</b> The creature strikes, you block, and only then does your blow land. It lunges at you when it does.",
@@ -6322,6 +6331,7 @@ function foeLandBlow(r) {
   const st = S.foeState; if (!st) return;
   r.felled = foeApplyBlow(r);
   render();                      // ❤️ the bar drops before anything pops up
+  strikeFx(r, r.felled);         // 💥 …and the exchange is visible, not just tallied
   if (!r.felled) { S.pendingR = r; S.beats = null; S.beatIndex = -1; foeCleanupAndNext(); return; }
   // it fell — one window: what happened, and what you got
   r.drops = rollDrops(S.encounter, 'Complete', r.perfect);
@@ -6383,6 +6393,7 @@ function startFoeBeat() {
     return;
   }
   st.turn++;
+  dealFx();          // 🃏 you were dealt back up — say so
   // 🔥 BURN FIRST, BEFORE IT ACTS — so a Burn can finish it, and so the number you were
   // shown last turn is the number that lands.
   st.hp = tickBurn(st.hp, base.name);
@@ -7369,6 +7380,51 @@ function hitWeight(value, pool) {
   return f >= 0.30 ? 3 : f >= 0.15 ? 2 : 1;
 }
 // play whatever this revealed beat earned
+// 💥 THE EXCHANGE, ANIMATED FROM THE RESOLUTION ITSELF (2026-08-30, Thomas: *"its currently
+// hard to tell whats going on without any motion"*).
+// 🔴 AND THAT WAS MY REGRESSION. Every impact animation lived in `beatFx()`, which is driven by
+// the staged reveal — so when build 432 replaced the staging with a single summary window, the
+// whole 💥 IMPACT set silently stopped firing on road fights. `beatFx` bails on `!beat.label`
+// and a summary beat has none. **Deleting a display can delete behaviour that was only ever
+// hanging off it**, and nothing errors, it just goes still.
+// 🔑 THE FIX IS THE BETTER STRUCTURE ANYWAY: an event's animation follows the EVENT. This is
+// called where the blow lands, so it cannot be lost again by changing how the blow is reported.
+// ⚠️ Still the sanctioned exception to *do not build presentation*: it is the ORDER and the
+// WEIGHT of the exchange made visible, both of which the numbers alone do not convey, and it is
+// CSS on the two animation slots so Godot replaces it wholesale.
+function strikeFx(r, felled) {
+  // ⚔️ you go first — your figure drives forward before anything lands on it
+  fx('mage-slot', 'fx-strike', 520);
+  if (r && r.evaded) { fx('foe-slot', 'fx-evade', 480); return; }
+  const raw = (r && (r.withBoost || r.value)) || 0;
+  // 🛡️ Armour ate the lion's share → the shrug, which is that shape's whole lesson
+  if (r && r.armorCut && r.value <= raw * 0.55) { fx('foe-slot', 'fx-shrug', 520); return; }
+  const st = S.foeState, ds = S.dragonState;
+  const pool = ds && S.finalMode ? ds.maxHp : (st ? st.maxHp : (S.encounter ? S.encounter.hp : 0));
+  const w = hitWeight((r && r.value) || 0, pool) || 1;
+  // 🟥 recoil + a red flash, scaled to how hard it landed — *how big was that* is the one
+  // question a health bar answers slowly and a reaction answers instantly
+  fx('foe-slot', 'fx-hit-' + w, 560);
+  if (w >= 3 || felled) fx('scene', 'fx-shake', 380);
+}
+
+// 🃏 A NEW HAND ARRIVED. ⚠️ Four cards silently replacing four cards is the single least
+// legible moment in the game — nothing on screen distinguishes *I drew* from *nothing happened*.
+// ⚠️ Staggered by index so it reads as four cards, not one block moving.
+function dealFx() {
+  if (REDUCED()) return;
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#slots-panel .card');
+    cards.forEach((el, i) => {
+      el.classList.remove('card-dealt');
+      void el.offsetWidth;
+      el.style.setProperty('--deal-i', i);
+      el.classList.add('card-dealt');
+      setTimeout(() => el && el.classList.remove('card-dealt'), 700 + i * 70);
+    });
+  }, 20);   // ⚠️ after the render that seated them, or there is nothing to find
+}
+
 function beatFx(beat) {
   const r = S.pendingR;
   if (!r || !beat || !beat.label) return;
@@ -12757,6 +12813,7 @@ function startDuelBeat() {
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
+  dealFx();
   logHeader(`— 🐉 Duel · beat ${S.duelBeat} —`);
   log(`${S.dragon.name}: ${S.dragonState.hp}/${S.dragonState.maxHp} HP · ${shapeStateText()}`);
   render();
@@ -12807,6 +12864,7 @@ function resolveDuel() {
   // 🔥 the finale never reaches finishResolve(), so the bank is collected here instead.
   if (r.banks) S.wakePending = r.bank;
   S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
+  strikeFx(r, kill);   // 💥 the duel is a fight too, and it lost the same animations
   // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it
   // paid for, and the Spell leaves its own status behind for the next beat.
   // ⚠️ The duel is the THIRD turn loop and it has swallowed half of every change made to the

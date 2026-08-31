@@ -1402,7 +1402,14 @@ button.stage.locked .stage-shape { font-style: italic; }
   @keyframes fx-hit-1 { 0%{transform:translate(0,0)} 22%{transform:translate(3%,-1%)} 100%{transform:translate(0,0)} }
   @keyframes fx-hit-2 { 0%{transform:translate(0,0)} 18%{transform:translate(6%,-2%) rotate(1.5deg)} 60%{transform:translate(-1%,0)} 100%{transform:translate(0,0)} }
   @keyframes fx-hit-3 { 0%{transform:translate(0,0)} 14%{transform:translate(9%,-3%) rotate(3deg)} 44%{transform:translate(-3%,1%) rotate(-1deg)} 72%{transform:translate(1%,0)} 100%{transform:translate(0,0)} }
-  @keyframes fx-flash { 0%{filter:none} 12%{filter:brightness(3.4) saturate(.2)} 46%{filter:brightness(1.5)} 100%{filter:none} }
+  /* 🟥 RED, not white (2026-08-30, Thomas: *"maybe it flashes a bit red as well"*).
+     ⚠️ Edited in place rather than adding a second rule: `.fx-hit-N` declares BOTH the
+     knock-back and the flash in one shorthand, so a new rule setting `animation-name` would
+     have silently deleted the recoil. **The knock-back was never missing — it just was not
+     firing**, because every impact hung off the staged reveal that build 432 removed. */
+  @keyframes fx-flash { 0%{filter:none}
+    12%{filter:brightness(1.9) sepia(1) hue-rotate(-32deg) saturate(6)}
+    46%{filter:brightness(1.25) sepia(.4) saturate(2)} 100%{filter:none} }
   .fx-hit-1 { animation: fx-hit-1 .5s ease-out, fx-flash .5s ease-out; }
   .fx-hit-2 { animation: fx-hit-2 .5s ease-out, fx-flash .5s ease-out; }
   .fx-hit-3 { animation: fx-hit-3 .52s cubic-bezier(.2,.8,.3,1), fx-flash .52s ease-out; }
@@ -1430,6 +1437,16 @@ button.stage.locked .stage-shape { font-style: italic; }
   }
   .fx-strikes-first { animation: k-strikes-first .62s cubic-bezier(.22,.9,.25,1); transform-origin: 60% 80%; }
 
+  /* ⚔️ YOU STRIKE FIRST — the mirror of k-strikes-first. Winning Initiative is the single most
+     important fact about a turn, and until now the two outcomes looked identical on screen. */
+  @keyframes k-strike {
+    0%   { transform: translate(0, 0) scale(1); }
+    18%  { transform: translate(-3%, 2%) scale(.98); }
+    50%  { transform: translate(7%, -4%) scale(1.07); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+  .fx-strike { animation: k-strike .52s cubic-bezier(.22,.9,.25,1); transform-origin: 40% 90%; }
+
   /* 🌀 EVASION — it simply isn't there. A lateral slip, and the blow passes through. */
   @keyframes fx-evade { 0%{transform:translate(0,0);opacity:1}
     26%{transform:translate(-9%,0);opacity:.25}
@@ -1443,6 +1460,15 @@ button.stage.locked .stage-shape { font-style: italic; }
     48%{transform:translate(1.5%,0);filter:brightness(.8)}
     100%{transform:translate(0,0);filter:none} }
   .fx-hurt { animation: fx-hurt .46s ease-out; }
+
+  /* 🃏 FOUR CARDS ARRIVED. Staggered off --deal-i so it reads as four cards being dealt
+     rather than one block sliding. ⚠️ Transform and opacity only — nothing that reflows, because
+     the slot row is the one piece of layout that must never move under a finger. */
+  @keyframes k-deal { 0% { transform: translateY(14px); opacity: 0; }
+    60% { transform: translateY(-3px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; } }
+  .card-dealt { animation: k-deal .38s cubic-bezier(.2,.85,.3,1) both;
+                animation-delay: calc(var(--deal-i, 0) * 55ms); }
 
   @keyframes fx-shake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-6px,2px)}
     40%{transform:translate(5px,-2px)} 60%{transform:translate(-3px,1px)} 80%{transform:translate(2px,0)} }
