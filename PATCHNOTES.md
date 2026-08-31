@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 443 — Clearer card wording
+*2026-08-30*
+
+**Fixed**
+- 🛡️ Guard cards said their mark came **“from your block”**, which reads like nothing. They now say **“when it blocks”** — the same wording their Lv4 power already used. Block damage with the card and the creature takes the mark.
+
 ## build 442 — The ladder climbs again
 *2026-08-30*
 

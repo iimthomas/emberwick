@@ -2999,6 +2999,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 443, date: '2026-08-30', title: 'Clearer card wording',
+    fixed: [
+      "🛡️ Guard cards said their mark came <b>“from your block”</b>, which reads like nothing. They now say <b>“when it blocks”</b> — the same wording their Lv4 power already used. Block damage with the card and the creature takes the mark.",
+    ] },
+
   { build: 442, date: '2026-08-30', title: 'The ladder climbs again',
     changed: [
       "🗺️ <b>Every stage is the same length now — twelve floors.</b> Stage 1 was eight and the rest were sixteen, so you reached the first dragon on half the supplies. That is why it was the hardest fight in the game.",
@@ -7616,7 +7621,7 @@ function beatDisplayHTML(beat, isNew) {
       if (!felled) for (const m of (r.marks || [])) {
         const d = STATUSES[m.id];
         subs.push(`<div class="pv-sub good">${d.icon} <b>${d.name}${m.id === 'stun' ? '' : ' ' + m.n}</b>` +
-          ` — ${m.card ? displayName(m.card) : ''}, from your ${SLOT_LABEL[homeSlotOf(m.card)] || 'hand'}</div>`);
+          ` — ${m.card ? displayName(m.card) : ''}, ${homeSlotOf(m.card) === 'soak' ? 'as it blocked' : 'from your ' + (SLOT_LABEL[homeSlotOf(m.card)] || 'hand')}</div>`);
       }
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
@@ -12488,7 +12493,8 @@ function cardHTML(card) {
     const d = STATUSES[markId];
     const n = markId === 'stun' ? '' : Math.max(1, card.level || 1);
     return { icon: d.icon, name: d.name, n,
-             where: markHome === 'soak' ? 'block' : (SLOT_LABEL[markHome] || markHome),
+             // ✅ matches `.card-verb` exactly: a slot gets "in <slot>", the soak gets "when it blocks"
+             where: markHome === 'soak' ? 'when it blocks' : 'in ' + (SLOT_LABEL[markHome] || markHome),
              full: classText(d.text).replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
   })() : null;
   // 🚣 A JOURNEY HAS NOTHING TO MARK (Thomas: *"stun doesn't make sense on a journey"*).
@@ -12614,7 +12620,7 @@ function cardHTML(card) {
     // the player already reads off the row in front of them — and it goes through SLOT_LABEL, so
     // a rogue would read *"from your Combo"* off the identical field.
     (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" title="${canMark ? stripTags(markLine.full) : 'Marks only land on a creature — there is nothing here to mark.'}">` +
-      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? 'from your ' + markLine.where : 'nothing to mark here')}</span></div>` : '') +
+      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? markLine.where : 'nothing to mark here')}</span></div>` : '') +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
