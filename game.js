@@ -2127,15 +2127,20 @@ const TUTORIAL = {
       point: '#encounter-panel .enc-stats span:nth-child(5)',
       text: '🪙 What it pays. Coins buy card levels and charms between encounters, and unspent coins carry over.' },
     // 👣 the journey panel asks a different question and gets its own walkthrough
+    // ⚠️ these two now fire ONLY on the Last Mile — the one journey left in the game, and the
+    // approach to the lair. That is correct: MP and Pace are the dragon's own two questions.
     { id: 'j-mp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(1)',
       text: '👣 A journey measures distance instead of damage, using the same cards. Beat its MP to arrive. Reach half and you arrive late.' },
     { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
       point: '#encounter-panel .enc-stats span:nth-child(2)',
       text: '🌙 Nightfall races your Catalyst\'s 💨. If yours is lower, you lose the card in your Arsenal and your candle goes out.' },
-    { id: 'j-tp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
-      point: '#encounter-panel .enc-stats span:nth-child(3)',
-      text: '⏳ <b>Time Penalty</b> is what arriving late costs. You cannot <b>sharpen</b> your cards for this many encounters. A fight costs you cards; a journey costs you growth.' },
+    // ⏳ REWRITTEN 2026-08-30: it used to fire on a journey and teach that arriving late costs
+    // you growth. Journeys are cut, and the Time Penalty moved onto **turns over par** — so the
+    // lesson now fires on a fight and names the thing that actually charges it.
+    { id: 'j-tp', when: () => isAssignPhase() && S.foeState && S.foeState.par > 0,
+      point: '#encounter-panel .enc-stats span:nth-child(1)',
+      text: '⚡ <b>par</b> is how many turns this should take. Go over it and you take a ⏳ <b>Time Penalty</b> — you cannot <b>sharpen</b> your cards for that many encounters. A fight costs you cards; a fight that <i>drags</i> costs you growth.' },
 
     { id: 'slots', when: () => isAssignPhase() && (S.encountersDone || 0) === 0,
       point: '#slots-panel',
@@ -3002,6 +3007,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 440, date: '2026-08-30', title: 'No more journeys',
+    warn: "Runs in progress will not load — the road changed shape. Your stages, grades, equipment and materials are all safe.",
+    changed: [
+      "👣 <b>Journeys are gone.</b> Every stop on the road is now a creature. Casting spells at a stretch of trail never made sense, and it made even less once your cards could mark what they hit.",
+      "📍 <b>The roads survive as places.</b> Highland Pass, Cinder Ravine, Drowned Meadow — all sixty-four are now <b>where</b> you fight rather than what you fight.",
+      "⏳ <b>The Time Penalty moved onto par.</b> Every creature shows how many turns it should take; go over and you cannot sharpen for that many encounters. A fight costs you cards — a fight that <i>drags</i> costs you growth.",
+      "🌙 Nightfall and the road perils went with the journeys. They may come back on creatures.",
+    ] },
+
   { build: 439, date: '2026-08-30', title: 'You can see the fight again',
     fixed: [
       "💥 <b>The hit animations are back.</b> They had stopped playing entirely a few builds ago when the step-by-step resolution was removed — the whole impact set was hanging off it. Fights had gone silent and still.",
@@ -3243,7 +3257,7 @@ const SAVE_KEY = 'emberwick-save-1' + KEY_NS;
 // now carries `attacks`, so a run restored mid-Quarry-Hound would resume as a one-hand fight
 // against a 34 HP creature it cannot kill. ⚠️ **Bump whenever a shape the run depends on changes**
 // — loadGame() failing is SILENT and indistinguishable from "no save yet".
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;   // 👣 journeys cut, encounters carry a `where`
 
 // 🔑 THE KEY IS A PARAMETER SO DEV SLOTS SHARE THIS EXACT SERIALIZER (2026-08-22).
 // ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
@@ -3464,7 +3478,7 @@ function loadGame(key) {
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
-    if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+    if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? foesOf(region).slice() : shuffle(foesOf(region));
     // the finale's encounter is synthetic (not in the region tables) — rebuild it for the saved beat
     // the finale's encounters are synthetic — not in the region tables, so rebuild them
     if (S.finalMode && S.finalPhase === 'duel') {
@@ -4306,7 +4320,7 @@ function freshGame(stage) {
     discard: [],
     trashed: [],
     // ⚠️ S does not exist yet, so RUN() cannot be asked — resolve the road from the picked dragon
-    encounterQueue: tutorialRun ? TUTORIAL.regions[0].encounters.slice() : shuffle(roadFor(pick.stage)[0].encounters),
+    encounterQueue: tutorialRun ? foesOf(TUTORIAL.regions[0]).slice() : shuffle(foesOf(roadFor(pick.stage)[0])),
     results: { Complete: 0, Narrow: 0, Loss: 0 },
     setout: null,       // 🏕️ the three class charms offered before turn 1
 
@@ -4549,7 +4563,7 @@ function nextRegion() {
   // 🕯️ Dawnwatch Cap — a fresh region, a fresh light. ⚠️ Placed at the REGION break rather than
   // per encounter on purpose: relighting every turn would delete the candle's whole tension.
   if (hasArmourRule('dawnlit') && !S.candle) lightCandle('Dawnwatch Cap catches the morning');
-  S.encounterQueue = S.tutorial ? RUN()[S.region - 1].encounters.slice() : shuffle(RUN()[S.region - 1].encounters);
+  S.encounterQueue = S.tutorial ? foesOf(RUN()[S.region - 1]).slice() : shuffle(foesOf(RUN()[S.region - 1]));
   draw(HAND_SIZE);
   // 🗡️ A DRAW IS A SWAP, NEVER AN ADDITION — but you get to SEE the card first, which is why
   // the extra arrives now and is put back at cleanup rather than being a blind exchange.
@@ -5452,10 +5466,21 @@ function generateMap() {
   // the only thing that reliably differs between two encounters. Each band draws from its own
   // region's bag, refilled as it empties.
   const bags = {};
+  // 🔴 THE SIXTH SEED OF THE SAME POOL. Journeys were filtered out of drawEncounter() and the
+  // count did not move, because the MAP pre-assigns an encounter to every node from its own bag —
+  // and freshGame, the region break, the load and offerFork each seed it too.
+  // 🔑 WHEN A COLLECTION IS BUILT IN SIX PLACES, GATING IT IN ONE GATES NOTHING. Same shape as
+  // the arrangement search living in four copies. `foesOf()` is the single filter now; anything
+  // that wants encounters asks it.
   const takeFrom = band => {
-    const pool = (RUN()[band - 1] || RUN()[0]).encounters;
+    const reg = RUN()[band - 1] || RUN()[0];
+    const pool = foesOf(reg);
     if (!bags[band] || !bags[band].length) bags[band] = shuffle(pool.slice());
-    return bags[band].shift();
+    const e = bags[band].shift();
+    // 📍 and WHERE you meet it — the 64 journey names survive as places, so a region's four
+    // creatures read as sixteen encounters instead of four.
+    const places = placesOf(reg);
+    return e ? Object.assign({}, e, { where: places.length ? places[Math.floor(rnd() * places.length)] : null }) : e;
   };
   for (let f = 0; f < MAP_FLOORS; f++)
     for (let c = 0; c < MAP_COLS; c++) {
@@ -5463,7 +5488,7 @@ function generateMap() {
       if (!n || (n.type !== 'normal' && n.type !== 'elite')) continue;
       const base = takeFrom(bandOf(f));
       n.enc = n.type === 'elite' ? eliteVersion(base) : base;
-      n.kind = n.enc && n.enc.type === 'journey' ? 'journey' : 'fight';
+      n.kind = 'fight';   // ❌ nothing else is drawn any more
     }
   return { floors, pos: null, taken: [] };
 }
@@ -5766,14 +5791,14 @@ function cancelHearthPick() { if (S.phase === 'hearthpick') { S.phase = 'hearth'
 // about exactly that feeling.
 function offerFork() {
   const region = RUN()[S.region - 1];
-  const refill = () => S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  const refill = () => S.tutorial ? foesOf(region).slice() : shuffle(foesOf(region));
   if (S.encounterQueue.length === 0) S.encounterQueue = refill();
   const a = S.encounterQueue.shift();
   if (S.encounterQueue.length === 0) S.encounterQueue = refill();
-  // ⚠️ prefer a branch of a DIFFERENT TYPE when the bag allows it. Two fights is a weaker
-  // question than a fight against a journey, and the bag is half and half by construction.
-  let bi = S.encounterQueue.findIndex(e => e.type !== a.type);
-  if (bi === -1) bi = 0;
+  // ❌ THE "PREFER A DIFFERENT TYPE" RULE DIED WITH JOURNEYS — every branch is a creature now, so
+  // it always fell through to 0 anyway. A fork is a choice between two CREATURES, which is a
+  // choice between two shapes and two speeds; that is the question it asks from here.
+  const bi = 0;
   const b = S.encounterQueue.splice(bi, 1)[0];
   S.fork = [a, b].filter(Boolean);
   return S.fork;
@@ -5795,19 +5820,44 @@ function takeFork(i) {
 // 🐉 `elite` scales the drawn creature rather than needing its own table - a harder version of
 // whatever the band offers, paying more. ⚠️ CONTENT IS CLASS-BLIND: hp/init/atk/mp and coins only,
 // never an element or a pair.
+// 👣 ❌ JOURNEYS ARE CUT (2026-08-30, Thomas). Six attempts across two months failed to make
+// them a distinct problem — [[Blow_And_Distance]] three times, then three more in one afternoon —
+// and the cause was never the mechanics.
+// 🔑 **A ROAD IS CLASS-BLIND BY DESIGN, AND THERE IS NO CLASS-BLIND FICTION FOR PLAYING YOUR
+// CLASS'S CARDS AT A DISTANCE.** Every class's identity is *a way of dealing with something*: the
+// mage pairs, the rogue chains, the guardian retaliates. **A creature is universally answerable;
+// a distance is not.** Reframing journeys as OBSTACLES fixes the mage ("the ford is in flood") and
+// breaks everyone else — a rogue has two knives and nothing to stab. That is also exactly why the
+// MECHANICS never worked: six failures, one cause.
+//
+// ✅ THE WRITING SURVIVES. The 64 journeys were named as PLACES — Highland Pass, Cinder Ravine,
+// Drowned Meadow — so they become **where you fight** instead of what you fight. That is also the
+// answer to halving the encounter pool: variety is now creature × place, so a region's four
+// creatures read as sixteen encounters rather than four.
+function placesOf(region) {
+  return (region.encounters || []).filter(e => e.type === 'journey').map(e => e.name);
+}
+function foesOf(region) {
+  return (region.encounters || []).filter(e => e.type !== 'journey');
+}
 function drawEncounter(avoidType, elite) {
   const region = RUN()[S.region - 1];
-  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  const pool = foesOf(region);
+  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? pool.slice() : shuffle(pool);
   // normal turns take the next in the shuffled bag; a caller may steer toward a DIFFERENT
   // type (its whole purpose) — falling back to next-in-bag only if the bag has no other type left.
+  // ⚠️ `avoidType` steered away from a journey and there is nothing left to steer to. Kept as a
+  // no-op parameter so every caller still compiles; delete the callers before deleting this.
   let idx = 0;
-  if (avoidType) {
-    const diff = S.encounterQueue.findIndex(e => e.type !== avoidType);
-    if (diff !== -1) idx = diff;
-  }
   let picked = S.encounterQueue.splice(idx, 1)[0];
-  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? region.encounters.slice() : shuffle(region.encounters);
+  if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? pool.slice() : shuffle(pool);
   if (elite && picked) picked = eliteVersion(picked);
+  // 📍 WHERE. A copy, never the shared def — writing a place onto the region's own object would
+  // pin every future draw of that creature to the first place it was ever met.
+  if (picked) {
+    const places = placesOf(region);
+    picked = Object.assign({}, picked, { where: places.length ? places[Math.floor(rnd() * places.length)] : null });
+  }
   beginEncounter(picked);
 }
 
@@ -6303,6 +6353,21 @@ function tickBurn(hpNow, name) {
   return hpNow - dealt;
 }
 
+// ⏳ THE TIME PENALTY'S NEW HOME (2026-08-30, Thomas: *"wonder how we can incorporate the time
+// penalty somewhere else"*). It used to fire when you failed a journey; with journeys gone it
+// lands on **a fight that drags** — one penalty per turn over `par`.
+// 🔑 THE FICTION IS FINALLY EXACT. A Time Penalty means *you cannot sharpen for N encounters*,
+// and the reason is now literally that the fight took too long. On a journey it was a metaphor;
+// on a fight it is the thing itself.
+// ✅ IT ALSO GIVES `par` A JOB. Every creature has carried one since the roster conversion and
+// nothing has ever read it — the spec's *"what scales is the REWARD, on turns against par"* was
+// listed as unbuilt. This is the other half of that: over par costs you, and it is class-blind
+// because par is measured in TURNS, not elements.
+function parPenalty() {
+  const st = S.foeState; if (!st || !st.par) return 0;
+  return Math.max(0, st.turn - st.par);
+}
+
 function foeApplyBlow(r) {
   const st = S.foeState, base = S.foeBase;
   // 🪨 EXPOSED IS SPENT HERE, not read here — computeAction already added it to the blow so
@@ -6316,9 +6381,11 @@ function foeApplyBlow(r) {
   // very hit that applied it — every mark is a statement about the NEXT turn.
   if (st.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (st.hp <= 0) {
-    const pace = st.turn <= st.par ? 'clean' : 'slow';
+    const over = parPenalty();
     log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
-        `(par ${st.par}, ${pace}).`, 'good result');
+        `(par ${st.par}, ${over ? 'slow' : 'clean'}).`, 'good result');
+    // ⏳ a fight that dragged costs you the afternoon
+    if (over > 0) r.timePenalty = (r.timePenalty || 0) + over;
     return true;
   }
   return false;
@@ -6455,7 +6522,7 @@ function foeCleanupAndNext() {
 function logChallenge() {
   const e = S.encounter;
   if (e.type === 'fight') {
-    log(`CHALLENGE: Fight — ${e.name} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · 🪙 ${e.xp})`);
+    log(`CHALLENGE: Fight — ${e.name}${e.where ? ` at ${e.where}` : ''} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · 🪙 ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · 🪙 ${e.xp})`);
@@ -11054,7 +11121,11 @@ function renderEncounter() {
     (S.hardship ? `<div class="enc-mod">⚠️ <b>${S.hardship}</b> — ${hardshipText(S.hardship)}</div>` : '');
   if (e.type === 'fight') {
     panel.innerHTML =
-      `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}</div><div class="enc-name">${e.name}</div>` +
+      // 📍 WHERE, beside WHAT. The 64 journeys were named as places, so they became the
+      // locations you fight in — which is also what stops the pool halving when journeys were cut:
+      // variety is creature × place, so four creatures a region read as sixteen encounters.
+      `<div class="enc-type">FIGHT — ${RUN()[S.region - 1].name}${e.where ? ` · ${e.where}` : ''}</div>` +
+      `<div class="enc-name">${e.name}</div>` +
       // ⚔️ A BEAT FIGHT SHOWS ITS POOL AND ITS TELEGRAPH, never the 9999 sentinel — that is the
       // placeholder that leaked to the screen as "LOSS" in the duel this week, and it is the
       // same trick being played here.

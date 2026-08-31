@@ -6,6 +6,17 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 440 — No more journeys
+*2026-08-30*
+
+> ⚠️ Runs in progress will not load — the road changed shape. Your stages, grades, equipment and materials are all safe.
+
+**Changed**
+- 👣 **Journeys are gone.** Every stop on the road is now a creature. Casting spells at a stretch of trail never made sense, and it made even less once your cards could mark what they hit.
+- 📍 **The roads survive as places.** Highland Pass, Cinder Ravine, Drowned Meadow — all sixty-four are now **where** you fight rather than what you fight.
+- ⏳ **The Time Penalty moved onto par.** Every creature shows how many turns it should take; go over and you cannot sharpen for that many encounters. A fight costs you cards — a fight that drags costs you growth.
+- 🌙 Nightfall and the road perils went with the journeys. They may come back on creatures.
+
 ## build 439 — You can see the fight again
 *2026-08-30*
 
