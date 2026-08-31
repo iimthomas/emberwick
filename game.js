@@ -2995,6 +2995,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 445, date: '2026-08-30', title: 'The four cards of an element stop being the same card',
+    changed: [
+      "⚡ <b>Stun has a size now.</b> It was the one mark that never grew when you sharpened a card — a quarter of your deck opted out of the only progression the game has. It now costs the creature that many attacks.",
+      "🧭 <b>What a card does to its mark depends on what kind of card it is.</b> ⚔️ a <b>Spell</b> card marks <b>twice as hard</b> · 💨 a <b>Catalyst</b> card's mark <b>also lands on the next creature you meet</b> · 🌊 a <b>Surge</b> card's mark <b>never fades</b> · 🛡️ a <b>block</b> card marks you for free while you defend.",
+      "So all four of your Fire cards still Burn — but one burns huge, one burns the next thing too, one burns forever, and one burns while you block.",
+    ] },
+
   { build: 444, date: '2026-08-30', title: 'Sweeping up after the journeys',
     warn: "If you were carrying Lantern-Bearer, Road Dust, Nightglass or The Long Walk, they are gone — all four did nothing once journeys were removed.",
     fixed: [
@@ -6096,9 +6103,9 @@ function foeAttacksOf(e) {
 // card owns nothing but which rule it names*. The element grid is 4×4, so each element owns one.
 const STATUSES = {
   burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
-            text: 'it loses <b>N</b> at the start of its turn, then the Burn halves' },
+            text: 'it loses <b>N</b> at the start of its turn', decay: ', then halves' },
   frost:  { el: 'Water',     icon: '❄️', name: 'Frost',
-            text: 'its Initiative is <b>N</b> lower next turn' },
+            text: 'its Initiative is <b>N</b> lower', decay: ' next turn' },
   // 🔴 THE TEXT WAS OVER-PROMISING, WHICH IS WHY IT READ AS TOO STRONG (Thomas: *"stun
   // sounds too strong"*). Measured A/B over 600 runs: turning Stun OFF ENTIRELY moves the ladder
   // by **zero points** (48% either way). It is not strong; it only SOUNDS strong, because *"it
@@ -6111,10 +6118,16 @@ const STATUSES = {
   // game's resolution is deterministic by design, and a coin flip inside a turn you are meant to
   // SOLVE is a different game. If it ever needs weakening the lever is the CONDITION — measured
   // at margin-3 it is worth +2 points, i.e. also nothing.
+  // ⚡ 🔴 IT WAS THE ONE MARK THAT DID NOT SCALE (2026-08-30, Thomas: *"upgrading them should
+  // make them better as well"*). Measured at every level: 🔥 Burn 1→4 · ❄️ Frost 1→4 ·
+  // 🪨 Exposed 1→4 — and ⚡ Stun, flat forever. **Four of the sixteen cards got nothing from
+  // sharpening on the mark axis**, which is a quarter of the deck opted out of the only
+  // progression system the game has. ✅ And there was room: Stun measured at ZERO win-rate points.
+  // 🔑 The magnitude is TURNS — it loses its next N attacks, one consumed per turn.
   stun:   { el: 'Lightning', icon: '⚡', name: 'Stun',
-            text: 'cancels its next attack — it still strikes, but plainly. <b>Only if you win Initiative</b>' },
+            text: 'it loses its next <b>N</b> attacks — it still strikes, but plainly. <b>Only if you win Initiative</b>' },
   expose: { el: 'Stone',     icon: '🪨', name: 'Exposed',
-            text: 'your next blow against it lands for <b>+N</b>' },
+            text: 'your blow against it lands for <b>+N</b>', decay: ' — once' },
 };
 function statusIdForEl(el) {
   for (const k in STATUSES) if (STATUSES[k].el === el) return k;
@@ -6139,7 +6152,28 @@ function statusIdForEl(el) {
 // 🔑 AND THE FORK IS AT THE CATALYST: attuning needs the Catalyst to MATCH the Spell's element,
 // marking needs it to be a SPARK, and only **20% of hands** (23% of attunable ones) can do both.
 // **On 77% of attunable hands you must choose between the bigger blow and the mark.**
+// 🧭 THE ARCHETYPE'S SECOND JOB (2026-08-30, Thomas: *"all the element cards doing the same
+// thing is kinda meh, i kinda wish they sorta do something different between them"*).
+// 🔑 He is right, and the fix is not a fifth thing to learn — it is the axis we already have,
+// doing work it was not doing. The archetype said only WHERE a mark fires; now it also says HOW
+// the mark behaves, uniformly across all four elements. **Still 8 facts, but 16 distinct cards.**
+//   ⚔️ FORCE (Spell)    — hits HARDEST: the mark lands at double magnitude.
+//   💨 SPARK (Catalyst) — TRAVELS: it also lands on the next creature you meet.
+//   🌊 FLOW  (Surge)    — lasts LONGEST: the mark does not decay.
+//   🛡️ WARD  (block)    — costs LEAST: unchanged, because its TRIGGER is already unique and it
+//                        is the only mark you pay a card level for.
+// ⚠️ SPARK was going to be *"lands this turn instead of next"* and that was wrong: the race and
+// the blow have both already resolved by the time a mark applies, so three of the four would have
+// done nothing and 🪨 Exposed would have buffed the blow that applied it. **A behaviour that
+// only works for one of four marks is not an archetype rule.**
 const ARCH_HOME = { FORCE: 'Spell', SPARK: 'Element', FLOW: 'Boost', WARD: 'soak' };
+const ARCH_MARK = {
+  FORCE: { mult: 2,  note: 'twice as strong' },
+  SPARK: { carry: true, note: 'also marks the next creature' },
+  FLOW:  { lasting: true, note: 'never fades' },
+  WARD:  { note: '' },   // ⚠️ its `where` already says "when it blocks" — a note here would repeat it
+};
+function archMark(card) { return (card && card.def && ARCH_MARK[card.def.arch]) || {}; }
 function homeSlotOf(card) { return card && card.def ? (ARCH_HOME[card.def.arch] || null) : null; }
 // 🏠 is this card sitting where it belongs? ⚠️ WARD's home is the SOAK, not a slot — it marks
 // when you BLOCK with it, which is the one cell you cannot get for free.
@@ -6172,8 +6206,8 @@ function foeStatusHTML() {
     const say = id === 'burn'   ? `loses <b>${n}</b> next turn`
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
-              : `<b>its next attack is lost</b>`;
-    bits.push(`<span class="foe-st foe-st-${id}">${d.icon} ${d.name}${id === 'stun' ? '' : ' ' + n} — ${say}</span>`);
+              : `its next <b>${n}</b> attack${n === 1 ? '' : 's'} lost`;
+    bits.push(`<span class="foe-st foe-st-${id}">${d.icon} ${d.name} ${n} — ${say}</span>`);
   }
   return bits.length ? `<div class="foe-status">${bits.join('')}</div>` : '';
 }
@@ -6255,7 +6289,10 @@ function beginEncounter(e) {
     S.foeBase = e;
     // ❤️ `untouched` is the fight-long half of ✦ PERFECT KILL: it starts true and one point of
     // damage getting through kills it for good. It lives on foeState so it travels in the save.
+    // 💨 whatever a SPARK card sent ahead is already on it when you arrive
+    const carried = S.markCarry || null; S.markCarry = null;
     S.foeState = { hp: e.hp, maxHp: e.hp, turn: 0, par: e.par || 3, untouched: true,
+                   status: carried ? Object.assign({}, carried) : {},
                    atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0 };
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
@@ -6349,14 +6386,18 @@ function markWith(card, r, lvl) {
   const id = statusIdForEl(el); if (!id) return null;
   // 🔑 the magnitude IS the level. ⚠️ `lvl` overrides it for the one case where the card's
   // level changes in the same breath as the mark — see the soak below.
-  const n = Math.max(1, lvl != null ? lvl : (card.level || 1));
+  const a = archMark(card);
+  const n = Math.max(1, lvl != null ? lvl : (card.level || 1)) * (a.mult || 1);
+  // 🌊 FLOW marks do not decay. One flag on the bag, read by every tick — not a per-mark
+  // exception, because an archetype rule that needs four special cases is four rules.
+  if (a.lasting) bag.lasting = Object.assign({}, bag.lasting, { [id]: true });
+  // 💨 SPARK marks travel. Stashed on the RUN, not the fight, and drained into the next one.
+  if (a.carry) S.markCarry = Object.assign({}, S.markCarry, { [id]: (S.markCarry && S.markCarry[id] || 0) + n });
   if (id === 'stun') {
     // ⚡ the only conditional one, and the condition is Lightning's own temperament: *go first*.
     // ⚠️ NOT a random chance — resolution here is deterministic by design, and a coin flip in
     // the middle of a turn you are meant to be able to SOLVE is a different game.
     if (r && r.initLost) return null;
-    bag.stun = 1;
-    return { id, n: 1, card };
   }
   bag[id] = (bag[id] || 0) + n;
   return { id, n, card };
@@ -6383,8 +6424,9 @@ function applyMarks(r) {
 function tickBurn(hpNow, name) {
   const bag = fightStatus(); if (!bag || !bag.burn) return hpNow;
   const dealt = Math.min(hpNow, bag.burn);
-  log(`🔥 Burn ${bag.burn}: ${name} loses <b>${dealt}</b>.`, 'good');
-  bag.burn = Math.floor(bag.burn / 2);                     // 4 → 2 → 1 → 0, as proposed
+  const keeps = !!(bag.lasting && bag.lasting.burn);       // 🌊 a FLOW burn never fades
+  log(`🔥 Burn ${bag.burn}: ${name} loses <b>${dealt}</b>.${keeps ? ' It does not fade.' : ''}`, 'good');
+  if (!keeps) bag.burn = Math.floor(bag.burn / 2);         // 4 → 2 → 1 → 0, as proposed
   return hpNow - dealt;
 }
 
@@ -6408,7 +6450,8 @@ function foeApplyBlow(r) {
   // 🪨 EXPOSED IS SPENT HERE, not read here — computeAction already added it to the blow so
   // every display shows the number that lands. ⚠️ Consuming it anywhere a RENDER can reach would
   // be *the instrument that perturbs what it measures*, in the game itself.
-  const bagB = fightStatus(); if (bagB && bagB.expose) bagB.expose = 0;
+  const bagB = fightStatus();
+  if (bagB && bagB.expose && !(bagB.lasting && bagB.lasting.expose)) bagB.expose = 0;
   const dealt = Math.max(0, r.value || 0);
   st.hp = Math.max(0, st.hp - dealt);
   log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
@@ -6513,9 +6556,11 @@ function startFoeBeat() {
   // denying it is denying a 🛡️ harden, a ⚔️ lunge or a 💨 circle — which is a different thing
   // from ❄️ Frost merely making it slow, and the reason both are worth having.
   const bagS = fightStatus();
-  if (bagS && bagS.stun) {
-    bagS.stun = 0;
-    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes. It still strikes, but plainly.`, 'good');
+  if (bagS && bagS.stun > 0) {
+    if (!(bagS.lasting && bagS.lasting.stun)) bagS.stun--;   // 🌊 a FLOW stun does not tick down
+    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes` +
+        (bagS.stun > 0 ? `, and ${bagS.stun} more turn${bagS.stun === 1 ? '' : 's'} of it to come` : '') +
+        `. It still strikes, but plainly.`, 'good');
     st.active = null;
   }
   else if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
@@ -6540,8 +6585,9 @@ function startFoeBeat() {
 
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
 function foeCleanupAndNext() {
-  // ❄️ Frost is spent on the turn it slowed — one turn, like every other mark here
-  if (S.foeState && S.foeState.status) S.foeState.status.frost = 0;
+  // ❄️ Frost is spent on the turn it slowed — unless it came from a 🌊 FLOW card, which never fades
+  const fb = S.foeState && S.foeState.status;
+  if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
   // ⚠️ THE GUARD, not just the caller. Three things route here (a soak exiting, a turn with no
   // damage, and the fight loop itself) and only one of them knows whether the creature is still
   // alive. A loop that can be re-entered from several places has to check its own precondition.
@@ -7626,7 +7672,8 @@ function beatDisplayHTML(beat, isNew) {
       // Catalyst* by being told, once, at the moment it happened.
       if (!felled) for (const m of (r.marks || [])) {
         const d = STATUSES[m.id];
-        subs.push(`<div class="pv-sub good">${d.icon} <b>${d.name}${m.id === 'stun' ? '' : ' ' + m.n}</b>` +
+        const lasts = (ARCH_MARK[m.card && m.card.def.arch] || {}).lasting;
+        subs.push(`<div class="pv-sub good">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never fades)</i>' : ''}` +
           ` — ${m.card ? displayName(m.card) : ''}, ${homeSlotOf(m.card) === 'soak' ? 'as it blocked' : 'from your ' + (SLOT_LABEL[homeSlotOf(m.card)] || 'hand')}</div>`);
       }
       const dmgB = felled ? 0 : foeCounter(r);
@@ -9049,7 +9096,7 @@ function soakWith(cardId) {
     const m = markWith(card, null, lvlBefore);
     if (m) {
       const d = STATUSES[m.id];
-      log(`${d.icon} <b>${d.name}${m.id === 'stun' ? '' : ' ' + m.n}</b> — ${displayName(card)} marks it as it blocks.`, 'good');
+      log(`${d.icon} <b>${d.name} ${m.n}</b> — ${displayName(card)} marks it as it blocks.`, 'good');
     }
   }
   S.damage = Math.max(0, S.damage - soak);
@@ -12505,11 +12552,15 @@ function cardHTML(card) {
   const markHome = homeSlotOf(card);
   const markLine = (markId && markHome) ? (() => {
     const d = STATUSES[markId];
-    const n = markId === 'stun' ? '' : Math.max(1, card.level || 1);
-    return { icon: d.icon, name: d.name, n,
+    // ⚠️ INCLUDING the archetype's multiplier, or a ⚔️ FORCE card's face would under-promise by
+    // half — the same fault as the 🛡️ WARD card that said Exposed 2 and paid 1.
+    const n = Math.max(1, card.level || 1) * ((ARCH_MARK[card.def.arch] || {}).mult || 1);
+    const am = ARCH_MARK[card.def.arch] || {};
+    return { icon: d.icon, name: d.name, n, note: am.note || '',
              // ✅ matches `.card-verb` exactly: a slot gets "in <slot>", the soak gets "when it blocks"
              where: markHome === 'soak' ? 'when it blocks' : 'in ' + (SLOT_LABEL[markHome] || markHome),
-             full: classText(d.text).replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
+             full: classText(d.text + (am.lasting ? '' : (d.decay || '')))
+                     .replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
   })() : null;
   // 🚣 A JOURNEY HAS NOTHING TO MARK (Thomas: *"stun doesn't make sense on a journey"*).
   // ⚠️ The RULES were already right — `fightStatus()` returns null with no creature, and a probe
@@ -12634,7 +12685,8 @@ function cardHTML(card) {
     // the player already reads off the row in front of them — and it goes through SLOT_LABEL, so
     // a rogue would read *"from your Combo"* off the identical field.
     (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" title="${canMark ? stripTags(markLine.full) : 'Marks only land on a creature — there is nothing here to mark.'}">` +
-      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? markLine.where : 'nothing to mark here')}</span></div>` : '') +
+      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? markLine.where : 'nothing to mark here')}` +
+      (markLine.note && canMark ? `<i class="mark-note"> · ${markLine.note}</i>` : '') + `</span></div>` : '') +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
@@ -12926,8 +12978,8 @@ function startDuelBeat() {
   // DUEL and that is on record as *a road mechanic that switches off at the boss*; the mage's new
   // kit must not repeat it on the one fight that decides the run.
   const dbag = (S.dragonState.status = S.dragonState.status || {});
-  if (dbag.stun) {
-    dbag.stun = 0;
+  if (dbag.stun > 0) {
+    if (!(dbag.lasting && dbag.lasting.stun)) dbag.stun--;
     log(`⚡ <b>${S.dragon.name} is stunned</b> — ${S.dragonState.active ? S.dragonState.active.name : 'its attack'} never comes. It still breathes, but plainly.`, 'good');
     S.dragonState.active = null;
   }
