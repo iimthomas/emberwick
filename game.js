@@ -3002,6 +3002,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 436, date: '2026-08-30', title: 'Your spells leave something behind',
+    added: [
+      "🏷️ <b>Every Spell now marks what it hits, and the mark is its element.</b> 🔥 <b>Burn</b> — it loses that much at the start of its turn, then the Burn halves. ❄️ <b>Frost</b> — its Initiative drops next turn. 🪨 <b>Exposed</b> — your next blow lands harder. ⚡ <b>Stun</b> — it loses its next attack, <b>but only if you win Initiative</b>.",
+      "<b>The size is the card's level.</b> A Lv4 Fire card burns for 4. Sharpening a card now makes what it <i>does</i> stronger, not just what it hits for.",
+      "🔥 Burn is not a blow — it goes straight past Armour, Evasion and Initiative alike. It is the answer to something you cannot out-hit, and the first thing that makes a long fight pay.",
+      "🐉 <b>All of it works on dragons too.</b>",
+    ] },
+
   { build: 435, date: '2026-08-30', title: 'A longer first road',
     changed: [
       "🗺️ <b>Stage 1 is eight floors instead of six.</b> Two more stops means two more shops — you reach Cindermaw with a build instead of an almost untouched starting deck.",
@@ -5952,6 +5960,75 @@ function foeAttacksOf(e) {
 }
 // ⚠️ `function` declarations, not const arrows — a top-level const never lands on the headless
 // sandbox and this is exactly the sort of thing an instrument will want to ask.
+// 🏷️ ELEMENTAL STATUSES (2026-08-30, Thomas: *"ice spells can inflict frost… lightning,
+// chance to stun… fire, inflict burn… stone, makes them vulnerable"*).
+//
+// 🔑 THE REASON THE CARDS WERE VANILLA WAS NEVER IMAGINATION, IT WAS **TENSE**. Every keyword
+// in the genre is a sentence about a LATER turn — *it takes more next turn*, *it loses HP at the
+// start of its turn* — and a one-hand encounter had nowhere for an effect to live. Multi-turn
+// fights did not make statuses a good idea; they made them possible.
+//
+// 🔑 ONE VALUE PER CARD SURVIVES because **the magnitude is the Spell's LEVEL** — a number
+// already printed on the face. Nothing new is written on a card, and it makes levelling do what
+// [[Levelling_As_Sharpening]] always claimed: *a level does not make a card better, it makes it
+// MORE ITSELF.* A Lv4 Fire card burns for 4.
+//
+// ⚠️ **"CHANCE TO STUN" IS THE ONE THING IN THE PROPOSAL I CHANGED.** This game's resolution is
+// deterministic by design — *legible math always*, *never buy suspense by hiding the maths*,
+// *unannounced = a dice roll*. A coin flip in the middle of a turn you are supposed to be able to
+// SOLVE is a different game. ⚡ Stun is CONDITIONAL instead: it lands only when you **win
+// Initiative**, which is Lightning's own temperament (*go first*) and a condition you can fail.
+//
+// 📦 PORT SHAPE: a status is a ROW, exactly like FOE_ATTACKS — *the pool owns the rule, the
+// card owns nothing but which rule it names*. The element grid is 4×4, so each element owns one.
+const STATUSES = {
+  burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
+            text: 'it loses <b>N</b> at the start of its turn, then the Burn halves' },
+  frost:  { el: 'Water',     icon: '❄️', name: 'Frost',
+            text: 'its Initiative is <b>N</b> lower next turn' },
+  stun:   { el: 'Lightning', icon: '⚡', name: 'Stun',
+            text: 'it loses its next attack — <b>only if you win Initiative</b>' },
+  expose: { el: 'Stone',     icon: '🪨', name: 'Exposed',
+            text: 'your next blow against it lands for <b>+N</b>' },
+};
+function statusIdForEl(el) {
+  for (const k in STATUSES) if (STATUSES[k].el === el) return k;
+  return null;
+}
+// 🔴 ONE ACCESSOR, BOTH FIGHTS. ● Momentum was measured DEAD IN THE DUEL — 78% break rate at
+// every stage, *a road mechanic that switches off at the boss* — and building the mage a kit that
+// only works on road creatures would repeat that exactly, on the fight that decides the run.
+// So statuses live on whichever pool is fighting, and every reader asks THIS.
+function fightStatus() {
+  if (S.dragonState && S.finalMode && S.finalPhase === 'duel') {
+    return (S.dragonState.status = S.dragonState.status || {});
+  }
+  if (S.foeState && S.encounter && S.encounter.beatFight) {
+    return (S.foeState.status = S.foeState.status || {});
+  }
+  return null;
+}
+function statusN(id) { const st = fightStatus(); return (st && st[id]) || 0; }
+// 🏷️ WHAT IS ON IT, ON SCREEN, EVERY TURN. 🔑 *Any persistent modifier must be on screen
+// every turn* — the rule the Mirror Fen taught, where a run-long −2 Pace was invisible from the
+// moment you took it. A status the player cannot see is a rule the game does not have.
+// ⚠️ Each chip says what it DOES, not just its size, for the same reason every field token
+// carries a `note`: a bare counter never shows you how it ends.
+function foeStatusHTML() {
+  const bag = fightStatus(); if (!bag) return '';
+  const bits = [];
+  for (const id of ['burn', 'frost', 'expose', 'stun']) {
+    const n = bag[id] || 0; if (!n) continue;
+    const d = STATUSES[id];
+    const say = id === 'burn'   ? `loses <b>${n}</b> next turn`
+              : id === 'frost'  ? `Initiative <b>−${n}</b>`
+              : id === 'expose' ? `your next blow <b>+${n}</b>`
+              : `<b>its next attack is lost</b>`;
+    bits.push(`<span class="foe-st foe-st-${id}">${d.icon} ${d.name}${id === 'stun' ? '' : ' ' + n} — ${say}</span>`);
+  }
+  return bits.length ? `<div class="foe-status">${bits.join('')}</div>` : '';
+}
+
 function isBeatFight(e) { return !!(FIGHT_BEATS && e && e.type === 'fight' && !e.finale && (e.attacks || []).length); }
 // ❤️ THE CREATURE'S LIFE BAR (2026-08-30, Thomas: *"lets give monsters an hp bar like the
 // dragons, it should animate and drop down when they get hit"*).
@@ -6114,11 +6191,48 @@ function foeCounter(r) {
 // 🔑 IT WAS ONE FUNCTION BECAUSE THE REVEAL USED TO RUN FIRST. The staged reveal owned the
 // moment, so damage had to wait until it finished; with the staging gone the natural order is
 // simply the real one. **A helper's shape is usually a fossil of the flow that needed it.**
+// 🏷️ WHAT YOUR SPELL LEAVES BEHIND. Called by both fights, after the blow lands.
+// ⚠️ It reads the element the card IS, which since the cycle was retired is also what it seeks
+// and what it deals — one element fact per card, so the face never disagrees with the effect.
+function applySpellStatus(r) {
+  const bag = fightStatus(); if (!bag) return null;
+  const spell = spellCard(); if (!spell) return null;
+  const el = elOf(spell); if (!el) return null;            // a wild card leaves nothing
+  const id = statusIdForEl(el); if (!id) return null;
+  const n = Math.max(1, spell.level || 1);                 // 🔑 the magnitude IS the level
+  if (id === 'stun') {
+    // ⚡ the only conditional one, and the condition is Lightning's own temperament
+    if (r && r.initLost) return null;
+    bag.stun = 1;
+    return { id, n: 1 };
+  }
+  bag[id] = (bag[id] || 0) + n;
+  return { id, n };
+}
+// 🔥 BURN IS THE ONLY ONE THAT TICKS, and it ticks at the START of the creature's turn -
+// before it acts, so a Burn can finish it. ⚠️ It is not a blow: it goes around 🛡️ Armour,
+// 🌀 Evasion and the Initiative gate alike, which is the whole reason Fire answers a shape you
+// cannot out-hit and makes a LONG fight pay when a long fight has only ever cost you.
+function tickBurn(hpNow, name) {
+  const bag = fightStatus(); if (!bag || !bag.burn) return hpNow;
+  const dealt = Math.min(hpNow, bag.burn);
+  log(`🔥 Burn ${bag.burn}: ${name} loses <b>${dealt}</b>.`, 'good');
+  bag.burn = Math.floor(bag.burn / 2);                     // 4 → 2 → 1 → 0, as proposed
+  return hpNow - dealt;
+}
+
 function foeApplyBlow(r) {
   const st = S.foeState, base = S.foeBase;
+  // 🪨 EXPOSED IS SPENT HERE, not read here — computeAction already added it to the blow so
+  // every display shows the number that lands. ⚠️ Consuming it anywhere a RENDER can reach would
+  // be *the instrument that perturbs what it measures*, in the game itself.
+  const bagB = fightStatus(); if (bagB && bagB.expose) bagB.expose = 0;
   const dealt = Math.max(0, r.value || 0);
   st.hp = Math.max(0, st.hp - dealt);
   log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
+  // 🏷️ and what the Spell leaves behind. ⚠️ AFTER the blow, so 🪨 Exposed cannot buff the
+  // very hit that applied it — every status is a statement about the NEXT turn.
+  if (st.hp > 0) { const s = applySpellStatus(r); if (s) r.status = s; }
   if (st.hp <= 0) {
     const pace = st.turn <= st.par ? 'clean' : 'slow';
     log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
@@ -6129,6 +6243,8 @@ function foeApplyBlow(r) {
 }
 function foeAfterBlow(r) {
   const st = S.foeState;
+  // ❄️ spent on the turn it slowed — one turn, like every other status here
+  if (st.status && st.status.frost) st.status.frost = 0;
   // it lives, so it answers. ⚠️ Uses the SAME terms computeAction already produced — no second
   // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
   // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
@@ -6160,9 +6276,14 @@ function publishFoeTurn() {
   if (!st || !base) return;
   const fx = (st.active && st.active.fx) || {};
   const climb = (fx.initStep || 0) * (st.turn - 1);
+  // ❄️ FROST lowers the Initiative it publishes, so every reader — the panel, computeAction,
+  // the race — sees the slowed number without any of them learning a new rule.
+  // ⚠️ It cannot beat 💨 circle's `initTake`: an attack that SEIZES the race outranks a status
+  // that merely slows it, or the telegraph would be a lie.
+  const frost = (S.foeState && S.foeState.status && S.foeState.status.frost) || 0;
   S.encounter = Object.assign({}, base, {
     hp: 9999, beatFight: true,
-    init: fx.initTake ? 99 : base.init + climb,
+    init: fx.initTake ? 99 : Math.max(0, base.init + climb - frost),
     atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
     shape: fx.evade ? 'evasion' : fx.armour ? 'armour' : base.shape,
     shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
@@ -6181,10 +6302,29 @@ function startFoeBeat() {
     return;
   }
   st.turn++;
+  // 🔥 BURN FIRST, BEFORE IT ACTS — so a Burn can finish it, and so the number you were
+  // shown last turn is the number that lands.
+  st.hp = tickBurn(st.hp, base.name);
+  if (st.hp <= 0) {
+    log(`🏆 <b>${base.name} falls</b> — burned down on turn ${st.turn}.`, 'good result');
+    S.pendingR = S.pendingR || {};
+    S.pendingR.felled = true;
+    finishResolve();
+    return;
+  }
   // 🎲 turn 1 is deliberately plain: you have not been given a chance to react to anything yet.
   st.active = st.next || null;
   st.next = foeBagDraw();
-  if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
+  // ⚡ STUN EATS THE ATTACK, NOT THE TURN. An attack is a one-turn modifier to its stats, so
+  // denying it is denying a 🛡️ harden, a ⚔️ lunge or a 💨 circle — which is a different thing
+  // from ❄️ Frost merely making it slow, and the reason both are worth having.
+  const bagS = fightStatus();
+  if (bagS && bagS.stun) {
+    bagS.stun = 0;
+    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes.`, 'good');
+    st.active = null;
+  }
+  else if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
 
   publishFoeTurn();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
@@ -6582,6 +6722,13 @@ function computeAction(reserve) {
                   // shipped - it is listed under the same rule and was simply never revisited when
                   // multi-hit arrived. `initLost` is computed ~17 lines above, so it fits here.
                   + charmStrike(spell)
+                  // 🪨 EXPOSED BELONGS IN `added` AND NOWHERE ELSE. Thomas's own rule decides
+                  // it: *"if a card does 8x2, any added damage like a +4 potion, will make it
+                  // 12x2."* This is added damage, so it lands on every blow and the card's own
+                  // value is still the only thing a multi-hit strike divides.
+                  // ⚠️ READ-ONLY here. computeAction() runs on every repaint; the status is
+                  // SPENT in foeApplyBlow()/duelStrike(), once, at resolution.
+                  + statusN('expose')
                   + (initLost && hasCharm('slowfoot') ? 4 : 0);
     const base = pileVal + added;
     const withBoost = base + boostEff;
@@ -7212,6 +7359,12 @@ function beatDisplayHTML(beat, isNew) {
       // ✦ named on the beat that kills it, and nowhere before — same rule as the verdict itself
       // ✦ name BOTH halves — a prize whose condition you cannot read is a prize you cannot aim for
       if (felled && r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — exactly lethal, and it never touched you</div>`);
+      // 🏷️ say what you left on it, where the blow is reported — *never state a rule about an
+      // object without marking the object*, at the moment the rule starts applying
+      if (!felled && r.status) {
+        const d = STATUSES[r.status.id];
+        subs.push(`<div class="pv-sub good">${d.icon} ${d.name}${r.status.id === 'stun' ? '' : ' ' + r.status.n} — ${classText(d.text).replace(/<b>N<\/b>/g, '<b>' + r.status.n + '</b>')}</div>`);
+      }
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
@@ -10659,6 +10812,7 @@ function renderEncounter() {
     const dragonBar =
       `<div class="dragon-hp"><div class="dragon-hp-fill" style="width:${hpPct}%"></div>` +
       `<span class="dragon-hp-label">🐉 ${S.dragon.name} — ${ds ? ds.hp : S.dragon.hp} / ${ds ? ds.maxHp : S.dragon.hp} HP</span></div>` +
+      foeStatusHTML() +
       `<div class="dragon-shields">${ds ? shapeStateText() : dragonShapeText(S.dragon)}` +
       ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>` +
       (S.finalPhase === 'duel' ? staminaBar() + telegraph() : '');
@@ -10713,7 +10867,7 @@ function renderEncounter() {
       // 🔑 The telegraph is LOAD-BEARING, not flavour: you can die to a hit your hand cannot
       // soak, and the only thing that makes that a mistake rather than a mugging is having been
       // told a beat early.
-      (S.foeState ? foeHpBar(S.foeState, e.name) +
+      (S.foeState ? foeHpBar(S.foeState, e.name) + foeStatusHTML() +
         `<div class="enc-stats">` +
         `<span>⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
         `<span>💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
@@ -12391,6 +12545,12 @@ function startDuelBeat() {
     return;
   }
   S.duelBeat++;
+  // 🔥 the dragon burns exactly like a creature does
+  S.dragonState.hp = tickBurn(S.dragonState.hp, S.dragon.name);
+  if (S.dragonState.hp <= 0) {
+    log(`🏆 <b>${S.dragon.name} falls</b> — burned down on beat ${S.duelBeat}.`, 'good result');
+    victory(); return;
+  }
   // 🐉 last beat's telegraph becomes this beat's reality, then it tells you the next one.
   // Beat 1 is deliberately plain — you have not been given a chance to react to anything yet.
   const atks = attacksFor(S.dragon);
@@ -12403,8 +12563,18 @@ function startDuelBeat() {
   // the counterstrike (full breath, HP-scaled) is the main threat. hp huge so computeAction never "wins" — we judge HP.
   // synthetic persistent enemy. NO `shape` field: computeAction must return the RAW strike, because
   // the dragon's shape is applied in duelStrike() where the boon and the beat counter live.
+  // ⚡❄️ the two race statuses reach the dragon too. 🔑 ● Momentum was measured DEAD IN THE
+  // DUEL and that is on record as *a road mechanic that switches off at the boss*; the mage's new
+  // kit must not repeat it on the one fight that decides the run.
+  const dbag = (S.dragonState.status = S.dragonState.status || {});
+  if (dbag.stun) {
+    dbag.stun = 0;
+    log(`⚡ <b>${S.dragon.name} is stunned</b> — ${S.dragonState.active ? S.dragonState.active.name : 'its attack'} never comes.`, 'good');
+    S.dragonState.active = null;
+  }
+  const dfrost = dbag.frost || 0; dbag.frost = 0;
   S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
-    init: S.dragon.init, atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
+    init: Math.max(0, S.dragon.init - dfrost), atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
@@ -12467,6 +12637,14 @@ function resolveDuel() {
   // 🔥 the finale never reaches finishResolve(), so the bank is collected here instead.
   if (r.banks) S.wakePending = r.bank;
   S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
+  // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it
+  // paid for, and the Spell leaves its own status behind for the next beat.
+  // ⚠️ The duel is the THIRD turn loop and it has swallowed half of every change made to the
+  // other two — 🔥 the Emberwake and ● Momentum both froze for an entire boss fight this way.
+  // Anything added to a fight belongs here in the same commit, or it is a road-only rule.
+  const dbag2 = fightStatus();
+  if (dbag2 && dbag2.expose) dbag2.expose = 0;
+  if (!kill) { const s = applySpellStatus(r); if (s) r.status = s; }
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
