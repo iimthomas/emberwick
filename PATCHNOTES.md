@@ -6,6 +6,17 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 438 — Lose the race and it hits you first
+*2026-08-30*
+
+**Changed**
+- 💨 **Losing Initiative now decides the ORDER, not just the damage.** The creature strikes, you block, and only then does your blow land. It lunges at you when it does.
+- ⚡ **Stun says what it actually does** — it cancels the creature's next attack, but the creature still strikes, plainly. It was never a skipped turn; the wording made it sound like one.
+
+**Fixed**
+- 🔴 **Killing a creature no longer charges you for a fight you lost.** A kill was reporting the win and then asking you to block damage that came from the wrong rule entirely.
+- 🚣 **Cards no longer promise a mark on a journey.** There is nothing on a road to burn or freeze, and the card says so instead of lighting up.
+
 ## build 437 — Every card has a home
 *2026-08-30*
 
