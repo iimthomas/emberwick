@@ -6,6 +6,18 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 444 — Sweeping up after the journeys
+*2026-08-30*
+
+> ⚠️ If you were carrying Lantern-Bearer, Road Dust, Nightglass or The Long Walk, they are gone — all four did nothing once journeys were removed.
+
+**Changed**
+- 🗺️ **The map no longer labels every row with a region number.** The status bar already names where you are — Verdant Edge (1/4) — and that is the more useful half. The regions themselves are unchanged.
+
+**Fixed**
+- 🧹 **Removed everything that still talked about Pace and Nightfall.** 🏮 Lantern-Bearer and 🧪 Road Dust and 🧪 Nightglass all did nothing; 📜 The Long Walk asked you to complete three journeys, which you can no longer do; and 🖤 Long Shadow was a **curse that cost you nothing**.
+- 💨 **Quickwick moved onto the level ladder** at ⭐3 to take Lantern-Bearer's place.
+
 ## build 443 — Clearer card wording
 *2026-08-30*
 

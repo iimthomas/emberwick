@@ -2603,8 +2603,6 @@ const CHARMS = [
   // is subtracted per HIT, so a percentage would swing wildly between a mage (1 hit) and a rogue.
   { id: 'ironsplit', tier: 2,   name: 'Ironsplitter',     rarity: 'uncommon', cost: 10, rule: true,
     text: '🛡️ <b>Armour</b> takes <b>2 less</b> off every hit' },
-  { id: 'lanternpace', tier: 2, name: "Lantern-Bearer",   rarity: 'uncommon', cost: 8,
-    text: '🌙 +2 Pace against Nightfall',            mods: { pace: 2 } },
   { id: 'tinderbox', tier: 2,   name: 'Deep Tinderbox',   rarity: 'uncommon', cost: 9,
     cls: 'mage',   // 🔴 dead for a class with no boost stat — see Bitterroot
     text: '➕ Your {slot:Boost} gives +1 more',        mods: { boost: 1 } },
@@ -2633,8 +2631,6 @@ const CHARMS = [
     text: '🛡️ Every card blocks −1',                  mods: { soak: -1 } },
   { id: 'tithe',       name: 'The Tithe',        rarity: 'curse', curse: true, cost: 0,
     text: '🪙 −2 coins from every encounter',        mods: { coin: -2 } },
-  { id: 'longshadow',  name: 'Long Shadow',      rarity: 'curse', curse: true, cost: 0,
-    text: '🌙 −2 Pace against Nightfall',            mods: { pace: -2 } },
 ];
 // 🔑 RULE-CHANGING CHARMS (2026-08-05). Every charm above modifies a NUMBER; these change a
 // RULE. That difference is the whole point - the market research (06_Development/Market_And_Retention.md)
@@ -2999,6 +2995,16 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 444, date: '2026-08-30', title: 'Sweeping up after the journeys',
+    warn: "If you were carrying Lantern-Bearer, Road Dust, Nightglass or The Long Walk, they are gone — all four did nothing once journeys were removed.",
+    fixed: [
+      "🧹 <b>Removed everything that still talked about Pace and Nightfall.</b> 🏮 Lantern-Bearer and 🧪 Road Dust and 🧪 Nightglass all did nothing; 📜 The Long Walk asked you to complete three journeys, which you can no longer do; and 🖤 Long Shadow was a <b>curse that cost you nothing</b>.",
+      "💨 <b>Quickwick moved onto the level ladder</b> at ⭐3 to take Lantern-Bearer's place.",
+    ],
+    changed: [
+      "🗺️ <b>The map no longer labels every row with a region number.</b> The status bar already names where you are — <i>Verdant Edge (1/4)</i> — and that is the more useful half. The regions themselves are unchanged.",
+    ] },
+
   { build: 443, date: '2026-08-30', title: 'Clearer card wording',
     fixed: [
       "🛡️ Guard cards said their mark came <b>“from your block”</b>, which reads like nothing. They now say <b>“when it blocks”</b> — the same wording their Lv4 power already used. Block damage with the card and the creature takes the mark.",
@@ -4785,8 +4791,6 @@ const CONTRACTS = [
     text: '🛡️ Finish <b>3</b> encounters <b>taking no damage</b>' },
   // 👣 the widest window in the table: only about half of all encounters are journeys, so a
   // 6-encounter window would ask for three of roughly three chances — the 23% trap again.
-  { id: 'longwalk', name: 'The Long Walk',   cost: 6, reward: 20, need: 3, window: 9, track: 'journey',
-    text: '👣 <b>Complete 3 journeys</b>' },
   // 🗺️ ONE QUEST PER LAND, tiered like the charms (2026-08-10, Thomas: *"each stage should
   // have some new quests and maybe potions to buy as well to help"*).
   // 🔑 Each names the thing ITS land is about, so a quest is a second reason to play the road
@@ -4865,8 +4869,6 @@ const POTIONS = [
   // she could buy it. *A string cannot be renamed into a stat the class does not have.*
   { id: 'bitterroot', name: 'Bitterroot', cost: 3, rarity: 'common', cls: 'mage',
     text: '➕ your <b>{slot:Boost} gives +3</b> more when used' },
-  { id: 'roaddust', name: 'Road Dust',    cost: 3, rarity: 'common',
-    text: '🌙 <b>+3 Pace</b> against the dark when used' },
   { id: 'tallow',   name: 'Tallow Stub',  cost: 3, rarity: 'common',
     text: '🕯️ your candle <b>cannot be snuffed</b> when used' },
   // ---- generic: every class inherits these unchanged ----
@@ -4891,8 +4893,6 @@ const POTIONS = [
   { id: 'salve',   name: 'Mending Salve',    cost: 9, rarity: 'uncommon', pick: true,
     text: '✨ <b>restore a card a level</b> — undo what the road took',
     can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
-  { id: 'nightglass', name: 'Nightglass', cost: 6, rarity: 'common',
-    text: '🌙 the dark <b>cannot catch you</b> — for the whole journey' },
   { id: 'breath',  name: 'Second Breath',  cost: 10, rarity: 'rare',
     text: '✦ your <b>{slot:Spell} is not spent</b> when used' },
   { id: 'quench',  name: 'Quenching Draught', cost: 11, rarity: 'rare',
@@ -4964,7 +4964,13 @@ const POTIONS = [
 const UNLOCKS = [
   // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
-  { level: 3,  kind: 'charm', id: 'lanternpace' },
+  // 🛡️ 🔒 THE LOAD-TIME GUARD EARNED ITS PLACE AGAIN. Deleting 🏮 Lantern-Bearer as dead
+  // journey content threw *"UNLOCKS names a charm that does not exist"* on the very next boot —
+  // exactly what it was written for. Without it level 3 would have unlocked NOTHING, silently,
+  // forever, and *a rung that pays nothing looks exactly like a rung you have not reached*.
+  // ✅ 💨 Quickwick is the natural heir: Lantern-Bearer was **+2 Pace**, and Initiative is what
+  // replaced Pace as the thing that saves you. It was a starter; it is now the first thing you earn.
+  { level: 3,  kind: 'charm', id: 'quickwick' },
   { level: 4,  kind: 'charm', id: 'tinderbox' },
   { level: 5,  kind: 'charm', id: 'swiftwick' },
   { level: 6,  kind: 'charm', id: 'ironsplit' },
@@ -10722,7 +10728,9 @@ function render() {
   // crashes when it is the first thing you touch is a bug waiting for a different boot order.
   if (!S) return;
   document.body.className = 'phase-' + S.phase;   // lets CSS emphasise per phase (e.g. armor during soak)
-  $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Region ${S.region} · Turn ${S.turn}`) + ` · build ${BUILD}`;
+  // ⚠️ the corner read "Region 1" while the status bar read "Verdant Edge (1/4)" two inches
+  // away — the same fact twice, one of them in the less useful form.
+  $('turn-indicator').textContent = (S.finalMode ? `🐉 THE FINAL BATTLE` : `Turn ${S.turn}`) + ` · build ${BUILD}`;
   try {
   renderStatus();
   renderScene();
@@ -11260,7 +11268,13 @@ function mapHTML() {
     // row of the lower band reading downward: floors 11/7/3. ⚠️ And never above the top row.
     const bandStart = f % MAP_BAND === MAP_BAND - 1 && f !== MAP_FLOORS - 1;
     rows.push(`<div class="mp-row${bandStart ? ' mp-band' : ''}">` +
-      `<span class="mp-f">${f === mapFloors(m) - 1 ? '▲' : 'r' + band}</span>` + cells.join('') + `</div>`);
+      // ❌ THE `r1/r2/r3` LABELS ARE GONE (2026-08-30, Thomas). ⚠️ REGIONS THEMSELVES STAY — they
+      // still choose the creature pool and all four are still visited (measured 563/473/394/244
+      // encounters over 200 runs; `bandOf` divides floors by region count, so 12 floors gives
+      // 3-floor bands). 🔑 What went is the REDUNDANCY: a bare number on every row saying what
+      // the status bar already says by NAME — *Verdant Edge (1/4)*. A land you can name does not
+      // also need an index, and twelve rows of it is twelve reminders of a fact you already had.
+      `<span class="mp-f">${f === mapFloors(m) - 1 ? '▲' : ''}</span>` + cells.join('') + `</div>`);
   }
   // 🗺️ THE LINES ARE THE MAP. Without them this is a grid of icons where the game decides
   // where you may go for reasons you cannot see - Thomas, pointing at an unreachable neighbour:
