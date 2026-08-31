@@ -3002,6 +3002,16 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 438, date: '2026-08-30', title: 'Lose the race and it hits you first',
+    changed: [
+      "💨 <b>Losing Initiative now decides the ORDER, not just the damage.</b> The creature strikes, you block, and only then does your blow land. It lunges at you when it does.",
+      "⚡ <b>Stun says what it actually does</b> — it cancels the creature's next attack, but the creature still strikes, plainly. It was never a skipped turn; the wording made it sound like one.",
+    ],
+    fixed: [
+      "🔴 <b>Killing a creature no longer charges you for a fight you lost.</b> A kill was reporting the win and then asking you to block damage that came from the wrong rule entirely.",
+      "🚣 <b>Cards no longer promise a mark on a journey.</b> There is nothing on a road to burn or freeze, and the card says so instead of lighting up.",
+    ] },
+
   { build: 437, date: '2026-08-30', title: 'Every card has a home',
     changed: [
       "🧭 <b>A card only leaves its mark from the slot it belongs in</b> — and the slot is printed on the card. Its <b>element</b> says what the mark is; <b>where it belongs</b> says which slot fires it.",
@@ -5995,8 +6005,20 @@ const STATUSES = {
             text: 'it loses <b>N</b> at the start of its turn, then the Burn halves' },
   frost:  { el: 'Water',     icon: '❄️', name: 'Frost',
             text: 'its Initiative is <b>N</b> lower next turn' },
+  // 🔴 THE TEXT WAS OVER-PROMISING, WHICH IS WHY IT READ AS TOO STRONG (Thomas: *"stun
+  // sounds too strong"*). Measured A/B over 600 runs: turning Stun OFF ENTIRELY moves the ladder
+  // by **zero points** (48% either way). It is not strong; it only SOUNDS strong, because *"it
+  // loses its next attack"* reads as *"it skips a turn"* — and what it really does is cancel the
+  // one-turn MODIFIER (🛡️ harden, 💢 windup, 💨 circle, ⚔️ lunge). The creature still strikes.
+  // 🔑 SO THE FIX IS THE SENTENCE, NOT THE RULE. This is the same display-disagrees-with-rule
+  // fault as everything else this week, for once in the GENEROUS direction — and a rule that
+  // sounds bigger than it is gets nerfed by feel until it is worth less than nothing.
+  // ⚠️ A *chance* to stun was asked for twice and is still declined for the same reason: this
+  // game's resolution is deterministic by design, and a coin flip inside a turn you are meant to
+  // SOLVE is a different game. If it ever needs weakening the lever is the CONDITION — measured
+  // at margin-3 it is worth +2 points, i.e. also nothing.
   stun:   { el: 'Lightning', icon: '⚡', name: 'Stun',
-            text: 'it loses its next attack — <b>only if you win Initiative</b>' },
+            text: 'cancels its next attack — it still strikes, but plainly. <b>Only if you win Initiative</b>' },
   expose: { el: 'Stone',     icon: '🪨', name: 'Exposed',
             text: 'your next blow against it lands for <b>+N</b>' },
 };
@@ -6219,8 +6241,8 @@ function foeCounter(r) {
 // ⚔️ THE BLOW LANDS FIRST, AND ONLY THEN IS ANYTHING REPORTED (2026-08-30, Thomas: *"it should
 // do the damage first, and then the popup shows up, telling you that you killed it... kinda like
 // a normal game now"*). Splitting these two is what makes that order possible: `foeApplyBlow()`
-// chips the pool so the ❤️ bar drops on the very next render, and `foeAfterBlow()` is what the
-// creature does about it — which only happens if it is still standing.
+// chips the pool so the ❤️ bar drops on the very next render. ⚠️ What the creature does back no
+// longer follows it: Initiative decides the ORDER, so its answer lands BEFORE this.
 // 🔑 IT WAS ONE FUNCTION BECAUSE THE REVEAL USED TO RUN FIRST. The staged reveal owned the
 // moment, so damage had to wait until it finished; with the staging gone the natural order is
 // simply the real one. **A helper's shape is usually a fossil of the flow that needed it.**
@@ -6292,22 +6314,30 @@ function foeApplyBlow(r) {
   }
   return false;
 }
-function foeAfterBlow(r) {
-  const st = S.foeState;
-  // ❄️ spent on the turn it slowed — one turn, like every other status here
-  if (st.status && st.status.frost) st.status.frost = 0;
-  // it lives, so it answers. ⚠️ Uses the SAME terms computeAction already produced — no second
-  // notion of what a hit is, which is the fork that put a placeholder's atk on screen this week.
-  // ⚠️ NOT `r.combatDmg` — that number is produced by the Loss branch of a fight whose outcome
-  // is a sentinel's lie. The beat computes its own, from a rule.
-  const damage = foeCounter(r);
-  if (damage > 0) st.untouched = false;   // ❤️ gone for the rest of this fight
-  tickMomentum(damage, r);
-  S.damage = damage; S.damageEl = null;
-  S.afterSoak = 'foeNext';
-  if (damage > 0) { log(`Damage to block: ${damage}`, 'bad'); startSoak(); }
-  else foeCleanupAndNext();
+// ⚔️ YOUR BLOW, AFTER IT HAS HAD ITS TURN. Reached directly when you won the race, or out of
+// the soak's exit when you did not. ⚠️ Everything the old inline path did lives here now, so the
+// two orders cannot drift — the same fault that had four copies of the arrangement search.
+function foeLandBlow(r) {
+  r = r || S.pendingR; if (!r) return;
+  const st = S.foeState; if (!st) return;
+  r.felled = foeApplyBlow(r);
+  render();                      // ❤️ the bar drops before anything pops up
+  if (!r.felled) { S.pendingR = r; S.beats = null; S.beatIndex = -1; foeCleanupAndNext(); return; }
+  // it fell — one window: what happened, and what you got
+  r.drops = rollDrops(S.encounter, 'Complete', r.perfect);
+  S.pendingR = r;
+  S.beats = [{ outcomeBeat: true, withDrops: true, final: true, summary: true, lines: [] }];
+  S.beatIndex = -1;
+  S.phase = 'reveal';
+  advanceBeat();
 }
+
+// ❌ foeAfterBlow() IS GONE (2026-08-30). It computed the creature's answer AFTER your blow, and
+// Initiative deciding the ORDER moved that in front of it — what it did now lives at the top of
+// resolve(). ⚠️ Deleted rather than left callable: a function that would charge the same damage
+// a second time is not a safe thing to leave sitting beside the one that replaced it.
+// ❄️ Its one surviving job, spending Frost, moved to foeCleanupAndNext() — the end of the turn
+// it slowed, which is where it always belonged.
 
 // ⚡ THIS TURN'S CREATURE, DERIVED FROM `foeBase` + the active attack. ⚠️ hp 9999 so
 // computeAction() never judges the kill — the turn chips a pool and `foeApplyBlow()` decides.
@@ -6372,7 +6402,7 @@ function startFoeBeat() {
   const bagS = fightStatus();
   if (bagS && bagS.stun) {
     bagS.stun = 0;
-    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes.`, 'good');
+    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes. It still strikes, but plainly.`, 'good');
     st.active = null;
   }
   else if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
@@ -6397,6 +6427,8 @@ function startFoeBeat() {
 
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
 function foeCleanupAndNext() {
+  // ❄️ Frost is spent on the turn it slowed — one turn, like every other mark here
+  if (S.foeState && S.foeState.status) S.foeState.status.frost = 0;
   // ⚠️ THE GUARD, not just the caller. Three things route here (a soak exiting, a turn with no
   // damage, and the fight loop itself) and only one of them knows whether the creature is still
   // alive. A loop that can be re-entered from several places has to check its own precondition.
@@ -7256,14 +7288,31 @@ function resolve() {
       for (const ln of (b.lines || [])) log(ln.text, ln.cls);
     }
     if (beatSt) {
-      r.felled = foeApplyBlow(r);   // ⚔️ the pool is chipped HERE, before anything is shown
-      render();                     // ❤️ …so the bar has already dropped when the popup arrives
-      if (!r.felled) {
-        // nothing ended, so nothing reports. Straight on to what it does back.
+      // 🔴 INITIATIVE DECIDES THE ORDER, NOT JUST THE GATE (2026-08-30, Thomas: *"when beating
+      // a monster, but i also lost initiative that turn, it said that i won, and then i assigned
+      // blocks — should be the other way around… any time i lose initiative, the monster should
+      // always attack me first"*).
+      // 🔑 He is right, and it is the same sentence the gate already is: *beat its Initiative
+      // and nothing gets through; lose the race and its attack lands.* If it lands, it lands
+      // BEFORE your blow — which also means a killing turn where you lost the race still costs
+      // you the hit. You did not out-speed it; you traded.
+      // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
+      // order on screen is: it strikes → you block → your blow → the verdict.
+      const first = foeCounter(r);
+      if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
-        foeAfterBlow(r);
+        beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
+        tickMomentum(first, r);
+        fx('foe-slot', 'fx-strikes-first', 620);  // 💥 it comes at you — see the impact note
+        fx('mage-slot', 'fx-hurt', 460);
+        log(`⚡ ${S.foeBase.name} is faster — it strikes first for <b>${first}</b>.`, 'bad');
+        S.damage = first; S.damageEl = null;
+        S.afterSoak = 'foeBlow';                  // …and THEN your blow lands
+        startSoak();
         return;
       }
+      foeLandBlow(r);
+      return;
     }
     // it is over — ONE popup: what happened, and what you got.
     r.drops = rollDrops(S.encounter, beatSt ? 'Complete' : r.outcome, r.perfect);
@@ -7455,7 +7504,8 @@ function beatDisplayHTML(beat, isNew) {
     subs.push(r.outcome !== 'Loss' ? `<div class="pv-sub good">🪙 +${e.xp}</div>` : `<div class="pv-sub bad">no coins</div>`);
     // ✦ named where the verdict is, because it IS part of the verdict
     if (r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — nothing to spare</div>`);
-    const dmg = r.early + r.combatDmg + (r.treacherousDmg || 0) + r.stormDmg;
+    // ⚠️ same lie, same guard — a beat fight's damage is taken before the blow, never here
+    const dmg = (e && e.beatFight ? 0 : r.early + r.combatDmg) + (r.treacherousDmg || 0) + r.stormDmg;
     if (dmg > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmg}</div>`);
     // 🔴 NAME WHAT CHARGED IT (2026-08-28, found by Thomas in play: *"how did i get a drop from
     // this one"* — and the ⏳ beside it was the stranger half). On a FIGHT the only source is the
@@ -7507,7 +7557,11 @@ function finishResolve() {
   if (S.foeState && isBeatFight(S.foeBase) && e && e.beatFight) {
     // ⚠️ THE BLOW HAS ALREADY LANDED — resolve() applies it before anything is shown, so this
     // reads the verdict rather than producing it. Double-applying here would chip the pool twice.
-    if (!r.felled) { foeAfterBlow(r); return; }   // it survived — the fight took over
+    // ⚠️ finishResolve() is now only ever reached on a KILL — a surviving turn goes from
+    // foeLandBlow() straight to foeCleanupAndNext() and never comes here. If this ever fires a new
+    // caller has appeared, and the encounter bookkeeping below (coins, drops, the candle, the
+    // elite boon) would pay out MID-FIGHT. It bails rather than guesses.
+    if (!r.felled) { foeCleanupAndNext(); return; }
     // 🔴 AND THE FIGHT'S SOAK EXIT HAS TO BE STOOD DOWN. `startFoeBeat()` points `afterSoak` at
     // 'foeNext' every turn, so the KILLING turn's soak still routed back into the fight loop —
     // `foeCleanupAndNext()` → `startFoeBeat()` on a corpse, which drew a fresh hand, found none,
@@ -7628,7 +7682,14 @@ function finishResolve() {
     if (got >= 0) log(`+${got} coins${r.outcome === 'Complete' ? ` (${e.xp} + ${COMPLETE_BONUS} for the clean win)` : ''} (you now hold ${S.coins})`, 'good');
     else log(`${got} coins — ${e.xp ? `${e.xp} earned, but the Tithe takes its share` : 'the Tithe takes its share'} (you now hold ${S.coins})`, 'bad');
   }
-  let damage = r.early + r.combatDmg + (r.treacherousDmg || 0);
+  // 🔴 EIGHTH READER OF `hp: 9999` (2026-08-30, found by Thomas in play: he killed a creature
+  // and was then asked to assign blocks). On a beat fight `computeAction` judges the kill against
+  // the sentinel, so `outcome` is Loss and `combatDmg`/`early` are the ROAD's damage for a fight
+  // you supposedly failed — charged on the very turn the creature died, after the reveal had said
+  // it fell. 🔑 A beat fight computes its own damage from `foeCounter()` and takes it BEFORE the
+  // blow; these two terms are a lie here and must never be added.
+  const sentinelFight = !!(e && e.beatFight);
+  let damage = (sentinelFight ? 0 : r.early + r.combatDmg) + (r.treacherousDmg || 0);
   if (r.treacherousDmg) log(`Treacherous: no Complete Victory → +${r.treacherousDmg} damage`, 'bad');
   if (r.stormDmg > 0) { damage += r.stormDmg; log(`Storm: Time Penalties also deal ${r.stormDmg} damage`, 'bad'); }
   // ⚔️ THE LAST MILE — arriving loud. It goes through `damage` rather than getting its own
@@ -8868,6 +8929,8 @@ function exitSoak() {
   if (dest === 'turnEnd') finishTurn();
   else if (dest === 'duelNext') duelCleanupAndNext();
   else if (dest === 'foeNext') foeCleanupAndNext();
+  // ⚔️ it struck first and you blocked it; NOW your blow lands
+  else if (dest === 'foeBlow') foeLandBlow(null);
   else startUpgrade();
 }
 
@@ -12277,7 +12340,15 @@ function cardHTML(card) {
              where: markHome === 'soak' ? 'block' : (SLOT_LABEL[markHome] || markHome),
              full: classText(d.text).replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
   })() : null;
-  const markLit = !!(markLine && (markHome === 'soak'
+  // 🚣 A JOURNEY HAS NOTHING TO MARK (Thomas: *"stun doesn't make sense on a journey"*).
+  // ⚠️ The RULES were already right — `fightStatus()` returns null with no creature, and a probe
+  // over 200 runs counted **zero** marks applied on a road. It was the CARD FACE that lied: the
+  // line lit up the moment you seated the card, promising a Frost that could never land.
+  // 🔑 The line stays, dimmed, and SAYS WHY — hiding it would make the same card look like two
+  // different cards depending on where you stood, and *never state a rule about an object without
+  // marking the object* cuts both ways: a rule that is OFF has to say so too.
+  const canMark = !!fightStatus();
+  const markLit = !!(canMark && markLine && (markHome === 'soak'
     ? S.phase === 'soak'
     : (S.assign && S.assign[markHome] === real.id)));
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
@@ -12391,8 +12462,8 @@ function cardHTML(card) {
     // that had five archetype-gated charms doing silent arithmetic for months. The slot is a word
     // the player already reads off the row in front of them — and it goes through SLOT_LABEL, so
     // a rogue would read *"from your Combo"* off the identical field.
-    (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}" title="${stripTags(markLine.full)}">` +
-      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : 'from your ' + markLine.where}</span></div>` : '') +
+    (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" title="${canMark ? stripTags(markLine.full) : 'Marks only land on a creature — there is nothing here to mark.'}">` +
+      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? 'from your ' + markLine.where : 'nothing to mark here')}</span></div>` : '') +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
@@ -12668,7 +12739,7 @@ function startDuelBeat() {
   const dbag = (S.dragonState.status = S.dragonState.status || {});
   if (dbag.stun) {
     dbag.stun = 0;
-    log(`⚡ <b>${S.dragon.name} is stunned</b> — ${S.dragonState.active ? S.dragonState.active.name : 'its attack'} never comes.`, 'good');
+    log(`⚡ <b>${S.dragon.name} is stunned</b> — ${S.dragonState.active ? S.dragonState.active.name : 'its attack'} never comes. It still breathes, but plainly.`, 'good');
     S.dragonState.active = null;
   }
   const dfrost = dbag.frost || 0; dbag.frost = 0;

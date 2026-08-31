@@ -298,6 +298,9 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .card-mark span { text-align: right; opacity: .85; }
 /* lit only when the card is actually seated where it fires — the seating IS the rule */
 .card-mark.mark-live { border-color: #7a6a2e; background: rgba(122,106,46,.28); color: #ecdfae; }
+/* a road has no creature, so the mark cannot land - shown, but visibly off */
+.card-mark.mark-off { opacity: .38; font-style: italic; }
+
 .card-mark.mark-live b { color: #ffe9a8; }
 
 .foe-status { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }
@@ -1410,6 +1413,22 @@ button.stage.locked .stage-shape { font-style: italic; }
     38%{transform:translate(-.5%,0);filter:brightness(1.15)}
     100%{transform:translate(0,0);filter:none} }
   .fx-shrug { animation: fx-shrug .52s ease-out; }
+
+  /* 💥 IT STRIKES FIRST (2026-08-30, Thomas: *"any time i lose initiative, the monster should
+     always attack me first, visually, have the image move forward a bit"*).
+     ⚠️ THE STANDING RULE IS DO NOT BUILD PRESENTATION, and this is a deliberate exception on the
+     same grounds the 💥 IMPACT set already shipped on: it is not decoration, it is the ORDER made
+     visible. Losing Initiative now means the creature acts before you do, and a turn whose whole
+     structure changed should not look identical to one that did not.
+     🔑 It is also CSS on the animation slot and nothing else, so the Godot version replaces it
+     wholesale without touching a rule — exactly what those slots are for. */
+  @keyframes k-strikes-first {
+    0%   { transform: translate(0, 0) scale(1); }
+    22%  { transform: translate(-4%, -2%) scale(1.04); }
+    55%  { transform: translate(6%, 7%) scale(1.16); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+  .fx-strikes-first { animation: k-strikes-first .62s cubic-bezier(.22,.9,.25,1); transform-origin: 60% 80%; }
 
   /* 🌀 EVASION — it simply isn't there. A lateral slip, and the blow passes through. */
   @keyframes fx-evade { 0%{transform:translate(0,0);opacity:1}
