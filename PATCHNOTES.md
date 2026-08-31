@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 436 — Your spells leave something behind
+*2026-08-30*
+
+**Added**
+- 🏷️ **Every Spell now marks what it hits, and the mark is its element.** 🔥 **Burn** — it loses that much at the start of its turn, then the Burn halves. ❄️ **Frost** — its Initiative drops next turn. 🪨 **Exposed** — your next blow lands harder. ⚡ **Stun** — it loses its next attack, **but only if you win Initiative**.
+- **The size is the card's level.** A Lv4 Fire card burns for 4. Sharpening a card now makes what it does stronger, not just what it hits for.
+- 🔥 Burn is not a blow — it goes straight past Armour, Evasion and Initiative alike. It is the answer to something you cannot out-hit, and the first thing that makes a long fight pay.
+- 🐉 **All of it works on dragons too.**
+
 ## build 435 — A longer first road
 *2026-08-30*
 
