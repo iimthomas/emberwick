@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 442 — The ladder climbs again
+*2026-08-30*
+
+**Changed**
+- 🗺️ **Every stage is the same length now — twelve floors.** Stage 1 was eight and the rest were sixteen, so you reached the first dragon on half the supplies. That is why it was the hardest fight in the game.
+- 🐉 **The dragons were re-tuned so the ladder actually climbs.** Cindermaw is the on-ramp; Skyrender, Cragmourn and Fathomdread each ask for more than the last.
+- ⚠️ Their health was set back when the approach handed them to you wounded. With that gone, they needed it back.
+
 ## build 441 — Straight to the dragon
 *2026-08-30*
 
