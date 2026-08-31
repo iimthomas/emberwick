@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 441 — Straight to the dragon
+*2026-08-30*
+
+**Changed**
+- 🐉 **The Last Mile is gone.** It was the final journey — you walked the approach and the dragon started hurt. Now you reach the lair and the fight begins.
+- ⚠️ **The dragons got much harder as a result.** The approach had been handing them to you 14 health down with their guard softened, every run.
+
 ## build 440 — No more journeys
 *2026-08-30*
 

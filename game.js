@@ -2127,14 +2127,9 @@ const TUTORIAL = {
       point: '#encounter-panel .enc-stats span:nth-child(5)',
       text: '🪙 What it pays. Coins buy card levels and charms between encounters, and unspent coins carry over.' },
     // 👣 the journey panel asks a different question and gets its own walkthrough
-    // ⚠️ these two now fire ONLY on the Last Mile — the one journey left in the game, and the
-    // approach to the lair. That is correct: MP and Pace are the dragon's own two questions.
-    { id: 'j-mp', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
-      point: '#encounter-panel .enc-stats span:nth-child(1)',
-      text: '👣 A journey measures distance instead of damage, using the same cards. Beat its MP to arrive. Reach half and you arrive late.' },
-    { id: 'j-night', when: () => isAssignPhase() && S.encounter && S.encounter.type === 'journey',
-      point: '#encounter-panel .enc-stats span:nth-child(2)',
-      text: '🌙 Nightfall races your Catalyst\'s 💨. If yours is lower, you lose the card in your Arsenal and your candle goes out.' },
+    // ❌ 👣 j-mp / j-night / lastmile were DELETED 2026-08-30 with the Last Mile. They gated on
+    // `encounter.type === 'journey'` and on `finalPhase === 'lastmile'`, neither of which can
+    // happen any more, so they would have sat here reading as content while firing never.
     // ⏳ REWRITTEN 2026-08-30: it used to fire on a journey and teach that arriving late costs
     // you growth. Journeys are cut, and the Time Penalty moved onto **turns over par** — so the
     // lesson now fires on a fight and names the thing that actually charges it.
@@ -2234,9 +2229,6 @@ const TUTORIAL = {
     { id: 'levels', when: () => S.phase === 'wheel' && (S.xpRun || 0) > 0,
       point: '#status .chip, #controls-panel',
       text: '⭐ Every encounter earns <b>xp</b>. A clean win pays most, a loss still pays. It fills two bars: your <b>account level</b>, which opens charms any class can use, and this <b>character\'s level</b>, which opens hers. Both are shown when the run ends.' },
-    { id: 'lastmile', when: () => S.finalMode && S.finalPhase === 'lastmile',
-      point: '#encounter-panel',
-      text: '⚔️ <b>The Last Mile</b> is one journey before the lair, and it costs you nothing: no Nightfall, no Time Penalty, no hardship. Every card is reshuffled for the duel afterwards, so play everything you have. Arrive with a <b>Complete</b> and the dragon starts wounded.' },
     { id: 'duel', when: () => S.finalMode && S.finalPhase === 'duel',
       point: '#encounter-panel',
       text: 'The duel is a race between two numbers: its HP, and how many cards you have left. You lose when you run out of cards, so every card you block with is stamina you do not get back.' },
@@ -3007,6 +2999,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 441, date: '2026-08-30', title: 'Straight to the dragon',
+    changed: [
+      "🐉 <b>The Last Mile is gone.</b> It was the final journey — you walked the approach and the dragon started hurt. Now you reach the lair and the fight begins.",
+      "⚠️ <b>The dragons got much harder as a result.</b> The approach had been handing them to you 14 health down with their guard softened, every run.",
+    ] },
+
   { build: 440, date: '2026-08-30', title: 'No more journeys',
     warn: "Runs in progress will not load — the road changed shape. Your stages, grades, equipment and materials are all safe.",
     changed: [
@@ -12643,7 +12641,18 @@ function beginFinalBattle() {
   // ⭐ arriving at the lair pays whether or not you leave it — reaching the dragon IS the run
   awardXP(XP_AWARD.lair);
   S.finalMode = true;
-  S.finalPhase = 'lastmile';
+  // ⚠️ ❌ THE LAST MILE IS CUT TOO (2026-08-30, Thomas: *"i think we just remove the last mile
+  // too"*). It was the game's final journey — 👣 MOVE against the lair's distance, 💨 PACE
+  // against whether the dragon had heard you — and it fell to the same objection as the rest:
+  // **a road is class-blind, and there is no class-blind fiction for playing your cards at a
+  // distance.** Keeping one journey because it was the important one is how a deleted system
+  // survives as an exception nobody can explain later.
+  // 🔑 What it DID is worth remembering when something replaces it: *how you arrive matters*.
+  // A lair guardian would carry that in fight terms — what the doorstep costs you is what you
+  // bring to the dragon — without inventing a rule. Not built; named so it is not lost.
+  // ⚠️ `dragonState.boon` stays in the shape at 0. duelArmour()/duelStrike()/duelCounter() all
+  // read it, and it was ALREADY 0 before the Last Mile filled it in build 318.
+  S.finalPhase = 'duel';
   S.duelBeat = 0;
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
   // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
@@ -12669,10 +12678,17 @@ function beginFinalBattle() {
   S.downgraded = new Set();
   S.damage = 0; S.poison = 0; S.loseReserve = null; S.afterSoak = 'upgrade';
   log(`Region 4 is behind you. One stretch of road remains.`);
-  startLastMile();
+  startDuel();   // ❌ straight to the dragon — there is no approach any more
 }
 
 // ---------- ⚔️ THE LAST MILE ----------
+// ❌ UNREACHABLE FROM 2026-08-30. `beginFinalBattle()` goes straight to `startDuel()` — the
+// Last Mile was the game's final journey and journeys are cut.
+// ⚠️ KEPT, NOT DELETED, and the distinction matters: `LAST_MILE`, `lastMileApproach()` and
+// `unseenPromise()` are ~100 lines of TUNED CONTENT (the −14/−7 HP head start, the three
+// per-shape softeners) that a lair guardian would want if one is ever built. Deleting the
+// three tutorial LESSONS was different — a lesson that cannot fire is a phantom in an audit,
+// whereas a function nobody calls is inert. 🔑 Cut what LIES; keep what merely sleeps.
 function startLastMile() {
   S.finalPhase = 'lastmile';
   S.encounter = { type: 'journey', name: 'The Last Mile', lastMile: true, finale: true,
