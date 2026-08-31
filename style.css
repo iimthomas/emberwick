@@ -300,6 +300,9 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .card-mark.mark-live { border-color: #7a6a2e; background: rgba(122,106,46,.28); color: #ecdfae; }
 /* a road has no creature, so the mark cannot land - shown, but visibly off */
 .card-mark.mark-off { opacity: .38; font-style: italic; }
+/* what the card's ARCHETYPE does to its mark — quieter than the mark itself, because it is
+   the second fact on the line and the eye should reach it second. */
+.card-mark .mark-note { opacity: .72; font-style: italic; }
 
 .card-mark.mark-live b { color: #ffe9a8; }
 

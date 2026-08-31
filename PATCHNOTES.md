@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 445 — The four cards of an element stop being the same card
+*2026-08-30*
+
+**Changed**
+- ⚡ **Stun has a size now.** It was the one mark that never grew when you sharpened a card — a quarter of your deck opted out of the only progression the game has. It now costs the creature that many attacks.
+- 🧭 **What a card does to its mark depends on what kind of card it is.** ⚔️ a **Spell** card marks **twice as hard** · 💨 a **Catalyst** card's mark **also lands on the next creature you meet** · 🌊 a **Surge** card's mark **never fades** · 🛡️ a **block** card marks you for free while you defend.
+- So all four of your Fire cards still Burn — but one burns huge, one burns the next thing too, one burns forever, and one burns while you block.
+
 ## build 444 — Sweeping up after the journeys
 *2026-08-30*
 
