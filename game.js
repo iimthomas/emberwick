@@ -3002,6 +3002,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 437, date: '2026-08-30', title: 'Every card has a home',
+    changed: [
+      "🧭 <b>A card only leaves its mark from the slot it belongs in</b> — and the slot is printed on the card. Its <b>element</b> says what the mark is; <b>where it belongs</b> says which slot fires it.",
+      "So all four of your Fire cards burn, but one burns from your <b>Spell</b>, one from your <b>Catalyst</b>, one from your <b>Surge</b>, and one <b>when you block with it</b>. Sixteen cards, sixteen different jobs.",
+      "⚔️ <b>Several can fire in one turn</b> — as many as you have different kinds of card in hand. Seating a card where it belongs is not always where its numbers want to be, and that is the choice.",
+      "🛡️ <b>Blocking marks the thing that hit you.</b> Which card you feed now decides what the creature is wearing next turn.",
+      "✦ A card's <b>Lv4 power still fires from that same slot</b> — it is what the card does there once it is fully sharpened, on top of its mark.",
+    ] },
+
   { build: 436, date: '2026-08-30', title: 'Your spells leave something behind',
     added: [
       "🏷️ <b>Every Spell now marks what it hits, and the mark is its element.</b> 🔥 <b>Burn</b> — it loses that much at the start of its turn, then the Burn halves. ❄️ <b>Frost</b> — its Initiative drops next turn. 🪨 <b>Exposed</b> — your next blow lands harder. ⚡ <b>Stun</b> — it loses its next attack, <b>but only if you win Initiative</b>.",
@@ -5995,6 +6004,30 @@ function statusIdForEl(el) {
   for (const k in STATUSES) if (STATUSES[k].el === el) return k;
   return null;
 }
+// 🧭 THE GRID (2026-08-30). The deck is 4 elements × 4 archetypes, so:
+//   🔑 **ELEMENT says WHAT the mark is. ARCHETYPE says WHICH SLOT produces it.**
+// Eight facts to learn, sixteen distinct cards — which is the answer to *"do we do those powers
+// on all 4 elements, or does each card do something different?"*: **neither, it is the grid.**
+// One-power-per-element wastes the archetype axis; sixteen separate powers is sixteen exceptions,
+// and *a verb is an exception* is exactly what got evolution cut in July.
+//
+// ⚠️ THIS IS THE SAME MAP `VERBS` ALREADY USES. The Lv4 verbs were always element × archetype
+// with the archetype picking the slot — their only fault was the `level >= 4` gate, which made
+// them fire 0.40 times a run with 77.5% of runs never seeing one. So the mark is what a card does
+// at home **from Lv1**, and its verb is what it *additionally* does at home at Lv4: a slope with
+// a cliff on top, instead of a cliff alone.
+//
+// 📏 MEASURED before building: the ceiling is the number of DISTINCT ARCHETYPES in hand
+// (2 in 24% of hands, 3 in 63%, 4 in only 13%), and playing purely for damage already lands ~1.6
+// marks — so the grid is about **+0.6 marks a turn** over the Spell-only version, not a doubling.
+// 🔑 AND THE FORK IS AT THE CATALYST: attuning needs the Catalyst to MATCH the Spell's element,
+// marking needs it to be a SPARK, and only **20% of hands** (23% of attunable ones) can do both.
+// **On 77% of attunable hands you must choose between the bigger blow and the mark.**
+const ARCH_HOME = { FORCE: 'Spell', SPARK: 'Element', FLOW: 'Boost', WARD: 'soak' };
+function homeSlotOf(card) { return card && card.def ? (ARCH_HOME[card.def.arch] || null) : null; }
+// 🏠 is this card sitting where it belongs? ⚠️ WARD's home is the SOAK, not a slot — it marks
+// when you BLOCK with it, which is the one cell you cannot get for free.
+function atHome(card, zone) { return !!(card && homeSlotOf(card) === zone); }
 // 🔴 ONE ACCESSOR, BOTH FIGHTS. ● Momentum was measured DEAD IN THE DUEL — 78% break rate at
 // every stage, *a road mechanic that switches off at the boss* — and building the mage a kit that
 // only works on road creatures would repeat that exactly, on the fight that decides the run.
@@ -6191,23 +6224,41 @@ function foeCounter(r) {
 // 🔑 IT WAS ONE FUNCTION BECAUSE THE REVEAL USED TO RUN FIRST. The staged reveal owned the
 // moment, so damage had to wait until it finished; with the staging gone the natural order is
 // simply the real one. **A helper's shape is usually a fossil of the flow that needed it.**
-// 🏷️ WHAT YOUR SPELL LEAVES BEHIND. Called by both fights, after the blow lands.
-// ⚠️ It reads the element the card IS, which since the cycle was retired is also what it seeks
-// and what it deals — one element fact per card, so the face never disagrees with the effect.
-function applySpellStatus(r) {
-  const bag = fightStatus(); if (!bag) return null;
-  const spell = spellCard(); if (!spell) return null;
-  const el = elOf(spell); if (!el) return null;            // a wild card leaves nothing
+// 🏷️ MARK ONE CARD. ⚠️ It reads the element the card IS, which since the cycle was retired
+// is also what it seeks and what it deals — one element fact per card, so the face can never
+// disagree with the effect.
+function markWith(card, r, lvl) {
+  const bag = fightStatus(); if (!bag || !card) return null;
+  const el = elOf(card); if (!el) return null;             // a wild card leaves nothing
   const id = statusIdForEl(el); if (!id) return null;
-  const n = Math.max(1, spell.level || 1);                 // 🔑 the magnitude IS the level
+  // 🔑 the magnitude IS the level. ⚠️ `lvl` overrides it for the one case where the card's
+  // level changes in the same breath as the mark — see the soak below.
+  const n = Math.max(1, lvl != null ? lvl : (card.level || 1));
   if (id === 'stun') {
-    // ⚡ the only conditional one, and the condition is Lightning's own temperament
+    // ⚡ the only conditional one, and the condition is Lightning's own temperament: *go first*.
+    // ⚠️ NOT a random chance — resolution here is deterministic by design, and a coin flip in
+    // the middle of a turn you are meant to be able to SOLVE is a different game.
     if (r && r.initLost) return null;
     bag.stun = 1;
-    return { id, n: 1 };
+    return { id, n: 1, card };
   }
   bag[id] = (bag[id] || 0) + n;
-  return { id, n };
+  return { id, n, card };
+}
+// 🏷️ EVERY CARD SITTING AT HOME MARKS (Thomas: *"we should let them all fire"*).
+// 🔑 No cap, deliberately. A cap of one would resolve to *pick the biggest number*, which is
+// the weak-fork trap the Surge target already failed at 0%; and the freebies are what make the
+// system FELT, which is the exact thing the Lv4 verbs never managed.
+// ⚠️ WARD is absent here on purpose — it marks in soakWith(), when you actually block.
+function applyMarks(r) {
+  const outMarks = [];
+  for (const zone of ['Spell', 'Element', 'Boost']) {
+    const c = cardById(S.assign && S.assign[zone]);
+    if (!atHome(c, zone)) continue;
+    const m = markWith(c, r);
+    if (m) outMarks.push(m);
+  }
+  return outMarks;
 }
 // 🔥 BURN IS THE ONLY ONE THAT TICKS, and it ticks at the START of the creature's turn -
 // before it acts, so a Burn can finish it. ⚠️ It is not a blow: it goes around 🛡️ Armour,
@@ -6230,9 +6281,9 @@ function foeApplyBlow(r) {
   const dealt = Math.max(0, r.value || 0);
   st.hp = Math.max(0, st.hp - dealt);
   log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
-  // 🏷️ and what the Spell leaves behind. ⚠️ AFTER the blow, so 🪨 Exposed cannot buff the
-  // very hit that applied it — every status is a statement about the NEXT turn.
-  if (st.hp > 0) { const s = applySpellStatus(r); if (s) r.status = s; }
+  // 🏷️ and what your cards leave behind. ⚠️ AFTER the blow, so 🪨 Exposed cannot buff the
+  // very hit that applied it — every mark is a statement about the NEXT turn.
+  if (st.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (st.hp <= 0) {
     const pace = st.turn <= st.par ? 'clean' : 'slow';
     log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
@@ -7361,9 +7412,15 @@ function beatDisplayHTML(beat, isNew) {
       if (felled && r.perfect) subs.push(`<div class="pv-sub good">✦ PERFECT KILL — exactly lethal, and it never touched you</div>`);
       // 🏷️ say what you left on it, where the blow is reported — *never state a rule about an
       // object without marking the object*, at the moment the rule starts applying
-      if (!felled && r.status) {
-        const d = STATUSES[r.status.id];
-        subs.push(`<div class="pv-sub good">${d.icon} ${d.name}${r.status.id === 'stun' ? '' : ' ' + r.status.n} — ${classText(d.text).replace(/<b>N<\/b>/g, '<b>' + r.status.n + '</b>')}</div>`);
+      // 🏷️ say what you left on it, where the blow is reported — *never state a rule about an
+      // object without marking the object*, at the moment the rule starts applying.
+      // ⚠️ PLURAL NOW: several cards can be at home in one turn, so this is a list. Naming the
+      // CARD beside each mark is what teaches the grid — you learn *Riverstep froze it from the
+      // Catalyst* by being told, once, at the moment it happened.
+      if (!felled) for (const m of (r.marks || [])) {
+        const d = STATUSES[m.id];
+        subs.push(`<div class="pv-sub good">${d.icon} <b>${d.name}${m.id === 'stun' ? '' : ' ' + m.n}</b>` +
+          ` — ${m.card ? displayName(m.card) : ''}, from your ${SLOT_LABEL[homeSlotOf(m.card)] || 'hand'}</div>`);
       }
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
@@ -8747,6 +8804,7 @@ function soakWith(cardId) {
   }
   // ✦ Lv4 WARD verbs, all of them about KEEPING CARDS — the run-level currency
   const v = verbOf(card);
+  const lvlBefore = card.level;   // 🛡️ the mark below is priced at this, not at what blocking leaves
   const bulwark = v && v.name === 'Bulwark';             // soaks everything still coming
   const guarded = v && v.name === 'Emberguard' && !S.emberguardUsed;  // takes the hit, keeps its level
   const soak = bulwark ? S.damage : soakValue(card);
@@ -8758,6 +8816,23 @@ function soakWith(cardId) {
     downgrade(card, `, blocking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
   }
   if (v && v.name === 'Groundwire') { S.wakePending = (S.wakePending || 0) + 2; log(`✦ Groundwire — the blow earns you a 🔥 +2 Emberwake.`, 'good'); }
+  // 🛡️ A WARD CARD'S HOME IS THE SOAK, so this is where it marks — **taking damage marks the
+  // thing that hit you.** 🔑 The best cell in the grid and the only one that is not free: every
+  // other mark costs you an arrangement, this one costs you a card's level.
+  // ⚠️ It is also the answer to the measured *designated victim* problem — best plate 5.8 against
+  // an average hit of 4.6, WARD paying 74% of the time, soaking a lookup rather than a decision.
+  // Now which card you feed decides what the creature is wearing next turn.
+  if (card.def.arch === 'WARD') {
+    // 🔴 MARK AT THE LEVEL IT HAD WHEN IT BLOCKED, not the level blocking left it at.
+    // `downgrade()` runs a few lines above, so reading `card.level` here gave **Exposed 1** off a
+    // card whose face said **Exposed 2** — a display lying about its own rule, at the moment the
+    // rule fires. 🔑 The card face is the promise; whatever the code does has to match it.
+    const m = markWith(card, null, lvlBefore);
+    if (m) {
+      const d = STATUSES[m.id];
+      log(`${d.icon} <b>${d.name}${m.id === 'stun' ? '' : ' ' + m.n}</b> — ${displayName(card)} marks it as it blocks.`, 'good');
+    }
+  }
   S.damage = Math.max(0, S.damage - soak);
   if (S.damage <= 0) {
     log(`All damage blocked.`);
@@ -12189,6 +12264,22 @@ function cardHTML(card) {
 
   const slot = zoneOf(card.id);
   const verb = verbOf(card);
+  // 🏷️ what this card leaves on a creature, and whether it is sitting where it can.
+  // ⚠️ Reads `real`, not the upgrade preview's clone, for the SEATING check — but the preview's
+  // LEVEL for the number, so sharpening shows you the bigger mark. Same discipline as the rest of
+  // the preview: it is the real renderer against a card one level higher.
+  const markId = statusIdForEl(elOf(card));
+  const markHome = homeSlotOf(card);
+  const markLine = (markId && markHome) ? (() => {
+    const d = STATUSES[markId];
+    const n = markId === 'stun' ? '' : Math.max(1, card.level || 1);
+    return { icon: d.icon, name: d.name, n,
+             where: markHome === 'soak' ? 'block' : (SLOT_LABEL[markHome] || markHome),
+             full: classText(d.text).replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
+  })() : null;
+  const markLit = !!(markLine && (markHome === 'soak'
+    ? S.phase === 'soak'
+    : (S.assign && S.assign[markHome] === real.id)));
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
   const fate = (isAssignPhase() && slot) ? fateOf(slot, card.id) : null;
   // ⚖️🐌🌀 name the barred card outright — "your heaviest" is not something you can read off a row.
@@ -12294,6 +12385,14 @@ function cardHTML(card) {
         `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span>`
       : '') + `</div>` +
     `<div class="card-vals">${vals}</div>` +
+    // 🏷️ THE MARK, AND THE SLOT IT FIRES FROM — on every card, at every level.
+    // 🔴 IT PRINTS THE HOME **SLOT**, NEVER THE ARCHETYPE. FORCE/SPARK/FLOW/WARD is an
+    // authoring tool printed nowhere, and gating a rule on an invisible fact is the exact mistake
+    // that had five archetype-gated charms doing silent arithmetic for months. The slot is a word
+    // the player already reads off the row in front of them — and it goes through SLOT_LABEL, so
+    // a rogue would read *"from your Combo"* off the identical field.
+    (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}" title="${stripTags(markLine.full)}">` +
+      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : 'from your ' + markLine.where}</span></div>` : '') +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
@@ -12644,7 +12743,7 @@ function resolveDuel() {
   // Anything added to a fight belongs here in the same commit, or it is a road-only rule.
   const dbag2 = fightStatus();
   if (dbag2 && dbag2.expose) dbag2.expose = 0;
-  if (!kill) { const s = applySpellStatus(r); if (s) r.status = s; }
+  if (!kill) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +

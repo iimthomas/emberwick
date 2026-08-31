@@ -6,6 +6,16 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 437 — Every card has a home
+*2026-08-30*
+
+**Changed**
+- 🧭 **A card only leaves its mark from the slot it belongs in** — and the slot is printed on the card. Its **element** says what the mark is; **where it belongs** says which slot fires it.
+- So all four of your Fire cards burn, but one burns from your **Spell**, one from your **Catalyst**, one from your **Surge**, and one **when you block with it**. Sixteen cards, sixteen different jobs.
+- ⚔️ **Several can fire in one turn** — as many as you have different kinds of card in hand. Seating a card where it belongs is not always where its numbers want to be, and that is the choice.
+- 🛡️ **Blocking marks the thing that hit you.** Which card you feed now decides what the creature is wearing next turn.
+- ✦ A card's **Lv4 power still fires from that same slot** — it is what the card does there once it is fully sharpened, on top of its mark.
+
 ## build 436 — Your spells leave something behind
 *2026-08-30*
 
