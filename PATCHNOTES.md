@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 448 — Tooltips that actually explain things
+*2026-08-30*
+
+**Changed**
+- 💡 **Every tooltip rewritten.** They now say what a thing **does**, in one sentence, the way a card game should — instead of explaining one mechanic with another one you also do not know yet.
+- ✦ The **Attuned** number and the ⏳ **Time Penalty** have explanations now too. They never did.
+
 ## build 447 — Cards you can actually read
 *2026-08-30*
 

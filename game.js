@@ -2995,6 +2995,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 448, date: '2026-08-30', title: 'Tooltips that actually explain things',
+    changed: [
+      "💡 <b>Every tooltip rewritten.</b> They now say what a thing <b>does</b>, in one sentence, the way a card game should — instead of explaining one mechanic with another one you also do not know yet.",
+      "✦ The <b>Attuned</b> number and the ⏳ <b>Time Penalty</b> have explanations now too. They never did.",
+    ] },
+
   { build: 447, date: '2026-08-30', title: 'Cards you can actually read',
     changed: [
       "🏷️ <b>A card's mark is a stat now, not a paragraph.</b> It sits in the row with 💨 ➕ ⚔️ 🛡️ as <b>❄️ 4</b> — one glyph, one number, like everything else on the card.",
@@ -7682,8 +7688,8 @@ function beatDisplayHTML(beat, isNew) {
       if (!felled) for (const m of (r.marks || [])) {
         const d = STATUSES[m.id];
         const lasts = (ARCH_MARK[m.card && m.card.def.arch] || {}).lasting;
-        subs.push(`<div class="pv-sub good">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never fades)</i>' : ''}` +
-          ` — ${m.card ? displayName(m.card) : ''}, ${homeSlotOf(m.card) === 'soak' ? 'as it blocked' : 'from your ' + (SLOT_LABEL[homeSlotOf(m.card)] || 'hand')}</div>`);
+        subs.push(`<div class="pv-sub good" data-tip="${m.id}">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never ends)</i>' : ''}` +
+          ` — from ${m.card ? displayName(m.card) : 'your hand'}</div>`);
       }
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
@@ -7731,7 +7737,7 @@ function beatDisplayHTML(beat, isNew) {
       ? (r.type === 'fight' && r.hardship ? ` — ⚠️ ${r.hardship}`
         : r.peril === 'Toll' ? ` — ⏳ Toll doubles it` : '')
       : '';
-    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad">⏳ Time Penalty ${r.timePenalty}${tpWhy}</div>`);
+    if (r.timePenalty > 0) subs.push(`<div class="pv-sub bad" data-tip="tp">⏳ Time Penalty ${r.timePenalty}${tpWhy}</div>`);
     if (r.poison > 0) subs.push(`<div class="pv-sub bad">☠️ Poison: ${r.poison} to your next hand</div>`);
     if (r.loseReserve) subs.push(`<div class="pv-sub bad">your Arsenal is lost — ${r.loseReserve}</div>`);
     return `<div class="pv-result${pop}"><span class="oc oc-${r.outcome}">${r.outcome.toUpperCase()}</span>` +
@@ -9105,7 +9111,7 @@ function soakWith(cardId) {
     const m = markWith(card, null, lvlBefore);
     if (m) {
       const d = STATUSES[m.id];
-      log(`${d.icon} <b>${d.name} ${m.n}</b> — ${displayName(card)} marks it as it blocks.`, 'good');
+      log(`${d.icon} <b>${d.name} ${m.n}</b> — from ${displayName(card)}, as it blocked.`, 'good');
     }
   }
   S.damage = Math.max(0, S.damage - soak);
@@ -12395,24 +12401,48 @@ function roleButtons(card) {
 // pointer, TAP the glyph on touch, same content either way.
 // ⚠️ Presentation, built anyway, on the 💥 impact set's grounds: this is *legible math always*,
 // which is a pillar. Godot replaces the renderer wholesale and loses nothing.
+// 💡 REWRITTEN 2026-08-30 AGAINST HEARTHSTONE AND LEGENDS OF RUNETERRA (Thomas: *"the
+// tooltips dont even explain what the ability does… look up other tcg games and their tooltips"*).
+// 🔑 THE HOUSE STYLE, TAKEN FROM THEIRS: **name, then the rule as ONE plain sentence.** A
+// second sentence only for duration or decay. Compare:
+//   • *Divine Shield: Absorbs the first source of any damage, removing the shield.*
+//   • *Barrier: Negates the next amount of damage the unit will take. Lasts one round.*
+//   • *Frostbite: Sets a unit's power to zero.* — five words.
+// 🔴 MINE BROKE ALL THREE RULES. ❄️ Frost read *"its Initiative drops by this much next turn
+// — which is how you win the race, and winning the race means nothing gets through"*: twenty-four
+// words, it explained the effect via ANOTHER MECHANIC that also needs explaining, and it told you
+// why it was GOOD instead of what it DID. ⚠️ **A tooltip states the rule. Strategy is the
+// player's job** — the same line as *rules text is not flavour text*.
+// ❌ AND THE WORD "MARK" IS GONE. I invented it as a category noun for the four effects and never
+// defined it anywhere — the ‘accord’ mistake exactly. Neither Hearthstone nor LoR has a word for
+// *keyword* in player-facing text; each effect is simply named. So these are named too.
 const TIPS = {
-  init:   ['💨 Initiative', 'Your speed this turn, from your <b>{slot:Element}</b>. Beat the creature and <b>nothing it does gets through</b>. Lose the race and its attack lands in full, <b>before</b> your blow.'],
-  boost:  ['➕ Surge', 'What this card adds from your <b>{slot:Boost}</b> — or what you <b>channel</b> into the Emberwake to spend next turn.'],
-  value:  ['⚔️ Value', 'What this card is worth as your <b>{slot:Spell}</b>. The second number is what it becomes <b>attuned</b> — when your {slot:Element} shares its element.'],
-  armour: ['🛡️ Block', 'How much damage this card soaks. <b>Blocking costs it a level</b>, and a Lv1 card that blocks leaves your deck for the rest of the run. That is your health bar.'],
-  burn:   ['🔥 Burn', 'It loses this much at the <b>start of its turn</b>, then the Burn halves. Not a blow — it goes straight past Armour, Evasion and Initiative alike.'],
-  frost:  ['❄️ Frost', 'Its Initiative drops by this much next turn — which is how you <b>win the race</b>, and winning the race means nothing gets through.'],
-  stun:   ['⚡ Stun', 'It loses its next attacks — the named move it telegraphed. It still strikes, but plainly. <b>Only lands if you win Initiative.</b>'],
-  expose: ['🪨 Exposed', 'Your next blow against it lands for this much more.'],
-  mkforce:['⚔️ Marks hardest', 'From your <b>{slot:Spell}</b>, and it marks <b>twice as hard</b> — the number shown already includes it.'],
-  mkspark:['→ The mark travels', 'It also lands on the <b>next creature you meet</b>.'],
-  mkflow: ['∞ The mark never fades', 'It is <b>never spent</b> — it does not halve and it is not used up.'],
-  mkward: ['🛡️ Marks when it blocks', 'This card marks the creature as you <b>soak damage</b> with it — the only mark you get for something you had to do anyway.'],
-  foehp:  ['❤️ Its health', 'Chip it to nothing and it falls. Your deck does not come back mid-fight, so a long fight is one you pay for.'],
-  foepar: ['⚔️ Par', 'How many turns this should take. Go over and you take a <b>⏳ Time Penalty</b> — you cannot sharpen for that many encounters.'],
-  foeinit:['💨 Its Initiative', 'Beat this and <b>nothing gets through</b>. Lose to it and its attack lands in full, before your blow.'],
-  foeatk: ['⚔️ Its blow', 'What it deals if it beats your Initiative. You block it with your cards, and blocking costs them levels.'],
-  foenext:['↷ What it does next', 'Every creature telegraphs its next move a turn ahead. It is a one-turn change to its own stats — tougher, faster, or a blow you cannot outrun.'],
+  // — what a card shows —
+  init:   ['💨 Initiative', 'Your speed this turn, taken from your {slot:Element}. If it is higher than the creature\'s Initiative, the creature deals no damage to you this turn.'],
+  boost:  ['➕ Surge', 'How much this card adds to your attack when it sits in your {slot:Boost}.'],
+  value:  ['⚔️ Attack', 'The damage this card deals as your {slot:Spell}. The second number is what it deals when Attuned.'],
+  armour: ['🛡️ Block', 'How much damage this card can absorb. A card that blocks loses a level. A card at Lv1 that blocks is destroyed.'],
+  attune: ['✦ Attuned', 'Your {slot:Spell} attacks for its higher number when your {slot:Element} is the same element.'],
+
+  // — the four effects —
+  burn:   ['🔥 Burn', 'The creature loses this much health at the start of its turn. The Burn then halves.'],
+  frost:  ['❄️ Frost', 'The creature\'s Initiative is this much lower next turn.'],
+  stun:   ['⚡ Stun', 'The creature\'s next attacks are cancelled. It still deals damage. Only applies if your Initiative is higher.'],
+  expose: ['🪨 Exposed', 'Your next attack against the creature deals this much more damage.'],
+
+  // — and what a card's kind does to its effect —
+  mkforce:['⚔️ Twice as strong', 'This card applies its effect at double strength. The number shown already includes it.'],
+  mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
+  mkflow: ['∞ It never ends', 'This card\'s effect is never removed or reduced.'],
+  mkward: ['🛡️ Applied by blocking', 'This card applies its effect when you block damage with it.'],
+
+  // — what a creature shows —
+  foehp:  ['❤️ Health', 'Reduce it to zero to defeat the creature. Your deck is not shuffled back during a fight.'],
+  foepar: ['⚔️ Par', 'How many turns this creature should take. Every turn over par gives you a Time Penalty.'],
+  foeinit:['💨 Its Initiative', 'If your Initiative is higher, the creature deals no damage this turn. If it is not, the creature attacks before you do.'],
+  foeatk: ['⚔️ Its attack', 'The damage it deals when its Initiative is higher than yours. You block it with cards from your hand.'],
+  foenext:['↷ Its next action', 'What the creature will do on its next turn, shown one turn early. It changes the creature\'s own numbers for that turn only.'],
+  tp:     ['⏳ Time Penalty', 'You cannot sharpen your cards for this many encounters.'],
 };
 function tipHTML(key) {
   const t = TIPS[key]; if (!t) return '';
@@ -12774,7 +12804,7 @@ function cardHTML(card) {
     // explanation is flavour the moment you have learned it. The sentence lives in the tooltip.
     (markLine ? `<span class="s-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" data-tip="${markLine.tip}">` +
       `${markLine.icon} ${markLine.n}${markLine.suffix}</span>` : '') + `</div>` +
-    `<div class="card-vals" data-tip="value">${vals}</div>` +
+    `<div class="card-vals" data-tip="${attV != null ? 'attune' : 'value'}">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
