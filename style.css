@@ -299,6 +299,32 @@ label.radio { margin-right: 14px; cursor: pointer; }
 /* lit only when the card is actually seated where it fires — the seating IS the rule */
 .card-mark.mark-live { border-color: #7a6a2e; background: rgba(122,106,46,.28); color: #ecdfae; }
 /* a road has no creature, so the mark cannot land - shown, but visibly off */
+/* 💡 THE TOOLTIP. Fixed, so it is positioned against the viewport and cannot be clipped by
+   the panel it came from; pointer-events:none so it never swallows the tap that opened it. */
+#tip {
+  position: fixed; z-index: 9999; left: 0; top: 0;
+  width: 260px; max-width: max(200px, calc(100vw - 16px));
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid #5a5240;
+  background: #16140f;
+  box-shadow: 0 6px 22px rgba(0,0,0,.55);
+  opacity: 0; visibility: hidden;
+  transition: opacity .12s ease;
+  pointer-events: none;
+}
+#tip.on { opacity: 1; visibility: visible; }
+#tip b { display: block; font-size: 12.5px; color: #f0d79a; margin-bottom: 3px; }
+#tip span { display: block; font-size: 11.5px; line-height: 1.45; color: #cfc7b4; }
+#tip span b { display: inline; color: #ecdfae; margin: 0; font-size: inherit; }
+
+/* 🏷️ the mark, now a stat like the others */
+.s-mark { opacity: .8; }
+.s-mark.mark-live { color: #ffe9a8; opacity: 1; font-weight: bold; }
+.s-mark.mark-off { opacity: .3; }
+/* ⚠️ anything tippable says so quietly — a dotted underline is the one affordance that does
+   not compete with the number it sits under. */
+[data-tip] { cursor: help; }
+
 .card-mark.mark-off { opacity: .38; font-style: italic; }
 /* what the card's ARCHETYPE does to its mark — quieter than the mark itself, because it is
    the second fact on the line and the eye should reach it second. */

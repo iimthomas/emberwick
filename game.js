@@ -2995,6 +2995,15 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 447, date: '2026-08-30', title: 'Cards you can actually read',
+    changed: [
+      "🏷️ <b>A card's mark is a stat now, not a paragraph.</b> It sits in the row with 💨 ➕ ⚔️ 🛡️ as <b>❄️ 4</b> — one glyph, one number, like everything else on the card.",
+      "A small mark after it says what kind: <b>→</b> it also marks the next creature · <b>∞</b> it never fades · <b>🛡️</b> it marks when you block. A Spell card needs no mark — its doubling is already in the number.",
+    ],
+    added: [
+      "💡 <b>Hover anything to find out what it means</b> — every card stat, every mark, the creature's health, its Initiative, its par, and what it has telegraphed. <b>On a phone, tap the icon.</b>",
+    ] },
+
   { build: 445, date: '2026-08-30', title: 'The four cards of an element stop being the same card',
     changed: [
       "⚡ <b>Stun has a size now.</b> It was the one mark that never grew when you sharpened a card — a quarter of your deck opted out of the only progression the game has. It now costs the creature that many attacks.",
@@ -6207,7 +6216,7 @@ function foeStatusHTML() {
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
               : `its next <b>${n}</b> attack${n === 1 ? '' : 's'} lost`;
-    bits.push(`<span class="foe-st foe-st-${id}">${d.icon} ${d.name} ${n} — ${say}</span>`);
+    bits.push(`<span class="foe-st foe-st-${id}" data-tip="${id}">${d.icon} ${d.name} ${n} — ${say}</span>`);
   }
   return bits.length ? `<div class="foe-status">${bits.join('')}</div>` : '';
 }
@@ -10751,6 +10760,7 @@ function sizeModal(panel) {
 }
 
 function render() {
+  bindTips();
   if (isShell()) {
     document.body.className = 'phase-' + S.phase + ' shell';
     $('turn-indicator').textContent = `build ${BUILD}`;
@@ -11218,11 +11228,12 @@ function renderEncounter() {
       // told a beat early.
       (S.foeState ? foeHpBar(S.foeState, e.name) + foeStatusHTML() +
         `<div class="enc-stats">` +
-        `<span>⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
-        `<span>💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span><span>⚔️ Atk <b>${e.atk}</b></span>` +
+        `<span data-tip="foepar">⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
+        `<span data-tip="foeinit">💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span>` +
+        `<span data-tip="foeatk">⚔️ Atk <b>${e.atk}</b></span>` +
         `<span>🪙 <b>${e.xp}</b></span></div>` +
         (S.foeState.active ? `<div class="foe-now">${S.foeState.active.icon} <b>${S.foeState.active.name}</b> — ${S.foeState.active.now}</div>` : '') +
-        (S.foeState.next ? `<div class="foe-tell">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '')
+        (S.foeState.next ? `<div class="foe-tell" data-tip="foenext">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '')
       : '') +
       (S.foeState ? '' :
       // ❤️ the same bar, with the half mark on it — one creature, one way of reading its health
@@ -12374,6 +12385,76 @@ function roleButtons(card) {
   return `<div class="role-bar">${btns}</div>`;
 }
 
+// 💡 TOOLTIPS (2026-08-30, Thomas: *"its just hard to understand at times"* → *"would it be
+// possible to add a tooltip on mouseover to explain the abilities and icons"*).
+// 🔑 THIS IS THE OTHER HALF OF COMPRESSING THE MARK TO A GLYPH. A card can only afford
+// `❄️ 4` instead of a sentence **if there is somewhere to learn what ❄️ means** — otherwise
+// shortening the card just moves the confusion. The two changes are one change.
+// ⚠️ NOT `title=`. Native tooltips wait a second, cannot be styled, and — the one that decides
+// it — **do not exist on touch**, and this is playtested on a phone every day. So: hover on a
+// pointer, TAP the glyph on touch, same content either way.
+// ⚠️ Presentation, built anyway, on the 💥 impact set's grounds: this is *legible math always*,
+// which is a pillar. Godot replaces the renderer wholesale and loses nothing.
+const TIPS = {
+  init:   ['💨 Initiative', 'Your speed this turn, from your <b>{slot:Element}</b>. Beat the creature and <b>nothing it does gets through</b>. Lose the race and its attack lands in full, <b>before</b> your blow.'],
+  boost:  ['➕ Surge', 'What this card adds from your <b>{slot:Boost}</b> — or what you <b>channel</b> into the Emberwake to spend next turn.'],
+  value:  ['⚔️ Value', 'What this card is worth as your <b>{slot:Spell}</b>. The second number is what it becomes <b>attuned</b> — when your {slot:Element} shares its element.'],
+  armour: ['🛡️ Block', 'How much damage this card soaks. <b>Blocking costs it a level</b>, and a Lv1 card that blocks leaves your deck for the rest of the run. That is your health bar.'],
+  burn:   ['🔥 Burn', 'It loses this much at the <b>start of its turn</b>, then the Burn halves. Not a blow — it goes straight past Armour, Evasion and Initiative alike.'],
+  frost:  ['❄️ Frost', 'Its Initiative drops by this much next turn — which is how you <b>win the race</b>, and winning the race means nothing gets through.'],
+  stun:   ['⚡ Stun', 'It loses its next attacks — the named move it telegraphed. It still strikes, but plainly. <b>Only lands if you win Initiative.</b>'],
+  expose: ['🪨 Exposed', 'Your next blow against it lands for this much more.'],
+  mkforce:['⚔️ Marks hardest', 'From your <b>{slot:Spell}</b>, and it marks <b>twice as hard</b> — the number shown already includes it.'],
+  mkspark:['→ The mark travels', 'It also lands on the <b>next creature you meet</b>.'],
+  mkflow: ['∞ The mark never fades', 'It is <b>never spent</b> — it does not halve and it is not used up.'],
+  mkward: ['🛡️ Marks when it blocks', 'This card marks the creature as you <b>soak damage</b> with it — the only mark you get for something you had to do anyway.'],
+  foehp:  ['❤️ Its health', 'Chip it to nothing and it falls. Your deck does not come back mid-fight, so a long fight is one you pay for.'],
+  foepar: ['⚔️ Par', 'How many turns this should take. Go over and you take a <b>⏳ Time Penalty</b> — you cannot sharpen for that many encounters.'],
+  foeinit:['💨 Its Initiative', 'Beat this and <b>nothing gets through</b>. Lose to it and its attack lands in full, before your blow.'],
+  foeatk: ['⚔️ Its blow', 'What it deals if it beats your Initiative. You block it with your cards, and blocking costs them levels.'],
+  foenext:['↷ What it does next', 'Every creature telegraphs its next move a turn ahead. It is a one-turn change to its own stats — tougher, faster, or a blow you cannot outrun.'],
+};
+function tipHTML(key) {
+  const t = TIPS[key]; if (!t) return '';
+  return `<b>${classText(t[0])}</b><span>${classText(t[1])}</span>`;
+}
+function showTip(key, el) {
+  const box = $('tip'); if (!box || !TIPS[key]) return;
+  box.innerHTML = tipHTML(key);
+  box.classList.add('on');
+  // 🔴 GUARD THE VIEWPORT. `innerWidth`/`innerHeight` can read **0** — a hidden tab, an
+  // orientation change mid-frame, a PWA cold start — and this arithmetic then clamps the tip to
+  // a negative left and squeezes it to a 22px column of text. Caught while verifying in a hidden
+  // browser pane, which reported 0×0 and reproduced it exactly.
+  // 🔑 Same family as *rAF does not fire in a hidden tab*: **anything that measures the window
+  // has to survive the window not being there yet.**
+  const vw = innerWidth || document.documentElement.clientWidth || 360;
+  const vh = innerHeight || document.documentElement.clientHeight || 640;
+  const r = el.getBoundingClientRect(), bw = box.offsetWidth || 260, bh = box.offsetHeight || 90;
+  box.style.left = Math.max(8, Math.min(r.left + r.width / 2 - bw / 2, vw - bw - 8)) + 'px';
+  // ⚠️ flip above when there is no room below, THEN CLAMP. The flip alone left it 6px off the
+  // bottom on a card near the hand row, because it depends on `offsetHeight` being final at the
+  // moment it is read — and a box whose content was set two statements ago may not be.
+  // 🔑 A PREFERENCE PLUS A CLAMP BEATS A BRANCH YOU HAVE TO GET RIGHT: the branch chooses the
+  // nice side, the clamp guarantees it is on screen whatever the branch decided.
+  const below = r.bottom + 8, above = r.top - bh - 8;
+  const want = (below + bh < vh - 8) ? below : above;
+  box.style.top = Math.max(8, Math.min(want, vh - bh - 8)) + 'px';
+}
+function hideTip() { const b = $('tip'); if (b) b.classList.remove('on'); }
+function bindTips() {
+  if (window.__tipsBound) return; window.__tipsBound = true;
+  const find = e => (e.target && e.target.closest) ? e.target.closest('[data-tip]') : null;
+  document.addEventListener('mouseover', e => { const t = find(e); if (t) showTip(t.dataset.tip, t); });
+  document.addEventListener('mouseout',  e => { if (find(e)) hideTip(); });
+  // 📱 touch: tap the glyph. ⚠️ stopPropagation, or tapping a stat would ALSO select the card
+  // for a swap — the slot row's tap handler sits on the card itself.
+  document.addEventListener('click', e => {
+    const t = find(e);
+    if (t) { e.stopPropagation(); showTip(t.dataset.tip, t); } else hideTip();
+  }, true);
+}
+
 function cardHTML(card) {
   // 🔼 THE UPGRADE PREVIEW. Thomas: *"it should basically look like the card but in its upgraded
   // form. i don't want to just see text saying what number changes to what number."*
@@ -12556,7 +12637,13 @@ function cardHTML(card) {
     // half — the same fault as the 🛡️ WARD card that said Exposed 2 and paid 1.
     const n = Math.max(1, card.level || 1) * ((ARCH_MARK[card.def.arch] || {}).mult || 1);
     const am = ARCH_MARK[card.def.arch] || {};
-    return { icon: d.icon, name: d.name, n, note: am.note || '',
+    // → travels · ∞ never fades · 🛡️ on the block. ⚠️ ⚔️ FORCE gets NO suffix, because
+    // its doubling is **already in the number** — printing the reason beside a result that is
+    // already correct is the redundancy that made the card unreadable in the first place.
+    const suffix = am.carry ? '\u2192' : am.lasting ? '\u221e' : (markHome === 'soak' ? '🛡️' : '');
+    const tip = am.carry ? 'mkspark' : am.lasting ? 'mkflow'
+              : markHome === 'soak' ? 'mkward' : (am.mult ? 'mkforce' : markId);
+    return { icon: d.icon, name: d.name, n, note: am.note || '', suffix, tip,
              // ✅ matches `.card-verb` exactly: a slot gets "in <slot>", the soak gets "when it blocks"
              where: markHome === 'soak' ? 'when it blocks' : 'in ' + (SLOT_LABEL[markHome] || markHome),
              full: classText(d.text + (am.lasting ? '' : (d.decay || '')))
@@ -12670,23 +12757,24 @@ function cardHTML(card) {
     // treatment ✦ Lv4 verbs get, for the same reason: a rule you must remember is a rule you misplay.
     (d.verb ? `<div class="card-verb${comboCard() && comboCard().id === card.id ? ' verb-live' : (isMate ? ' verb-offer' : '')}">` +
       `<b>🗡️ ${isMate ? 'Move me to COMBO' : 'Combo'}</b><span>${ROGUE_VERBS[d.verb]}</span></div>` : '') +
-    `<div class="card-row"><span class="s-init">💨 ${v.init}</span>` +
+    // 💡 EVERY GLYPH IS TIPPABLE. A card can only afford `❄️ 4` instead of a sentence if
+    // there is somewhere to learn what ❄️ means — otherwise shortening it just moves the confusion.
+    `<div class="card-row"><span class="s-init" data-tip="init">💨 ${v.init}</span>` +
     // ⚠️ ➕ IS THE MAGE'S SURGE STAT. A rogue card has no boost, so printing "➕ 0" on all sixteen
     // of them is a number that means nothing — same fault as the ✦ attuned value, same fix.
     (CLASS.boosts
-      ? `<span class="s-boost${resoOn ? ' resonating' : ''}"${resoOn ? ' title="Resonates — it feeds what the Spell seeks"' : ''}>` +
+      ? `<span class="s-boost${resoOn ? ' resonating' : ''}" data-tip="boost">` +
         `➕ ${v.boost}${resoOn ? ` ${elIcon(wantEl)}✦` : ''}</span>`
-      : '') + `</div>` +
-    `<div class="card-vals">${vals}</div>` +
-    // 🏷️ THE MARK, AND THE SLOT IT FIRES FROM — on every card, at every level.
-    // 🔴 IT PRINTS THE HOME **SLOT**, NEVER THE ARCHETYPE. FORCE/SPARK/FLOW/WARD is an
-    // authoring tool printed nowhere, and gating a rule on an invisible fact is the exact mistake
-    // that had five archetype-gated charms doing silent arithmetic for months. The slot is a word
-    // the player already reads off the row in front of them — and it goes through SLOT_LABEL, so
-    // a rogue would read *"from your Combo"* off the identical field.
-    (markLine ? `<div class="card-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" title="${canMark ? stripTags(markLine.full) : 'Marks only land on a creature — there is nothing here to mark.'}">` +
-      `<b>${markLine.icon} ${markLine.name} ${markLine.n}</b><span>${markLit ? markLine.full : (canMark ? markLine.where : 'nothing to mark here')}` +
-      (markLine.note && canMark ? `<i class="mark-note"> · ${markLine.note}</i>` : '') + `</span></div>` : '') +
+      : '') +
+    // 🏷️ 🔴 THE MARK IS A FIFTH STAT NOW, NOT A PARAGRAPH (2026-08-30, Thomas: *"its just hard
+    // to understand at times"*). Counted on a real card: **eleven facts, and the mark was the only
+    // SENTENCE among them** — every other fact is glyph + number, so you learn 💨 once and then
+    // just read numbers. The mark broke that grammar on every card, every turn.
+    // 🔑 *Flavour belongs where it is read ONCE, never in text re-read every encounter* — and an
+    // explanation is flavour the moment you have learned it. The sentence lives in the tooltip.
+    (markLine ? `<span class="s-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" data-tip="${markLine.tip}">` +
+      `${markLine.icon} ${markLine.n}${markLine.suffix}</span>` : '') + `</div>` +
+    `<div class="card-vals" data-tip="value">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
     (barred ? `<div class="card-barred">${barred}</div>` : '') +
@@ -12694,7 +12782,7 @@ function cardHTML(card) {
     `<div class="card-row card-foot">` +
       `<span class="card-type">${typeLine(d)}</span>` +
       (enhLine ? `<span class="card-enh">${enhLine}</span>` : '') +
-      `<span class="s-armor">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
+      `<span class="s-armor" data-tip="armour">🛡️ ${v.armor > 0 ? v.armor : '—'}</span></div>` +
     action + `</div>`;
 }
 

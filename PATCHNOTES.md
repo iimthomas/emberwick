@@ -6,6 +6,16 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 447 — Cards you can actually read
+*2026-08-30*
+
+**Added**
+- 💡 **Hover anything to find out what it means** — every card stat, every mark, the creature's health, its Initiative, its par, and what it has telegraphed. **On a phone, tap the icon.**
+
+**Changed**
+- 🏷️ **A card's mark is a stat now, not a paragraph.** It sits in the row with 💨 ➕ ⚔️ 🛡️ as **❄️ 4** — one glyph, one number, like everything else on the card.
+- A small mark after it says what kind: **→** it also marks the next creature · **∞** it never fades · **🛡️** it marks when you block. A Spell card needs no mark — its doubling is already in the number.
+
 ## build 445 — The four cards of an element stop being the same card
 *2026-08-30*
 
