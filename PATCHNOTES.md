@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 457 — Dragons fight in a cycle
+*2026-09-02*
+
+**Changed**
+- 🔁 **A dragon plays its three attacks in a fixed order**, over and over, and the order is printed — in the stage briefing, at the lair, and on the duel panel with the next step in bold. Plan the whole fight, not just the next beat. Road creatures still draw from their bag.
+
 ## build 456 — Packs
 *2026-09-02*
 

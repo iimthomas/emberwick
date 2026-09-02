@@ -2993,6 +2993,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 457, date: '2026-09-02', title: 'Dragons fight in a cycle',
+    changed: [
+      "🔁 <b>A dragon plays its three attacks in a fixed order</b>, over and over, and the order is printed — in the stage briefing, at the lair, and on the duel panel with the next step in bold. Plan the whole fight, not just the next beat. Road creatures still draw from their bag.",
+    ] },
+
   { build: 456, date: '2026-09-02', title: 'Packs',
     changed: [
       "🎯 <b>Some creatures bring minions.</b> Eight so far, two a road. Tap a body on the panel to aim your Spell at it; your effects land on the body you hit. The pack shares its leader's Initiative — lose the race and every living body swings. Beat the leader and the rest scatter.",
@@ -4522,7 +4527,7 @@ function freshGame(stage) {
   // random draw, the reveal is a briefing rather than a surprise, which is what makes a run
   // soft-directional: everything you level and every card you stack is preparation for a problem
   // you can already name.
-  log(`🐉 STAGE ${S.dragon.stage} — beyond Region ${RUN().length} waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b>`);
+  log(`🐉 STAGE ${S.dragon.stage} — beyond Region ${RUN().length} waits <b>${S.dragon.name}</b> ${elIcon(S.dragon.element)}. ${dragonShapeText(S.dragon)}: ${dragonDemand(S.dragon)}. ${S.dragon.brief} <b>It asks one thing of you: ${S.dragon.teaches}.</b> 🔁 It fights in a cycle: ${attacksFor(S.dragon).map(a => a.name).join(' → ')}.`);
   render();
 }
 
@@ -12688,6 +12693,7 @@ const TIPS = {
   tp:     ['⏳ Time Penalty', 'You cannot sharpen your cards for this many encounters.'],
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
+  cycle:    ['🔁 Cycle', 'A dragon plays its attacks in this order, over and over. The next one is in bold.'],
   target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
   shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
   rally:    ['📣 Rallies', 'While it lives, the leader\'s attack is +1.'],
@@ -13284,7 +13290,9 @@ function telegraph() {
   const plain = attacksFor(S.dragon)[0];
   return (now && now.id !== plain.id
       ? `<div class="tg now">🐉 <b>NOW — ${now.name}:</b> ${now.tell}</div>` : '') +
-    (next ? `<div class="tg next">👁️ <b>NEXT BEAT — ${next.name}:</b> ${next.tell}</div>` : '');
+    (next ? `<div class="tg next">👁️ <b>NEXT BEAT — ${next.name}:</b> ${next.tell}</div>` : '') +
+    // 🔁 the whole cycle, the next step lit — so the beat after next is knowable too
+    `<div class="tg cycle" data-tip="cycle">🔁 ${attacksFor(S.dragon).map(a => (next && a.id === next.id) ? `<b>${a.name}</b>` : a.name).join(' → ')} → …</div>`;
 }
 
 function staminaBar() {
@@ -13314,6 +13322,7 @@ function startDuel() {
   // nothing on screen said it. Remember what you arrived with so the race can be drawn.
   S.duelStamina0 = S.deck.length;
   log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
+  log(`🔁 It fights in a cycle: ${attacksFor(S.dragon).map(a => `<b>${a.name}</b>`).join(' → ')} → and again.`);
   startDuelBeat();
 }
 
@@ -13336,8 +13345,14 @@ function startDuelBeat() {
   // 🐉 last beat's telegraph becomes this beat's reality, then it tells you the next one.
   // Beat 1 is deliberately plain — you have not been given a chance to react to anything yet.
   const atks = attacksFor(S.dragon);
+  // 🔁 A DRAGON FIGHTS IN A CYCLE (2026-09-02, build 457). Road creatures draw from a shuffled bag
+  // because you meet them twenty times a run and the bag is their variety; a dragon is fought ONCE
+  // and is the fight you are meant to LEARN. StS2's bosses are all *one countable cycle + one rule
+  // + a spike as the last step* — Vantom is always Ink Blot → Lance → Dismember → Prepare — and
+  // that is what lets a table say *"the big one is next beat, go all in now."* The order is the
+  // data's order: plain → the shape's lean → the spike. ⚠️ No `rnd()` here any more.
   S.dragonState.active = S.dragonState.next || atks[0];
-  S.dragonState.next = atks[Math.floor(rnd() * atks.length)];
+  S.dragonState.next = atks[S.duelBeat % atks.length];
   if (S.dragonState.active && S.dragonState.active.id !== atks[0].id)
     log(`🐉 ${S.dragon.name} — <b>${S.dragonState.active.name}</b>: ${S.dragonState.active.tell}.`, 'bad');
   // synthetic persistent enemy: armor [] so computeAction returns the RAW strike; shields are applied here.
