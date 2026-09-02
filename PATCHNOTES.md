@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 450 — Stun is Daze now, and the dragons stand taller
+*2026-09-01*
+
+**Changed**
+- ⚡ **Stun is called Daze, and it does what the name says:** the creature's **next attack deals that much less damage**. It no longer needs you to win Initiative. Sharpen a Lightning card and the Daze grows with it; a Spell card's Daze is doubled.
+- 🐉 **Every dragon has more health again.** The effects and card behaviours added over the last few builds had made the ladder about twenty points easier than intended.
+
 ## build 448 — Tooltips that actually explain things
 *2026-08-30*
 

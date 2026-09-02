@@ -2995,6 +2995,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 450, date: '2026-09-01', title: 'Stun is Daze now, and the dragons stand taller',
+    changed: [
+      "⚡ <b>Stun is called Daze, and it does what the name says:</b> the creature's <b>next attack deals that much less damage</b>. It no longer needs you to win Initiative. Sharpen a Lightning card and the Daze grows with it; a Spell card's Daze is doubled.",
+      "🐉 <b>Every dragon has more health again.</b> The effects and card behaviours added over the last few builds had made the ladder about twenty points easier than intended.",
+    ] },
+
   { build: 448, date: '2026-08-30', title: 'Tooltips that actually explain things',
     changed: [
       "💡 <b>Every tooltip rewritten.</b> They now say what a thing <b>does</b>, in one sentence, the way a card game should — instead of explaining one mechanic with another one you also do not know yet.",
@@ -4766,7 +4772,12 @@ let COIN_MULT = 1.0;
 // approach gone those bases describe a ladder that does not climb, and this is the correction.
 // ⚠️ ⭐1, a FRESH ACCOUNT — the hardest the game ever is. The meta ladder roughly doubles the win
 // rate at the hard stages. Quote a stage number with the level it was taken at or it means nothing.
-let DRAGON_HP_ADD = { 1: 4, 2: 18, 3: 13, 4: 30 };
+// 📏 RE-TUNED 2026-09-01 after build 445 (Stun scaling + archetype behaviours) left the ladder
+// ~20 points soft. Swept at 12 floors: 4:18:13:30 → win [53,42,24,31] · 12:26:20:40 → [45,36,20,11]
+// · **16:30:24:46 → [34,23,15,9]**, on the 442 target of 31/21/15/7. Total dragon HP is now
+// **76 / 90 / 92 / 96**. ⚠️ That is a lot of HP answering a lot of player power; if creatures that
+// RESIST effects land next, they are a second counter to the same bill — re-measure, do not stack.
+let DRAGON_HP_ADD = { 1: 16, 2: 30, 3: 24, 4: 46 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
@@ -6139,8 +6150,18 @@ const STATUSES = {
   // sharpening on the mark axis**, which is a quarter of the deck opted out of the only
   // progression system the game has. ✅ And there was room: Stun measured at ZERO win-rate points.
   // 🔑 The magnitude is TURNS — it loses its next N attacks, one consumed per turn.
-  stun:   { el: 'Lightning', icon: '⚡', name: 'Stun',
-            text: 'it loses its next <b>N</b> attacks — it still strikes, but plainly. <b>Only if you win Initiative</b>' },
+  // ⚡ DAZE, formerly Stun (2026-09-01, Thomas's call from two options). Stun cancelled the
+  // creature's named MOVE and it still hit you; the word promised denial and three rewordings
+  // could not make it stop promising. 🔑 **When a name keeps producing the wrong expectation,
+  // change the name or the rule, never the wording again.** Daze is what a dial-shaped effect
+  // honestly is: its next blow is N weaker. It scales like the other three, every archetype
+  // behaviour works on it (×2 / travels / never fades), and at Lv4-doubled it blanks a hit
+  // outright — so it reaches denial by degrees instead of promising it flat.
+  // ❌ The *"only if you win Initiative"* condition is gone with it: that gate existed because
+  // denial was strong. A −2 off a 4-point hit needs no gate, and one unconditional rule for four
+  // effects beats three-and-a-footnote.
+  daze:   { el: 'Lightning', icon: '⚡', name: 'Daze',
+            text: 'the creature\'s next attack deals <b>N</b> less damage', decay: ' — once' },
   expose: { el: 'Stone',     icon: '🪨', name: 'Exposed',
             text: 'your blow against it lands for <b>+N</b>', decay: ' — once' },
 };
@@ -6215,13 +6236,13 @@ function statusN(id) { const st = fightStatus(); return (st && st[id]) || 0; }
 function foeStatusHTML() {
   const bag = fightStatus(); if (!bag) return '';
   const bits = [];
-  for (const id of ['burn', 'frost', 'expose', 'stun']) {
+  for (const id of ['burn', 'frost', 'expose', 'daze']) {
     const n = bag[id] || 0; if (!n) continue;
     const d = STATUSES[id];
     const say = id === 'burn'   ? `loses <b>${n}</b> next turn`
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
-              : `its next <b>${n}</b> attack${n === 1 ? '' : 's'} lost`;
+              : `its next blow <b>−${n}</b>`;
     bits.push(`<span class="foe-st foe-st-${id}" data-tip="${id}">${d.icon} ${d.name} ${n} — ${say}</span>`);
   }
   return bits.length ? `<div class="foe-status">${bits.join('')}</div>` : '';
@@ -6379,7 +6400,16 @@ function foeCounter(r) {
   const fx = foeFx();
   // ⚔️ a lunge lands whatever your speed — the one attack that suspends the gate
   if (!r.initLost && !fx.unstoppable) return 0;
-  return Math.max(0, (S.encounter && S.encounter.atk) || 0);
+  const atk = Math.max(0, (S.encounter && S.encounter.atk) || 0);
+  // ⚡ Dazed: its blow is that much weaker. READ-ONLY — this runs on every repaint; the effect
+  // is SPENT at resolution, in resolve(), the moment the creature actually swings.
+  return Math.max(0, atk - statusN('daze'));
+}
+// ⚡ spend a Daze — only when the creature actually swung (won the race = it never attacked, so
+// "its next attack" has not happened yet and the Daze waits for it). 🌊 FLOW's never fades.
+function spendDaze() {
+  const b = fightStatus(); if (!b || !b.daze) return;
+  if (!(b.lasting && b.lasting.daze)) b.daze = 0;
 }
 
 // ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
@@ -6408,12 +6438,6 @@ function markWith(card, r, lvl) {
   if (a.lasting) bag.lasting = Object.assign({}, bag.lasting, { [id]: true });
   // 💨 SPARK marks travel. Stashed on the RUN, not the fight, and drained into the next one.
   if (a.carry) S.markCarry = Object.assign({}, S.markCarry, { [id]: (S.markCarry && S.markCarry[id] || 0) + n });
-  if (id === 'stun') {
-    // ⚡ the only conditional one, and the condition is Lightning's own temperament: *go first*.
-    // ⚠️ NOT a random chance — resolution here is deterministic by design, and a coin flip in
-    // the middle of a turn you are meant to be able to SOLVE is a different game.
-    if (r && r.initLost) return null;
-  }
   bag[id] = (bag[id] || 0) + n;
   return { id, n, card };
 }
@@ -6570,15 +6594,7 @@ function startFoeBeat() {
   // ⚡ STUN EATS THE ATTACK, NOT THE TURN. An attack is a one-turn modifier to its stats, so
   // denying it is denying a 🛡️ harden, a ⚔️ lunge or a 💨 circle — which is a different thing
   // from ❄️ Frost merely making it slow, and the reason both are worth having.
-  const bagS = fightStatus();
-  if (bagS && bagS.stun > 0) {
-    if (!(bagS.lasting && bagS.lasting.stun)) bagS.stun--;   // 🌊 a FLOW stun does not tick down
-    log(`⚡ <b>${base.name} is stunned</b> — ${st.active ? st.active.name : 'its attack'} never comes` +
-        (bagS.stun > 0 ? `, and ${bagS.stun} more turn${bagS.stun === 1 ? '' : 's'} of it to come` : '') +
-        `. It still strikes, but plainly.`, 'good');
-    st.active = null;
-  }
-  else if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
+  if (st.active) log(`${st.active.icon} ${base.name} — <b>${st.active.name}</b>.`, 'bad');
 
   publishFoeTurn();
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
@@ -7473,6 +7489,7 @@ function resolve() {
       // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
       // order on screen is: it strikes → you block → your blow → the verdict.
       const first = foeCounter(r);
+      if (r.initLost || foeFx().unstoppable) spendDaze();   // ⚡ it swung; the Daze did its work
       if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
@@ -7715,7 +7732,7 @@ function beatDisplayHTML(beat, isNew) {
       subs.push(`<div class="pv-sub good">🐉 ${S.dragon.name}: −${st.toHp} HP${felled ? ' — it falls' : ` → ${hpAfter} left`}</div>`);
       if (st.evaded) subs.push(`<div class="pv-sub bad">🌀 it slipped the blow — halved</div>`);
       // mirrors the resolution exactly: a dead dragon neither bites nor breathes
-      const dmgD = felled ? 0 : (r.early || 0) + duelCounter(hpAfter);
+      const dmgD = felled ? 0 : Math.max(0, (r.early || 0) + duelCounter(hpAfter) - statusN('daze'));
       if (dmgD > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgD}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
         `${felled ? 'FELLED' : 'STRUCK'}</span>` +
@@ -12427,7 +12444,7 @@ const TIPS = {
   // — the four effects —
   burn:   ['🔥 Burn', 'The creature loses this much health at the start of its turn. The Burn then halves.'],
   frost:  ['❄️ Frost', 'The creature\'s Initiative is this much lower next turn.'],
-  stun:   ['⚡ Stun', 'The creature\'s next attacks are cancelled. It still deals damage. Only applies if your Initiative is higher.'],
+  daze:   ['⚡ Daze', 'The creature\'s next attack deals this much less damage.'],
   expose: ['🪨 Exposed', 'Your next attack against the creature deals this much more damage.'],
 
   // — and what a card's kind does to its effect —
@@ -12445,12 +12462,14 @@ const TIPS = {
   tp:     ['⏳ Time Penalty', 'You cannot sharpen your cards for this many encounters.'],
 };
 function tipHTML(key) {
-  const t = TIPS[key]; if (!t) return '';
-  return `<b>${classText(t[0])}</b><span>${classText(t[1])}</span>`;
+  // a `+` joins keys — an effect and what the card's kind does to it read as two short blocks
+  return String(key).split('+').map(k => TIPS[k]).filter(Boolean)
+    .map(t => `<b>${classText(t[0])}</b><span>${classText(t[1])}</span>`).join('');
 }
 function showTip(key, el) {
-  const box = $('tip'); if (!box || !TIPS[key]) return;
-  box.innerHTML = tipHTML(key);
+  const box = $('tip'); if (!box) return;
+  const html = tipHTML(key); if (!html) return;
+  box.innerHTML = html;
   box.classList.add('on');
   // 🔴 GUARD THE VIEWPORT. `innerWidth`/`innerHeight` can read **0** — a hidden tab, an
   // orientation change mid-frame, a PWA cold start — and this arithmetic then clamps the tip to
@@ -12671,8 +12690,9 @@ function cardHTML(card) {
     // its doubling is **already in the number** — printing the reason beside a result that is
     // already correct is the redundancy that made the card unreadable in the first place.
     const suffix = am.carry ? '\u2192' : am.lasting ? '\u221e' : (markHome === 'soak' ? '🛡️' : '');
-    const tip = am.carry ? 'mkspark' : am.lasting ? 'mkflow'
-              : markHome === 'soak' ? 'mkward' : (am.mult ? 'mkforce' : markId);
+    const archTip = am.carry ? 'mkspark' : am.lasting ? 'mkflow'
+                  : markHome === 'soak' ? 'mkward' : (am.mult ? 'mkforce' : '');
+    const tip = archTip ? markId + '+' + archTip : markId;   // effect first, then what this kind does to it
     return { icon: d.icon, name: d.name, n, note: am.note || '', suffix, tip,
              // ✅ matches `.card-verb` exactly: a slot gets "in <slot>", the soak gets "when it blocks"
              where: markHome === 'soak' ? 'when it blocks' : 'in ' + (SLOT_LABEL[markHome] || markHome),
@@ -13096,11 +13116,6 @@ function startDuelBeat() {
   // DUEL and that is on record as *a road mechanic that switches off at the boss*; the mage's new
   // kit must not repeat it on the one fight that decides the run.
   const dbag = (S.dragonState.status = S.dragonState.status || {});
-  if (dbag.stun > 0) {
-    if (!(dbag.lasting && dbag.lasting.stun)) dbag.stun--;
-    log(`⚡ <b>${S.dragon.name} is stunned</b> — ${S.dragonState.active ? S.dragonState.active.name : 'its attack'} never comes. It still breathes, but plainly.`, 'good');
-    S.dragonState.active = null;
-  }
   const dfrost = dbag.frost || 0; dbag.frost = 0;
   S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
     init: Math.max(0, S.dragon.init - dfrost), atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
@@ -13166,7 +13181,12 @@ function resolveDuel() {
   }
   // 🔥 the finale never reaches finishResolve(), so the bank is collected here instead.
   if (r.banks) S.wakePending = r.bank;
-  S.duelResult = { atk, toHp, kill, early, counter, damage, armour: st.armour, evaded: st.evaded };
+  // ⚡ Dazed: the dragon's blow is that much weaker, then the Daze is spent. Same two lines as
+  // the road — the duel is the third turn loop and it has lost half of every change made to the
+  // other two; anything that touches a fight lands here in the same commit.
+  const dazeCut = Math.min(damage, statusN('daze'));
+  if (dazeCut > 0) { log(`⚡ Dazed — its blow lands <b>${dazeCut}</b> weaker.`, 'good'); spendDaze(); }
+  S.duelResult = { atk, toHp, kill, early, counter, damage: damage - dazeCut, armour: st.armour, evaded: st.evaded };
   strikeFx(r, kill);   // 💥 the duel is a fight too, and it lost the same animations
   // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it
   // paid for, and the Spell leaves its own status behind for the next beat.

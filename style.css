@@ -343,7 +343,7 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .foe-st-burn   { border-color: #7a3a1c; background: rgba(122, 58, 28, .30); }
 .foe-st-frost  { border-color: #2f5f7a; background: rgba(47, 95, 122, .30); }
 .foe-st-expose { border-color: #6a5a2a; background: rgba(106, 90, 42, .30); }
-.foe-st-stun   { border-color: #6a6320; background: rgba(140, 130, 40, .30); }
+.foe-st-daze   { border-color: #6a6320; background: rgba(140, 130, 40, .30); }
 
 @media (prefers-reduced-motion: reduce) {
   .foe-hp-ghost { display: none; }
