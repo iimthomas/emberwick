@@ -2995,6 +2995,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 452, date: '2026-09-01', title: 'Under the hood',
+    changed: [
+      "No change to how the game plays. The tools we use to test balance can now see the effects your cards leave on a creature — they had been playing blind to them, so the numbers we tune against were off. Expect a difficulty pass to follow.",
+    ] },
+
   { build: 451, date: '2026-09-01', title: 'Creatures answer your spells',
     added: [
       "🧬 <b>Every creature now resists one effect and is weak to another</b>, by its element. 🔥 Fire creatures shrug off Burn and hate Frost · 💧 Water shrugs off Frost and hates Daze · ⚡ Lightning shrugs off Daze and hates Exposed · 🪨 Stone shrugs off Exposed and hates Burn.",
@@ -6470,7 +6475,10 @@ function spendDaze() {
 // 🏷️ MARK ONE CARD. ⚠️ It reads the element the card IS, which since the cycle was retired
 // is also what it seeks and what it deals — one element fact per card, so the face can never
 // disagree with the effect.
-function markWith(card, r, lvl) {
+// ⚠️ `dry` computes the effect WITHOUT applying it — for the solver and for any display that wants
+// to show what an arrangement would leave behind. One function, so the number the bot prices, the
+// number the reveal prints and the number that lands on the creature can never disagree.
+function markWith(card, r, lvl, dry) {
   const bag = fightStatus(); if (!bag || !card) return null;
   const el = elOf(card); if (!el) return null;             // a wild card leaves nothing
   const id = statusIdForEl(el); if (!id) return null;
@@ -6484,6 +6492,7 @@ function markWith(card, r, lvl) {
   const resisted = !!(af && af.resist === id), weakened = !!(af && af.weak === id);
   if (resisted) n = Math.max(1, Math.floor(n / 2));
   if (weakened) n *= 2;
+  if (dry) return { id, n, card, resisted, weakened, lasting: !!a.lasting, carry: !!a.carry };
   // 🌊 FLOW marks do not decay. One flag on the bag, read by every tick — not a per-mark
   // exception, because an archetype rule that needs four special cases is four rules.
   if (a.lasting) bag.lasting = Object.assign({}, bag.lasting, { [id]: true });
@@ -6503,6 +6512,22 @@ function applyMarks(r) {
     const c = cardById(S.assign && S.assign[zone]);
     if (!atHome(c, zone)) continue;
     const m = markWith(c, r);
+    if (m) outMarks.push(m);
+  }
+  return outMarks;
+}
+// 🔭 WHAT THIS ARRANGEMENT WOULD LEAVE ON THE CREATURE — pure, no mutation. The solver reads it;
+// so could a preview. ⚠️ Built 2026-09-01 because `chooseBest()` had never valued an effect: every
+// ladder number since build 436 came from a bot that never aimed one, and against a Fire creature
+// it led Burn (resisted) 287 times to Frost (doubled) 193. *Check the bot is ALLOWED to do a thing
+// before quoting how often it does it* — it was allowed; it did not know the thing existed.
+function previewMarks(r) {
+  if (!fightStatus()) return [];
+  const outMarks = [];
+  for (const zone of ['Spell', 'Element', 'Boost']) {
+    const c = cardById(S.assign && S.assign[zone]);
+    if (!atHome(c, zone)) continue;
+    const m = markWith(c, r, null, true);
     if (m) outMarks.push(m);
   }
   return outMarks;

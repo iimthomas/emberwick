@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 452 — Under the hood
+*2026-09-01*
+
+**Changed**
+- No change to how the game plays. The tools we use to test balance can now see the effects your cards leave on a creature — they had been playing blind to them, so the numbers we tune against were off. Expect a difficulty pass to follow.
+
 ## build 451 — Creatures answer your spells
 *2026-09-01*
 
