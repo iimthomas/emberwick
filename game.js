@@ -1611,6 +1611,7 @@ const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST fo
 // ROGUE_DEFS is generated from that copy, so `setTunable` cannot move it. Changing the literal here
 // works; a runtime sweep does not.
 let SPIKE_STEP_VALUE = 2;   // 🗡️ the rogue's power dial
+let ROGUE_ARM_MIN_LV = 2;   // 🗡️ the plate bonus starts at this level. 📏 Lv1 → 53/25/21/6, Lv2 → 38/20/14/19 (mage 27/20/12/2) (2 = a Lv1 card stays thin; sharpening adds the plate)
 let ROGUE_ARM_ROLE = 'all'; // 🗡️ which of her cards the plate bonus lands on: 'all' | 'tool' | 'blade'
 let ROGUE_ARM_ADD = 1;      // 🗡️ her plates. 📏 0 → 32/2/12/2 · 1 → 52/22/22/7 · 2 → 62/25/30/18 (mage 27/20/12/2); tools-only 25/8/12/7, blades-only 40/12/8/12 — added to every rogue card's armour (arm 1 on six of eight cards; the mage averages 3.1)
 const SPIKE_STEP = { value: SPIKE_STEP_VALUE, init: 1, armor: 1 };
@@ -1770,6 +1771,8 @@ function foeInitCut() {
   if (!bag) return 0;
   return (bag.frost || 0) + (bag.knife || 0);
 }
+let KNIFE_ARMOUR_CAP = 3;   // 🔪 the most Armour knives can open (Initiative is cut by every knife regardless)
+function knifeArmourCut() { return Math.min(KNIFE_ARMOUR_CAP, leadKnives()); }
 function leadKnives() {
   if (S.dragonState && S.finalMode && S.finalPhase === 'duel') return (S.dragonState.status && S.dragonState.status.knife) || 0;
   return (S.foeState && S.foeState.status && S.foeState.status.knife) || 0;
@@ -1828,12 +1831,31 @@ const ROGUE = {
   perHitBonus(card) {
     return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card);
   },
-  // 🔪 after her blow lands on `body`: a tool sticks, a rip spends. The ENGINE calls this; the
-  // class decides what its cards leave behind — the same seam as the mage's marks.
+  // ☠️🩸 what a BLADE leaves behind, by PAIR: OPENING poisons, HOLD bleeds. Magnitude = level.
+  // Printed on the face as the fifth stat, the way the mage's element effect is.
+  cardEffect(card) {
+    const d = card && card.def; if (!d || d.role !== 'blade') return null;
+    const id = d.pair === 'OPENING' ? 'poison' : d.pair === 'HOLD' ? 'bleed' : null;
+    if (!id) return null;
+    const s = STATUSES[id], n = Math.max(1, card.level || 1);
+    return { id, icon: s.icon, name: s.name, n, suffix: '', tip: id, rogue: true, where: 'as your Strike',
+             full: s.text.replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
+  },
+  // 🔪 after her blow lands on `body`: a tool sticks, a rip spends, a blade leaves its effect. The
+  // ENGINE calls this; the class decides what its cards leave behind — the same seam as the marks.
   afterBlow(r, body) {
     const bag = body && (body.status = body.status || {});
     if (!bag || !r || !r.rogue) return;
     const st = r.spell;
+    const fx = st && body.hp > 0 ? CLASS.cardEffect(st) : null;
+    if (fx) {
+      const af = affinityOf();
+      let n = fx.n; const resisted = !!(af && af.resist === fx.id), weakened = !!(af && af.weak === fx.id);
+      if (resisted) n = Math.max(1, Math.floor(n / 2)); if (weakened) n *= 2;
+      bag[fx.id] = (bag[fx.id] || 0) + n;
+      (r.marks = r.marks || []).push({ id: fx.id, n, card: st, resisted, weakened, amp: 1 });
+      log(`${fx.icon} <b>${st.def.name}</b> — ${fx.name} ${n} on it${resisted ? ' (resisted)' : weakened ? ' (weak to it)' : ''}.`, 'good');
+    }
     if (S.ripArmed && bag.knife) { log(`🔪 She rips <b>${bag.knife}</b> knife${bag.knife === 1 ? '' : 's'} out.`, 'good'); bag.knife = 0; r.ripped = true; }
     if (st && st.def.role === 'tool' && body.hp > 0) {
       const n = (hasCharm('deadhand') ? 2 : 1) + (r.rogue.verb === 'surge' ? 1 : 0);
@@ -1911,7 +1933,8 @@ const ROGUE = {
                bonus: m.bonus, verbBonus: m.verbBonus, streakDmg: m.streakDmg,
                fuelName: m.fuel ? m.fuel.def.name : null,
                rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true,
-               sticks: strike.def.role === 'tool', rips: rip, knives: knivesIn() },
+               sticks: strike.def.role === 'tool', rips: rip, knives: knivesIn(),
+               effect: CLASS.cardEffect(strike) },
     };
   },
 };
@@ -3034,6 +3057,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 463, date: '2026-09-02', title: 'Poison and Bleed',
+    changed: [
+      "☠️ <b>Lethal Dose poisons</b> — the creature loses that much at the start of every turn. 🩸 <b>Slow Poison bleeds</b> — it loses that much every time it attacks. Neither fades. The amount is the card's level, printed on the card.",
+    ] },
+
   { build: 462, date: '2026-09-02', title: 'The rogue blocks a little better',
     changed: [
       "🛡️ <b>Every rogue card blocks 1 more.</b> Six of her eight cards blocked 1; her deck was the thinner health bar in every fight.",
@@ -4768,7 +4796,7 @@ function eff(card) {
     // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
     init: Math.max(INIT_FLOOR, init + charmMod('init', d.element)),
     // ⚠️ cost comes from LEVEL_COST, not the row - column 7 of every level table is now dead data
-    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am + (d.paid != null && (ROGUE_ARM_ROLE === 'all' || ROGUE_ARM_ROLE === d.role) ? ROGUE_ARM_ADD : 0)),   // 🗡️ her plates
+    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am + (d.paid != null && (ROGUE_ARM_ROLE === 'all' || ROGUE_ARM_ROLE === d.role) && card.level >= ROGUE_ARM_MIN_LV ? ROGUE_ARM_ADD : 0)),   // 🗡️ her plates
     cost: LEVEL_COST[card.level - 1],
   };
 }
@@ -6242,6 +6270,12 @@ function foeAttacksOf(e) {
 const STATUSES = {
   // 🔪 THE ROGUE'S KNIVES (2026-09-02, build 459) — no element; a tool Strike sticks one, a blade
   // Strike rips them out for a hit each. Engine state on the body, so a partner sees the holes.
+  // ☠️🩸 THE ROGUE'S HP-BAR EFFECTS (2026-09-02, build 463) — no element. An OPENING blade poisons,
+  // a HOLD blade bleeds; magnitude = the card's level, like the mage's. Engine state on the body.
+  poison: { el: null,        icon: '☠️', name: 'Poison',
+            text: 'it loses <b>N</b> at the start of its turn', decay: '' },
+  bleed:  { el: null,        icon: '🩸', name: 'Bleed',
+            text: 'it loses <b>N</b> each time it attacks', decay: '' },
   knife:  { el: null,        icon: '🔪', name: 'Knives',
             text: 'its Armour and Initiative are <b>N</b> lower while they stay in', decay: '' },
   burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
@@ -6393,10 +6427,12 @@ function foeAffinityHTML() {
 function foeStatusHTML() {
   const bag = fightStatus(); if (!bag) return '';
   const bits = [];
-  for (const id of ['knife', 'burn', 'frost', 'expose', 'daze']) {
+  for (const id of ['knife', 'poison', 'bleed', 'burn', 'frost', 'expose', 'daze']) {
     const n = bag[id] || 0; if (!n) continue;
     const d = STATUSES[id];
     const say = id === 'knife'  ? `Armour & Initiative <b>−${n}</b>`
+              : id === 'poison' ? `loses <b>${n}</b> every turn`
+              : id === 'bleed'  ? `loses <b>${n}</b> when it attacks`
               : id === 'burn'   ? `loses <b>${n}</b> next turn`
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
@@ -6631,7 +6667,8 @@ function spendDaze() {
 // 🔥 minions burn too; a burned-out minion is gone before the turn starts
 function tickPackBurn() {
   for (const m of packBodies()) {
-    const bag = m.status; if (!bag || !bag.burn) continue;
+    m.hp = tickPoison(m.hp, `${m.icon} ${m.name}`, m.status);
+    const bag = m.status; if (!bag || !bag.burn || m.hp <= 0) continue;
     const dealt = Math.min(m.hp, bag.burn), keeps = !!(bag.lasting && bag.lasting.burn);
     m.hp -= dealt;
     log(`🔥 Burn ${bag.burn}: ${m.icon} ${m.name} loses <b>${dealt}</b>${m.hp <= 0 ? ' — and falls' : ''}.`, 'good');
@@ -6751,7 +6788,24 @@ function previewMarks(r) {
 // before it acts, so a Burn can finish it. ⚠️ It is not a blow: it goes around 🛡️ Armour,
 // 🌀 Evasion and the Initiative gate alike, which is the whole reason Fire answers a shape you
 // cannot out-hit and makes a LONG fight pay when a long fight has only ever cost you.
+// ☠️ Poison ticks beside Burn and never fades
+function tickPoison(hpNow, name, bag) {
+  bag = bag || fightStatus(); if (!bag || !bag.poison || hpNow <= 0) return hpNow;
+  const dealt = Math.min(hpNow, bag.poison);
+  log(`☠️ Poison ${bag.poison}: ${name} loses <b>${dealt}</b>.`, 'good');
+  return hpNow - dealt;
+}
+// 🩸 Bleed — it loses N every time it swings. Called where the creature attacks (road + duel).
+function bleedTick() {
+  const duel = !!(S.dragonState && S.finalMode && S.finalPhase === 'duel');
+  const body = duel ? S.dragonState : S.foeState; if (!body) return;
+  const bag = body.status; if (!bag || !bag.bleed || body.hp <= 0) return;
+  const dealt = Math.min(body.hp, bag.bleed);
+  body.hp -= dealt;
+  log(`🩸 Bleed ${bag.bleed}: it loses <b>${dealt}</b> as it attacks${body.hp <= 0 ? ' — and falls' : ''}.`, 'good');
+}
 function tickBurn(hpNow, name) {
+  hpNow = tickPoison(hpNow, name);
   const bag = fightStatus(); if (!bag || !bag.burn) return hpNow;
   const dealt = Math.min(hpNow, bag.burn);
   const keeps = !!(bag.lasting && bag.lasting.burn);       // 🌊 a FLOW burn never fades
@@ -7357,7 +7411,7 @@ function computeAction(reserve) {
     const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
     const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce')
-      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0) - leadKnives()) : 0;   // 🛡️ Ironsplitter · 🔪 knives
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0) - knifeArmourCut()) : 0;   // 🛡️ Ironsplitter · 🔪 knives
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
     // 🌀 Windreader widens the margin Evasion needs, so a near-miss on the race still lands full
     const evGrace = hasCharm('windreader') ? 2 : 0;
@@ -7806,7 +7860,7 @@ function resolve() {
       // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
       // order on screen is: it strikes → you block → your blow → the verdict.
       const first = foeCounter(r);
-      if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(r); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
+      if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(r); bleedTick(); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
       if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
@@ -12768,6 +12822,8 @@ const TIPS = {
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
   cycle:    ['🔁 Cycle', 'A dragon plays its attacks in this order, over and over. The next one is in bold.'],
+  poison:   ['☠️ Poison', 'It loses that much at the start of each of its turns. It does not fade.'],
+  bleed:    ['🩸 Bleed', 'It loses that much every time it attacks. It does not fade.'],
   knife:    ['🔪 Knives', 'Each knife in it lowers its Armour and its Initiative by 1. A blade Strike can rip them out for one extra hit each. Lose the race by 3 or more and one falls out.'],
   target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
   shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
@@ -12994,7 +13050,7 @@ function cardHTML(card) {
   // the preview: it is the real renderer against a card one level higher.
   const markId = statusIdForEl(elOf(card));
   const markHome = homeSlotOf(card);
-  const markLine = (markId && markHome) ? (() => {
+  const markLine = (CLASS.cardEffect && CLASS.cardEffect(card)) || ((markId && markHome) ? (() => {
     const d = STATUSES[markId];
     // ⚠️ INCLUDING the archetype's multiplier, or a ⚔️ FORCE card's face would under-promise by
     // half — the same fault as the 🛡️ WARD card that said Exposed 2 and paid 1.
@@ -13012,7 +13068,7 @@ function cardHTML(card) {
              where: markHome === 'soak' ? 'when it blocks' : 'in ' + (SLOT_LABEL[markHome] || markHome),
              full: classText(d.text + (am.lasting ? '' : (d.decay || '')))
                      .replace(/<b>N<\/b>/g, '<b>' + n + '</b>') };
-  })() : null;
+  })() : null);
   // 🚣 A JOURNEY HAS NOTHING TO MARK (Thomas: *"stun doesn't make sense on a journey"*).
   // ⚠️ The RULES were already right — `fightStatus()` returns null with no creature, and a probe
   // over 200 runs counted **zero** marks applied on a road. It was the CARD FACE that lied: the
@@ -13021,7 +13077,7 @@ function cardHTML(card) {
   // different cards depending on where you stood, and *never state a rule about an object without
   // marking the object* cuts both ways: a rule that is OFF has to say so too.
   const canMark = !!fightStatus();
-  const markLit = !!(canMark && markLine && (markHome === 'soak'
+  const markLit = (markLine && markLine.rogue) ? !!(canMark && S.assign && S.assign.Spell === card.id) : !!(canMark && markLine && (markHome === 'soak'
     ? S.phase === 'soak'
     : (S.assign && S.assign[markHome] === real.id)));
   const verbLit = !!(verb && (verb.slot === 'soak' ? S.phase === 'soak' : slot === verb.slot));
@@ -13301,7 +13357,7 @@ function finaleAfterTurn() {
 // possible at all, and why it is a boss-only shape.
 function duelArmour() {
   if (!hasShape('armour')) return 0;
-  return Math.max(0, S.dragon.shapeV - (S.dragonState.boon.armourCut || 0) - leadKnives());   // 🔪 knives open it
+  return Math.max(0, S.dragon.shapeV - (S.dragonState.boon.armourCut || 0) - knifeArmourCut());   // 🔪 knives open it
 }
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
@@ -13509,7 +13565,7 @@ function resolveDuel() {
   // other two; anything that touches a fight lands here in the same commit.
   const dazeCut = Math.min(damage, statusN('daze'));
   if (dazeCut > 0) { log(`⚡ Dazed — its blow lands <b>${dazeCut}</b> weaker.`, 'good'); spendDaze(); }
-  if (r.initLost) shakeKnife(r);                                    // 🔪 it swung
+  if (r.initLost) { shakeKnife(r); bleedTick(); }                   // 🔪 it swung · 🩸 and bleeds for it
   S.duelResult = { atk, toHp, kill, early, counter, damage: damage - dazeCut, armour: st.armour, evaded: st.evaded };
   strikeFx(r, kill);   // 💥 the duel is a fight too, and it lost the same animations
   // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it

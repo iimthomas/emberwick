@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 463 — Poison and Bleed
+*2026-09-02*
+
+**Changed**
+- ☠️ **Lethal Dose poisons** — the creature loses that much at the start of every turn. 🩸 **Slow Poison bleeds** — it loses that much every time it attacks. Neither fades. The amount is the card's level, printed on the card.
+
 ## build 462 — The rogue blocks a little better
 *2026-09-02*
 

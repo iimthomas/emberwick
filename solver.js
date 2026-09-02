@@ -123,7 +123,10 @@ function chainValue(r) {
   // 🔪 2026-09-02: Momentum is gone; the rogue's chain is KNIVES. A stick is worth about a point a
   // blow for two blows (its Armour −1 while it stays in); a rip is already priced in r.value/hits.
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
-  if (typeof CLASS !== 'undefined' && CLASS.knives) return MOMENTUM_WEIGHT * (r.rogue.sticks ? 2 : 0);
+  if (typeof CLASS !== 'undefined' && CLASS.knives) {
+    const fx = r.rogue.effect;   // ☠️ poison ≈ 2N (never fades), 🩸 bleed ≈ 1.5N (it usually swings)
+    return MOMENTUM_WEIGHT * ((r.rogue.sticks ? 2 : 0) + (fx ? (fx.id === 'poison' ? 2 : 1.5) * fx.n : 0));
+  }
   const touched = (r.combatDmg || 0) + (r.early || 0) + (r.timePenalty || 0) > 0;
   const now = r.rogue.streak || 0;
   return touched ? 0 : MOMENTUM_WEIGHT * Math.min(MOMENTUM_CAP, now + 1);
