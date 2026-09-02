@@ -60,9 +60,37 @@ const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
 // how often a human who can read the candle would want it.
 // ⚠️ Every number produced with this must be reported alongside BANK_WEIGHT = 0, which reproduces
 // the old never-banks bot exactly.
-let BANK_WEIGHT = 0.6;
+let EFFECT_WEIGHT = 1;   // 🏷️ how much the bot values an effect it would leave on the creature (0 = blind, the pre-451 bot)
+  let BANK_WEIGHT = 0.6;
 function setBankWeight(w) { BANK_WEIGHT = w; }
 const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) : 0);
+// 🏷️ WHAT AN ARRANGEMENT'S EFFECTS ARE WORTH, in the currency the scorer already trusts: damage.
+// 🔴 Added 2026-09-01. Until this the bot never valued an effect — not Burn's future damage,
+// not Frost's race, not Exposed's next blow, not affinity — so EVERY ladder number since build
+// 436 was from a bot that never aimed one, and a blind lead understates the whole layer.
+// 🔑 Priced the way the bank was priced: as DEFERRED damage / deferred safety, folded into the
+// value term below outcome and below incoming damage. `EFFECT_WEIGHT` is the one dial (0 = the
+// old blind bot, for an A/B). Weights are deliberately rough — this is a one-encounter scorer
+// and the fight may end before a Burn ticks; the point is that the bot can now SEE the layer.
+//   🔥 Burn N   → ~1.5N (halving series ~2N, discounted; lasting → 3N)
+//   ❄️ Frost N  → half of what it could save: min(N, its atk) / 2
+//   ⚡ Daze N   → the same
+//   🪨 Exposed N → N on the next blow, discounted to 0.8N
+// Affinity is already inside the preview (a resisted Burn previews as 1, a weak Frost as 4), so
+// the bot reads the creature's response for free.
+function effectValue(r) {
+  if (!EFFECT_WEIGHT || typeof previewMarks !== 'function') return 0;
+  const atk = (S.encounter && S.encounter.atk) || 0;
+  let v = 0;
+  for (const m of previewMarks(r)) {
+    if (m.id === 'burn')        v += m.lasting ? 3 * m.n : 1.5 * m.n;
+    else if (m.id === 'frost')  v += Math.min(m.n, atk) / 2;
+    else if (m.id === 'daze')   v += Math.min(m.n, atk) / 2;
+    else if (m.id === 'expose') v += 0.8 * m.n;
+    if (m.carry) v += 0.5 * m.n;   // 💨 it lands on the next creature too
+  }
+  return EFFECT_WEIGHT * v;
+}
 
 function chainValue(r) {
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
@@ -126,7 +154,7 @@ const SOLVER = (() => {
   // ---- score a computeAction result: [outcomeRank, -damage, -loseReserve, chain, value] ----
   function fightScore(r) {
     const dmg = (r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + (r.stormDmg || 0);
-    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, chainValue(r), r.value];
+    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, chainValue(r), r.value + effectValue(r)];
   }
   function journeyScore(r) {
     const pen = (r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0);
@@ -389,7 +417,7 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
        approachValue(r), chainValue(r), r.value + bankValue(r)];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
@@ -579,7 +607,7 @@ const RUNSIM = (() => {
     // not as a tie-break below it. Next beat is guaranteed here in a way the road's next encounter
     // never is — that is the whole reason channelling is worth more in the finale, and a
     // lexicographic tie-break could only ever find it on an exact tie (1 beat in 278, measured).
-    return [kill ? 1 : 0, st.toHp + bankValue(r), -incoming];
+    return [kill ? 1 : 0, st.toHp + bankValue(r) + effectValue(r), -incoming];
   }
   // 🚨 THIS IS THE **FOURTH** COPY OF THE ARRANGEMENT SEARCH, and it is the one that proves the
   // point the other three keep making. It silently omitted `bankArmed` AND the wake's aim, so the
