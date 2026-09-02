@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 458 — Cragmourn settles last
+*2026-09-02*
+
+**Changed**
+- 🐉 **Cragmourn's cycle is now Grind → Rockbind → Settle.** Its breath still climbs every beat; the extra step comes at the end of the cycle instead of the start.
+
 ## build 457 — Dragons fight in a cycle
 *2026-09-02*
 
