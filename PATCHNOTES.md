@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 462 — The rogue blocks a little better
+*2026-09-02*
+
+**Changed**
+- 🛡️ **Every rogue card blocks 1 more.** Six of her eight cards blocked 1; her deck was the thinner health bar in every fight.
+
 ## build 461 — Knives hold in a near race
 *2026-09-02*
 

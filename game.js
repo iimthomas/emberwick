@@ -1611,6 +1611,8 @@ const ROGUE_COST = [2, 3, 4, null];   // ⚠️ dead - eff() reads LEVEL_COST fo
 // ROGUE_DEFS is generated from that copy, so `setTunable` cannot move it. Changing the literal here
 // works; a runtime sweep does not.
 let SPIKE_STEP_VALUE = 2;   // 🗡️ the rogue's power dial
+let ROGUE_ARM_ROLE = 'all'; // 🗡️ which of her cards the plate bonus lands on: 'all' | 'tool' | 'blade'
+let ROGUE_ARM_ADD = 1;      // 🗡️ her plates. 📏 0 → 32/2/12/2 · 1 → 52/22/22/7 · 2 → 62/25/30/18 (mage 27/20/12/2); tools-only 25/8/12/7, blades-only 40/12/8/12 — added to every rogue card's armour (arm 1 on six of eight cards; the mage averages 3.1)
 const SPIKE_STEP = { value: SPIKE_STEP_VALUE, init: 1, armor: 1 };
 const ROGUE_DEFS = ROGUE_SPEC.map(s => {
   const idx = { value: 0, init: 1, armor: 2 };
@@ -3032,6 +3034,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 462, date: '2026-09-02', title: 'The rogue blocks a little better',
+    changed: [
+      "🛡️ <b>Every rogue card blocks 1 more.</b> Six of her eight cards blocked 1; her deck was the thinner health bar in every fight.",
+    ] },
+
   { build: 461, date: '2026-09-02', title: 'Knives hold in a near race',
     changed: [
       "🔪 <b>A knife only shakes loose when you lose the race by 3 or more.</b> Lose it narrowly and the knives hold.",
@@ -4761,7 +4768,7 @@ function eff(card) {
     // unable to play at all. Paired with a -2 on creature Initiative so the two ranges overlap.
     init: Math.max(INIT_FLOOR, init + charmMod('init', d.element)),
     // ⚠️ cost comes from LEVEL_COST, not the row - column 7 of every level table is now dead data
-    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am),
+    boost: boost + charmMod('boost', d.element), armor: Math.max(0, armor + am + (d.paid != null && (ROGUE_ARM_ROLE === 'all' || ROGUE_ARM_ROLE === d.role) ? ROGUE_ARM_ADD : 0)),   // 🗡️ her plates
     cost: LEVEL_COST[card.level - 1],
   };
 }
