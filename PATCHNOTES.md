@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 455 — Some creatures answer, most do not
+*2026-09-02*
+
+**Changed**
+- 🧬 **Only some creatures resist or are weak to an effect now** — about one in three, and every dragon. It is that creature's own trait, shown on its panel before you arrange. The rest answer nothing.
+
 ## build 454 — The Emberwake amplifies
 *2026-09-01*
 
