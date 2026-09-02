@@ -1778,9 +1778,14 @@ function toggleRip() {
   S.ripArmed = !S.ripArmed; render();
 }
 // 🎲 the creature swung — its thrashing shakes one knife loose (unless she is Second Nature)
-function shakeKnife() {
+let KNIFE_SHAKE_MARGIN = 2;   // a knife falls only when the race is lost by MORE than this. 📏 0 → 42% of sticks fell, 2 → 24%, 4 → same as 2
+function shakeKnife(r) {
   const bag = fightStatus(); if (!bag || !bag.knife) return;
   if (hasCharm('secondnature') || hasArmourRule('steadymo')) return;
+  if (r && KNIFE_SHAKE_MARGIN > 0) {
+    const theirs = (S.encounter && S.encounter.init) || 0;
+    if (theirs - (r.init || 0) <= KNIFE_SHAKE_MARGIN) return;   // a near thing: the knives hold
+  }
   bag.knife -= 1;
   log(`🔪 Its thrashing shakes a knife loose — ${bag.knife} left in it.`, 'bad');
 }
@@ -1814,7 +1819,7 @@ const ROGUE = {
   momentum: false,         // ● RETIRED 2026-09-02 — measured dead in multi-turn fights (78% break rate)
   knives: true,            // 🔪 her hook: stick with a tool, rip with a blade — see Rogue_Knives.md
   trait: { icon: '🔪', name: 'Knives',
-    text: 'A <b>tool</b> Strike sticks a knife in it (up to 3). Each knife lowers its <b>Armour and Initiative by 1</b> — for you and a partner. A <b>blade</b> Strike can <b>rip</b> them out: <b>one extra hit</b> per knife. Lose the race and one falls out.' },
+    text: 'A <b>tool</b> Strike sticks a knife in it (up to 3). Each knife lowers its <b>Armour and Initiative by 1</b> — for you and a partner. A <b>blade</b> Strike can <b>rip</b> them out: <b>one extra hit</b> per knife. Lose the race by 3 or more and one falls out.' },
   hitsOf(c, isStrike) {
     return (c.def.hits || 1) + (isStrike && S.ripArmed ? knivesIn() : 0) + extraHits(isStrike);
   },
@@ -3027,6 +3032,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 461, date: '2026-09-02', title: 'Knives hold in a near race',
+    changed: [
+      "🔪 <b>A knife only shakes loose when you lose the race by 3 or more.</b> Lose it narrowly and the knives hold.",
+    ] },
+
   { build: 460, date: '2026-09-02', title: 'Knives slow it too',
     changed: [
       "🔪 <b>A knife in the creature lowers its Initiative as well as its Armour.</b> Three knives take a dragon from 10 to 7 — for you and for a partner.",
@@ -7789,7 +7799,7 @@ function resolve() {
       // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
       // order on screen is: it strikes → you block → your blow → the verdict.
       const first = foeCounter(r);
-      if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
+      if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(r); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
       if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
@@ -12751,7 +12761,7 @@ const TIPS = {
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
   cycle:    ['🔁 Cycle', 'A dragon plays its attacks in this order, over and over. The next one is in bold.'],
-  knife:    ['🔪 Knives', 'Each knife in it lowers its Armour and its Initiative by 1. A blade Strike can rip them out for one extra hit each. Lose the race and one falls out.'],
+  knife:    ['🔪 Knives', 'Each knife in it lowers its Armour and its Initiative by 1. A blade Strike can rip them out for one extra hit each. Lose the race by 3 or more and one falls out.'],
   target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
   shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
   rally:    ['📣 Rallies', 'While it lives, the leader\'s attack is +1.'],
@@ -13492,7 +13502,7 @@ function resolveDuel() {
   // other two; anything that touches a fight lands here in the same commit.
   const dazeCut = Math.min(damage, statusN('daze'));
   if (dazeCut > 0) { log(`⚡ Dazed — its blow lands <b>${dazeCut}</b> weaker.`, 'good'); spendDaze(); }
-  if (r.initLost) shakeKnife();                                     // 🔪 it swung
+  if (r.initLost) shakeKnife(r);                                    // 🔪 it swung
   S.duelResult = { atk, toHp, kill, early, counter, damage: damage - dazeCut, armour: st.armour, evaded: st.evaded };
   strikeFx(r, kill);   // 💥 the duel is a fight too, and it lost the same animations
   // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it

@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 461 — Knives hold in a near race
+*2026-09-02*
+
+**Changed**
+- 🔪 **A knife only shakes loose when you lose the race by 3 or more.** Lose it narrowly and the knives hold.
+
 ## build 460 — Knives slow it too
 *2026-09-02*
 
