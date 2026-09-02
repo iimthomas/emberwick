@@ -116,8 +116,13 @@ function effectValue(r) {
   return EFFECT_WEIGHT * v;
 }
 
+// ⚠️ 2026-09-02: chainValue moved INTO the value term. As its own tuple slot it outranked damage,
+// so with knives a +2 stick beat any blade — 75% tool Strikes, blades paid 3% of turns.
 function chainValue(r) {
+  // 🔪 2026-09-02: Momentum is gone; the rogue's chain is KNIVES. A stick is worth about a point a
+  // blow for two blows (its Armour −1 while it stays in); a rip is already priced in r.value/hits.
   if (!MOMENTUM_WEIGHT || !r || !r.rogue) return 0;
+  if (typeof CLASS !== 'undefined' && CLASS.knives) return MOMENTUM_WEIGHT * (r.rogue.sticks ? 2 : 0);
   const touched = (r.combatDmg || 0) + (r.early || 0) + (r.timePenalty || 0) > 0;
   const now = r.rogue.streak || 0;
   return touched ? 0 : MOMENTUM_WEIGHT * Math.min(MOMENTUM_CAP, now + 1);
@@ -178,7 +183,7 @@ const SOLVER = (() => {
   // ---- score a computeAction result: [outcomeRank, -damage, -loseReserve, chain, value] ----
   function fightScore(r) {
     const dmg = (r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + (r.stormDmg || 0);
-    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, chainValue(r), r.value + effectValue(r)];
+    return [OUTCOME_RANK[r.outcome], -dmg, r.loseReserve ? -1 : 0, r.value + effectValue(r) + chainValue(r)];
   }
   function journeyScore(r) {
     const pen = (r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0);
@@ -448,15 +453,16 @@ function forEachArrangement(hand, o, fn) {
 function searchArrangements(o) {
   let best = null;
   forEachArrangement(o.hand, o, (spell, spark, tinder, ember) => {
-    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) {
+    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) for (const rip of (o.rips || [undefined])) {
       S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                    Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
       S.boostTarget = bt; if (arm !== undefined) S.bankArmed = arm;
       if (t !== undefined) S.foeTarget = t;       // 🎯 packs: which body the Spell is aimed at
+      if (rip !== undefined) S.ripArmed = rip;    // 🔪 the rogue: rip the knives out, or leave them
       const r = computeAction(ember); if (!r) continue;
       const sc = o.score(r);
-      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t });
-      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, sc };
+      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t, rip });
+      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, rip, sc };
     }
   });
   return best;
@@ -475,9 +481,9 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r) + targetValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), r.value + bankValue(r) + effectValue(r) + targetValue(r) + chainValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
-       approachValue(r), chainValue(r), r.value + bankValue(r)];
+       approachValue(r), r.value + bankValue(r) + chainValue(r)];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
@@ -538,8 +544,11 @@ const RUNSIM = (() => {
     const best = searchArrangements({ hand: S.hand, legal: true, duel: false,
       boostTargets: isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'],
       arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better,
-      targets: (typeof packTargets === 'function') ? packTargets() : [undefined] });
+      targets: (typeof packTargets === 'function') ? packTargets() : [undefined],
+      rips: CLASS.knives ? [false, true] : [undefined] });
+    S.ripArmed = false;
     if (best && best.t !== undefined) S.foeTarget = best.t;
+    if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
@@ -593,7 +602,9 @@ const RUNSIM = (() => {
   function chooseBestDuel() {
     const best = searchArrangements({ hand: S.hand, legal: false, duel: true,
       boostTargets: ['Attack', 'Initiative'], arms: CLASS.emberwake ? [false, true] : [false],
-      score: evalDuelPlay, better });
+      rips: CLASS.knives ? [false, true] : [undefined], score: evalDuelPlay, better });
+    S.ripArmed = false;
+    if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
   }

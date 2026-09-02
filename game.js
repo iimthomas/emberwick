@@ -115,7 +115,7 @@ function looseWord() { return LOOSE_CUT === 2 ? 'half' : LOOSE_CUT === 3 ? 'a th
 // ✅ Picked over (SPIKE 2 + PAID 1), which measured 29/28/27/30 — a closer average but it makes
 // stage 1 HARDER for her than for the mage, and *a newly unlocked class steamrolling the on-ramp is
 // how you FEEL an unlock* (2026-08-21). Her being easiest at stage 1 is design, not slack.
-let PAID_STEP = 0;
+let PAID_STEP = 2;
 // 🛤️ the fork can be switched off, so it can be A/B'd against the blind draw it replaced.
 // ⚠️ Keep it: the fork changes the RUN ECONOMY (free agency where there was only paid agency
 // via ↩️ Divert), so every number taken before it is measured against a different game.
@@ -1411,7 +1411,11 @@ const PITCH_BASE = { tool: 6, blade: 4 };
 function pitchOf(card) {
   if (!card || !card.def) return 0;
   const base = PITCH_BASE[card.def.role] || 5;
-  return Math.max(0, base - (card.level || 1));
+  // 🔑 TOOLS ARE THE FUEL, BLADES THE PAYLOAD — and sharpening makes a card MORE ITSELF (2026-09-02).
+  // Pitch fell with level on BOTH, so a levelled deck could not pay a blade: measured 2% of turns
+  // paid in full, 75% tool Strikes, blow 7.2 vs the mage's 9.3, 0/0/0/0. A sharpened tool now
+  // pitches MORE (base + level − 1); a sharpened blade still pitches less (it is not a fuel).
+  return card.def.role === 'tool' ? base + (card.level || 1) - 1 : Math.max(0, base - (card.level || 1));
 }
 const MOMENTUM_DISCOUNT_CAP = 2;   // ⚠️ DEAD: momentum no longer touches cost. Kept so old saves load.
 const SLIP_MARGIN = 4;           // 🌀 beat its Initiative by this and it barely answers
@@ -1454,7 +1458,7 @@ const ROGUE_VERBS = {
   pierce:    'your strike <b>ignores 🛡️ Armour</b>',
   nocounter: 'it <b>does not counter</b> you',
   cycle2:    'you <b>draw two cards</b>',
-  surge:     '<b>+2 ●</b> Momentum',
+  surge:     'a tool Strike sticks <b>one more</b> 🔪 knife',
   unspent:   'your Strike is <b>not spent</b>',
 };
 // ⚠️ POLARISED 2026-08-17. The pairs used to be roughly symmetric — both halves mid-weight —
@@ -1736,15 +1740,48 @@ function rogueMath() {
   // each other: a SHORT meter you actually fill, with pips that matter, is a different design from
   // a long meter you never fill. Thomas: *"whats so bad about having a momentum cap of 3? what if
   // we increase what you get as well with a cap of 3"* — that is Design A done properly.
-  const atFullNow = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
-  const streakDmg = (MOMENTUM_FULL === 'convert' && atFullNow) ? 0 : (S.momentum || 0) * MOMENTUM_VALUE;
-  const bonus = verbBonus + streakDmg;
+  const streakDmg = 0;                                              // ● retired — knives now
+  const bonus = verbBonus;
   return { paired, verb, rawCost, cost, paid, full, fuel, bonus, verbBonus, streakDmg,
            saved: 0, streak: S.momentum || 0 };
 }
 // ● spending it is a per-turn choice, and — unlike the mage's bank — it is a POOL, so the question
 // is "is this the turn to cash out", not "yes or no".
 // ⚠️ DEAD, kept only so an older save's stored target cannot throw. Momentum is not spent any more.
+// 🔪 KNIVES — the rogue's hook (2026-09-02, build 459; spec 08_Ideas/Rogue_Knives.md).
+// A TOOL Strike sticks one in the body it hits; each lowers that body's Armour by 1 for EVERY blow
+// (a partner's too — the holes are engine state, so co-op sees them); a BLADE Strike may RIP them
+// out for a hit each, cleaving across a pack like any multi-hit; lose the race and one falls out.
+// ● Momentum was a streak on the PLAYER — measured dead in multi-turn fights and invisible to a
+// partner. Knives are the same press-your-luck, moved onto the creature.
+let KNIFE_CAP = 3;
+function knivesIn() { return statusN('knife'); }
+function leadKnives() {
+  if (S.dragonState && S.finalMode && S.finalPhase === 'duel') return (S.dragonState.status && S.dragonState.status.knife) || 0;
+  return (S.foeState && S.foeState.status && S.foeState.status.knife) || 0;
+}
+function toggleRip() {
+  if (!CLASS.knives || !isAssignPhase()) return;
+  const st = spellCard(); if (!st || st.def.role !== 'blade' || !knivesIn()) return;
+  S.ripArmed = !S.ripArmed; render();
+}
+// 🎲 the creature swung — its thrashing shakes one knife loose (unless she is Second Nature)
+function shakeKnife() {
+  const bag = fightStatus(); if (!bag || !bag.knife) return;
+  if (hasCharm('secondnature') || hasArmourRule('steadymo')) return;
+  bag.knife -= 1;
+  log(`🔪 Its thrashing shakes a knife loose — ${bag.knife} left in it.`, 'bad');
+}
+function knifeRowHTML() {
+  if (!CLASS.knives || !isAssignPhase()) return '';
+  const st = spellCard(), n = knivesIn();
+  if (!st || !n) return '';
+  if (st.def.role !== 'blade') return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="knife">🔪 <b>${n}</b> in it — its Armour −${n}. A <b>blade</b> Strike could rip them out.</span></div>`;
+  const on = !!S.ripArmed;
+  return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="knife">🔪 <b>${n}</b> in it — ` +
+    (on ? `<b>ripping</b>: +${n} hit${n === 1 ? '' : 's'} <span class="dim">(the holes close)</span>` : `leave them: its Armour −${n} <span class="dim">— or rip: +${n} hit${n === 1 ? '' : 's'}</span>`) + `</span>` +
+    `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleRip()">${on ? 'leave them in' : '🔪 rip them out'}</button></div>`;
+}
 function setMoTarget(t) {
   return;
   render();
@@ -1762,25 +1799,28 @@ const ROGUE = {
   boosts: false,           // ➕ no Surge stat either
   energy: true,            // ⚡ the Strike costs, slot ③ pays
   name: 'Rogue',
-  momentum: true,          // ● the untouched streak — earned by taking nothing, lost by taking anything
-  trait: { icon: '●', name: 'Momentum',
-    text: 'Every turn that costs you <b>nothing</b> earns a pip, up to ' + MOMENTUM_CAP +
-      '. Each pip adds <b>+1 to your Strike</b>. Take any damage and the whole streak breaks.' },
-  // 🏅 WHAT THE GRADE CALLS CRAFT — her source of power is PAYING, so availability is "could any
-  // card in this hand have covered another's ⚡ cost" and finding it is striking for the full value.
-  // 🔑 THE MAPPING IS THE ONE ALREADY WRITTEN DOWN FOR HARDSHIPS: *a rule that names ATTUNING,
-  // the rogue reads as PAYING.* Same sentence, one layer up.
-  // ● a FULL meter splits the Strike. Reads the same MOMENTUM_FULL the maths does, so the face and
-  // the resolution cannot disagree.
+  momentum: false,         // ● RETIRED 2026-09-02 — measured dead in multi-turn fights (78% break rate)
+  knives: true,            // 🔪 her hook: stick with a tool, rip with a blade — see Rogue_Knives.md
+  trait: { icon: '🔪', name: 'Knives',
+    text: 'A <b>tool</b> Strike sticks a knife in it (up to 3). Each knife lowers its <b>Armour by 1</b> for every blow — yours or a partner\'s. A <b>blade</b> Strike can <b>rip</b> them out: <b>one extra hit</b> per knife. Lose the race and one falls out.' },
   hitsOf(c, isStrike) {
-    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
-    return (c.def.hits || 1) + (isStrike && atFull ? 1 : 0) + extraHits(isStrike);
+    return (c.def.hits || 1) + (isStrike && S.ripArmed ? knivesIn() : 0) + extraHits(isStrike);
   },
-  // ● pips land on every blow, like a potion does. ⚠️ The blade VERB bonus is not shown here —
-  // it depends on the fuel card, which the face cannot know; the reveal still states it.
   perHitBonus(card) {
-    return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card)
-         + (MOMENTUM_FULL === 'convert' && (S.momentum||0) >= MOMENTUM_CAP ? 0 : (S.momentum || 0) * MOMENTUM_VALUE);
+    return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card);
+  },
+  // 🔪 after her blow lands on `body`: a tool sticks, a rip spends. The ENGINE calls this; the
+  // class decides what its cards leave behind — the same seam as the mage's marks.
+  afterBlow(r, body) {
+    const bag = body && (body.status = body.status || {});
+    if (!bag || !r || !r.rogue) return;
+    const st = r.spell;
+    if (S.ripArmed && bag.knife) { log(`🔪 She rips <b>${bag.knife}</b> knife${bag.knife === 1 ? '' : 's'} out.`, 'good'); bag.knife = 0; r.ripped = true; }
+    if (st && st.def.role === 'tool' && body.hp > 0) {
+      const n = (hasCharm('deadhand') ? 2 : 1) + (r.rogue.verb === 'surge' ? 1 : 0);
+      const was = bag.knife || 0; bag.knife = Math.min(KNIFE_CAP, was + n);
+      if (bag.knife > was) { log(`🔪 <b>${st.def.name}</b> sticks — ${bag.knife} knife${bag.knife === 1 ? '' : 's'} in it (Armour −${bag.knife}).`, 'good'); r.stuck = bag.knife - was; }
+    }
   },
   craft: {
     label: 'paid in full', gate: 'be paid in full',
@@ -1794,22 +1834,9 @@ const ROGUE = {
   // ⚠️ IT SHOWS AT ZERO, ALWAYS. An empty meter is still a thing you are trying to fill — and
   // 🗡️ Lone Fang pays +4 *precisely while the streak is broken*, so hiding an empty token would
   // hide that charm's entire payout. The Mirror Fen rule: show the terms even when they are zero.
-  tokens() {
-    const now = S.momentum || 0, lone = hasCharm('lonefang');
-    return [{
-      id: 'mo', icon: '🗡️', name: 'Momentum', count: now, cap: MOMENTUM_CAP,
-      // ⚠️ THE TOKEN MUST NAME THE PAYOFF *BEFORE* YOU REACH IT, or filling the meter is a surprise
-      // rather than a goal — "be fun trying to keep up the momentum" needs something to aim at.
-      worth: (MOMENTUM_FULL && now >= MOMENTUM_CAP)
-             ? `<b>+${now}</b> — and your Strike <b>splits in two</b>`
-           : now > 0 ? `your Strike hits for <b>+${now}</b>` +
-               (MOMENTUM_FULL ? ` <span class="dim">· fill it and the Strike splits</span>` : '')
-           : (lone ? 'nothing yet — but <b>Lone Fang</b> gives <b>+4</b>' : 'no bonus yet'),
-      note: now > 0
-        ? `any damage breaks it${hasCharm('secondnature') ? ' back to 2' : ''}`
-        : 'come through a turn untouched to start it',
-    }];
-  },
+  // 🔪 no token: knives are ON THE CREATURE (a status chip), never on the field — the field is
+  // for what a turn creates on the PLAYER.
+  tokens() { return null; },
   canPlace() { return true; },
   valid() { return !!spellCard(); },
   // ⚠️ ENERGY IS A TEMPO COST, NOT AN ATTRITION ONE (corrected 2026-08-17 by Thomas: *"nah i
@@ -1834,20 +1861,14 @@ const ROGUE = {
     // 🔑 PAID IN FULL BUYS THE BIG NUMBER. Short, you still swing — a card that cannot be played
     // is the harshest thing a four-card hand can hold, so underpaying costs power, never the turn.
     const dmg = (m.full ? st.attuned : st.value);
-    // 🎯 hits: the 🧱 GUARD ANSWER, AND IT IS HERS AGAIN (2026-08-18).
-    // ⚠️ This read `const hits = 1;` under a comment promising hits were *"reachable only through
-    // 🎯-granting effects"* - and no such effect existed anywhere. The rogue could never land more
-    // than one blow, while the MAGE quietly owned the only multi-hit card in the game
-    // (Sparkstrike ×2). 🔑 The class Guard was designed to EXCLUDE could engage with it; the class
-    // it was built FOR could not. Thomas found it on meeting his first Guard creature:
-    // *"how do i do multiple hits as rogue?"*
-    // 🔑 A COMMENT THAT DESCRIBES A SYSTEM IS NOT THE SYSTEM - same fault as `defs: null`.
-    // ● A FULL METER SPLITS THE STRIKE — see MOMENTUM_FULL.
-    const atFull = MOMENTUM_FULL && (S.momentum || 0) >= MOMENTUM_CAP;
+    const baseHits = strike.def.hits || 1;
     const hits = CLASS.hitsOf(strike, true);   // ⚠️ her card is `strike`, not `spell`
+    // 🔪 a rip adds a hit per knife, each at the blade's per-hit value — hits ADD, they do not split
+    const rip = S.ripArmed && strike.def.role === 'blade' ? knivesIn() : 0;
+    const ripDmg = rip * Math.floor(dmg / baseHits);
     return {
-      value: Math.max(0, dmg + (duelFx().value || 0)
-        + (hasCharm('lonefang') && (S.momentum || 0) === 0 ? 4 : 0)),
+      value: Math.max(0, dmg + ripDmg + (duelFx().value || 0)
+        + (hasCharm('lonefang') && knivesIn() === 0 ? 4 : 0)),
       element: null,
       init: combo ? eff(combo).init : 0,
       boost: 0,
@@ -1870,7 +1891,8 @@ const ROGUE = {
                // field, check the payload spread in the same edit.
                bonus: m.bonus, verbBonus: m.verbBonus, streakDmg: m.streakDmg,
                fuelName: m.fuel ? m.fuel.def.name : null,
-               rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true },
+               rawCost: m.rawCost, saved: m.saved, streak: m.streak, slips: true,
+               sticks: strike.def.role === 'tool', rips: rip, knives: knivesIn() },
     };
   },
 };
@@ -2770,7 +2792,7 @@ const RULE_CHARMS = [
   // read momentum === 0. Under a streak that means *just broken*, so it now pays you for the wreck —
   // deliberate anti-synergy with every other rogue charm, the way ✦ Cold Iron is for the mage.
   { id: 'lonefang', tier: 1, name: 'Lone Fang',      rarity: 'uncommon', cost: 9, rule: true, cls: 'rogue',
-    text: '🗡️ While your Momentum is <b>0</b>, your strike gains <b>+4</b>' },
+    text: '🔪 While <b>no knife</b> is in it, your strike gains <b>+4</b>' },
   { id: 'twinblades', tier: 2, name: 'Twin Blades',  rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
     // ⚠️ WAS "counts as the previous card" - pure CHAIN language, and the chain was deleted two
     // redesigns ago. The CODE was always fine: it lets the Arsenal complete a pair. Only the
@@ -2784,9 +2806,9 @@ const RULE_CHARMS = [
   // 🔑 A FLOOR, NOT AN OFF SWITCH: "Momentum never breaks" would delete the minigame outright.
   // A charm may bend the class's question, never answer it.
   { id: 'secondnature', tier: 4, name: 'Second Nature', rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
-    text: '🗡️ When your Momentum breaks it falls to <b>2</b>, not 0' },
+    text: '🔪 A lost race shakes <b>no knife</b> loose' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
-    text: '🗡️ <b>Complete</b> an encounter and Momentum rises by <b>2</b>' },
+    text: '🔪 A tool Strike sticks <b>two</b> knives' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
     text: '✦ When you attune, your <b>Catalyst stays in hand</b> instead of sliding under the deck',
     why: 'attuning stops costing you tempo' },
@@ -2993,6 +3015,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 459, date: '2026-09-02', title: 'The rogue keeps knives',
+    changed: [
+      "🔪 <b>Momentum is gone. The rogue sticks knives.</b> A tool Strike sticks a knife in the creature (up to 3). Each knife lowers its Armour by 1 for every blow. A blade Strike can rip them out for one extra hit each — and the hits cleave across a pack. Lose the race and one falls out.",
+      "🗡️ Lone Fang, Second Nature, Dead Hand, Bloodcord Vest, Quietstep Boots and Fangcord now speak knives instead of pips.",
+    ] },
+
   { build: 458, date: '2026-09-02', title: 'Cragmourn settles last',
     changed: [
       "🐉 <b>Cragmourn's cycle is now Grind → Rockbind → Settle.</b> Its breath still climbs every beat; the extra step comes at the end of the cycle instead of the start.",
@@ -5778,7 +5806,7 @@ function takeMapNode(f, c) {
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
@@ -6178,6 +6206,10 @@ function foeAttacksOf(e) {
 // 📦 PORT SHAPE: a status is a ROW, exactly like FOE_ATTACKS — *the pool owns the rule, the
 // card owns nothing but which rule it names*. The element grid is 4×4, so each element owns one.
 const STATUSES = {
+  // 🔪 THE ROGUE'S KNIVES (2026-09-02, build 459) — no element; a tool Strike sticks one, a blade
+  // Strike rips them out for a hit each. Engine state on the body, so a partner sees the holes.
+  knife:  { el: null,        icon: '🔪', name: 'Knives',
+            text: 'its Armour is <b>N</b> lower while they stay in', decay: '' },
   burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
             text: 'it loses <b>N</b> at the start of its turn', decay: ', then halves' },
   frost:  { el: 'Water',     icon: '❄️', name: 'Frost',
@@ -6327,10 +6359,11 @@ function foeAffinityHTML() {
 function foeStatusHTML() {
   const bag = fightStatus(); if (!bag) return '';
   const bits = [];
-  for (const id of ['burn', 'frost', 'expose', 'daze']) {
+  for (const id of ['knife', 'burn', 'frost', 'expose', 'daze']) {
     const n = bag[id] || 0; if (!n) continue;
     const d = STATUSES[id];
-    const say = id === 'burn'   ? `loses <b>${n}</b> next turn`
+    const say = id === 'knife'  ? `its Armour <b>−${n}</b>`
+              : id === 'burn'   ? `loses <b>${n}</b> next turn`
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
               : `its next blow <b>−${n}</b>`;
@@ -6743,6 +6776,7 @@ function foeApplyBlow(r) {
   }
   // 🏷️ effects land on the body you AIMED at, after the blow, if it still stands
   if (first && first.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
+  if (first && CLASS.afterBlow) CLASS.afterBlow(r, first);          // 🔪 what her cards leave behind
   if (!targetBody() || targetBody() === st) S.foeTarget = -1;
   if (st.hp > 0) return false;                       // the LEAD still stands — the fight goes on
 
@@ -6857,7 +6891,7 @@ function startFoeBeat() {
   // third loop skipped the resets the other two shared. A beat IS a turn.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
@@ -6978,7 +7012,7 @@ function nextTurn() {
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-    S.bankArmed = false; S.moTarget = null;
+    S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
     S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
     S.phase = 'fork';
     logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
@@ -6993,7 +7027,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
@@ -7289,7 +7323,7 @@ function computeAction(reserve) {
     const slipped = !!(a.rogue && a.rogue.slips && !initLost && (init - e.init) >= SLIP_MARGIN);
     // 🗡️ Venom Needle slips between the plates, exactly as ✦ Overwhelm does
     const armorCut = (!quenched && foeHas(e, 'armour') && vS !== 'Overwhelm' && rVerb !== 'pierce')
-      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0)) : 0;   // 🛡️ Ironsplitter
+      ? Math.max(0, (e.shapeV || 0) - (hasCharm('ironsplit') ? 2 : 0) - leadKnives()) : 0;   // 🛡️ Ironsplitter · 🔪 knives
     // 🧪 Skyglass — the blow simply cannot be halved · 🗡️ Second Fang catches what the first missed
     // 🌀 Windreader widens the margin Evasion needs, so a near-miss on the race still lands full
     const evGrace = hasCharm('windreader') ? 2 : 0;
@@ -7738,7 +7772,7 @@ function resolve() {
       // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
       // order on screen is: it strikes → you block → your blow → the verdict.
       const first = foeCounter(r);
-      if (r.initLost || foeFx().unstoppable) spendDaze();   // ⚡ it swung; the Daze did its work
+      if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
       if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
@@ -8402,9 +8436,9 @@ const ARMOUR = [
   { id: 'slowwick',  slot: 'Legs',  name: 'Slowwick Treads',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'mage',
     ongoing: 'wakekeep', text: '🔥 Your Emberwake <b>does not expire</b> — it keeps until you spend it.' },
   { id: 'bloodcord', slot: 'Chest', name: 'Bloodcord Vest',   block: 2, brk: 'worn', rarity: 'rare', cls: 'rogue',
-    ongoing: 'bloodpip', text: '● The <b>first card you block with</b> each encounter gains you a <b>pip</b>.' },
+    ongoing: 'bloodpip', text: '🔪 The <b>first card you block with</b> each encounter sticks a <b>knife</b> in it.' },
   { id: 'quietstep', slot: 'Legs',  name: 'Quietstep Boots',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'rogue',
-    ongoing: 'steadymo', text: '● A <b>Narrow</b> costs you <b>one pip</b> instead of breaking your Momentum.' },
+    ongoing: 'steadymo', text: '🔪 A lost race shakes <b>no knife</b> loose.' },
 
   // 👢 LEGS — speed
   { id: 'toadboots', slot: 'Legs', name: 'Anvil Toad Boots',   block: 1, brk: 'worn', rarity: 'rare',
@@ -8422,7 +8456,7 @@ const ARMOUR = [
     text: 'Break it: an Emberwake channelled this turn is ×3 instead of ×2.' },
   { id: 'fangcord', slot: 'Arms', name: 'Fangcord',           block: 0, brk: 'worn', rarity: 'legendary',
     cls: 'rogue', uses: 1, use: 'quicken', consume: true,
-    text: 'Break it: your ● Momentum fills to full.' },
+    text: 'Break it: <b>three knives</b> are in it.' },
   // 👞 LEGS — tempo.
   { id: 'sandals', slot: 'Legs',  name: 'Ashstep Sandals',    block: 2, brk: 'shatter', rarity: 'uncommon',
     onBlock: 'dash', text: 'When it blocks, your next turn gets +5 Initiative.' },
@@ -8786,7 +8820,7 @@ function applyArmourUse(key, d, opt, a) {
   else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — an Emberwake channelled this turn is ×3.`, 'good'); }
   // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
   // legendary-sized effect without being a number.
-  else if (key === 'quicken') { S.momentum = MOMENTUM_CAP; log(`🛡️ ${d.name} breaks — ● Momentum fills to ${MOMENTUM_CAP}.`, 'good'); }
+  else if (key === 'quicken') { const b = fightStatus(); if (b) { b.knife = KNIFE_CAP; log(`🛡️ ${d.name} breaks — 🔪 ${KNIFE_CAP} knives in it.`, 'good'); } }
   // ⚠️ LIVE THIS TURN, not pending — you tapped it during assign, so it must land on the strike
   // you are arranging right now. rollTurnTokens() wipes it at cleanup, which is exactly right.
   else if (key === 'burst') { S.armourStrike = (S.armourStrike || 0) + n; log(`🛡️ ${d.name} — your strike gets +${n} this turn.`, 'good'); }
@@ -9291,8 +9325,8 @@ function downgrade(card, why) {
   // several times an encounter and the meter simply never emptied. ⚠️ `S.downgraded` is already
   // per-encounter state, so "first" costs no new field - the same trick 🧱 Ironbound uses.
   if (hasArmourRule('bloodpip') && CLASS.id === 'rogue' && S.downgraded.size === 1) {
-    S.momentum = Math.min(MOMENTUM_CAP, (S.momentum || 0) + 1);
-    log(`🛡️ <b>Bloodcord Vest</b> — ● the blow feeds the streak (${S.momentum}/${MOMENTUM_CAP}).`, 'good');
+    const b = fightStatus();
+    if (b) { b.knife = Math.min(KNIFE_CAP, (b.knife || 0) + 1); log(`🛡️ <b>Bloodcord Vest</b> — 🔪 the blow sticks a knife (${b.knife} in it).`, 'good'); }
   }
   // 🧱 IRONBOUND - the deck can be bruised, never blunted.
   // ⚠️ TWO EARLIER VERSIONS FAILED AND BOTH ARE INSTRUCTIVE. *Never destroyed* measured **+0.7
@@ -9696,7 +9730,7 @@ function pouredIds() { return CLASS.spentIds(); }
 // the same reason: the finale is a third turn loop, and a class token that cannot move during the
 // boss fight is a token the boss fight does not have.
 function tickMomentum(damage, r) {
-  if (!r || !r.rogue) return;
+  if (!r || !r.rogue || !CLASS.momentum) return;   // ● retired for the rogue (knives); kept for old saves
   // 🔑 WHAT COUNTS AS "TOUCHED" IS THE ONLY LEVER THAT CHANGES THE STREAK'S SHAPE.
   // At MOMENTUM_BREAK = 1 this is the original rule: *any* damage shatters it. Raising it means
   // a graze no longer breaks your rhythm but a real blow does — which is the one change that
@@ -11793,6 +11827,7 @@ function renderControls() {
       lessonRow +
       potionRow +
       bankRowHTML() +
+      knifeRowHTML() +
       strikePromptHTML() +
       boostRow +
       resolveBtn +
@@ -12525,7 +12560,7 @@ function rogueZoneHint(zone, isFight) {
 // ⚠️ RENAMED RATHER THAN GUTTED IN PLACE. A function still called momentumRowHTML that no longer
 // draws momentum is the "a comment that describes a system is not the system" trap, one level down.
 function strikePromptHTML() {
-  if (!CLASS.momentum || !isAssignPhase()) return '';
+  if (!CLASS.energy || !isAssignPhase()) return '';
   if (rogueMath()) return '';
   return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
 }
@@ -12699,6 +12734,7 @@ const TIPS = {
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
   cycle:    ['🔁 Cycle', 'A dragon plays its attacks in this order, over and over. The next one is in bold.'],
+  knife:    ['🔪 Knives', 'Each knife in it lowers its Armour by 1 for every blow. A blade Strike can rip them out for one extra hit each. Lose the race and one falls out.'],
   target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
   shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
   rally:    ['📣 Rallies', 'While it lives, the leader\'s attack is +1.'],
@@ -13181,7 +13217,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -13231,7 +13267,7 @@ function finaleAfterTurn() {
 // possible at all, and why it is a boss-only shape.
 function duelArmour() {
   if (!hasShape('armour')) return 0;
-  return Math.max(0, S.dragon.shapeV - (S.dragonState.boon.armourCut || 0));
+  return Math.max(0, S.dragon.shapeV - (S.dragonState.boon.armourCut || 0) - leadKnives());   // 🔪 knives open it
 }
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
@@ -13380,7 +13416,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false;   // 🔥 banking is armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -13439,6 +13475,7 @@ function resolveDuel() {
   // other two; anything that touches a fight lands here in the same commit.
   const dazeCut = Math.min(damage, statusN('daze'));
   if (dazeCut > 0) { log(`⚡ Dazed — its blow lands <b>${dazeCut}</b> weaker.`, 'good'); spendDaze(); }
+  if (r.initLost) shakeKnife();                                     // 🔪 it swung
   S.duelResult = { atk, toHp, kill, early, counter, damage: damage - dazeCut, armour: st.armour, evaded: st.evaded };
   strikeFx(r, kill);   // 💥 the duel is a fight too, and it lost the same animations
   // 🏷️ SAME TWO LINES AS THE ROAD, at the same moment: 🪨 Exposed is spent by the blow it
@@ -13449,6 +13486,7 @@ function resolveDuel() {
   const dbag2 = fightStatus();
   if (dbag2 && dbag2.expose) dbag2.expose = 0;
   if (!kill) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
+  if (!kill && CLASS.afterBlow) CLASS.afterBlow(r, S.dragonState);   // 🔪
 
   log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
       ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +

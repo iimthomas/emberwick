@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 459 — The rogue keeps knives
+*2026-09-02*
+
+**Changed**
+- 🔪 **Momentum is gone. The rogue sticks knives.** A tool Strike sticks a knife in the creature (up to 3). Each knife lowers its Armour by 1 for every blow. A blade Strike can rip them out for one extra hit each — and the hits cleave across a pack. Lose the race and one falls out.
+- 🗡️ Lone Fang, Second Nature, Dead Hand, Bloodcord Vest, Quietstep Boots and Fangcord now speak knives instead of pips.
+
 ## build 458 — Cragmourn settles last
 *2026-09-02*
 
