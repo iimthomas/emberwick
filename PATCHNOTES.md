@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 453 — The dragons stand taller again
+*2026-09-01*
+
+**Changed**
+- 🐉 **Skyrender, Cragmourn and Fathomdread have more health.** Now that creatures answer your spells and your cards have real effects, the last three dragons had become too easy. Cindermaw is unchanged.
+
 ## build 452 — Under the hood
 *2026-09-01*
 
