@@ -2291,8 +2291,8 @@ const DRAGON_ATTACKS = {
   ],
   Cragmourn: [
     { id: 'grind',  name: 'Grind',          tell: 'it leans into you without hurrying', fx: {} },
-    { id: 'settle', name: 'Settle',         tell: 'it draws a longer breath — ⏳ the escalation takes an extra step', fx: { breathStep: 1 } },
     { id: 'bind',   name: 'Rockbind',       tell: 'stone closes on your pack — whatever you hold in ARSENAL will be taken', fx: { burn: 'Reserve' } },
+    { id: 'settle', name: 'Settle',         tell: 'it draws a longer breath — ⏳ the escalation takes an extra step', fx: { breathStep: 1 } },
   ],
   Fathomdread: [
     { id: 'under',  name: 'Undertow',       tell: 'the current gathers under you', fx: {} },
@@ -2993,6 +2993,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 458, date: '2026-09-02', title: 'Cragmourn settles last',
+    changed: [
+      "🐉 <b>Cragmourn's cycle is now Grind → Rockbind → Settle.</b> Its breath still climbs every beat; the extra step comes at the end of the cycle instead of the start.",
+    ] },
+
   { build: 457, date: '2026-09-02', title: 'Dragons fight in a cycle',
     changed: [
       "🔁 <b>A dragon plays its three attacks in a fixed order</b>, over and over, and the order is printed — in the stage briefing, at the lair, and on the duel panel with the next step in bold. Plan the whole fight, not just the next beat. Road creatures still draw from their bag.",
