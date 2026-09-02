@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 460 — Knives slow it too
+*2026-09-02*
+
+**Changed**
+- 🔪 **A knife in the creature lowers its Initiative as well as its Armour.** Three knives take a dragon from 10 to 7 — for you and for a partner.
+
 ## build 459 — The rogue keeps knives
 *2026-09-02*
 

@@ -69,6 +69,7 @@ function setBankWeight(w) { BANK_WEIGHT = w; }
 // 2026-09-01 (dev/wake-probe.js, n=120): a plain turn leaves 6.65, and 21% of held wakes gutter
 // (kill turn, or nothing at home) → 6.65 × 0.79 ≈ 5.
 let EXPECT_EFFECT = 5;
+let KNIFE_DUEL_WEIGHT = 6;   // 🔪 what a knife stuck in a dragon is worth to the one-beat duel scorer
 // 🎯 WHAT AIMING AT A MINION IS WORTH (2026-09-02). The value term scores r.value the same whoever
 // it lands on, so without this the bot would aim by tie-break. A dead minion is two turns of its
 // attack you never soak (+ its rule); chip damage on a minion is half wasted.
@@ -592,7 +593,11 @@ const RUNSIM = (() => {
     // not as a tie-break below it. Next beat is guaranteed here in a way the road's next encounter
     // never is — that is the whole reason channelling is worth more in the finale, and a
     // lexicographic tie-break could only ever find it on an exact tie (1 beat in 278, measured).
-    return [kill ? 1 : 0, st.toHp + bankValue(r) + effectValue(r), -incoming];
+    // 🔪 A STICK IN THE DUEL IS DEFERRED VALUE — the next beat is guaranteed, so a knife (Armour −1,
+    // Initiative −1, for the rest of the fight) is priced INSIDE the damage term like the bank, or
+    // the one-beat scorer never opens with a tool (measured: 0.6 sticks a duel, race lost 74%).
+    const knifeDuel = (r.rogue && r.rogue.sticks && !kill) ? KNIFE_DUEL_WEIGHT : 0;
+    return [kill ? 1 : 0, st.toHp + bankValue(r) + effectValue(r) + knifeDuel, -incoming];
   }
   // 🚨 THIS IS THE **FOURTH** COPY OF THE ARRANGEMENT SEARCH, and it is the one that proves the
   // point the other three keep making. It silently omitted `bankArmed` AND the wake's aim, so the
