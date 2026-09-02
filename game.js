@@ -514,7 +514,7 @@ const REGIONS = [
       par: 1, attacks: [{ a: 'circle', name: 'Wisp Away' }, { a: 'lunge', name: 'Flare Out' }, { a: 'windup', name: 'Kindled Blow' }] },
     { type: 'fight', name: 'Stormtoad',      hp: 10, init: 6, atk: 2, atkEl: 'Lightning',  xp: 3,
       par: 2, attacks: [{ a: 'windup', name: 'Bellow Slam' }, { a: 'flurry', name: 'Thunderclap' }, { a: 'blur', name: 'Stormskin' }] },
-    { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 5, atk: 4, atkEl: 'Fire',      shape: 'armour', shapeV: 2,      xp: 6,
+    { type: 'fight', name: 'Ashen Boar',     hp: 26, init: 5, atk: 4, atkEl: 'Fire', pack: [{ name: 'Cinder Whelp', icon: '🐗', hp: 3, atk: 1, rule: 'rally' }, { name: 'Cinder Whelp', icon: '🐗', hp: 3, atk: 1, rule: 'rally' }],      shape: 'armour', shapeV: 2,      xp: 6,
       par: 3, attacks: [{ a: 'windup', name: 'Tusk Charge' }, { a: 'harden', name: 'Cinder Crust' }, { a: 'quicken', name: 'Blood Up' }] },
     { type: 'fight', name: 'Frostbark Elder', hp: 22, init: 5, atk: 3, atkEl: 'Water', resist: 'frost', weak: 'burn',    shape: 'evasion', shapeV: 1,     xp: 5, ability: 'Freeze',
       par: 3, attacks: [{ a: 'harden', name: 'Rimeplate' }, { a: 'circle', name: 'Drift' }, { a: 'lunge', name: 'Deep Freeze' }] },
@@ -527,7 +527,7 @@ const REGIONS = [
   { name: 'Deepdark Hollows', hardshipChance: 0.5, hardships: ['Dead Air', 'Hazards', 'Night Travel', 'Storm'], encounters: [
     { type: 'fight', name: 'Basalt Basilisk', hp: 28, init: 5, atk: 3, atkEl: 'Stone', resist: 'expose', weak: 'burn',    shape: 'armour', shapeV: 3,    xp: 6,
       par: 4, attacks: [{ a: 'harden', name: 'Stoneskin' }, { a: 'set', name: 'Coil Tight' }, { a: 'lunge', name: 'Gaze' }] },
-    { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 5, atk: 3, atkEl: 'Water',     shape: 'guard', shapeV: 1,     xp: 6,
+    { type: 'fight', name: 'Grotto Hydra',   hp: 20, init: 5, atk: 3, atkEl: 'Water', pack: [{ name: 'Hydra Head', icon: '🐍', hp: 3, atk: 1, rule: 'shield' }, { name: 'Hydra Head', icon: '🐍', hp: 3, atk: 1, rule: 'shield' }],     shape: 'guard', shapeV: 1,     xp: 6,
       par: 3, attacks: [{ a: 'set', name: 'Coil' }, { a: 'circle', name: 'Second Head' }, { a: 'lunge', name: 'Snap' }] },
     { type: 'fight', name: 'Sulfur Crawler', hp: 11, init: 4, atk: 2, atkEl: 'Fire',      shape: 'evasion', shapeV: 1,      xp: 5, ability: 'Poison',
       par: 2, attacks: [{ a: 'circle', name: 'Sidle' }, { a: 'lunge', name: 'Snap' }, { a: 'windup', name: 'Fume Burst' }] },
@@ -581,7 +581,7 @@ const ROAD_STORMREACH = [
   // 🍃 Windward Steps — no hardships: the same teaching grace stage 1 opens with. High, open,
   // and mercifully empty; what it teaches is that up here things are FASTER than you.
   { name: 'Windward Steps', hardshipChance: 0, hardships: [], encounters: [
-    { type: 'fight', name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 3,
+    { type: 'fight', name: 'Kite Hawk',    hp: 8,  init: 4, atk: 2, atkEl: 'Lightning', pack: [{ name: 'Kite Fledgling', icon: '🐦', hp: 3, atk: 1 }, { name: 'Kite Fledgling', icon: '🐦', hp: 3, atk: 1 }, { name: 'Kite Fledgling', icon: '🐦', hp: 3, atk: 1 }], shape: 'evasion', shapeV: 1, xp: 3,
       par: 1, attacks: [{ a: 'circle', name: 'Wheel' }, { a: 'lunge', name: 'Stoop' }, { a: 'windup', name: 'Talon' }] },
     { type: 'fight', name: 'Gale Colt',    hp: 12, init: 4, atk: 2, atkEl: 'Water',     xp: 4,
       par: 2, attacks: [{ a: 'windup', name: 'Kick' }, { a: 'flurry', name: 'Bolt' }, { a: 'blur', name: 'Duststreak' }] },
@@ -599,7 +599,7 @@ const ROAD_STORMREACH = [
   { name: 'The Shrike Downs', hardshipChance: 0.35, hardships: ['Ambush', 'Vertigo', 'Night Travel'], encounters: [
     { type: 'fight', name: 'Downs Shrike',   hp: 9,  init: 5, atk: 3, atkEl: 'Lightning', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Ranged',
       par: 1, attacks: [{ a: 'circle', name: 'Ring Round' }, { a: 'quicken', name: 'Dive' }, { a: 'windup', name: 'Impale' }] },
-    { type: 'fight', name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone',     shape: 'armour', shapeV: 2, xp: 5,
+    { type: 'fight', name: 'Gorse Lurcher',  hp: 13, init: 3, atk: 3, atkEl: 'Stone', pack: [{ name: 'Gorse Hound', icon: '🐕', hp: 3, atk: 2, rule: 'rally' }, { name: 'Gorse Hound', icon: '🐕', hp: 3, atk: 2, rule: 'rally' }],     shape: 'armour', shapeV: 2, xp: 5,
       par: 2, attacks: [{ a: 'harden', name: 'Thornhide' }, { a: 'lunge', name: 'Snag' }, { a: 'windup', name: 'Haul In' }] },
     { type: 'fight', name: 'Quillback',      hp: 7, init: 4, atk: 2, atkEl: 'Stone',     shape: 'guard', shapeV: 1, xp: 5, ability: 'Windshear',
       par: 1, attacks: [{ a: 'set', name: 'Quills Up' }, { a: 'lunge', name: 'Barb' }, { a: 'blur', name: 'Bristle Haze' }] },
@@ -657,7 +657,7 @@ const ROAD_FELLGRIND = [
   { name: 'The Sloughs', hardshipChance: 0, hardships: [], encounters: [
     { type: 'fight', name: 'Sump Toad',     hp: 10, init: 3, atk: 2, atkEl: 'Water', xp: 4,
       par: 2, attacks: [{ a: 'windup', name: 'Belly Slam' }, { a: 'flurry', name: 'Croaking Fit' }, { a: 'blur', name: 'Bog Haze' }] },
-    { type: 'fight', name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', shape: 'armour', shapeV: 2, xp: 5,
+    { type: 'fight', name: 'Peat Warden',   hp: 14, init: 2, atk: 3, atkEl: 'Stone', pack: [{ name: 'Peat Wisp', icon: '👁️', hp: 3, atk: 1, rule: 'shield' }, { name: 'Peat Wisp', icon: '👁️', hp: 3, atk: 1, rule: 'shield' }], shape: 'armour', shapeV: 2, xp: 5,
       par: 2, attacks: [{ a: 'harden', name: 'Peat Skin' }, { a: 'lunge', name: 'Long Reach' }, { a: 'windup', name: 'Heave' }] },
     { type: 'fight', name: 'Bittern',       hp: 9,  init: 4, atk: 2, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 4, ability: 'Backlash',
       par: 1, attacks: [{ a: 'circle', name: 'Sidestep' }, { a: 'lunge', name: 'Stab' }, { a: 'windup', name: 'Reed Strike' }] },
@@ -697,7 +697,7 @@ const ROAD_FELLGRIND = [
       par: 2, attacks: [{ a: 'circle', name: 'Ring' }, { a: 'quicken', name: 'Stoop' }, { a: 'windup', name: 'Skewer' }] },
     { type: 'fight', name: 'Glasswing Moth', hp: 10, init: 4, atk: 3, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 5, ability: 'Backlash',
       par: 2, attacks: [{ a: 'circle', name: 'Drift' }, { a: 'lunge', name: 'Alight' }, { a: 'windup', name: 'Wing Beat' }] },
-    { type: 'fight', name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire', resist: 'burn', weak: 'daze',  shape: 'armour', shapeV: 3, xp: 7,
+    { type: 'fight', name: 'Hollow Bull',    hp: 17, init: 2, atk: 5, atkEl: 'Fire', pack: [{ name: 'Hollow Calf', icon: '🐂', hp: 4, atk: 2 }, { name: 'Hollow Calf', icon: '🐂', hp: 4, atk: 2 }], resist: 'burn', weak: 'daze',  shape: 'armour', shapeV: 3, xp: 7,
       par: 2, attacks: [{ a: 'harden', name: 'Hollowplate' }, { a: 'lunge', name: 'Horn' }, { a: 'windup', name: 'Stampede' }] },
     { type: 'journey', name: 'The Deadfall',    mp: 13, timePenalty: 2, element: 'Stone',     nightfall: 6, xp: 5, peril: 'Toll' },
     { type: 'journey', name: 'Blackwater Run',  mp: 12, timePenalty: 2, element: 'Water',     nightfall: 6, xp: 4, peril: 'Treacherous' },
@@ -759,7 +759,7 @@ const ROAD_FATHOM = [
     { type: 'journey', name: 'The Undertow',    mp: 15, timePenalty: 2, element: 'Lightning', nightfall: 6, xp: 5, peril: 'Updraft' },
   ]},
   { name: 'The Black Shelf', hardshipChance: 0.5, hardships: ['Riptide', 'Squall', 'Dead Air', 'Ambush'], encounters: [
-    { type: 'fight', name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
+    { type: 'fight', name: 'Shelf Sentinel', hp: 13, init: 4, atk: 4, atkEl: 'Stone', pack: [{ name: 'Shelf Barnacle', icon: '🐚', hp: 3, atk: 1, rule: 'shield' }, { name: 'Shelf Barnacle', icon: '🐚', hp: 3, atk: 1, rule: 'shield' }], shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
       par: 2, attacks: [{ a: 'windup', name: 'Overhead' }, { a: 'flurry', name: 'Cascade' }, { a: 'blur', name: 'Silt Cloud' }] },
     { type: 'fight', name: 'Fathom Ray',     hp: 13, init: 6, atk: 4, atkEl: 'Water', shape: 'evasion', shapeV: 1, xp: 6, ability: 'Windshear',
       par: 2, attacks: [{ a: 'circle', name: 'Glide Round' }, { a: 'quicken', name: 'Sweep Up' }, { a: 'windup', name: 'Mantle Blow' }] },
@@ -773,7 +773,7 @@ const ROAD_FATHOM = [
     { type: 'journey', name: 'Emberdrown',      mp: 13, timePenalty: 2, element: 'Fire',      nightfall: 7, xp: 5 },
   ]},
   { name: "Fathomdread's Trench", hardshipChance: 0.6, hardships: ['Riptide', 'Exacting', 'Squall', 'Vertigo', 'Dead Weight', 'Rationed'], encounters: [
-    { type: 'fight', name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
+    { type: 'fight', name: 'Trench Warden',  hp: 15, init: 5, atk: 5, atkEl: 'Water', pack: [{ name: 'Trench Eel', icon: '🐍', hp: 4, atk: 2, rule: 'rally' }, { name: 'Trench Eel', icon: '🐍', hp: 4, atk: 2, rule: 'rally' }], shapes: ['armour', 'evasion'], shapeV: 2, xp: 7,
       par: 2, attacks: [{ a: 'windup', name: 'Guard Blow' }, { a: 'flurry', name: 'Rout' }, { a: 'blur', name: 'Trench Murk' }] },
     { type: 'fight', name: 'Hadal Serpent',  hp: 15, init: 6, atk: 5, atkEl: 'Lightning', resist: 'daze', weak: 'expose', shape: 'evasion', shapeV: 1, xp: 7, ability: 'Windshear',
       par: 2, attacks: [{ a: 'circle', name: 'Coil About' }, { a: 'quicken', name: 'Race Down' }, { a: 'windup', name: 'Deep Strike' }] },
@@ -2993,6 +2993,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 456, date: '2026-09-02', title: 'Packs',
+    changed: [
+      "🎯 <b>Some creatures bring minions.</b> Eight so far, two a road. Tap a body on the panel to aim your Spell at it; your effects land on the body you hit. The pack shares its leader's Initiative — lose the race and every living body swings. Beat the leader and the rest scatter.",
+      "🛡️ <b>Shield</b> minions halve what reaches the leader while they live. 📣 <b>Rally</b> minions give the leader +1 attack while they live.",
+    ] },
+
   { build: 455, date: '2026-09-02', title: 'Some creatures answer, most do not',
     changed: [
       "🧬 <b>Only some creatures resist or are weak to an effect now</b> — about one in three, and every dragon. It is that creature's own trait, shown on its panel before you arrange. The rest answer nothing.",
@@ -3373,7 +3379,7 @@ function saveGame(key) {
       // week: a value that exists to suppress a rule is dangerous the moment it outlives the
       // function that put it there. `foeBase` is the pristine creature; `foeState` is the pool,
       // the beat, the bag and the telegraph.
-      foeState: S.foeState || null, foeBase: S.foeBase || null,
+      foeState: S.foeState || null, foeBase: S.foeBase || null, foeTarget: S.foeTarget == null ? -1 : S.foeTarget,
       lastMileOutcome: S.lastMileOutcome, lastMileApproach: S.lastMileApproach, duelBeat: S.duelBeat, defeatMsg: S.defeatMsg,
       fork: S.fork ? S.fork.map(e => e.name) : null,
       boon: S.boon, boonOwed: S.boonOwed,
@@ -3509,7 +3515,7 @@ function loadGame(key) {
       beats: null, beatIndex: -1, pendingR: null, beatTimer: null, selectedId: null,
       beatResult: null, stack: d.stack || null,
       finalMode: d.finalMode, finalPhase: d.finalPhase || null, dragonState: d.dragonState || null,
-      foeState: d.foeState || null, foeBase: d.foeBase || null,
+      foeState: d.foeState || null, foeBase: d.foeBase || null, foeTarget: d.foeTarget == null ? -1 : d.foeTarget,
       lastMileOutcome: d.lastMileOutcome || null, lastMileApproach: d.lastMileApproach || null, duelBeat: d.duelBeat || 0, duelResult: null,
       defeatMsg: d.defeatMsg,
       // ⚠️ re-resolved from the region by NAME, never stored as objects - a serialized copy
@@ -4456,7 +4462,7 @@ function freshGame(stage) {
     // turn; `wakePending` is what you banked this turn and collect at cleanup. It expires after
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
-    wake: 0, wakePending: 0, wakeUsed: false,
+    wake: 0, wakePending: 0, wakeUsed: false, foeTarget: -1,
     // 🛡️ THE LOADOUT. `wear` counts DOWN from the piece's printed wear; at 0 it is battered
     // through for the rest of the run. ⚠️ Nothing here is ever destroyed for good — you forged it,
     // you keep it. What a piece costs is the RUN, and that is the only reason it may exist at all
@@ -6257,7 +6263,9 @@ function fightStatus() {
     return (S.dragonState.status = S.dragonState.status || {});
   }
   if (S.foeState && S.encounter && S.encounter.beatFight) {
-    return (S.foeState.status = S.foeState.status || {});
+    // 🎯 the bag of the body you are AIMING AT — the lead unless a minion is targeted
+    const b = targetBody();
+    return (b.status = b.status || {});
   }
   return null;
 }
@@ -6289,7 +6297,8 @@ function affinityFrom(o) {
 // 🐉 one accessor for both fights, like fightStatus()
 function affinityOf() {
   if (S.dragonState && S.finalMode && S.finalPhase === 'duel') return affinityFrom(S.dragon);
-  return affinityFrom(S.foeBase);
+  const b = targetBody();
+  return affinityFrom(b === S.foeState ? S.foeBase : b);   // 🎯 a minion answers only if authored
 }
 // 🏷️ WHAT IS ON IT, ON SCREEN, EVERY TURN. 🔑 *Any persistent modifier must be on screen
 // every turn* — the rule the Mirror Fen taught, where a run-long −2 Pace was invisible from the
@@ -6386,7 +6395,7 @@ function scaleFoe(e) {
 }
 function beginEncounter(e) {
   const region = RUN()[S.region - 1];
-  e = scaleFoe(e);
+  e = packLead(scaleFoe(e));
   S.encounter = e;
   // ⚔️ a creature with attacks becomes a FIGHT rather than a hand. Everything below still runs
   // (hardship roll, logging, the panel) — the beat loop takes over at the end of this function.
@@ -6401,7 +6410,9 @@ function beginEncounter(e) {
     const carried = S.markCarry || null; S.markCarry = null;
     S.foeState = { hp: e.hp, maxHp: e.hp, turn: 0, par: e.par || 3, untouched: true,
                    status: carried ? Object.assign({}, carried) : {},
-                   atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0 };
+                   atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0,
+                   minions: packMinionsOf(e) };
+    S.foeTarget = -1;
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.rangedDodge = false;
@@ -6468,20 +6479,100 @@ function beginEncounter(e) {
 // still reeling when it answers — half force. Lose the race and you take the early bite as well.
 // ⚠️ This is the dial to turn if beats feel too cheap or too brutal; it is deliberately ONE
 // number rather than a new system.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🎯 PACKS (2026-09-02, build 456) — a LEAD with MINIONS, and a Spell that picks a body.
+// Thomas: *"some monsters will just come with some additional ones, like little minions you gotta
+// take care of."* Spec: 08_Ideas/Packs_And_Targeting.md. The lead keeps `S.foeState` (its HP,
+// its three attacks, its printed rule) so everything written for one creature still reads the
+// lead; minions ride on `foeState.minions`, each with its own HP, attack and effects bag.
+// 🔑 THE PACK SHARES THE LEAD'S INITIATIVE — a turn is still ONE race (a race per body would
+// multiply the demand the way a shape × a stat did on the Stormreach). Lose it and EVERY living
+// body swings. 🔑 THE TARGET IS A TURN CHOICE, NEVER CARD TEXT: `S.foeTarget` (-1 = the lead),
+// tapped on the panel; effects land on the body you aim at (`fightStatus()` reads it).
+// Minion rules are *"while it lives"* rules that name their own counter-play:
+//   shield — the lead takes HALF while one lives (StS2's Living Shield)
+//   rally  — the lead's attack is +2 while one lives
+// 📏 A LEADER THAT BRINGS MINIONS IS A THINNER LEADER. First cut measured pack fights at 40%
+// death vs 9% plain, 3.7 turns vs 1.6, 2.7 incoming a turn vs 1.4 — HP and damage both doubling,
+// *a shape and a stat that enforce the same thing multiply*. The pack carries the rest.
+let PACK_LEAD_HP = 0.7;    // the lead's HP, as a fraction of its printed HP, when it has a pack
+let PACK_LEAD_ATK = 0.8;   // the lead's attack, likewise
+let PACK_RALLY = 1;        // what a 📣 rally minion adds to the lead's attack while it lives
+let PACK_MINION_HP = 1;    // minion HP multiplier (1 = as authored; 0.5 = *any hit kills*)
+function packLead(e) {
+  if (!e || !e.pack || !e.pack.length) return e;
+  return Object.assign({}, e, { hp: Math.max(1, Math.round(e.hp * PACK_LEAD_HP)),
+                                atk: Math.max(1, Math.round(e.atk * PACK_LEAD_ATK)) });
+}
+function packMinionsOf(e) {
+  const hpOf = m => Math.max(1, Math.round(m.hp * PACK_MINION_HP));
+  return ((e && e.pack) || []).map(m => ({ name: m.name, icon: m.icon || '•', hp: hpOf(m), maxHp: hpOf(m),
+                                            atk: m.atk, rule: m.rule || null, status: {} }));
+}
+function packBodies() { return ((S.foeState && S.foeState.minions) || []).filter(m => m.hp > 0); }
+function targetBody() {
+  const st = S.foeState; if (!st) return null;
+  const t = S.foeTarget == null ? -1 : S.foeTarget;
+  const m = t >= 0 && st.minions ? st.minions[t] : null;
+  return (m && m.hp > 0) ? m : st;
+}
+function isLeadTarget() { return !S.foeState || targetBody() === S.foeState; }
+function packRule(rule) { return packBodies().some(m => m.rule === rule); }
+function packTargets() {
+  const st = S.foeState; if (!st || !st.minions) return [-1];
+  return [-1, ...st.minions.map((m, i) => m.hp > 0 ? i : -2).filter(i => i >= 0)];
+}
+function setFoeTarget(i) {
+  if (!isAssignPhase() || !S.foeState) return;
+  const m = i >= 0 && S.foeState.minions ? S.foeState.minions[i] : null;
+  S.foeTarget = (m && m.hp > 0) ? i : -1;
+  render();
+}
+// ⚔️ what the LEAD hits for this turn — its attack, the telegraphed modifier, and ✦ rally
+function leadAtk() {
+  const base = S.foeBase, fx = foeFx(); if (!base) return 0;
+  return Math.max(1, Math.round(base.atk * (fx.atkMult || 1))) + (packRule('rally') ? PACK_RALLY : 0);
+}
+// the whole pack's swing, BEFORE Daze — what the panel prints as ⚔️ Atk and what the bot scores
+function packAtkTotal() { return leadAtk() + packBodies().reduce((a, m) => a + m.atk, 0); }
 function foeCounter(r) {
   const fx = foeFx();
-  // ⚔️ a lunge lands whatever your speed — the one attack that suspends the gate
   if (!r.initLost && !fx.unstoppable) return 0;
-  const atk = Math.max(0, (S.encounter && S.encounter.atk) || 0);
-  // ⚡ Dazed: its blow is that much weaker. READ-ONLY — this runs on every repaint; the effect
-  // is SPENT at resolution, in resolve(), the moment the creature actually swings.
-  return Math.max(0, atk - statusN('daze'));
+  const st = S.foeState; if (!st) return Math.max(0, (S.encounter && S.encounter.atk) || 0);
+  const dz = b => Math.max(0, (b && b.status && b.status.daze) || 0);
+  let total = Math.max(0, leadAtk() - dz(st));
+  for (const m of packBodies()) total += Math.max(0, m.atk - dz(m));
+  return total;
 }
-// ⚡ spend a Daze — only when the creature actually swung (won the race = it never attacked, so
-// "its next attack" has not happened yet and the Daze waits for it). 🌊 FLOW's never fades.
+// ⚡ every body that swung spends its Daze — the lead and each living minion
 function spendDaze() {
-  const b = fightStatus(); if (!b || !b.daze) return;
-  if (!(b.lasting && b.lasting.daze)) b.daze = 0;
+  const spend = b => { const bag = b && b.status; if (!bag || !bag.daze) return; if (!(bag.lasting && bag.lasting.daze)) bag.daze = 0; };
+  if (S.dragonState && S.finalMode && S.finalPhase === 'duel') { spend(S.dragonState); return; }
+  if (!S.foeState) return;
+  spend(S.foeState); packBodies().forEach(spend);
+}
+// 🔥 minions burn too; a burned-out minion is gone before the turn starts
+function tickPackBurn() {
+  for (const m of packBodies()) {
+    const bag = m.status; if (!bag || !bag.burn) continue;
+    const dealt = Math.min(m.hp, bag.burn), keeps = !!(bag.lasting && bag.lasting.burn);
+    m.hp -= dealt;
+    log(`🔥 Burn ${bag.burn}: ${m.icon} ${m.name} loses <b>${dealt}</b>${m.hp <= 0 ? ' — and falls' : ''}.`, 'good');
+    if (!keeps) bag.burn = Math.floor(bag.burn / 2);
+  }
+  if (!targetBody() || targetBody() === S.foeState) S.foeTarget = -1;
+}
+// 🎯 the pack row: one chip per body, the target lit; tap to aim. Only when there ARE minions.
+function packHTML() {
+  const st = S.foeState; if (!st || !st.minions || !st.minions.length) return '';
+  const t = S.foeTarget == null ? -1 : S.foeTarget, live = isAssignPhase();
+  const chip = (i, icon, name, hp, max, extra, dead) =>
+    `<button class="foe-body${(!dead && ((i === -1 && isLeadTarget()) || i === t)) ? ' on' : ''}${dead ? ' dead' : ''}" ` +
+    `${live && !dead ? `onclick="setFoeTarget(${i})"` : 'disabled'} data-tip="target">${icon} ${name} <b>${hp}</b>/${max}${extra}</button>`;
+  return `<div class="foe-pack">` + chip(-1, '🎯', S.foeBase.name, st.hp, st.maxHp, '') +
+    st.minions.map((m, i) => chip(i, m.icon, m.name, m.hp, m.maxHp,
+      ` · ⚔️${m.atk}${m.rule === 'shield' ? ' <span class="foe-rule" data-tip="shield">🛡️ shields</span>' : m.rule === 'rally' ? ' <span class="foe-rule" data-tip="rally">📣 rallies</span>' : ''}`, m.hp <= 0)).join('') +
+    `</div>`;
 }
 
 // ⚔️ resolve one beat against the HP pool. Returns TRUE if the creature survived and the beat
@@ -6607,19 +6698,45 @@ function parPenalty() {
   return Math.max(0, st.turn - st.par);
 }
 
+// 🗡️ THE CLEAVE (2026-09-02) — Thomas: *"using our multihit system as the AOE."* A multi-hit
+// Spell puts its FIRST hit on the body you aimed at and the rest on the next living bodies in
+// order (lead, then minions), wrapping. Against one body every hit lands on it, so nothing changes
+// outside a pack. The card's total (`r.value`) is split evenly across the hits it lands — face ×
+// hits = the total, as the card says. 🔑 ONE function: the blow applies it, the bot prices it.
+function cleavePlan(r) {
+  const st = S.foeState; if (!st) return [];
+  const hits = Math.max(1, (r && r.hits) || 1), total = Math.max(0, (r && r.value) || 0);
+  const first = targetBody(), order = [first];
+  if (hits > 1) for (const b of [st, ...packBodies()]) if (!order.includes(b)) order.push(b);
+  const per = Math.floor(total / hits), out = [];
+  for (let i = 0; i < hits; i++) {
+    const body = order[i % order.length], dmg = per + (i === 0 ? total - per * hits : 0);
+    const o = out.find(x => x.body === body); if (o) o.dmg += dmg; else out.push({ body, dmg });
+  }
+  return out;
+}
 function foeApplyBlow(r) {
   const st = S.foeState, base = S.foeBase;
-  // 🪨 EXPOSED IS SPENT HERE, not read here — computeAction already added it to the blow so
-  // every display shows the number that lands. ⚠️ Consuming it anywhere a RENDER can reach would
-  // be *the instrument that perturbs what it measures*, in the game itself.
+  const plan = cleavePlan(r), first = plan[0] && plan[0].body;
   const bagB = fightStatus();
   if (bagB && bagB.expose && !(bagB.lasting && bagB.lasting.expose)) bagB.expose = 0;
-  const dealt = Math.max(0, r.value || 0);
-  st.hp = Math.max(0, st.hp - dealt);
-  log(`⚔️ ${base.name}: ${st.hp + dealt} → ${st.hp} HP`, st.hp <= 0 ? 'good' : '');
-  // 🏷️ and what your cards leave behind. ⚠️ AFTER the blow, so 🪨 Exposed cannot buff the
-  // very hit that applied it — every mark is a statement about the NEXT turn.
-  if (st.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
+  r.cleaved = plan.length > 1;
+  for (const p of plan) {
+    const body = p.body, lead = body === st;
+    let dealt = p.dmg;
+    // 🛡️ a shield minion halves what reaches the lead — *while it lives* names the counter-play
+    if (lead && packRule('shield') && dealt > 0) { const was = dealt; dealt = Math.max(1, Math.floor(dealt / 2)); log(`🛡️ Its minions shield it: ${was} → ${dealt}.`, 'bad'); }
+    const bname = lead ? base.name : `${body.icon} ${body.name}`;
+    body.hp = Math.max(0, body.hp - dealt);
+    log(`⚔️ ${bname}: ${body.hp + dealt} → ${body.hp} HP${plan.length > 1 ? ' <i>(cleave)</i>' : ''}`, body.hp <= 0 ? 'good' : '');
+    if (!lead && body.hp <= 0) { log(`☠️ ${bname} falls.`, 'good'); r.minionFelled = (r.minionFelled || 0) + 1; }
+  }
+  // 🏷️ effects land on the body you AIMED at, after the blow, if it still stands
+  if (first && first.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
+  if (!targetBody() || targetBody() === st) S.foeTarget = -1;
+  if (st.hp > 0) return false;                       // the LEAD still stands — the fight goes on
+
+  if (st.hp <= 0 && packBodies().length) log(`The rest scatter.`, 'good');
   if (st.hp <= 0) {
     const over = parPenalty();
     log(`🏆 <b>${base.name} falls</b> — ${st.turn} turn${st.turn === 1 ? '' : 's'} ` +
@@ -6682,7 +6799,7 @@ function publishFoeTurn() {
   S.encounter = Object.assign({}, base, {
     hp: 9999, beatFight: true,
     init: fx.initTake ? 99 : Math.max(0, base.init + climb - frost),
-    atk: Math.max(1, Math.round(base.atk * (fx.atkMult || 1))),
+    atk: packAtkTotal(),   // 🎯 the whole pack's swing (before Daze) — one number, everywhere
     shape: fx.evade ? 'evasion' : fx.armour ? 'armour' : base.shape,
     shapeV: fx.armour ? (base.shape === 'armour' ? base.shapeV + fx.armour : fx.armour) : base.shapeV,
     guard: fx.guard || base.guard || 0,
@@ -6703,6 +6820,7 @@ function startFoeBeat() {
   dealFx();          // 🃏 you were dealt back up — say so
   // 🔥 BURN FIRST, BEFORE IT ACTS — so a Burn can finish it, and so the number you were
   // shown last turn is the number that lands.
+  tickPackBurn();
   st.hp = tickBurn(st.hp, base.name);
   if (st.hp <= 0) {
     log(`🏆 <b>${base.name} falls</b> — burned down on turn ${st.turn}.`, 'good result');
@@ -6740,8 +6858,10 @@ function startFoeBeat() {
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
 function foeCleanupAndNext() {
   // ❄️ Frost is spent on the turn it slowed — unless it came from a 🌊 FLOW card, which never fades
-  const fb = S.foeState && S.foeState.status;
-  if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
+  for (const b of [S.foeState, ...packBodies()]) {
+    const fb = b && b.status;
+    if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
+  }
   // ⚠️ THE GUARD, not just the caller. Three things route here (a soak exiting, a turn with no
   // damage, and the fight loop itself) and only one of them knows whether the creature is still
   // alive. A loop that can be re-entered from several places has to check its own precondition.
@@ -7406,6 +7526,7 @@ function perfectKillInfo(r) {
   if (!e || e.type !== 'fight') return none;
   const st = beatPool();
   const dealt = Math.max(0, (r && r.value) || 0);
+  if (st && !isLeadTarget()) return none;             // 🎯 a blow aimed at a minion kills nothing perfectly
   if (st) {
     if (dealt !== st.hp) return none;                 // ⚔️ overkill or short — not perfect damage
     if (!st.untouched) return none;                   // ❤️ something got through earlier in the fight
@@ -11362,7 +11483,7 @@ function renderEncounter() {
       // 🔑 The telegraph is LOAD-BEARING, not flavour: you can die to a hit your hand cannot
       // soak, and the only thing that makes that a mistake rather than a mugging is having been
       // told a beat early.
-      (S.foeState ? foeHpBar(S.foeState, e.name) + foeAffinityHTML() + foeStatusHTML() +
+      (S.foeState ? foeHpBar(S.foeState, e.name) + foeAffinityHTML() + foeStatusHTML() + packHTML() +
         `<div class="enc-stats">` +
         `<span data-tip="foepar">⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
         `<span data-tip="foeinit">💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span>` +
@@ -12567,6 +12688,9 @@ const TIPS = {
   tp:     ['⏳ Time Penalty', 'You cannot sharpen your cards for this many encounters.'],
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
+  target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
+  shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
+  rally:    ['📣 Rallies', 'While it lives, the leader\'s attack is +1.'],
 };
 function tipHTML(key) {
   // a `+` joins keys — an effect and what the card's kind does to it read as two short blocks
@@ -12607,7 +12731,9 @@ function bindTips() {
   // for a swap — the slot row's tap handler sits on the card itself.
   document.addEventListener('click', e => {
     const t = find(e);
-    if (t) { e.stopPropagation(); showTip(t.dataset.tip, t); } else hideTip();
+    // ⚠️ a tip on something CLICKABLE must show AND let the click through — stopping propagation
+    // in the capture phase silently killed the first button that ever carried one (the pack row)
+    if (t) { if (!t.closest('button, a, [onclick]')) e.stopPropagation(); showTip(t.dataset.tip, t); } else hideTip();
   }, true);
 }
 

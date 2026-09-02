@@ -69,6 +69,24 @@ function setBankWeight(w) { BANK_WEIGHT = w; }
 // 2026-09-01 (dev/wake-probe.js, n=120): a plain turn leaves 6.65, and 21% of held wakes gutter
 // (kill turn, or nothing at home) → 6.65 × 0.79 ≈ 5.
 let EXPECT_EFFECT = 5;
+// 🎯 WHAT AIMING AT A MINION IS WORTH (2026-09-02). The value term scores r.value the same whoever
+// it lands on, so without this the bot would aim by tie-break. A dead minion is two turns of its
+// attack you never soak (+ its rule); chip damage on a minion is half wasted.
+function targetValue(r) {
+  if (typeof cleavePlan !== 'function' || !S.foeState || !S.encounter || !S.encounter.beatFight) return 0;
+  // ⚠️ FIRST CUT GRINDED: a kill bonus ON TOP of the blow's value made the bot spend a turn on a
+  // minion whenever it could kill one, then pay for the extra turns in cards (pack fights 3 turns,
+  // 11-25% of runs dead in them at every dial). Damage that lands on a minion did NOT land on the
+  // lead, so it is charged in full; a kill earns back its attack for ~2 turns plus what its rule
+  // was costing. A cleave that kills for free still reads as free; a big blow on a whelp does not.
+  const lead = S.foeState; let v = 0;
+  for (const p of cleavePlan(r)) {
+    const b = p.body; if (b === lead) continue;
+    v -= p.dmg;
+    if (p.dmg >= b.hp) v += 2 * b.atk + (b.rule === 'shield' ? Math.min(6, Math.floor(lead.hp / 2)) : b.rule === 'rally' ? 2 * (PACK_RALLY || 1) : 0);
+  }
+  return v;
+}
 const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) * EXPECT_EFFECT : 0);
 // 🏷️ WHAT AN ARRANGEMENT'S EFFECTS ARE WORTH, in the currency the scorer already trusts: damage.
 // 🔴 Added 2026-09-01. Until this the bot never valued an effect — not Burn's future damage,
@@ -430,14 +448,15 @@ function forEachArrangement(hand, o, fn) {
 function searchArrangements(o) {
   let best = null;
   forEachArrangement(o.hand, o, (spell, spark, tinder, ember) => {
-    for (const bt of o.boostTargets) for (const arm of o.arms) {
+    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) {
       S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                    Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
       S.boostTarget = bt; if (arm !== undefined) S.bankArmed = arm;
+      if (t !== undefined) S.foeTarget = t;       // 🎯 packs: which body the Spell is aimed at
       const r = computeAction(ember); if (!r) continue;
       const sc = o.score(r);
-      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm });
-      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, sc };
+      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t });
+      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, sc };
     }
   });
   return best;
@@ -456,7 +475,7 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r) + targetValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
        approachValue(r), chainValue(r), r.value + bankValue(r)];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
@@ -518,7 +537,9 @@ const RUNSIM = (() => {
     const isFight = S.encounter.type === 'fight';
     const best = searchArrangements({ hand: S.hand, legal: true, duel: false,
       boostTargets: isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'],
-      arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better });
+      arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better,
+      targets: (typeof packTargets === 'function') ? packTargets() : [undefined] });
+    if (best && best.t !== undefined) S.foeTarget = best.t;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
