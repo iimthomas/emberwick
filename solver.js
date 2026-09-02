@@ -69,6 +69,24 @@ function setBankWeight(w) { BANK_WEIGHT = w; }
 // 2026-09-01 (dev/wake-probe.js, n=120): a plain turn leaves 6.65, and 21% of held wakes gutter
 // (kill turn, or nothing at home) → 6.65 × 0.79 ≈ 5.
 let EXPECT_EFFECT = 5;
+// 🎯 WHAT AIMING AT A MINION IS WORTH (2026-09-02). The value term scores r.value the same whoever
+// it lands on, so without this the bot would aim by tie-break. A dead minion is two turns of its
+// attack you never soak (+ its rule); chip damage on a minion is half wasted.
+function targetValue(r) {
+  if (typeof cleavePlan !== 'function' || !S.foeState || !S.encounter || !S.encounter.beatFight) return 0;
+  // ⚠️ FIRST CUT GRINDED: a kill bonus ON TOP of the blow's value made the bot spend a turn on a
+  // minion whenever it could kill one, then pay for the extra turns in cards (pack fights 3 turns,
+  // 11-25% of runs dead in them at every dial). Damage that lands on a minion did NOT land on the
+  // lead, so it is charged in full; a kill earns back its attack for ~2 turns plus what its rule
+  // was costing. A cleave that kills for free still reads as free; a big blow on a whelp does not.
+  const lead = S.foeState; let v = 0;
+  for (const p of cleavePlan(r)) {
+    const b = p.body; if (b === lead) continue;
+    v -= p.dmg;
+    if (p.dmg >= b.hp) v += 2 * b.atk + (b.rule === 'shield' ? Math.min(6, Math.floor(lead.hp / 2)) : b.rule === 'rally' ? 2 * (PACK_RALLY || 1) : 0);
+  }
+  return v;
+}
 const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) * EXPECT_EFFECT : 0);
 // 🏷️ WHAT AN ARRANGEMENT'S EFFECTS ARE WORTH, in the currency the scorer already trusts: damage.
 // 🔴 Added 2026-09-01. Until this the bot never valued an effect — not Burn's future damage,
@@ -183,46 +201,10 @@ const SOLVER = (() => {
     // One card per slot: every choice of Spell x every arrangement of the rest. `enhUsed` is
     // read straight off the result, so the attune metrics below (availability, obligation,
     // "does attuning buy a whole outcome tier") come back to life with the rule itself.
-    const n = hand.length;
-    for (let w = 0; w < n; w++) {
-      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
-      const opts = [null, ...rest];
-      for (const spark of opts) {
-        for (const tinder of opts) {
-          if (tinder && tinder === spark) continue;
-          for (const ember of opts) {
-            if (ember && (ember === spark || ember === tinder)) continue;
-            // ⚠️ EVERY SLOT THE HAND CAN FILL MUST BE FILLED (2026-08-18). `normalizeAssign()`
-            // seats every hand card left-to-right, so a PLAYER with four cards always has all four
-            // slots occupied - they cannot decline to carry an ✦ Arsenal. The bot writes S.assign
-            // directly and was simply omitting it: **an empty Arsenal on 100% of turns.**
-            // 🔑 SO EVERY RULE THAT READS THE ARSENAL HAS BEEN MEASURED AS FREE - ⛰️ Steep (which
-            // adds what it would have given), 🌙 Nightfall, ❄️ Freeze, 🌊 Riptide and 🐉 Rockbind
-            // all take or read a card the bot never held. Thomas found it by asking why Steep only
-            // added 2; the honest answer was that in every measurement it added nothing at all.
-            // 🔑 A BOT THAT CAN DECLINE A RULE THE PLAYER CANNOT DECLINE IS NOT PLAYING THE GAME.
-            // Fourth instrument blind spot of the day, and the same shape as the placement bans:
-            // the UI enforced something the search never saw.
-            if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
-            for (const bt of boostTargets) {
-              S.assign = {
-                Spell: spell.id,
-                Element: spark ? spark.id : null,
-                Boost: tinder ? tinder.id : null,
-                Reserve: ember ? ember.id : null,
-              };
-              S.boostTarget = bt;
-              const r = computeAction(ember);
-              if (!r) continue;
-              plays.push({
-                r, score: scoreOf(r), enhUsed: !!r.enhUsed,
-                wickName: spell.def.name, usedTinder: !!tinder, boostTarget: bt,
-              });
-            }
-          }
-        }
-      }
-    }
+    // 🔍 the one search; the analyser keeps EVERY play, not just the best
+    searchArrangements({ hand, legal: false, duel: false, boostTargets, arms: [undefined], score: scoreOf, better,
+      collect: e => plays.push({ r: e.r, score: e.sc, enhUsed: !!e.r.enhUsed,
+                                 wickName: e.spell.def.name, usedTinder: !!e.tinder, boostTarget: e.bt }) });
     return plays;
   }
 
@@ -410,6 +392,76 @@ function SOLVER_pct(n, d) { return d ? Math.round(n / d * 100) : 0; }
 // A/Bs events on vs off so we can isolate the run-layer's difficulty impact.
 // Caveats surfaced in the report: optimal play = difficulty ceiling; bot never Diverts.
 // ============================================================
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔍 THE ONE ARRANGEMENT SEARCH (extracted 2026-09-02). There were FOUR copies of this loop —
+// the analyser's `enumerate`, RUNSIM's `pickArrangement` (dead), `chooseBestOnce` (the road) and
+// `chooseBestDuel` (the finale) — and every rule that had to reach the bot was patched into them
+// one at a time: the placement bans twice, the Arsenal three times, `bankArmed` never reached the
+// duel at all while the mage's numbers were quoted as measurements of her. 🔑 A rule the search
+// cannot see is a rule the instrument cannot measure — so the search is ONE function now, and
+// packs + targeting (the next dimension) get added HERE and nowhere else.
+//
+// ⚠️ IDENTITY-PRESERVING: each caller's enumeration ORDER and SET are exactly what its copy did,
+// so ties fall the same way and `dev/identity.js` is bit-identical. Two shapes remain:
+//   road  — spell × spark × tinder × ember over [null, ...rest], placement bans optional, every
+//           slot the hand can fill must be filled (a player cannot decline the Arsenal)
+//   duel  — spark/tinder drawn from what is left, the Arsenal is the best-boost leftover (not
+//           enumerated), no bans. ⚠️ A quirk kept deliberately for identity; normalising it is a
+//           measured change, not a refactor.
+function forEachArrangement(hand, o, fn) {
+  const ok = (c, z) => !o.legal || !c || slotLegal(c.id, z);
+  const n = hand.length;
+  for (let w = 0; w < n; w++) {
+    const spell = hand[w], rest = hand.filter((_, i) => i !== w);
+    if (!ok(spell, 'Spell')) continue;
+    if (o.duel) {
+      const full = n >= 3;
+      for (const spark of (full ? rest : [null, ...rest])) {
+        const after = rest.filter(c => c !== spark);
+        for (const tinder of (full ? after : [null, ...after])) {
+          const left = after.filter(c => c !== tinder);
+          const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
+          fn(spell, spark, tinder, ember);
+        }
+      }
+      continue;
+    }
+    const opts = [null, ...rest];
+    for (const spark of opts) for (const tinder of opts) {
+      if (tinder && tinder === spark) continue;
+      if (!ok(spark, 'Element') || !ok(tinder, 'Boost')) continue;
+      for (const ember of opts) {
+        if (ember && (ember === spark || ember === tinder)) continue;
+        if (!ok(ember, 'Reserve')) continue;
+        // 🔑 A BOT THAT CAN DECLINE A RULE THE PLAYER CANNOT DECLINE IS NOT PLAYING THE GAME —
+        // every slot the hand can fill is filled (the empty-Arsenal blind spot, 2026-08-18).
+        if ([spell, spark, tinder, ember].filter(Boolean).length < Math.min(4, n)) continue;
+        fn(spell, spark, tinder, ember);
+      }
+    }
+  }
+}
+// o = { hand, legal, duel, boostTargets, arms, score(r), better(a, b), collect?(entry) }
+// `arms` carries `S.bankArmed` as a DIMENSION (per-turn state, not part of the arrangement — the
+// option is unreachable however it is scored unless the search walks it); `undefined` leaves it.
+// Returns the best entry; `collect` sees every one (the analyser wants the whole distribution).
+function searchArrangements(o) {
+  let best = null;
+  forEachArrangement(o.hand, o, (spell, spark, tinder, ember) => {
+    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) {
+      S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
+                   Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
+      S.boostTarget = bt; if (arm !== undefined) S.bankArmed = arm;
+      if (t !== undefined) S.foeTarget = t;       // 🎯 packs: which body the Spell is aimed at
+      const r = computeAction(ember); if (!r) continue;
+      const sc = o.score(r);
+      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t });
+      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, sc };
+    }
+  });
+  return best;
+}
+
 const RUNSIM = (() => {
   const OUT = { Complete: 2, Narrow: 1, Loss: 0 };
   // 🗡️ chainValue() is shared with the analyser's scorer — see the note at the top of this file.
@@ -423,7 +475,7 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), chainValue(r), r.value + bankValue(r) + effectValue(r) + targetValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
        approachValue(r), chainValue(r), r.value + bankValue(r)];
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
@@ -433,40 +485,7 @@ const RUNSIM = (() => {
   // the arrangement search, factored out so anything can ask "how good is this hand?" — its only
   // caller (the Prism's bot policy) went with the rule on 2026-08-05, but it stays exported
   // because "score this hand" is the question every future card-selection experiment starts from
-  function pickArrangement() {
-    const hand = S.hand, isFight = S.encounter.type === 'fight';
-    const scoreOf2 = scoreOf;   // RUNSIM's own scorer;
-    let best = null;
-    // ⚠️ THE BOT USED TO IGNORE PLACEMENT BANS ENTIRELY (found 2026-08-05). It builds arrangements
-    // directly instead of going through the UI, and nothing here asked `slotLegal` — so ⚖️ Dead
-    // Weight and 🐌 Mire, the two hardships whose whole content is a ban, were invisible to every
-    // measurement we have ever taken. The bot simply played the arrangement a human is forbidden.
-    // 🔑 A RULE THE ENGINE ENFORCES ONLY AT THE UI IS A RULE THE INSTRUMENT CANNOT SEE. Anything
-    // that constrains a human must be asked here too, or its measured cost is zero by construction.
-    const ok = (c, z) => !c || slotLegal(c.id, z);
-    for (let w = 0; w < hand.length; w++) {
-      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
-      if (!ok(spell, 'Spell')) continue;
-      const opts = [null, ...rest];
-      for (const spark of opts) for (const tinder of opts) {
-        if (tinder && tinder === spark) continue;
-        if (!ok(spark, 'Element') || !ok(tinder, 'Boost')) continue;
-        for (const ember of opts) {
-          if (ember && (ember === spark || ember === tinder)) continue;
-          if (!ok(ember, 'Reserve')) continue;
-          // ⚠️ see chooseBestOnce - a player cannot leave a slot empty while holding a card
-          if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
-          S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
-                       Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
-          const r = computeAction(ember); if (!r) continue;
-          const sc = scoreOf2(r);
-          if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, sc };
-        }
-      }
-    }
-    if (best) S.assign = best.assign;
-    return best ? best.sc : [-1, 0, 0];
-  }
+  // ❌ pickArrangement() deleted 2026-09-02 — it had no callers and was the second copy of the search.
 
   // 🗺️ ROUTE VALUE. What a node is worth to a route, in the crude terms a bot can price.
   // ⚠️ The bot still cannot price the FUTURE well (it scores one encounter at a time), so these
@@ -507,7 +526,6 @@ const RUNSIM = (() => {
   }
 
   // ⚠️ how many of the four slots this arrangement actually fills
-  function arranged(a, b, c, d) { return [a, b, c, d].filter(Boolean).length; }
 
   function chooseBestOnce() {
     // 🔥 aim any Emberwake we're holding. ⚠️ The bot can never BANK one: it scores a single
@@ -516,46 +534,12 @@ const RUNSIM = (() => {
     // meaningless; only a human can price the future.
     // ❌ the Prism's bot policy was deleted with the rule (2026-08-05) — a rainbow hand is now
     // simply a hand that cannot attune, and the bot plays it the same way it plays any other.
-    const hand = S.hand, isFight = S.encounter.type === 'fight';
-    const bts = isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'];
-    let best = null;
-    const n = hand.length;
-    // ⚠️ the SAME placement-ban gate as pickArrangement — and the reason both need it is that this
-    // is a SECOND COPY of the arrangement search. Patching one left ⚖️ Dead Weight and 🌀 Vertigo
-    // still violated on the path autoRun actually walks. 🔑 Two searches over the same rules drift
-    // exactly the way a forked duel-maths copy did in July; if a third is ever needed, extract it.
-    const ok = (c, z) => !c || slotLegal(c.id, z);
-    for (let w = 0; w < n; w++) {                          // every card as the Spell
-      const spell = hand[w], rest = hand.filter((_, i) => i !== w);
-      if (!ok(spell, 'Spell')) continue;
-      const opts = [null, ...rest];
-      for (const spark of opts) for (const tinder of opts) {
-        if (tinder && tinder === spark) continue;
-        if (!ok(spark, 'Element') || !ok(tinder, 'Boost')) continue;
-        for (const ember of opts) {
-          if (ember && (ember === spark || ember === tinder)) continue;
-          if (!ok(ember, 'Reserve')) continue;
-          // ⚠️ see chooseBestOnce - a player cannot leave a slot empty while holding a card.
-          // 🔑 THIS IS THE THIRD COPY OF THE SEARCH. The placement bans needed patching twice for
-          // exactly this reason; if a fourth is ever wanted, extract it instead.
-          if (arranged(spell, spark, tinder, ember) < Math.min(4, hand.length)) continue;
-          for (const bt of bts) {
-            // 🔥 ...and both ways of resolving the Surge. `S.bankArmed` is per-turn STATE rather
-            // than part of the arrangement, so unless the search carries it as a dimension the
-            // bot can never reach the option at all — which is precisely how it went a week
-            // never channelling while a number derived from that was quoted as a measurement.
-            for (const arm of (CLASS.emberwake ? [false, true] : [false])) {
-              S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
-                           Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
-              S.boostTarget = bt; S.bankArmed = arm;
-              const r = computeAction(ember); if (!r) continue;
-              const sc = scoreOf(r);
-              if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, sc };
-            }
-          }
-        }
-      }
-    }
+    const isFight = S.encounter.type === 'fight';
+    const best = searchArrangements({ hand: S.hand, legal: true, duel: false,
+      boostTargets: isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'],
+      arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better,
+      targets: (typeof packTargets === 'function') ? packTargets() : [undefined] });
+    if (best && best.t !== undefined) S.foeTarget = best.t;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
@@ -607,27 +591,9 @@ const RUNSIM = (() => {
   // measurements of her. 🔑 EXTRACT THESE FOUR. Until then: anything added to the search must
   // be added HERE TOO.
   function chooseBestDuel() {
-    const hand = S.hand, full = hand.length >= 3;
-    let best = null;
-    for (let w = 0; w < hand.length; w++) {
-      const rest = hand.filter((_, i) => i !== w);
-      for (const spark of (full ? rest : [null, ...rest])) {
-        const after = rest.filter(c => c !== spark);
-        for (const tinder of (full ? after : [null, ...after])) {
-          const left = after.filter(c => c !== tinder);
-          const ember = left.slice().sort((a, b) => eff(b).boost - eff(a).boost)[0] || null;
-          for (const bt of ['Attack', 'Initiative']) {
-            for (const arm of (CLASS.emberwake ? [false, true] : [false])) {
-              S.assign = { Spell: hand[w].id, Element: spark ? spark.id : null, Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
-              S.boostTarget = bt; S.bankArmed = arm;
-              const r = computeAction(ember); if (!r) continue;
-              const sc = evalDuelPlay(r);
-              if (!best || better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, sc };
-            }
-          }
-        }
-      }
-    }
+    const best = searchArrangements({ hand: S.hand, legal: false, duel: true,
+      boostTargets: ['Attack', 'Initiative'], arms: CLASS.emberwake ? [false, true] : [false],
+      score: evalDuelPlay, better });
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
   }
@@ -1004,7 +970,7 @@ const RUNSIM = (() => {
               try { localStorage.removeItem('emberwick-save-1'); } catch (e) {} }
     return { N, on, off };
   }
-  return { run, batch, autoRun, chooseBest, chooseBestDuel, pickArrangement, setHook, bigness, scoreOf, better, setMomentumWeight,
+  return { run, batch, autoRun, chooseBest, chooseBestDuel, setHook, bigness, scoreOf, better, setMomentumWeight,
            setUnseenWeight, setBankWeight, setLevel };
 })();
 

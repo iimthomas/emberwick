@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 456 — Packs
+*2026-09-02*
+
+**Changed**
+- 🎯 **Some creatures bring minions.** Eight so far, two a road. Tap a body on the panel to aim your Spell at it; your effects land on the body you hit. The pack shares its leader's Initiative — lose the race and every living body swings. Beat the leader and the rest scatter.
+- 🛡️ **Shield** minions halve what reaches the leader while they live. 📣 **Rally** minions give the leader +1 attack while they live.
+
 ## build 455 — Some creatures answer, most do not
 *2026-09-02*
 
