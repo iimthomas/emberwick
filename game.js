@@ -2995,6 +2995,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 453, date: '2026-09-01', title: 'The dragons stand taller again',
+    changed: [
+      "🐉 <b>Skyrender, Cragmourn and Fathomdread have more health.</b> Now that creatures answer your spells and your cards have real effects, the last three dragons had become too easy. Cindermaw is unchanged.",
+    ] },
+
   { build: 452, date: '2026-09-01', title: 'Under the hood',
     changed: [
       "No change to how the game plays. The tools we use to test balance can now see the effects your cards leave on a creature — they had been playing blind to them, so the numbers we tune against were off. Expect a difficulty pass to follow.",
@@ -4789,7 +4794,12 @@ let COIN_MULT = 1.0;
 // · **16:30:24:46 → [34,23,15,9]**, on the 442 target of 31/21/15/7. Total dragon HP is now
 // **76 / 90 / 92 / 96**. ⚠️ That is a lot of HP answering a lot of player power; if creatures that
 // RESIST effects land next, they are a second counter to the same bill — re-measure, do not stack.
-let DRAGON_HP_ADD = { 1: 16, 2: 30, 3: 24, 4: 46 };
+// 📏 RE-TUNED AGAIN 2026-09-01 (build 453) — this time against a bot that can SEE effects
+// (build 452). The previous values measured 30/41/31/12 once the bot stopped playing blind; the
+// sweep read 16:44:36:52 → [30,23,20,4] and 16:48:40:54 → [25,17,13,6]. Total dragon HP is now
+// **76 / 104 / 104 / 102** — the effect layer is worth roughly the Last Mile's old −14 head start,
+// twice over, and the dragons pay for it in health because that is the only boss-only dial.
+let DRAGON_HP_ADD = { 1: 16, 2: 44, 3: 36, 4: 52 };
 const COMPLETE_BONUS = 2;
 // POTION_CAP moved to the top-of-file constants (2026-08-12): the tutorial's potion lesson names
 // it, and TUTORIAL is defined ~1,100 lines earlier, so declaring it here put it in the temporal
