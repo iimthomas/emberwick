@@ -1756,6 +1756,18 @@ function rogueMath() {
 // partner. Knives are the same press-your-luck, moved onto the creature.
 let KNIFE_CAP = 3;
 function knivesIn() { return statusN('knife'); }
+// 💨 HOW SLOWED IS IT — Frost + knives on the lead body, ONE read for road and duel (2026-09-02).
+// ⚠️ The duel does its OWN republish in startDuelBeat() (it rebuilds S.encounter with the dragon's
+// Initiative minus Frost, and spends the Frost there) — this helper serves the ROAD; the duel's
+// rebuild subtracts knives itself. The rogue could not win a race against Initiative 10 at all
+// (her fastest Combo card tops out at 9): 🔪 a knife in the body now slows it as well as opening
+// it — three knives take a 10 to 7, which her Lv2 tools reach.
+function foeInitCut() {
+  const bag = (S.dragonState && S.finalMode && S.finalPhase === 'duel') ? S.dragonState.status
+            : (S.foeState && S.foeState.status);
+  if (!bag) return 0;
+  return (bag.frost || 0) + (bag.knife || 0);
+}
 function leadKnives() {
   if (S.dragonState && S.finalMode && S.finalPhase === 'duel') return (S.dragonState.status && S.dragonState.status.knife) || 0;
   return (S.foeState && S.foeState.status && S.foeState.status.knife) || 0;
@@ -1776,10 +1788,10 @@ function knifeRowHTML() {
   if (!CLASS.knives || !isAssignPhase()) return '';
   const st = spellCard(), n = knivesIn();
   if (!st || !n) return '';
-  if (st.def.role !== 'blade') return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="knife">🔪 <b>${n}</b> in it — its Armour −${n}. A <b>blade</b> Strike could rip them out.</span></div>`;
+  if (st.def.role !== 'blade') return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="knife">🔪 <b>${n}</b> in it — Armour & Initiative −${n}. A <b>blade</b> Strike could rip them out.</span></div>`;
   const on = !!S.ripArmed;
   return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="knife">🔪 <b>${n}</b> in it — ` +
-    (on ? `<b>ripping</b>: +${n} hit${n === 1 ? '' : 's'} <span class="dim">(the holes close)</span>` : `leave them: its Armour −${n} <span class="dim">— or rip: +${n} hit${n === 1 ? '' : 's'}</span>`) + `</span>` +
+    (on ? `<b>ripping</b>: +${n} hit${n === 1 ? '' : 's'} <span class="dim">(the holes close)</span>` : `leave them: Armour & Initiative −${n} <span class="dim">— or rip: +${n} hit${n === 1 ? '' : 's'}</span>`) + `</span>` +
     `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleRip()">${on ? 'leave them in' : '🔪 rip them out'}</button></div>`;
 }
 function setMoTarget(t) {
@@ -1802,7 +1814,7 @@ const ROGUE = {
   momentum: false,         // ● RETIRED 2026-09-02 — measured dead in multi-turn fights (78% break rate)
   knives: true,            // 🔪 her hook: stick with a tool, rip with a blade — see Rogue_Knives.md
   trait: { icon: '🔪', name: 'Knives',
-    text: 'A <b>tool</b> Strike sticks a knife in it (up to 3). Each knife lowers its <b>Armour by 1</b> for every blow — yours or a partner\'s. A <b>blade</b> Strike can <b>rip</b> them out: <b>one extra hit</b> per knife. Lose the race and one falls out.' },
+    text: 'A <b>tool</b> Strike sticks a knife in it (up to 3). Each knife lowers its <b>Armour and Initiative by 1</b> — for you and a partner. A <b>blade</b> Strike can <b>rip</b> them out: <b>one extra hit</b> per knife. Lose the race and one falls out.' },
   hitsOf(c, isStrike) {
     return (c.def.hits || 1) + (isStrike && S.ripArmed ? knivesIn() : 0) + extraHits(isStrike);
   },
@@ -1819,7 +1831,7 @@ const ROGUE = {
     if (st && st.def.role === 'tool' && body.hp > 0) {
       const n = (hasCharm('deadhand') ? 2 : 1) + (r.rogue.verb === 'surge' ? 1 : 0);
       const was = bag.knife || 0; bag.knife = Math.min(KNIFE_CAP, was + n);
-      if (bag.knife > was) { log(`🔪 <b>${st.def.name}</b> sticks — ${bag.knife} knife${bag.knife === 1 ? '' : 's'} in it (Armour −${bag.knife}).`, 'good'); r.stuck = bag.knife - was; }
+      if (bag.knife > was) { log(`🔪 <b>${st.def.name}</b> sticks — ${bag.knife} knife${bag.knife === 1 ? '' : 's'} in it (Armour & Initiative −${bag.knife}).`, 'good'); r.stuck = bag.knife - was; }
     }
   },
   craft: {
@@ -3015,6 +3027,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 460, date: '2026-09-02', title: 'Knives slow it too',
+    changed: [
+      "🔪 <b>A knife in the creature lowers its Initiative as well as its Armour.</b> Three knives take a dragon from 10 to 7 — for you and for a partner.",
+    ] },
+
   { build: 459, date: '2026-09-02', title: 'The rogue keeps knives',
     changed: [
       "🔪 <b>Momentum is gone. The rogue sticks knives.</b> A tool Strike sticks a knife in the creature (up to 3). Each knife lowers its Armour by 1 for every blow. A blade Strike can rip them out for one extra hit each — and the hits cleave across a pack. Lose the race and one falls out.",
@@ -6209,7 +6226,7 @@ const STATUSES = {
   // 🔪 THE ROGUE'S KNIVES (2026-09-02, build 459) — no element; a tool Strike sticks one, a blade
   // Strike rips them out for a hit each. Engine state on the body, so a partner sees the holes.
   knife:  { el: null,        icon: '🔪', name: 'Knives',
-            text: 'its Armour is <b>N</b> lower while they stay in', decay: '' },
+            text: 'its Armour and Initiative are <b>N</b> lower while they stay in', decay: '' },
   burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
             text: 'it loses <b>N</b> at the start of its turn', decay: ', then halves' },
   frost:  { el: 'Water',     icon: '❄️', name: 'Frost',
@@ -6362,7 +6379,7 @@ function foeStatusHTML() {
   for (const id of ['knife', 'burn', 'frost', 'expose', 'daze']) {
     const n = bag[id] || 0; if (!n) continue;
     const d = STATUSES[id];
-    const say = id === 'knife'  ? `its Armour <b>−${n}</b>`
+    const say = id === 'knife'  ? `Armour & Initiative <b>−${n}</b>`
               : id === 'burn'   ? `loses <b>${n}</b> next turn`
               : id === 'frost'  ? `Initiative <b>−${n}</b>`
               : id === 'expose' ? `your next blow <b>+${n}</b>`
@@ -6839,7 +6856,7 @@ function publishFoeTurn() {
   // the race — sees the slowed number without any of them learning a new rule.
   // ⚠️ It cannot beat 💨 circle's `initTake`: an attack that SEIZES the race outranks a status
   // that merely slows it, or the telegraph would be a lie.
-  const frost = (S.foeState && S.foeState.status && S.foeState.status.frost) || 0;
+  const frost = foeInitCut();                    // ❄️ Frost + 🔪 knives
   S.encounter = Object.assign({}, base, {
     hp: 9999, beatFight: true,
     init: fx.initTake ? 99 : Math.max(0, base.init + climb - frost),
@@ -7705,7 +7722,7 @@ function resolve() {
     // turn of the run. 🔑 A term shown doing nothing is worse than no term: it teaches the player
     // that the number does not matter, on the exact turn it matters most.
     if (r.lastMile) {
-      const di = S.dragon.init, half = Math.ceil(di / 2);
+      const di = (S.encounter && S.encounter.init != null) ? S.encounter.init : S.dragon.init, half = Math.ceil(di / 2);
       if (r.lastMile === 'unseen') b2.push(L(`🌒 Pace ${r.pace} vs its Initiative ${di} → you match it. You come up on the ${S.dragon.name} unheard — ${stripTags(unseenPromise())}`, 'good'));
       else if (r.lastMile === 'heard') b2.push(L(`🐉 Pace ${r.pace} vs its Initiative ${di} (half ${half}) → it hears you coming, and takes the opening blow: ${r.rouse} damage`, 'bad'));
       else b2.push(L(`Pace ${r.pace} vs its Initiative ${di} → you arrive without waking it, but it is set for you. No blow given, none taken.`));
@@ -12734,7 +12751,7 @@ const TIPS = {
   afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
   afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
   cycle:    ['🔁 Cycle', 'A dragon plays its attacks in this order, over and over. The next one is in bold.'],
-  knife:    ['🔪 Knives', 'Each knife in it lowers its Armour by 1 for every blow. A blade Strike can rip them out for one extra hit each. Lose the race and one falls out.'],
+  knife:    ['🔪 Knives', 'Each knife in it lowers its Armour and its Initiative by 1. A blade Strike can rip them out for one extra hit each. Lose the race and one falls out.'],
   target:   ['🎯 Target', 'Tap a body to aim your Spell at it. Your effects land on the body you hit. Beat the leader and the rest scatter.'],
   shield:   ['🛡️ Shields', 'While it lives, the leader takes half damage.'],
   rally:    ['📣 Rallies', 'While it lives, the leader\'s attack is +1.'],
@@ -13277,7 +13294,7 @@ function duelStrike(r) {
   // 🌀 Windreader applies at the lair too - a dragon is where Evasion actually decides runs.
   // ⚠️ The duel only knows initLost (a boolean), so the margin is re-read from the same terms
   // computeAction used, rather than inventing a second notion of "close".
-  const evMargin = (S.dragon && S.dragon.init != null) ? (S.dragon.init - (r.init || 0)) : 99;
+  const evMargin = (S.encounter && S.encounter.init != null) ? (S.encounter.init - (r.init || 0)) : (S.dragon && S.dragon.init != null) ? (S.dragon.init - (r.init || 0)) : 99;
   const evaded = !quenched && hasShape('evasion') && r.initLost
                  && !(hasCharm('windreader') && evMargin <= 2)
                  && !(S.dragonState.boon.unseen > 0);
@@ -13407,7 +13424,7 @@ function startDuelBeat() {
   const dbag = (S.dragonState.status = S.dragonState.status || {});
   const dfrost = dbag.frost || 0; dbag.frost = 0;
   S.encounter = { type: 'fight', name: S.dragon.name, dragon: true, hp: 9999,
-    init: Math.max(0, S.dragon.init - dfrost), atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };
+    init: Math.max(0, S.dragon.init - dfrost - (dbag.knife || 0)), atk: Math.ceil(S.dragon.breath / 2), atkEl: S.dragon.element, xp: 0, finale: true };   // 🔪 knives slow it too
   S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
   S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
   S.loseReserve = null; S.afterSoak = 'upgrade';
