@@ -971,10 +971,14 @@ function toggleBank() {
 // channelling good — it was what made it MANDATORY.
 // ⚠️ Its DISPLAY had to change with it: "+5 next turn (it was worth +5 now)" reads as a pure
 // loss. The reveal now names the real payoff — you carry it, and you choose where it lands.
-let BANK_MULT = 1.0;
 // 🔥 ×2 while the Emberwake Band is broken this turn. ⚠️ HERE, in the ONE place a bank is
 // valued, so the Surge row, the reveal line and the token can never disagree about the number.
-function bankValueOf(surge) { return surge ? Math.ceil(eff(surge).boost * BANK_MULT) * (S && S.armourTwin ? 2 : 1) : 0; }
+// 🔥 REBUILT 2026-09-01 (Thomas: *"channel to AMPLIFY: next turn's effect is doubled"*). The wake
+// is no longer +N damage aimed at strike or speed — with creatures carrying HP and cards leaving
+// EFFECTS, it is a MULTIPLIER on next turn's effects. `bank` is its STRENGTH: 1 = ×2, 2 = ×3.
+// The Band adds a step while broken; ✦ Backdraft adds one in compose(). ⚠️ A channelled Surge
+// fires NOTHING this turn — not its boost, not its effect (✦ Motherlode is the one exception).
+function bankValueOf(surge) { return surge ? 1 + (S && S.armourTwin ? 1 : 0) : 0; }
 // ⚠️ THE BANK NOW HAS TWO STORIES, SO NOTHING MAY HARD-CODE THE OLD ONE. Banking normally costs
 // you the boost this turn, but ✦ Motherlode buys that price off — and three log lines plus a slot
 // hint all used to state "feeds nothing now" as a fact. Same trap as ✦ Second Flame: when a second
@@ -998,9 +1002,9 @@ function bankCostPhrase(surge) {
 // full-boost token (avg 5.9) closes it 84.6% of the time. 💨 reads low only because you lose the
 // race on just 16.4% of fights — and the bot aims at the creature in front of it, which is exactly
 // the case a human does NOT have: seeing on the candle that the next one is fast and banking for it.
-const WAKE_TARGETS = { atk: '⚔️ attack', init: '💨 initiative' };
 // the token is only aimable while you can still see the encounter and change your mind
-function wakeReady() { return hasEmberwake() && S.wake > 0 && isAssignPhase(); }
+// 🔥 what a held wake does to every effect this turn. Read in markWith() and nowhere else.
+function wakeMult() { return 1 + (S && S.wake > 0 ? S.wake : 0); }
 // 🎴 AIMED BY TAPPING THE TOKEN ITSELF (2026-08-21). It used to be a labelled row of buttons in
 // the controls panel, which meant the Emberwake was drawn in TWO places — a prose line in the
 // status bar saying what you held, and a button row somewhere else for doing something with it.
@@ -1009,12 +1013,6 @@ function wakeReady() { return hasEmberwake() && S.wake > 0 && isAssignPhase(); }
 // ⚠️ It never cycles back to UNAIMED: an unaimed Emberwake simply gutters out, so "no target" is
 // not a choice anyone would make — offering it would be the picker rule again, an option that is
 // never correct. First tap aims at ⚔️ attack (indexOf(-1) + 1 === 0), then it toggles.
-function cycleWake() {
-  if (!wakeReady()) return;
-  const keys = Object.keys(WAKE_TARGETS);
-  S.wakeTarget = keys[(keys.indexOf(S.wakeTarget) + 1) % keys.length];
-  render();
-}
 
 // ============================================================
 // 🕯️ THE CANDLE (2026-07-29, Thomas). While it is lit you can see the NEXT encounter.
@@ -1190,7 +1188,7 @@ const MAGE = {
   // ⚠️ It is a DESCRIPTION, not a new rule - it names the mechanic that already exists, so it
   // cannot drift from the game as long as it is written from the code.
   trait: { icon: '🔥', name: 'Emberwake',
-    text: '<b>Channel</b> your Surge instead of spending it. You carry it into next turn as <b>one bigger blow</b>, aimed at your <b>strike</b> or your <b>speed</b>. One big hit beats 🛡️ Armour, which is only subtracted once.' },
+    text: '<b>Channel</b> your Surge instead of spending it: nothing this turn, and next turn every effect you leave on the creature is <b>doubled</b>. Spend it or lose it.' },
   // 🏅 WHAT THE GRADE CALLS CRAFT — the mage's source of power is PAIRING, so availability is
   // "does this hand hold a same-element pair" and finding it is attuning.
   // ⚠️ THE ENGINE MAY ASK *was your power available, did you use it*; only the CLASS may say
@@ -1219,12 +1217,12 @@ const MAGE = {
     if (!S.wake) return null;
     return [{
       id: 'wake', icon: '🔥', name: 'Emberwake', count: S.wake,
-      worth: S.wakeTarget ? `→ <b>${WAKE_TARGETS[S.wakeTarget]}</b>` : '<b>unaimed</b> — tap to aim it',
+      worth: `every effect you leave on it this turn is <b>×${wakeMult()}</b>`,
       // 🔑 EVERY TOKEN SAYS HOW IT DIES, and this one has two deaths — ✦ Deepwell buys it an extra
       // turn, and a note that stated only the usual one would be the ✦ Second Flame trap again:
       // a second way for something to happen, with every line still explaining the first.
       note: S.wakeDeep ? '✦ Deepwell — it survives one unspent turn' : 'spend it or lose it',
-      tap: wakeReady() ? 'cycleWake()' : null,
+      tap: null,
     }];
   },
   canPlace() { return true; },
@@ -1246,19 +1244,19 @@ const MAGE = {
     const vB = verbOf(boostC);
     let bank = banks ? bankValueOf(boostC) : 0;
     if (banks && vB && vB.slot === 'Boost') {
-      if (vB.name === 'Backdraft') bank *= 2;
+      if (vB.name === 'Backdraft') bank += 1;   // ×3 instead of ×2
     }
     // ✦ MOTHERLODE (rewritten 2026-08-12). Its old job — "keeps the FULL boost, not half" — became
     // a no-op the moment the bank went to full value. A verb must name what the rule COSTS you, so
     // it now buys off the one price banking still charges: the boost fires this turn as well.
     const lode = banks && vB && vB.slot === 'Boost' && vB.name === 'Motherlode';
-    const w = S.wake || 0, wt = S.wakeTarget;
+    const w = S.wake || 0;
     return {
-      value: Math.max(0, mageStrike(spell, attuned, elem, boostC) + (wt === 'atk' ? w : 0)
+      value: Math.max(0, mageStrike(spell, attuned, elem, boostC)
         + (attuned && vElem && vElem.name === 'Firstflame' ? 3 : 0)
         + (duelFx().value || 0)),                       // 🐉 Deep Pressure
       element: spell.def.element,
-      init: (elem ? eff(elem).init : 0) + (wt === 'init' ? w : 0)
+      init: (elem ? eff(elem).init : 0)
         + (banksNow() && verbOf(boostC) && verbOf(boostC).name === 'Quickspark' ? 3 : 0),
       boost: (banks && !lode) ? 0 : (boostC ? eff(boostC).boost : 0),
       hits: CLASS.hitsOf(spell, true),   // ⚡ a forking card prints its own; grants add to it
@@ -1267,7 +1265,7 @@ const MAGE = {
       // reveal was printing the FULL bonus regardless — see attunedLineText.
       attApplied: attuned ? (looseOnly() ? Math.floor((st.attuned - st.value) / 2) : st.attuned - st.value) : 0,
       cardVal: st.value,
-      banks, bank, wake: w, wakeTarget: wt,
+      banks, bank, wake: w,
       vSpell: vSpell && vSpell.slot === 'Spell' ? vSpell.name : null,
       vElem: vElem && vElem.slot === 'Element' ? vElem.name : null,
       spell, elem, boostC,
@@ -1371,7 +1369,7 @@ let SPLIT_ADDS_PER_HIT = true;
 // `solver.js` cannot bank well by construction, and a player who deliberately holds ⚡ Sparkstrike
 // hits it far more often. **Do not tune this from solver data** — same standing caution as
 // `BANK_MULT`, which is hypersensitive (×1.1 swung the duel 27-43 points).
-let WAKE_PER_HIT = true;
+// ❌ `WAKE_PER_HIT` retired 2026-09-01 — the wake multiplies EFFECTS now, not damage; nothing splits.
 // ⚡ PITCH — WHAT A CARD GIVES WHEN YOU FEED IT (2026-08-18, Thomas, from Flesh and Blood):
 // *"maybe it needs to be, the lower lvl the card, the more energy it gives, kinda like how cards
 // work in flesh and blood, blue cards are weaker but they give more pitch."*
@@ -1855,7 +1853,7 @@ const ROGUE = {
       boost: 0,
       hits,
       attuned: false, attBonus: 0,
-      banks: false, bank: 0, wake: 0, wakeTarget: null,
+      banks: false, bank: 0, wake: 0,
       vSpell: null, vElem: null,
       spell: strike, elem: combo, boostC: cardById(S.assign.Boost),
       attuner: null, loose: false,
@@ -1917,14 +1915,14 @@ const VERBS = {
   Quickfire:    { slot: 'Element', name: 'Outpace',    text: 'You win Initiative automatically.' },
   Flintdart:    { slot: 'Element', name: 'Bedrock',    text: 'You take no Early Damage, even when you lose the race.' },
   // FLOW → SURGE — the fork, the 🔥 Emberwake
-  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Channelling from here DOUBLES the Emberwake.' },
+  Bellowsbreath:{ slot: 'Boost',   name: 'Backdraft',  text: 'Channelling from here makes the Emberwake ×3 instead of ×2.' },
   Wellspring:   { slot: 'Boost',   name: 'Deepwell',   text: 'An Emberwake channelled from here lasts a second turn.' },
   Stormglass:   { slot: 'Boost',   name: 'Quickspark', text: 'Channelling from here also gives +3 Initiative this turn.' },
   Deepvein:     { slot: 'Boost',   name: 'Motherlode', text: 'Channelling from here ALSO fires the boost this turn.' },
   // WARD → SOAKING — keeping cards, the run-level currency
   Hearthwall:   { slot: 'soak',    name: 'Emberguard', text: 'The first time it blocks each encounter, it loses no level.' },
   Rimeguard:    { slot: 'soak',    name: 'Frostbite',  text: 'It blocks 4 more than its armour.' },
-  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it blocks, you gain a 🔥 +2 Emberwake.' },
+  Staticwall:   { slot: 'soak',    name: 'Groundwire', text: 'When it blocks, you gain a 🔥 Emberwake.' },
   Cairnguard:   { slot: 'soak',    name: 'Bulwark',    text: 'When it blocks, it blocks ALL remaining damage.' },
 };
 // a card only has its verb at Lv4 — soften it and the verb is gone
@@ -2076,7 +2074,7 @@ const TUTORIAL = {
     // 🔑 THE BAR: every stat must say what it SUBTRACTS FROM WHAT. If a sentence could be true of
     // three different rules, it is flavour, not a brief.
     { title: 'A turn is an arrangement',
-      body: 'Your four cards sit under four labels. The position is the role. Swap cards to change it.<br><br><b>SPELL</b> — its number is what you deal. It is then spent: it goes to the discard and does not come back until the region ends.<br><br><b>CATALYST</b> — its 💨 Initiative races the enemy\'s. If it also shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger ✦ number on its face.<br><br><b>SURGE</b> — its ➕ is added to your Spell. Or channel it: nothing this turn, and next turn you spend its full value on your strike or your speed.<br><br><b>ARSENAL</b> — the one card you keep for the next hand. Your Catalyst and Surge slide back under your deck.' },
+      body: 'Your four cards sit under four labels. The position is the role. Swap cards to change it.<br><br><b>SPELL</b> — its number is what you deal. It is then spent: it goes to the discard and does not come back until the region ends.<br><br><b>CATALYST</b> — its 💨 Initiative races the enemy\'s. If it also shares your Spell\'s element, the Spell <b>attunes</b> and strikes for the bigger ✦ number on its face.<br><br><b>SURGE</b> — its ➕ is added to your Spell. Or channel it: nothing this turn, and next turn every effect you leave on the creature is doubled.<br><br><b>ARSENAL</b> — the one card you keep for the next hand. Your Catalyst and Surge slide back under your deck.' },
     { title: '⚔️ A fight asks for damage',
       body: 'Your Spell plus your Surge is your blow. Compare it to the creature\'s ❤️ HP:<br><br>• <b>Complete</b> — you meet or beat its HP. It does not touch you.<br>• <b>Narrow</b> — you reach half its HP. You get past it, but it hits you for its ⚔️.<br>• <b>Loss</b> — below half. It hits you and you gain nothing. You still move on; one encounter never ends the run.<br><br>💨 Initiative is separate from damage. If your Catalyst is slower than the creature\'s 💨, it strikes first for its ⚔️, even if your blow then kills it.<br><br>Each creature also has a defence. 🛡️ <b>Armour N</b> takes N off your blow, so it wants one big hit. 🌀 <b>Evasion</b> halves your blow unless you won Initiative, so it wants speed.' },
     { title: '👣 A journey asks for distance',
@@ -2177,14 +2175,14 @@ const TUTORIAL = {
     // that banking is a choice, a lesson gated on the choice can never teach that the choice exists.
     { id: 'bank', when: () => hasEmberwake() && isAssignPhase() && !!cardById(S.assign.Boost) && !S.bankArmed,
       point: '.in-Boost',
-      text: 'Your <b>SURGE</b> can fire now, or ⟳ <b>channel</b> it: nothing this turn, and next turn you spend its full value on your strike or your speed. A bigger Surge channels for more.' },
+      text: 'Your <b>SURGE</b> can fire now, or ⟳ <b>channel</b> it: nothing this turn, and next turn every effect you leave on the creature is <b>doubled</b>.' },
     // 🔥 the other half of the Emberwake. The bank lesson teaches the SAVING; nothing taught the
     // SPENDING, so a player who banked met an unexplained row of buttons the following turn.
     // ⚠️ POINTS AT THE TOKEN (2026-08-21). It used to point at `.wake-row`, which no longer
     // exists — a lesson whose target is gone silently rings nothing at all.
     { id: 'aim', when: () => isAssignPhase() && S.wake > 0,
       point: '#field .tok-wake',
-      text: '🔥 You are holding an <b>Emberwake</b>. Tap it to aim it at your strike or your speed. 🛡️ Armour wants the bigger hit, 🌀 Evasion wants you to go first. Spend it this turn or lose it.' },
+      text: '🔥 You are holding an <b>Emberwake</b>. Every effect you leave on the creature this turn is <b>doubled</b> — seat your cards where they fire. Spend it this turn or lose it.' },
     { id: 'soak', when: () => S.phase === 'soak',
       point: '#slots-panel',
       text: 'Tap a card to <b>block</b>. It blocks its printed 🛡️ number and drops one level. Block the whole hit or the run ends. Your deck is your health.' },
@@ -2995,6 +2993,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 454, date: '2026-09-01', title: 'The Emberwake amplifies',
+    changed: [
+      "🔥 <b>Channelling is new.</b> Channel your Surge and it does nothing this turn — next turn, every effect you leave on the creature (Burn, Frost, Daze, Exposed) is <b>doubled</b>. It no longer adds damage, and there is nothing to aim.",
+      "✦ <b>Backdraft</b> and the <b>Emberwake Band</b> now make the Emberwake ×3 instead of ×2. <b>Groundwire</b> grants an Emberwake outright.",
+      "📖 The Surge row, the token and the tutorial say the new rule.",
+    ],
+    warn: "A run saved mid-fight with an Emberwake held will load with it at ×2." },
+
   { build: 453, date: '2026-09-01', title: 'The dragons stand taller again',
     changed: [
       "🐉 <b>Skyrender, Cragmourn and Fathomdread have more health.</b> Now that creatures answer your spells and your cards have real effects, the last three dragons had become too easy. Cindermaw is unchanged.",
@@ -3383,7 +3389,7 @@ function saveGame(key) {
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakeTarget: S.wakeTarget, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
+      wake: S.wake, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       splitPending: S.splitPending || 0, armourWinInit: !!S.armourWinInit,
@@ -3510,7 +3516,8 @@ function loadGame(key) {
       pendingEvent: d.pendingEvent || false, eventAt: d.eventAt != null ? d.eventAt : 1,
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
-      wake: d.wake || 0, wakeTarget: d.wakeTarget || null, wakePending: d.wakePending || 0,
+      // ⚠️ clamped: before 454 a wake was a DAMAGE figure (could be 9); now it is a strength ≤ 2
+      wake: Math.min(2, d.wake || 0), wakePending: Math.min(2, d.wakePending || 0),
       // 🛡️ filtered against the live table, so a piece removed in a later build cannot
       // resurrect as `undefined` and throw on armourBlock().
       loot: d.loot || {}, encountersDone: d.encountersDone || 0,
@@ -4444,7 +4451,7 @@ function freshGame(stage) {
     // turn; `wakePending` is what you banked this turn and collect at cleanup. It expires after
     // one turn on purpose - a token that keeps would make farming banks on easy encounters the
     // optimal line, and the run would become savings-account management.
-    wake: 0, wakeTarget: null, wakePending: 0,
+    wake: 0, wakePending: 0, wakeUsed: false,
     // 🛡️ THE LOADOUT. `wear` counts DOWN from the piece's printed wear; at 0 it is battered
     // through for the rest of the run. ⚠️ Nothing here is ever destroyed for good — you forged it,
     // you keep it. What a piece costs is the RUN, and that is the only reason it may exist at all
@@ -6502,25 +6509,38 @@ function markWith(card, r, lvl, dry) {
   const resisted = !!(af && af.resist === id), weakened = !!(af && af.weak === id);
   if (resisted) n = Math.max(1, Math.floor(n / 2));
   if (weakened) n *= 2;
-  if (dry) return { id, n, card, resisted, weakened, lasting: !!a.lasting, carry: !!a.carry };
+  // 🔥 THE EMBERWAKE — a held wake multiplies every effect this turn. Read HERE, so the bot's
+  // preview, the reveal and the creature agree; spent by the TURN (rollTurnTokens), not per mark.
+  const amp = wakeMult();
+  if (amp > 1) n *= amp;
+  if (dry) return { id, n, card, resisted, weakened, amp, lasting: !!a.lasting, carry: !!a.carry };
+  if (amp > 1) S.wakeUsed = true;
   // 🌊 FLOW marks do not decay. One flag on the bag, read by every tick — not a per-mark
   // exception, because an archetype rule that needs four special cases is four rules.
   if (a.lasting) bag.lasting = Object.assign({}, bag.lasting, { [id]: true });
   // 💨 SPARK marks travel. Stashed on the RUN, not the fight, and drained into the next one.
   if (a.carry) S.markCarry = Object.assign({}, S.markCarry, { [id]: (S.markCarry && S.markCarry[id] || 0) + n });
   bag[id] = (bag[id] || 0) + n;
-  return { id, n, card, resisted, weakened };
+  return { id, n, card, resisted, weakened, amp };
 }
 // 🏷️ EVERY CARD SITTING AT HOME MARKS (Thomas: *"we should let them all fire"*).
 // 🔑 No cap, deliberately. A cap of one would resolve to *pick the biggest number*, which is
 // the weak-fork trap the Surge target already failed at 0%; and the freebies are what make the
 // system FELT, which is the exact thing the Lv4 verbs never managed.
 // ⚠️ WARD is absent here on purpose — it marks in soakWith(), when you actually block.
+// 🔥 a CHANNELLED Surge fires nothing — not its boost, not its effect — unless ✦ Motherlode.
+// Otherwise channelling a FLOW card at home would keep its lasting effect AND double next turn.
+function surgeChannelled(r, c) {
+  if (!(r && r.banks)) return false;
+  const v = verbOf(c);
+  return !(v && v.slot === 'Boost' && v.name === 'Motherlode');
+}
 function applyMarks(r) {
   const outMarks = [];
   for (const zone of ['Spell', 'Element', 'Boost']) {
     const c = cardById(S.assign && S.assign[zone]);
     if (!atHome(c, zone)) continue;
+    if (zone === 'Boost' && surgeChannelled(r, c)) continue;
     const m = markWith(c, r);
     if (m) outMarks.push(m);
   }
@@ -6531,12 +6551,24 @@ function applyMarks(r) {
 // ladder number since build 436 came from a bot that never aimed one, and against a Fire creature
 // it led Burn (resisted) 287 times to Frost (doubled) 193. *Check the bot is ALLOWED to do a thing
 // before quoting how often it does it* — it was allowed; it did not know the thing existed.
+// 🏷️ ONE LINE PER LANDED MARK, for BOTH reveals. 🐛 The duel's reveal never printed marks at all
+// (found 2026-09-01 verifying the amplifier) — Exposed 8 landed on Cindermaw and the screen said
+// nothing. *Never state a rule about an object without marking the object*, on the fight that
+// decides the run. Two reveals, one text: they cannot drift.
+function markLineHTML(m) {
+  const d = STATUSES[m.id];
+  const lasts = (ARCH_MARK[m.card && m.card.def.arch] || {}).lasting;
+  const af = m.resisted ? ' <i>(resisted — halved)</i>' : m.weakened ? ' <i>(weak to it — doubled)</i>' : '';
+  const amp = m.amp > 1 ? ` <i>(🔥 Emberwake ×${m.amp})</i>` : '';
+  return `${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never ends)</i>' : ''}${af}${amp} — from ${m.card ? displayName(m.card) : 'your hand'}`;
+}
 function previewMarks(r) {
   if (!fightStatus()) return [];
   const outMarks = [];
   for (const zone of ['Spell', 'Element', 'Boost']) {
     const c = cardById(S.assign && S.assign[zone]);
     if (!atHome(c, zone)) continue;
+    if (zone === 'Boost' && surgeChannelled(r, c)) continue;
     const m = markWith(c, r, null, true);
     if (m) outMarks.push(m);
   }
@@ -7017,7 +7049,7 @@ function computeAction(reserve) {
   const enhUsed = !!a.attuned, isEnh = enhUsed, enhEl = spellEl, resonant = false;
   const attBonus = a.attBonus || 0, attApplied = a.attApplied != null ? a.attApplied : attBonus;
   const cardVal = a.cardVal != null ? a.cardVal : null;
-  const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0, wakeTarget = a.wakeTarget || null;
+  const banks = !!a.banks, bank = a.bank || 0, wake = a.wake || 0;
   // ⚠️ THE CLASS'S OWN PAYLOAD RIDES ALONG UNREAD. computeAction rebuilds its result field by
   // field, so anything a class returns that the engine does not name is silently dropped — which
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
@@ -7177,11 +7209,7 @@ function computeAction(reserve) {
     // Mage output is unchanged: hits === 1 and whet === 0 makes this 1 * (withBoost - armorCut).
     // ⚠️ SPLIT ONLY THE CARD. `withBoost` is card + bonuses + Surge; dividing all of it made a
     // +4 potion worth +2 a hit, which is not what the face says.
-    // 🔥 the banked Emberwake, optionally moved from the SPLIT bucket into the PER-HIT one.
-    // It rides inside `withBoost` (compose() folds it into `value`), so it has to be named here
-    // rather than added — subtract it out of the split, then hand it to every blow.
-    const wakeAdd = (WAKE_PER_HIT && a.wakeTarget === 'atk') ? (a.wake || 0) : 0;
-    const added2 = added + wakeAdd;
+    const added2 = added;
     const splitBase = withBoost - added2;
     const perHit = (hits > 1 && SPLIT_ADDS_PER_HIT
                       ? Math.floor(splitBase / hits) + added2
@@ -7243,7 +7271,7 @@ function computeAction(reserve) {
     // 🗡️ `perHit` TRAVELS NOW, because the duel needs it. ⚠️ This is the payload trap the note on
     // compose() warns about, met from the other side: the value was computed and never left the
     // function, so the finale had no way to charge armour per blow and quietly stopped trying.
-    return { ...classPayload, slipped, type: 'fight', spell, hits, perHit, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+    return { ...classPayload, slipped, type: 'fight', spell, hits, perHit, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, vSpell: vS, vElem: vE, shape: e.shape || null, shapes: shapesOf(e), armorCut, evaded, guarded, guardPool, guardCut, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
              base, withBoost, armorCut, value, init, initLost, rangedHits, early, half, outcome,
              combatDmg, timePenalty, stormDmg, loseReserve, poison, ability, backlash, target: e.hp, hardship: h };
   }
@@ -7314,7 +7342,7 @@ function computeAction(reserve) {
   // 🌙 caught after dark: the Arsenal is only half of it
   const loseReserve = h === 'Riptide' ? '🌊 dragged under by the Riptide'
     : nightCaught && reserve && !S.emberShield && !hasArmourRule('nightwise') ? 'caught by Nightfall' : null;
-  return { ...classPayload, type: 'journey', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, wakeTarget, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
+  return { ...classPayload, type: 'journey', spell, hits, attBonus, attApplied, cardVal, added, attuner, loose, banks, bank, wake, elem, boostC, boostVal, boostEff, nightCut, resonant, spellEl, enhEl, isEnh, enhUsed, wrongType,
            // ⚠️ WHEN compose() GAINS A FIELD, CHECK THE PAYLOAD IN THE SAME EDIT - three separate
            // bugs this month came from a value being computed and then never reaching the reveal.
            stride, strideNames: strideCards.map(c => c.def.name),
@@ -7451,11 +7479,10 @@ function resolve() {
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
-    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} is held back, ${bankCostPhrase(boostC)}. Next turn every effect you leave on it is <b>×${r.bank + 1}</b>`, 'good'));
     // ⚠️ the Surge is a MAGE stat - the rogue's slot ③ pays ⚡ and adds no damage, so printing
     // "Surge +0" reported a mechanic she does not have
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
-    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
     // 🗡️ Whetstone was invisible: it added +1 per hit and the log never said so
     if (hasCharm('whetstone')) b1.push(L(`🗡️ Whetstone: +1 on every hit`, 'good'));
     if (r.armorCut) b1.push(L(`🛡️ Armour ${r.armorCut}: it shrugs off all but the heaviest blow → ${r.withBoost} − ${r.armorCut}`, 'bad'));
@@ -7496,9 +7523,8 @@ function resolve() {
     if (r.rogue) rogueActionLines(r, spell, L, 'Move').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Move'), 'good'));
     else b1.push(L(`Move: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
-    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into next turn, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+    if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} is held back, ${bankCostPhrase(boostC)}. Next turn every effect you leave on it is <b>×${r.bank + 1}</b>`, 'good'));
     else if (boostC && !r.rogue) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
-    if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
 
     beats.push({ label: '👣 MOVE', big: r.value, vs: `vs MP ${r.mpEff}${r.steepAdd ? ` (${e.mp}+${r.steepAdd} Steep)` : ''} (half ${r.half})`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 
@@ -7789,13 +7815,7 @@ function beatDisplayHTML(beat, isNew) {
       // ⚠️ PLURAL NOW: several cards can be at home in one turn, so this is a list. Naming the
       // CARD beside each mark is what teaches the grid — you learn *Riverstep froze it from the
       // Catalyst* by being told, once, at the moment it happened.
-      if (!felled) for (const m of (r.marks || [])) {
-        const d = STATUSES[m.id];
-        const lasts = (ARCH_MARK[m.card && m.card.def.arch] || {}).lasting;
-        const af = m.resisted ? ' <i>(resisted — halved)</i>' : m.weakened ? ' <i>(weak to it — doubled)</i>' : '';
-        subs.push(`<div class="pv-sub good" data-tip="${m.id}">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never ends)</i>' : ''}${af}` +
-          ` — from ${m.card ? displayName(m.card) : 'your hand'}</div>`);
-      }
+      if (!felled) for (const m of (r.marks || [])) subs.push(`<div class="pv-sub good" data-tip="${m.id}">${markLineHTML(m)}</div>`);
       const dmgB = felled ? 0 : foeCounter(r);
       if (dmgB > 0) subs.push(`<div class="pv-sub bad">damage to block: ${dmgB}</div>`);
       return `<div class="pv-result${pop}"><span class="oc oc-${felled ? 'Complete' : 'Narrow'}">` +
@@ -8263,7 +8283,7 @@ const ARMOUR = [
   // and the grade: the ENGINE owns the slot, the CLASS owns the noun.
   { id: 'wakeband', slot: 'Arms', name: 'Emberwake Band',     block: 0, brk: 'worn', rarity: 'legendary',
     cls: 'mage', uses: 1, use: 'twinflame', consume: true,
-    text: 'Break it: this turn, what you channel is DOUBLED.' },
+    text: 'Break it: an Emberwake channelled this turn is ×3 instead of ×2.' },
   { id: 'fangcord', slot: 'Arms', name: 'Fangcord',           block: 0, brk: 'worn', rarity: 'legendary',
     cls: 'rogue', uses: 1, use: 'quicken', consume: true,
     text: 'Break it: your ● Momentum fills to full.' },
@@ -8627,7 +8647,7 @@ function applyArmourUse(key, d, opt, a) {
   // 🎯 spent on the turn you choose - the whole reason this stopped being an `onBlock`.
   else if (key === 'firstlight') { S.armourWinInit = true; log(`🛡️ ${d.name} — 💨 you take the initiative this turn, whatever it has.`, 'good'); }
   else if (key === 'split') { S.splitPending = (S.splitPending || 0) + 1; log(`🛡️ ${d.name} — 🎯 your strike SPLITS IN TWO this turn.`, 'good'); }
-  else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — what you channel this turn is DOUBLED.`, 'good'); }
+  else if (key === 'twinflame') { S.armourTwin = true; log(`🛡️ ${d.name} breaks — an Emberwake channelled this turn is ×3.`, 'good'); }
   // ● rogue — the streak is arithmetically hard to fill (12% of turns at cap), so filling it is a
   // legendary-sized effect without being a number.
   else if (key === 'quicken') { S.momentum = MOMENTUM_CAP; log(`🛡️ ${d.name} breaks — ● Momentum fills to ${MOMENTUM_CAP}.`, 'good'); }
@@ -9201,7 +9221,7 @@ function soakWith(cardId) {
   } else {
     downgrade(card, `, blocking ${soak}${bulwark ? ' — ✦ Bulwark turns aside everything' : ''}`);
   }
-  if (v && v.name === 'Groundwire') { S.wakePending = (S.wakePending || 0) + 2; log(`✦ Groundwire — the blow earns you a 🔥 +2 Emberwake.`, 'good'); }
+  if (v && v.name === 'Groundwire') { S.wakePending = Math.max(S.wakePending || 0, 1); log(`✦ Groundwire — the blow earns you a 🔥 Emberwake.`, 'good'); }
   // 🛡️ A WARD CARD'S HOME IS THE SOAK, so this is where it marks — **taking damage marks the
   // thing that hit you.** 🔑 The best cell in the grid and the only one that is not free: every
   // other mark costs you an arrangement, this one costs you a card's level.
@@ -9604,19 +9624,19 @@ function rollTurnTokens() {
   }
   S.armourPace = S.armourPacePending || 0;     S.armourPacePending = 0;
   // ✦ Deepwell — a wake banked from a Lv4 Wellspring survives one more turn
-  if (S.wake > 0 && !S.wakeTarget && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
+  if (S.wake > 0 && !S.wakeUsed && S.wakeDeep) { S.wakeDeep = false; log(`✦ Deepwell — your Emberwake holds another turn.`, 'good'); S.wakePending = Math.max(S.wakePending || 0, S.wake); }
   // 🔥 Slowwick Treads — it does not gutter. ⚠️ Hooked HERE, in rollTurnTokens(), which is the
   // one function all three turn loops call: the Emberwake froze for an entire finale once because
   // its rollover lived in endTurn() alone, and this piece would have inherited that bug exactly.
-  else if (S.wake > 0 && !S.wakeTarget && hasArmourRule('wakekeep')) {
+  else if (S.wake > 0 && !S.wakeUsed && hasArmourRule('wakekeep')) {
     S.wakePending = Math.max(S.wakePending || 0, S.wake);
     log(`🛡️ <b>Slowwick Treads</b> — 🔥 your Emberwake holds.`, 'good');
   }
-  else if (S.wake > 0 && !S.wakeTarget) log(`Your Emberwake gutters out unspent.`, 'bad');
+  else if (S.wake > 0 && !S.wakeUsed) log(`Your Emberwake gutters out unspent.`, 'bad');
   S.wakeDeep = verbLive('Wellspring', 'Boost') && banksNow();
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
-  S.wakeTarget = null;
+  S.wakeUsed = false;
 }
 
 function endTurn() {
@@ -12378,25 +12398,16 @@ function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
   if (!sc) return '';
-  // 🔑 SHOW BOTH TERMS. The whole point of channelling is that it pays MORE than it costs, and a
-  // trade whose two sides are not on screen together is not a decision — it is a guess.
-  // 🐛 This line used to print `+${bankValueOf(sc)} power now`, i.e. the BANKED figure labelled as
-  // the spent one. Harmless while the two were equal; the moment interest existed it would have
-  // been a straight lie about the cheaper half. *When a value gains a modifier, find every line
-  // that prints the unmodified one.*
-  const now = eff(sc).boost, later = bankValueOf(sc);
+  // 🔑 SHOW BOTH TERMS — what it gives now, what channelling gives instead. The two sides of a
+  // trade must be on screen together or it is a guess, not a decision.
+  const now = eff(sc).boost, mult = 1 + bankValueOf(sc) + (verbLive('Bellowsbreath', 'Boost') ? 1 : 0);
   const on = !!S.bankArmed;
-  return `<div class="wake-row bank-row"><span class="wake-lab">🔥 Your <b>Surge</b> — ` +
-    (on ? `channelling: <b>+${later}</b> next turn <span class="dim">(instead of +${now} now)</span>`
-        : `<b>+${now}</b> now <span class="dim">— or <b>+${later}</b> channelled</span>`) + `</span>` +
+  return `<div class="wake-row bank-row"><span class="wake-lab" data-tip="wake">🔥 Your <b>Surge</b> — ` +
+    (on ? `channelling: next turn's effects <b>×${mult}</b> <span class="dim">(nothing now)</span>`
+        : `<b>+${now}</b> now <span class="dim">— or channel it: next turn's effects ×${mult}</span>`) + `</span>` +
     `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleBank()">` +
     (on ? 'spend it now instead' : `⟳ channel it`) + `</button>` +
-    // ⚠️ STATE THE RULE, NOT A COMPUTED RATIO. This read `worth ${later/now}×`, which prints
-    // "2.0×" on a Surge worth 1 (ceil rounds it up) and "1.5×" on a big one — technically true and
-    // exactly backwards as a teaching line, since the point of a proportional bonus is that the
-    // BIG Surge is the one worth channelling. The two numbers are already on screen above; this
-    // slot should say WHEN, not restate WHAT.
-    `<span class="wake-note">${on ? 'nothing this turn' : 'one bigger blow next turn — and 🛡️ Armour only subtracts once'}</span></div>`;
+    `<span class="wake-note">${on ? 'it fires nothing this turn' : 'spend it next turn or lose it'}</span></div>`;
 }
 
 // a one-word mark of the card's fate, shown on the card itself during the action phase
@@ -12525,6 +12536,7 @@ const TIPS = {
   // — what a card shows —
   init:   ['💨 Initiative', 'Your speed this turn, taken from your {slot:Element}. If it is higher than the creature\'s Initiative, the creature deals no damage to you this turn.'],
   boost:  ['➕ Surge', 'How much this card adds to your attack when it sits in your {slot:Boost}.'],
+  wake:   ['🔥 Emberwake', 'Channel your Surge: it does nothing this turn. Next turn, every effect you leave on the creature is doubled. Spend it or lose it.'],
   value:  ['⚔️ Attack', 'The damage this card deals as your {slot:Spell}. The second number is what it deals when Attuned.'],
   armour: ['🛡️ Block', 'How much damage this card can absorb. A card that blocks loses a level. A card at Lv1 that blocks is destroyed.'],
   attune: ['✦ Attuned', 'Your {slot:Spell} attacks for its higher number when your {slot:Element} is the same element.'],
@@ -13309,12 +13321,12 @@ function resolveDuel() {
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
-  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} pours into the Emberwake instead of the strike, ${bankCostPhrase(boostC)}. You carry <b>🔥 ${r.bank}</b> into the next beat, to spend on your <b>strike</b> or your <b>speed</b>`, 'good'));
+  if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} is held back, ${bankCostPhrase(boostC)}. Next turn every effect you leave on it is <b>×${r.bank + 1}</b>`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
-  if (r.wakeTarget === 'atk' && r.wake) b1.push(L(`🔥 Emberwake +${r.wake} spent on the strike`, 'good'));
   if (st.armour) b1.push(L(`🛡️ Armour ${st.armour}: the slag turns all but the heaviest blow → ${r.withBoost} − ${st.armour}`, 'bad'));
   if (st.evaded) b1.push(L(`🌀 Evasion: it saw you coming — half the blow finds nothing → ${toHp}`, 'bad'));
   if (hasShape('evasion') && r.initLost && ds.boon.unseen > 0) b1.push(L(`🌀 It has not seen you yet — the blow lands whole despite your pace`, 'good'));
+  for (const m of (r.marks || [])) b1.push(L(markLineHTML(m), 'good'));
   b1.push(L(`🐉 ${S.dragon.name}: ${hpBefore} → ${ds.hp} HP`, ds.hp < hpBefore ? 'good' : ''));
   beats.push({ label: '⚔️ STRIKE', big: toHp, vs: `to HP · 🐉 ${hpBefore}→${ds.hp}`, numCls: r.enhUsed ? 'enh' : '', lines: b1 });
 

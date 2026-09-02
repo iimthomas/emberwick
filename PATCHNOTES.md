@@ -6,6 +6,16 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 454 — The Emberwake amplifies
+*2026-09-01*
+
+> ⚠️ A run saved mid-fight with an Emberwake held will load with it at ×2.
+
+**Changed**
+- 🔥 **Channelling is new.** Channel your Surge and it does nothing this turn — next turn, every effect you leave on the creature (Burn, Frost, Daze, Exposed) is **doubled**. It no longer adds damage, and there is nothing to aim.
+- ✦ **Backdraft** and the **Emberwake Band** now make the Emberwake ×3 instead of ×2. **Groundwire** grants an Emberwake outright.
+- 📖 The Surge row, the token and the tutorial say the new rule.
+
 ## build 453 — The dragons stand taller again
 *2026-09-01*
 

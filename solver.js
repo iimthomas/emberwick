@@ -63,7 +63,13 @@ const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
 let EFFECT_WEIGHT = 1;   // 🏷️ how much the bot values an effect it would leave on the creature (0 = blind, the pre-451 bot)
   let BANK_WEIGHT = 0.6;
 function setBankWeight(w) { BANK_WEIGHT = w; }
-const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) : 0);
+// 🔥 2026-09-01: a bank is a MULTIPLIER on next turn's effects, not deferred damage. Next turn's
+// hand is unknown, so it is priced as strength × an expected turn's worth of effects, discounted.
+// `EXPECT_EFFECT` is what an average arrangement leaves, in effectValue() units. 📏 Measured
+// 2026-09-01 (dev/wake-probe.js, n=120): a plain turn leaves 6.65, and 21% of held wakes gutter
+// (kill turn, or nothing at home) → 6.65 × 0.79 ≈ 5.
+let EXPECT_EFFECT = 5;
+const bankValue = r => (r && r.banks ? BANK_WEIGHT * (r.bank || 0) * EXPECT_EFFECT : 0);
 // 🏷️ WHAT AN ARRANGEMENT'S EFFECTS ARE WORTH, in the currency the scorer already trusts: damage.
 // 🔴 Added 2026-09-01. Until this the bot never valued an effect — not Burn's future damage,
 // not Frost's race, not Exposed's next blow, not affinity — so EVERY ladder number since build
@@ -508,20 +514,6 @@ const RUNSIM = (() => {
     // encounter, so giving up boost now for a token later is always negative to it — exactly the
     // blind spot it has about the Spell being spent. Banking rates from RUNSIM are therefore
     // meaningless; only a human can price the future.
-    // ⚠️ READ THE TARGETS OFF WAKE_TARGETS, NEVER A LOCAL LIST. This loop hard-coded
-    // ['atk','init','armor'], so when 🛡️ armour was cut (2026-08-12) the bot would have gone on
-    // aiming at a target the rules no longer honour — and reported it as a choice. A bot holding a
-    // stale copy of an enum is the same class of bug as the placement bans it could not see.
-    if (S.wake > 0) {
-      let bestT = 'atk', bestSc = null;
-      for (const t of Object.keys(WAKE_TARGETS)) {
-        S.wakeTarget = t;
-        const r = computeAction(null); if (!r) continue;
-        const sc = scoreOf(r);
-        if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
-      }
-      S.wakeTarget = bestT;
-    }
     // ❌ the Prism's bot policy was deleted with the rule (2026-08-05) — a rainbow hand is now
     // simply a hand that cannot attune, and the bot plays it the same way it plays any other.
     const hand = S.hand, isFight = S.encounter.type === 'fight';
@@ -617,18 +609,6 @@ const RUNSIM = (() => {
   function chooseBestDuel() {
     const hand = S.hand, full = hand.length >= 3;
     let best = null;
-    // 🔥 aim whatever we are holding before searching — same as chooseBestOnce, and off
-    // WAKE_TARGETS rather than a local list, so a retired target can never be aimed at.
-    if (S.wake > 0) {
-      let bestT = 'atk', bestSc = null;
-      for (const t of Object.keys(WAKE_TARGETS)) {
-        S.wakeTarget = t;
-        const r = computeAction(null); if (!r) continue;
-        const sc = evalDuelPlay(r);
-        if (!bestSc || better(sc, bestSc)) { bestSc = sc; bestT = t; }
-      }
-      S.wakeTarget = bestT;
-    }
     for (let w = 0; w < hand.length; w++) {
       const rest = hand.filter((_, i) => i !== w);
       for (const spark of (full ? rest : [null, ...rest])) {
