@@ -2995,6 +2995,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 451, date: '2026-09-01', title: 'Creatures answer your spells',
+    added: [
+      "🧬 <b>Every creature now resists one effect and is weak to another</b>, by its element. 🔥 Fire creatures shrug off Burn and hate Frost · 💧 Water shrugs off Frost and hates Daze · ⚡ Lightning shrugs off Daze and hates Exposed · 🪨 Stone shrugs off Exposed and hates Burn.",
+      "<b>Resisted lands at half. Weak lands at double.</b> Nothing is ever immune — every card still does something, but which one you lead with now depends on what is in front of you.",
+      "It is printed on the creature before you arrange, and the fight log says when it happened.",
+    ] },
+
   { build: 450, date: '2026-09-01', title: 'Stun is Daze now, and the dragons stand taller',
     changed: [
       "⚡ <b>Stun is called Daze, and it does what the name says:</b> the creature's <b>next attack deals that much less damage</b>. It no longer needs you to win Initiative. Sharpen a Lightning card and the Daze grows with it; a Spell card's Daze is doubled.",
@@ -6228,11 +6235,49 @@ function fightStatus() {
   return null;
 }
 function statusN(id) { const st = fightStatus(); return (st && st[id]) || 0; }
+
+// 🧬 CREATURES RESPOND TO EFFECTS (2026-09-01, Thomas: *"i like creatures that respond to
+// effects"* — chosen as the next layer, with partner effects spec'd behind it).
+// 🔑 THIS IS "VARIETY FROM PROBLEMS" APPLIED TO THE NEW KIT. Four effects that land the same on
+// every creature are a pile you always empty the same way; four effects that each creature takes
+// differently are a question you have to READ before you answer. It is also the co-op sentence
+// itself — *"it shrugs off Burn, you Frost it and I'll hit"* — arriving as solo content first.
+// 🔑 ZERO AUTHORING. Every creature already carries `atkEl` and every dragon an `element`, so
+// the response is DERIVED from what the creature already is — four rows, sixty-eight creatures,
+// nothing to write per creature and nothing that can drift out of step with the roster.
+//   🔥 Fire      resists Burn   · weak to Frost    (water quenches fire)
+//   💧 Water     resists Frost  · weak to Daze     (lightning splits water)
+//   ⚡ Lightning resists Daze   · weak to Exposed  (stone grounds lightning)
+//   🪨 Stone     resists Exposed · weak to Burn    (fire cracks stone)
+// ⚠️ RESIST IS HALF, NEVER IMMUNE. *A shape a class cannot engage with is a paywall* holds in
+// miniature: an immune creature makes a quarter of the deck dead cards. Half keeps every card
+// doing SOMETHING while still making the read matter — and it mirrors ⚔️ FORCE's ×2 exactly, so the
+// player learns one number. Weak is double.
+const AFFINITY = {
+  Fire:      { resist: 'burn',   weak: 'frost' },
+  Water:     { resist: 'frost',  weak: 'daze' },
+  Lightning: { resist: 'daze',   weak: 'expose' },
+  Stone:     { resist: 'expose', weak: 'burn' },
+};
+// 🐉 one accessor for both fights, like fightStatus() — the dragon's element counts too
+function affinityOf() {
+  if (S.dragonState && S.finalMode && S.finalPhase === 'duel') return AFFINITY[S.dragon && S.dragon.element] || null;
+  const base = S.foeBase; return (base && AFFINITY[base.atkEl]) || null;
+}
 // 🏷️ WHAT IS ON IT, ON SCREEN, EVERY TURN. 🔑 *Any persistent modifier must be on screen
 // every turn* — the rule the Mirror Fen taught, where a run-long −2 Pace was invisible from the
 // moment you took it. A status the player cannot see is a rule the game does not have.
 // ⚠️ Each chip says what it DOES, not just its size, for the same reason every field token
 // carries a `note`: a bare counter never shows you how it ends.
+// 🧬 what this creature does to your effects — on the panel BEFORE you arrange, because a
+// response you learn only after committing is a trap, not a puzzle. *Telegraph everything.*
+function foeAffinityHTML() {
+  const af = affinityOf(); if (!af) return '';
+  const r = STATUSES[af.resist], w = STATUSES[af.weak];
+  return `<div class="foe-status foe-af">` +
+    `<span class="foe-st foe-af-resist" data-tip="afresist">${r.icon} resists ${r.name}</span>` +
+    `<span class="foe-st foe-af-weak" data-tip="afweak">${w.icon} weak to ${w.name}</span></div>`;
+}
 function foeStatusHTML() {
   const bag = fightStatus(); if (!bag) return '';
   const bits = [];
@@ -6432,14 +6477,20 @@ function markWith(card, r, lvl) {
   // 🔑 the magnitude IS the level. ⚠️ `lvl` overrides it for the one case where the card's
   // level changes in the same breath as the mark — see the soak below.
   const a = archMark(card);
-  const n = Math.max(1, lvl != null ? lvl : (card.level || 1)) * (a.mult || 1);
+  let n = Math.max(1, lvl != null ? lvl : (card.level || 1)) * (a.mult || 1);
+  // 🧬 the creature answers: halved if it resists this effect, doubled if it is weak to it.
+  // Read HERE and nowhere else, so every caller — Spell, Catalyst, Surge, block, duel — agrees.
+  const af = affinityOf();
+  const resisted = !!(af && af.resist === id), weakened = !!(af && af.weak === id);
+  if (resisted) n = Math.max(1, Math.floor(n / 2));
+  if (weakened) n *= 2;
   // 🌊 FLOW marks do not decay. One flag on the bag, read by every tick — not a per-mark
   // exception, because an archetype rule that needs four special cases is four rules.
   if (a.lasting) bag.lasting = Object.assign({}, bag.lasting, { [id]: true });
   // 💨 SPARK marks travel. Stashed on the RUN, not the fight, and drained into the next one.
   if (a.carry) S.markCarry = Object.assign({}, S.markCarry, { [id]: (S.markCarry && S.markCarry[id] || 0) + n });
   bag[id] = (bag[id] || 0) + n;
-  return { id, n, card };
+  return { id, n, card, resisted, weakened };
 }
 // 🏷️ EVERY CARD SITTING AT HOME MARKS (Thomas: *"we should let them all fire"*).
 // 🔑 No cap, deliberately. A cap of one would resolve to *pick the biggest number*, which is
@@ -6634,7 +6685,8 @@ function foeCleanupAndNext() {
 function logChallenge() {
   const e = S.encounter;
   if (e.type === 'fight') {
-    log(`CHALLENGE: Fight — ${e.name}${e.where ? ` at ${e.where}` : ''} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · 🪙 ${e.xp})`);
+    const afL = AFFINITY[e.atkEl];
+    log(`CHALLENGE: Fight — ${e.name}${e.where ? ` at ${e.where}` : ''}${afL ? ` · resists ${STATUSES[afL.resist].name}, weak to ${STATUSES[afL.weak].name}` : ''} (HP ${e.hp} · Init ${e.init} · Atk ${e.atk} · ${e.shape === 'armour' ? `Armour ${e.shapeV}` : e.shape === 'evasion' ? 'Evasion' : 'unguarded'} · 🪙 ${e.xp})`);
     if (e.ability) log(`ABILITY — ${e.ability}: ${ABILITIES[e.ability]}`, 'bad');
   } else {
     log(`CHALLENGE: Journey — ${e.name} (MP ${e.mp} · Nightfall ${e.nightfall} · Time Penalty ${e.timePenalty} · 🪙 ${e.xp})`);
@@ -7705,7 +7757,8 @@ function beatDisplayHTML(beat, isNew) {
       if (!felled) for (const m of (r.marks || [])) {
         const d = STATUSES[m.id];
         const lasts = (ARCH_MARK[m.card && m.card.def.arch] || {}).lasting;
-        subs.push(`<div class="pv-sub good" data-tip="${m.id}">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never ends)</i>' : ''}` +
+        const af = m.resisted ? ' <i>(resisted — halved)</i>' : m.weakened ? ' <i>(weak to it — doubled)</i>' : '';
+        subs.push(`<div class="pv-sub good" data-tip="${m.id}">${d.icon} <b>${d.name} ${m.n}</b>${lasts ? ' <i>(never ends)</i>' : ''}${af}` +
           ` — from ${m.card ? displayName(m.card) : 'your hand'}</div>`);
       }
       const dmgB = felled ? 0 : foeCounter(r);
@@ -11190,7 +11243,7 @@ function renderEncounter() {
     const dragonBar =
       `<div class="dragon-hp"><div class="dragon-hp-fill" style="width:${hpPct}%"></div>` +
       `<span class="dragon-hp-label">🐉 ${S.dragon.name} — ${ds ? ds.hp : S.dragon.hp} / ${ds ? ds.maxHp : S.dragon.hp} HP</span></div>` +
-      foeStatusHTML() +
+      foeAffinityHTML() + foeStatusHTML() +
       `<div class="dragon-shields">${ds ? shapeStateText() : dragonShapeText(S.dragon)}` +
       ` <span class="dim">· 💨 Init ${S.dragon.init} · breath ${S.dragon.breath}</span></div>` +
       (S.finalPhase === 'duel' ? staminaBar() + telegraph() : '');
@@ -11249,7 +11302,7 @@ function renderEncounter() {
       // 🔑 The telegraph is LOAD-BEARING, not flavour: you can die to a hit your hand cannot
       // soak, and the only thing that makes that a mistake rather than a mugging is having been
       // told a beat early.
-      (S.foeState ? foeHpBar(S.foeState, e.name) + foeStatusHTML() +
+      (S.foeState ? foeHpBar(S.foeState, e.name) + foeAffinityHTML() + foeStatusHTML() +
         `<div class="enc-stats">` +
         `<span data-tip="foepar">⚔️ turn <b>${S.foeState.turn}</b>${S.foeState.par ? ` · par ${S.foeState.par}` : ''}</span>` +
         `<span data-tip="foeinit">💨 Init <b>${e.init > 90 ? '—' : e.init}</b></span>` +
@@ -12460,6 +12513,8 @@ const TIPS = {
   foeatk: ['⚔️ Its attack', 'The damage it deals when its Initiative is higher than yours. You block it with cards from your hand.'],
   foenext:['↷ Its next action', 'What the creature will do on its next turn, shown one turn early. It changes the creature\'s own numbers for that turn only.'],
   tp:     ['⏳ Time Penalty', 'You cannot sharpen your cards for this many encounters.'],
+  afresist: ['Resists', 'This kind of effect lands on the creature at half strength.'],
+  afweak:   ['Weak to', 'This kind of effect lands on the creature at double strength.'],
 };
 function tipHTML(key) {
   // a `+` joins keys — an effect and what the card's kind does to it read as two short blocks

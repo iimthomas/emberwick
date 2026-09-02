@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 451 — Creatures answer your spells
+*2026-09-01*
+
+**Added**
+- 🧬 **Every creature now resists one effect and is weak to another**, by its element. 🔥 Fire creatures shrug off Burn and hate Frost · 💧 Water shrugs off Frost and hates Daze · ⚡ Lightning shrugs off Daze and hates Exposed · 🪨 Stone shrugs off Exposed and hates Burn.
+- **Resisted lands at half. Weak lands at double.** Nothing is ever immune — every card still does something, but which one you lead with now depends on what is in front of you.
+- It is printed on the creature before you arrange, and the fight log says when it happened.
+
 ## build 450 — Stun is Daze now, and the dragons stand taller
 *2026-09-01*
 
