@@ -1989,7 +1989,7 @@ const GUARDIAN = {
   stances: true,           // 🛡️ her slot ③ fork: brace or taunt
   name: 'Guardian',
   tagline: 'every blow comes back',
-  unlock: '🔒 clear stage 2 to unlock them',
+  unlock: '🔒 clear stage 2 to unlock him',
   trait: { icon: '🛡️', name: 'Wrath',
     text: 'Damage you take in a fight becomes <b>Wrath</b>, and your <b>Bulwark</b> hits that much harder. Your <b>Shield</b> card can <b>Brace</b> (block with its armour, unharmed) or <b>Taunt</b> (it strikes you whatever the race — and a partner is spared).' },
   hitsOf(c, isStrike) {
