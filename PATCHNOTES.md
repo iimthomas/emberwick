@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 477 — Under the hood
+*2026-09-03*
+
+**Changed**
+- 📦 No change to play. The game's card, creature and dragon tables are now also written out as data files for the engine port.
+
 ## build 476 — Balance instrument only
 *2026-09-03*
 
