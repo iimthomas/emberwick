@@ -2180,7 +2180,105 @@ const ALCHEMIST = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST };
+// ============================================================
+// 🏹 THE RANGER (2026-09-03, build 478) — [[The_Ranger]]. Source of power: FOREKNOWLEDGE — she
+// reads what is coming and plays into it. The game just built the things she owns: the dark map
+// (a lit candle is sight), the telegraphed attack, the dragon's printed cycle. She sees one row
+// further, sees the creature's attack TWO turns out, and her slot ③ is the MARK: the card there
+// is LOOSED (its ➕ feeds her blow) or spent to MARK the creature — the next blow anyone lands on
+// it is CERTAIN (no Armour, no Evasion). The mage's Exposed is "+N"; the Ranger's Mark is "for
+// sure", which is what answers a SHAPE. For a partner it is the cleanest set-up in the game.
+// 🔑 The bot can PRICE this one: a Mark is worth what the next blow would have lost to the shape.
+// ⚠️ Risk named in advance: certainty against a DOUBLE shape (stage 4) is strong — watch it.
+// ============================================================
+let MARK_LASTING = 1;   // 🏹 how many blows a Mark survives (1 = spent by the next)
+const RANGER_SPEC = [
+  // role      name            spike     base [value, init, boost, armour]
+  { role: 'shot',    name: 'Broadhead',     spike: 'value', base: [6, 3, 2, 2] },
+  { role: 'shot',    name: 'Bodkin',        spike: 'value', base: [5, 5, 2, 1] },
+  { role: 'shot',    name: 'Longshot',      spike: 'value', base: [7, 1, 3, 2] },
+  { role: 'shot',    name: 'Snapshot',      spike: 'init',  base: [3, 7, 2, 1] },
+  { role: 'quarrel', name: 'Fletching',     spike: 'boost', base: [2, 4, 5, 2] },
+  { role: 'quarrel', name: 'Hawk Feather',  spike: 'init',  base: [2, 6, 3, 2] },
+  { role: 'quarrel', name: 'Sinew Cord',    spike: 'boost', base: [3, 2, 4, 3] },
+  { role: 'quarrel', name: 'Hide Bracer',   spike: 'armor', base: [2, 3, 3, 5] },
+];
+const RANGER_DEFS = RANGER_SPEC.map(s => {
+  const ix = { value: 0, init: 1, boost: 2, armor: 3 };
+  const step = s.spike === 'value' ? 3 : s.spike === 'boost' ? 2 : 1;
+  const lv = [0, 1, 2, 3].map(L => {
+    const st = s.base.map((v, i) => (i === ix[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+    st[3] = Math.max(1, st[3]);
+    return [st[0], null, st[1], st[2], st[3], null, null];
+  });
+  return { name: s.name, element: null, arch: null, role: s.role, hits: 1, lv, ranger: true };
+});
+// what a Mark would save the NEXT blow, against this creature's shape — the bot's price and the row's promise
+function markWorth(e) {
+  if (!e) return 0;
+  if (foeHas(e, 'armour')) return Math.max(0, e.shapeV || 0);
+  if (foeHas(e, 'evasion')) return Math.max(3, Math.round(((S.foeState && S.foeState.hp) || 12) / 4));
+  return 0;
+}
+const RANGER = {
+  id: 'ranger',
+  mark: '🏹',
+  multi: null,
+  labels: { Spell: 'Shot', Element: 'Draw', Boost: 'Quiver', Reserve: 'Arsenal' },
+  defs: RANGER_DEFS,
+  deck() { return shuffle(RANGER_DEFS.concat(RANGER_DEFS).map(newCard)); },   // 8 x 2
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false, brews: false,
+  marks: true,             // 🏹 her slot ③ fork: loose it or mark with it
+  foresight: true,         // 🕯️ one more row of the map; the creature's attack two turns out
+  name: 'Ranger',
+  tagline: 'she sees it coming',
+  unlock: '🔒 clear stage 4 to unlock her',
+  trait: { icon: '🏹', name: 'The Mark',
+    text: 'You see <b>one more row</b> of the road and a creature\'s attack <b>two turns out</b>. The card in your <b>Quiver</b> either looses (its ➕ feeds your Shot) or <b>marks</b> the creature: <b>the next blow anyone lands on it is certain</b> — no Armour, no Evasion.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card) + (statusN('mark') > 0 && hasCharm('trueshot') ? 3 : 0); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'marked', gate: 'mark it first',
+    avail() { return !!(S.encounter && S.encounter.type === 'fight' && markWorth(S.encounter) > 0); },
+    found(r) { return !!(r.ranger && (r.ranger.marks || r.ranger.onMark)); },
+  },
+  tokens() { return null; },   // the Mark is on the creature, where a partner can see it
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const shot = spellCard(); if (!shot) return null;
+    const draw = cardById(S.assign.Element), q = cardById(S.assign.Boost);
+    const marks = !!(S.markArmed && q);
+    const boost = q && !marks ? eff(q).boost : 0;
+    const onMark = statusN('mark') > 0;
+    return {
+      value: Math.max(0, eff(shot).value + (duelFx().value || 0)),
+      element: null,
+      init: (draw ? eff(draw).init : 0) + (marks && hasCharm('quickdraw') ? 1 : 0),
+      boost,
+      hits: CLASS.hitsOf(shot, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: shot, elem: draw, boostC: q,
+      attuner: null, loose: false,
+      ranger: { marks, onMark, worth: markWorth(S.encounter), quiverName: q ? q.def.name : null },
+    };
+  },
+  // 🏹 after her blow: the Mark she spent this turn lands (after, so it never certifies her own blow)
+  afterBlow(r, body) {
+    const bag = body && (body.status = body.status || {});
+    if (!bag || !r || !r.ranger || !r.ranger.marks || body.hp <= 0) return;
+    bag.mark = Math.max(bag.mark || 0, MARK_LASTING + (hasCharm('twinmark') ? 1 : 0));
+    if (hasCharm('stalker')) bag.frost = (bag.frost || 0) + 2;
+    log(`🏹 <b>${r.ranger.quiverName}</b> marks it — the next blow on it is <b>certain</b>${hasCharm('stalker') ? ', and it is 2 slower' : ''}.`, 'good');
+    r.marked = true;
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -2734,7 +2832,7 @@ function wallSummary() {
 // you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
 // ============================================================
 const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
-function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : id === 'alchemist' ? stagesCleared() >= 3 : stagesCleared() >= 1); }
+function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : id === 'alchemist' ? stagesCleared() >= 3 : id === 'ranger' ? stagesCleared() >= 4 : stagesCleared() >= 1); }
 function pickedClassId() {
   try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
   catch (e) { return 'mage'; }
@@ -3135,6 +3233,19 @@ const RULE_CHARMS = [
     text: '⚗️ Every brew makes <b>two</b>' },
   { id: 'mortar', tier: 4, name: 'Mortar',              rarity: 'rare', cost: 13, rule: true, cls: 'alchemist',
     text: '⚗️ Every brew comes out <b>concentrated</b>' },
+  // 🏹 THE RANGER'S — all starters for now
+  { id: 'hawkeye', tier: 1, name: 'Hawk Eye',           rarity: 'uncommon', cost: 8, rule: true, cls: 'ranger',
+    text: '🕯️ You see <b>one more row</b> of the road' },
+  { id: 'quickdraw', tier: 1, name: 'Quick Draw',       rarity: 'uncommon', cost: 8, rule: true, cls: 'ranger',
+    text: '🏹 Marking gives <b>+1 Initiative</b>' },
+  { id: 'trueshot', tier: 1, name: 'True Shot',         rarity: 'uncommon', cost: 9, rule: true, cls: 'ranger',
+    text: '🏹 Your Shot on a <b>marked</b> creature hits <b>+3</b>' },
+  { id: 'stalker', tier: 2, name: 'Stalker',            rarity: 'rare', cost: 11, rule: true, cls: 'ranger',
+    text: '🏹 A mark also makes it <b>2 slower</b>' },
+  { id: 'barbed', tier: 3, name: 'Barbed',              rarity: 'rare', cost: 12, rule: true, cls: 'ranger',
+    text: '🏹 A certain blow bites <b>2 deeper</b>' },
+  { id: 'twinmark', tier: 4, name: 'Twin Mark',         rarity: 'rare', cost: 13, rule: true, cls: 'ranger',
+    text: '🏹 A mark makes the next <b>two</b> blows certain' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
     text: '🔪 A tool Strike sticks <b>two</b> knives' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
@@ -3343,6 +3454,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 478, date: '2026-09-03', title: 'The Ranger',
+    changed: [
+      "🏹 <b>A fifth character: the Ranger.</b> Unlocks when you clear stage 4. She sees <b>one more row</b> of the map and a creature's attack <b>two turns out</b>. The card in her <b>Quiver</b> either looses (its ➕ feeds her Shot) or <b>marks</b> the creature: the next blow anyone lands on it is <b>certain</b> — no Armour, no Evasion. In Two-Handed the mark is there for a partner too. Six charms of her own.",
+    ] },
+
   { build: 477, date: '2026-09-03', title: 'Under the hood',
     changed: [
       "📦 No change to play. The game's card, creature and dragon tables are now also written out as data files for the engine port.",
@@ -6264,7 +6380,8 @@ function demandOf(n) {
 function partySight() {
   const lit = !isTwoHanded() ? (S.candle ? 1 : 0)
     : S.hands.reduce((t, h, i) => t + ((i === S.handIdx ? S.candle : h.candle) ? 1 : 0), 0);
-  return SIGHT_BASE + lit;
+  const far = (!isTwoHanded() ? CLASS.foresight : S.hands.some(h => (CLASSES[h.cls] || MAGE).foresight)) ? 1 : 0;   // 🏹 a Ranger in the party
+  return SIGHT_BASE + lit + far + (far && hasCharm('hawkeye') ? 1 : 0);
 }
 let SIGHT_BASE = 1;   // 🕯️ rows you see with every candle out
 function nodeSeen(n) { return !!(n && (n.seen || n.done || (S && S.tutorial))); }
@@ -6371,7 +6488,7 @@ function takeMapNode(f, c) {
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
@@ -6720,6 +6837,13 @@ const FOE_ATTACKS = {
 // 🎲 A SHUFFLED BAG, NOT A DIE (Thomas's call). Pure random can roll *harden* three beats
 // running and then the creature never shows you the two things that make it itself. A bag
 // guarantees you meet the whole creature and still cannot be predicted.
+// 🏹 FORESIGHT: the attack AFTER the telegraphed one — the top of the bag, if the bag still holds one.
+// Only a party with a Ranger reads it; a reshuffled bag reads as unknown (honest, not omniscient).
+function foeAfterNext() {
+  const has = !isTwoHanded() ? CLASS.foresight : (S.hands || []).some(h => (CLASSES[h.cls] || MAGE).foresight);
+  const st = S.foeState; if (!has || !st || !st.bag || !st.bag.length) return null;
+  return st.atks[st.bag[st.bag.length - 1]] || null;
+}
 function foeBagDraw() {
   const st = S.foeState;
   if (!st.bag || !st.bag.length) {
@@ -6779,6 +6903,8 @@ const STATUSES = {
             text: 'it loses <b>N</b> at the start of its turn', decay: '' },
   bleed:  { el: null,        icon: '🩸', name: 'Bleed',
             text: 'it loses <b>N</b> each time it attacks', decay: '' },
+  mark:   { el: null,        icon: '🏹', name: 'Marked',
+            text: 'the next <b>N</b> blow on it is certain — no Armour, no Evasion', decay: '' },
   knife:  { el: null,        icon: '🔪', name: 'Knives',
             text: 'its Armour and Initiative are <b>N</b> lower while they stay in', decay: '' },
   burn:   { el: 'Fire',      icon: '🔥', name: 'Burn',
@@ -7360,6 +7486,7 @@ function foeApplyBlow(r) {
   const plan = cleavePlan(r), first = plan[0] && plan[0].body;
   const bagB = fightStatus();
   if (bagB && bagB.expose && !(bagB.lasting && bagB.lasting.expose)) bagB.expose = 0;
+  if (bagB && bagB.mark > 0 && r.value > 0) { bagB.mark--; if (hasCharm('barbed')) { st.hp = Math.max(0, st.hp - 2); log(`🏹 Barbed — the certain blow bites 2 deeper.`, 'good'); } }   // 🏹 spent by the blow it made certain
   r.cleaved = plan.length > 1;
   for (const p of plan) {
     const body = p.body, lead = body === st;
@@ -7491,11 +7618,11 @@ function startFoeBeat() {
   // third loop skipped the resets the other two shared. A beat IS a turn.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
-  log(`${base.name}: ${st.hp}/${st.maxHp} HP` + (st.next ? ` · next: ${st.next.icon} <b>${st.next.name}</b> — ${stripTags(st.next.tell)}` : ''));
+  log(`${base.name}: ${st.hp}/${st.maxHp} HP` + (st.next ? ` · next: ${st.next.icon} <b>${st.next.name}</b> — ${stripTags(st.next.tell)}` : '') + (() => { const a2 = foeAfterNext(); return a2 ? ` · 🏹 after that: ${a2.icon} <b>${a2.name}</b>` : ''; })());
   render();
 }
 
@@ -7521,7 +7648,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance', 'still', 'stillArmed'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance', 'still', 'stillArmed', 'markArmed'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 // 💾 a hand's record on disk. Cards by index into the hand's OWN class table (names duplicate
 // across elements, and a rogue index means nothing in the mage's table). Per-turn scratch
@@ -7569,7 +7696,7 @@ function handTurnReset() {
   S.boostTarget = 'Attack'; S.loseReserve = null; S.afterSoak = 'foeNext';
   S.damage = 0; S.damageEl = null; S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 // a new creature turn: every hand draws up and is reset; a hand with no cards is OUT (the
@@ -7803,7 +7930,7 @@ function nextTurn() {
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
+    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
     S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
     S.phase = 'fork';
     logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
@@ -7818,7 +7945,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
@@ -8014,7 +8141,7 @@ function computeAction(reserve) {
   // field, so anything a class returns that the engine does not name is silently dropped — which
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
   // hands it straight back to the class. One line, so a third class needs no change here.
-  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : a.alchemist ? { alchemist: a.alchemist } : null;
+  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : a.alchemist ? { alchemist: a.alchemist } : a.ranger ? { ranger: a.ranger } : null;
   // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
   // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
@@ -8093,7 +8220,7 @@ function computeAction(reserve) {
     //  exactly one hit, so it has nothing to bite on. It is the rogue's lock, not the mage's.)
     // ✦ Overwhelm ignores Armour · Landslide can't be halved · Slipstream beats Evasion's check
     // 🧪 Quenching Draught — the shape simply does not apply this turn
-    const quenched = !!(S.potionFx && S.potionFx.noShape);
+    const quenched = !!(S.potionFx && S.potionFx.noShape) || statusN('mark') > 0;   // 🏹 a marked creature: the blow is certain
     // 🌀 SLIPPED (rogue) — beat its Initiative by SLIP_MARGIN and its answer comes in HALF.
     // 🔑 THIS IS WHY THE ROGUE'S METER IS NOT THE MAGE'S: winning the race is BINARY and stops
     // paying the moment you win it (measured twice — the old Attack-or-Initiative fork read 13%,
@@ -12650,7 +12777,7 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      bankRowHTML() + stanceRowHTML() + stillRowHTML() +
+      bankRowHTML() + stanceRowHTML() + stillRowHTML() + markRowHTML() +
       knifeRowHTML() +
       strikePromptHTML() +
       boostRow +
@@ -13128,6 +13255,7 @@ function renderControls() {
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           row('guardian', '🛡️ The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           row('alchemist', '⚗️ The Alchemist', 'A brewer whose kit does what her cards cannot.') +
+          row('ranger', '🏹 The Ranger', 'A hunter who sees what is coming and shoots where it will be.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -13166,7 +13294,6 @@ function renderControls() {
           soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
-          soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
           soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
           `</div></div></div>`;
       })() +
@@ -13324,6 +13451,7 @@ function zoneHint(zone) {
   if (CLASS.id === 'rogue') return rogueZoneHint(zone, isFight);
   if (CLASS.id === 'guardian') return guardianZoneHint(zone, isFight);
   if (CLASS.id === 'alchemist') return alchemistZoneHint(zone, isFight);
+  if (CLASS.id === 'ranger') return rangerZoneHint(zone, isFight);
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -13476,6 +13604,33 @@ function givePotion(id) {
   spendPotion(id); h.potions.push(id);
   log(`🧪 You hand <b>${potionById(id).name}</b> to the ${(CLASSES[h.cls] || MAGE).name}.`, 'good');
   render();
+}
+// 🏹 THE RANGER'S SLOT ③ — loose it, or mark with it. Both terms on screen: the ➕ now, and what
+// certainty is worth against THIS creature's shape.
+function markRowHTML() {
+  if (!CLASS.marks || !isAssignPhase()) return '';
+  const q = cardById(S.assign.Boost); if (!q) return '';
+  const e = S.encounter, fight = e && e.type === 'fight';
+  const on = !!S.markArmed, now = eff(q).boost, worth = fight ? markWorth(e) : 0, already = statusN('mark') > 0;
+  const shape = e && foeHas(e, 'armour') ? `Armour ${e.shapeV}` : e && foeHas(e, 'evasion') ? 'Evasion' : null;
+  return `<div class="wake-row mark-row"><span class="wake-lab" data-tip="mark">🏹 Your <b>Quiver</b> — ` +
+    (on ? `marking it: the next blow on it is <b>certain</b>${shape ? ` (no ${shape})` : ''} <span class="dim">(nothing now)</span>`
+        : `<b>+${now}</b> now <span class="dim">— or mark it${shape ? `: the next blow ignores its ${shape}` : ': nothing to ignore here'}</span>`) + `</span>` +
+    (already ? '' : `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleMark()">${on ? 'loose it instead' : '🏹 mark it'}</button>`) +
+    `<span class="wake-note">${already ? 'it is already marked' : on ? 'for you or a partner, next blow' : (worth ? `worth about ${worth} next blow` : 'a mark only matters against a shape')}</span></div>`;
+}
+function toggleMark() {
+  if (!CLASS.marks || !isAssignPhase()) return;
+  S.markArmed = !S.markArmed;
+  render();
+}
+function rangerZoneHint(zone, isFight) {
+  switch (zone) {
+    case 'Spell': { const s = spellCard(); return s ? `your Shot: <b>${eff(s).value}</b>${statusN('mark') > 0 ? ' — <b>certain</b>' : ''}` : 'your Shot'; }
+    case 'Element': return 'your Initiative — beat its number and it cannot strike';
+    case 'Boost': return S.markArmed ? '🏹 marking — the next blow on it is certain' : 'looses: its ➕ feeds your Shot';
+    default: return 'carried to next turn';
+  }
 }
 function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
@@ -13632,6 +13787,7 @@ const TIPS = {
 
   // — and what a card's kind does to its effect —
   mkforce:['⚔️ Twice as strong', 'This card applies its effect at double strength. The number shown already includes it.'],
+  mark:   ['🏹 The Mark', 'Loose the card: its ➕ feeds your Shot. Mark with it: it fires nothing, and the next blow anyone lands on the creature is certain — no Armour, no Evasion.'],
   still:  ['⚗️ The Still', 'Fire the card: its ➕ feeds your blow. Throw it in: its reagent goes into the Still and it deals nothing this turn. Two reagents brew a potion at the turn\'s end. Brew the same potion twice and it concentrates.'],
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
@@ -14152,7 +14308,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14206,7 +14362,7 @@ function duelArmour() {
 }
 // what a strike is actually worth once the shape has had its say
 function duelStrike(r) {
-  const quenched = !!(S.potionFx && S.potionFx.noShape);   // 🧪 Quenching Draught works on a dragon too
+  const quenched = !!(S.potionFx && S.potionFx.noShape) || statusN('mark') > 0;   // 🧪 Quenching Draught works on a dragon too · 🏹 so does a Mark
   const armour = quenched ? 0 : Math.max(0, duelArmour() + (duelFx().armour || 0) - (hasCharm('ironsplit') ? 2 : 0));   // 🐉 Bank the Forge · 🛡️ Ironsplitter
   // a clean Approach means it hasn't seen you yet — evasion sleeps for the first `unseen` beats
   // 🌀 Windreader applies at the lair too - a dragon is where Evasion actually decides runs.
@@ -14369,7 +14525,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14440,6 +14596,7 @@ function resolveDuel() {
   // Anything added to a fight belongs here in the same commit, or it is a road-only rule.
   const dbag2 = fightStatus();
   if (dbag2 && dbag2.expose) dbag2.expose = 0;
+  if (dbag2 && dbag2.mark > 0 && toHp > 0) dbag2.mark--;   // 🏹
   if (!kill) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (!kill && CLASS.afterBlow) CLASS.afterBlow(r, S.dragonState);   // 🔪
 
@@ -14509,7 +14666,7 @@ function duelHandReset() {
   S.loseReserve = null; S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.moTarget = null;
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.moTarget = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 function duelTurnStartTwo() {

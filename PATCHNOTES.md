@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 478 — The Ranger
+*2026-09-03*
+
+**Changed**
+- 🏹 **A fifth character: the Ranger.** Unlocks when you clear stage 4. She sees **one more row** of the map and a creature's attack **two turns out**. The card in her **Quiver** either looses (its ➕ feeds her Shot) or **marks** the creature: the next blow anyone lands on it is **certain** — no Armour, no Evasion. In Two-Handed the mark is there for a partner too. Six charms of her own.
+
 ## build 477 — Under the hood
 *2026-09-03*
 
