@@ -3076,6 +3076,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 469, date: '2026-09-02', title: 'Two-Handed runs save',
+    changed: [
+      "💾 <b>A Two-Handed run saves and continues</b> like any other — mid-fight, at the Wheel, in the duel. Both characters come back exactly as you left them.",
+    ] },
+
   { build: 468, date: '2026-09-02', title: 'Two-Handed at the lair',
     changed: [
       "🐉 <b>The dragon fight is two-handed.</b> Both characters gather their decks at the lair and fight it the same way as any creature: each races it with their own cards, whoever strikes first goes first, and the other arranges against it as it now is. The dragon has more HP for two.",
@@ -3493,7 +3498,9 @@ const SAVE_VERSION = 8;   // 👣 journeys cut, encounters carry a `where`
 // which is the worst possible bug in a TESTING tool: it would make you chase ghosts in the game.
 function saveGame(key) {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
-  if (isTwoHanded()) return;   // 🙌 a save that stored one hand would resume as a lie — off until the container is in the schema
+  // 🙌 the loaded hand's fields are written below as always; every hand's record rides along in
+  // `hands` (cards by index into THAT class's table), and `handIdx` says which one is loaded.
+  if (isTwoHanded()) stashHand();
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
       // ⚠️ INDEXED INTO THE CLASS'S OWN TABLE. Cards are stored by index because names duplicate;
@@ -3561,6 +3568,8 @@ function saveGame(key) {
       taught: S.taught, lessonsOff: S.lessonsOff,
       curseNextFight: S.curseNextFight, paceBless: S.paceBless, emberShield: S.emberShield,
       logEntries: S.logEntries.slice(0, 40),
+      hands: isTwoHanded() ? S.hands.map(encodeHand) : null, handIdx: isTwoHanded() ? S.handIdx : 0,
+      boonDone: S.boonDone || null, setoutDone: S.setoutDone || null,
     }));
   } catch (err) { /* storage unavailable — play on without saves */ }
 }
@@ -3708,6 +3717,15 @@ function loadGame(key) {
       curseNextFight: d.curseNextFight || false, paceBless: d.paceBless || 0, emberShield: d.emberShield || false,
       logEntries: d.logEntries || [],
     };
+    // 🙌 a Two-Handed save: every hand's record comes back, and the one that was live is loaded
+    // onto S (its fields were restored above too; loadHand makes the two agree and sets CLASS).
+    if (Array.isArray(d.hands) && d.hands.length > 1) {
+      const hands = d.hands.map(decodeHand);
+      if (hands.some(h => !h)) return false;   // a class or card table changed since the save
+      S.hands = hands; S.handIdx = Math.max(0, Math.min(hands.length - 1, d.handIdx || 0));
+      S.boonDone = d.boonDone || []; S.setoutDone = d.setoutDone || [];
+      loadHand(S.handIdx);
+    }
     if (S.encounterQueue.length === 0) S.encounterQueue = S.tutorial ? foesOf(region).slice() : shuffle(foesOf(region));
     // the finale's encounter is synthetic (not in the region tables) — rebuild it for the saved beat
     // the finale's encounters are synthetic — not in the region tables, so rebuild them
@@ -7117,6 +7135,39 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
   'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
+// 💾 a hand's record on disk. Cards by index into the hand's OWN class table (names duplicate
+// across elements, and a rogue index means nothing in the mage's table). Per-turn scratch
+// (potionFx, pickers) is not stored — it is reset by whatever loads the hand into a turn.
+const HAND_CARD_FIELDS = ['deck', 'hand', 'discard', 'trashed'];
+const HAND_SKIP_FIELDS = ['potionFx', 'potionPick', 'upgradePick', 'selectedId'];
+function encodeHand(h) {
+  const cls = CLASSES[h.cls] || MAGE;
+  const card = c => ({ id: c.id, n: cls.defs.indexOf(c.def), lv: c.level });
+  const o = { cls: h.cls, struck: !!h.struck, out: !!h.out };
+  for (const f of HAND_FIELDS) {
+    if (HAND_SKIP_FIELDS.includes(f)) continue;
+    const v = h[f];
+    if (HAND_CARD_FIELDS.includes(f)) o[f] = (v || []).map(card);
+    else if (f === 'downgraded') o[f] = [...(v || [])];
+    else o[f] = v === undefined ? null : v;
+  }
+  return o;
+}
+function decodeHand(o) {
+  const cls = CLASSES[o && o.cls]; if (!cls) return null;
+  const mk = s => { const def = cls.defs[s.n]; return def ? { id: s.id, def, level: s.lv } : null; };
+  const h = { cls: o.cls, struck: !!o.struck, out: !!o.out };
+  for (const f of HAND_FIELDS) {
+    if (HAND_CARD_FIELDS.includes(f)) { h[f] = (o[f] || []).map(mk); if (h[f].some(c => !c)) return null; }
+    else if (f === 'downgraded') h[f] = new Set(o[f] || []);
+    else if (f === 'potionFx') h[f] = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} };
+    else if (HAND_SKIP_FIELDS.includes(f)) h[f] = null;
+    else if (f === 'armour') h[f] = (o[f] || []).filter(a => a && armourDef(a.id)).map(a => ({ ...a, uses: a.uses || 0, up: a.up || 0 }));
+    else if (f === 'assign') h[f] = o[f] || { Spell: null, Element: null, Boost: null, Reserve: null };
+    else h[f] = o[f] == null ? (f === 'stats' ? migrateStats(null) : f === 'candle' ? true : (['charms', 'potions', 'actionSetIds'].includes(f) ? [] : (typeof o[f] === 'number' ? 0 : null))) : o[f];
+  }
+  return h;
+}
 function handSnapshot(cls) { const h = { cls, struck: false, out: false }; for (const f of HAND_FIELDS) h[f] = S[f]; return h; }
 function stashHand() { const h = S.hands[S.handIdx]; for (const f of HAND_FIELDS) h[f] = S[f]; }
 function loadHand(i) {
