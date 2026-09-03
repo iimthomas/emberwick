@@ -3454,6 +3454,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 479, date: '2026-09-03', title: 'Online co-op, first cut',
+    changed: [
+      "🌐 <b>Play Two-Handed with a friend online.</b> On the Stages screen: one of you presses <b>Host a game</b> and reads out the 4-letter room code; the other picks their character and <b>Joins</b> with it. The host chooses the stage and walks the map; in fights and shops, whoever's turn it is plays while the other waits with cards hidden. Needs both of you online; the game data goes browser to browser.",
+    ],
+    warn: "First cut: if either of you closes the page the game is gone for both. The host's save keeps the run; the guest cannot resume it yet." },
+
   { build: 478, date: '2026-09-03', title: 'The Ranger',
     changed: [
       "🏹 <b>A fifth character: the Ranger.</b> Unlocks when you clear stage 4. She sees <b>one more row</b> of the map and a creature's attack <b>two turns out</b>. The card in her <b>Quiver</b> either looses (its ➕ feeds her Shot) or <b>marks</b> the creature: the next blow anyone lands on it is <b>certain</b> — no Armour, no Evasion. In Two-Handed the mark is there for a partner too. Six charms of her own.",
@@ -3921,8 +3927,10 @@ const SAVE_VERSION = 8;   // 👣 journeys cut, encounters carry a `where`
 // ⚠️ A second copy of "how a run is written down" would drift the way a forked duel-maths copy did
 // in July — and a slot that saved a slightly different shape would load into a subtly wrong run,
 // which is the worst possible bug in a TESTING tool: it would make you chase ghosts in the game.
-function saveGame(key) {
-  if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
+// 🌐 the save as an OBJECT — the wire format for networked co-op. `force` lets it be taken mid-reveal.
+function gameData() { return saveGame(null, true); }
+function saveGame(key, force) {
+  if (!S || (S.phase === 'reveal' && !force)) return; // mid-reveal saves would lose the pending resolution
   // 🙌 the loaded hand's fields are written below as always; every hand's record rides along in
   // `hands` (cards by index into THAT class's table), and `handIdx` says which one is loaded.
   if (isTwoHanded()) stashHand();
@@ -3934,7 +3942,7 @@ function saveGame(key) {
       const o = { id: c.id, n: CLASS.defs.indexOf(c.def), lv: c.level };
       return o;
     };
-    localStorage.setItem(key || SAVE_KEY, JSON.stringify({
+    const data = {
       v: SAVE_VERSION, uid, dragon: S.dragon ? S.dragon.name : null,
       region: S.region, turn: S.turn, regionTurn: S.regionTurn,
       deck: S.deck.map(card), hand: S.hand.map(card),
@@ -3995,7 +4003,10 @@ function saveGame(key) {
       logEntries: S.logEntries.slice(0, 40),
       hands: isTwoHanded() ? S.hands.map(encodeHand) : null, handIdx: isTwoHanded() ? S.handIdx : 0,
       boonDone: S.boonDone || null, setoutDone: S.setoutDone || null,
-    }));
+      netPhase: S.phase, beats: S.beats || null, beatIndex: S.beatIndex == null ? -1 : S.beatIndex,
+    };
+    if (force) return data;   // 🌐 the object itself, never written
+    localStorage.setItem(key || SAVE_KEY, JSON.stringify(data));
   } catch (err) { /* storage unavailable — play on without saves */ }
 }
 
@@ -4026,8 +4037,13 @@ function loadGame(key) {
   try {
     const raw = localStorage.getItem(key || SAVE_KEY);
     if (!raw) return false;
-    const d = JSON.parse(raw);
-    if (d.v !== SAVE_VERSION) return false;
+    return loadGameData(JSON.parse(raw));
+  } catch (err) { return false; }
+}
+// 🌐 the reader, from an object — the guest applies the host's state through it
+function loadGameData(d) {
+  try {
+    if (!d || d.v !== SAVE_VERSION) return false;
     // ⚠️ THE CLASS MUST BE RESTORED BEFORE ANY CARD IS DECODED — a card index means nothing without
     // knowing whose table it indexes into. Old saves have no `cls` and are mage runs by definition.
     setClass(CLASSES[d.cls] || MAGE);
@@ -13268,6 +13284,7 @@ function renderControls() {
               `<button class="mode-pick${mode === 'two' ? ' on' : ''}${open ? '' : ' locked'}" ${open ? `onclick="pickMode('two')"` : 'disabled'}>` +
               `<b>🙌 Two-Handed</b><span>${open ? 'Play two characters at once. Each fights with their own cards; whoever strikes first goes first.' : '🔒 fell a dragon to unlock a partner'}</span></button>` +
               `</div>` +
+              (typeof onlinePartyHTML === 'function' ? onlinePartyHTML() : '') +
               (mode === 'two' && open ? `<div class="wall-line">🎭 <b>Partner</b></div><div class="class-row">` +
                 partners.map(id => { const cls = CLASSES[id];
                   return `<button class="class-pick${pickedPartnerId() === id ? ' on' : ''}" onclick="pickPartner('${id}')">` +

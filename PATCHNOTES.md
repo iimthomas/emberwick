@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 479 — Online co-op, first cut
+*2026-09-03*
+
+> ⚠️ First cut: if either of you closes the page the game is gone for both. The host's save keeps the run; the guest cannot resume it yet.
+
+**Changed**
+- 🌐 **Play Two-Handed with a friend online.** On the Stages screen: one of you presses **Host a game** and reads out the 4-letter room code; the other picks their character and **Joins** with it. The host chooses the stage and walks the map; in fights and shops, whoever's turn it is plays while the other waits with cards hidden. Needs both of you online; the game data goes browser to browser.
+
 ## build 478 — The Ranger
 *2026-09-03*
 

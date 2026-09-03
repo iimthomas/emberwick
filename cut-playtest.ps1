@@ -28,6 +28,7 @@ $dest = Join-Path $root 'play'
 $files = @(
   'index.html',
   'game.js',
+  'net.js',      # 🌐 networked co-op (479) — ships with the game, or a drop's Online row would be a dead button
   'style.css',
   'manifest.json',
   'icon.svg',

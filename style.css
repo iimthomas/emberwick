@@ -1165,6 +1165,15 @@ button.stage.locked .stage-shape { font-style: italic; }
   background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; letter-spacing: 0; }
 .back-top:hover { border-color: #c9a24a; color: #f0d9a8; }
 
+/* 🌐 networked co-op: the waiting side sees no cards and touches nothing */
+body.net-wait #slots-panel .card { visibility: hidden; }
+body.net-wait #controls-panel > *:not(#net-banner) { pointer-events: none; opacity: .45; }
+#net-banner { padding: 8px 12px; margin: 0 0 8px; border-radius: 8px; background: rgba(58,106,138,.22); border: 1px solid #3a6a8a; color: #cfe6f5; font-size: 13px; }
+.net-box { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; padding: 10px 12px; background: #1d1a15; border: 1px solid #3a3126; border-radius: 10px; }
+.net-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.net-row input { width: 84px; padding: 8px 10px; font-size: 16px; letter-spacing: 3px; text-transform: uppercase; background: #0f0d0a; border: 1px solid #3a3126; border-radius: 8px; color: #f0d9a8; }
+.net-status { font-size: 13px; color: #b8b2a3; }
+
 /* 🏹 the Ranger's slot ③ row */
 .mark-row .wake-btn.on { border-color: #8fc4e8; color: #cfe6f5; }
 .foe-st-mark { border-color: #3a6a8a; background: rgba(58, 106, 138, .30); }
