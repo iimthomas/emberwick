@@ -3343,6 +3343,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 474, date: '2026-09-03', title: 'You always see the next row',
+    changed: [
+      "🕯️ <b>The next row of the map is always visible.</b> A lit candle shows one more row (two in solo). In Two-Handed, both candles lit show three.",
+    ] },
+
   { build: 473, date: '2026-09-03', title: 'The Alchemist',
     changed: [
       "⚗️ <b>A fourth character: the Alchemist.</b> Unlocks when you clear stage 3. Her cards are <b>reagents</b>. The card in her <b>Still</b> either fires (its ➕ feeds her blow) or is thrown in; <b>two reagents brew a potion</b> at the turn's end from a fixed recipe table, and brewing the same one twice <b>concentrates</b> it. Her brews are stronger and stranger than the shop's. Her kit holds 5. Six charms of her own.",
@@ -6238,10 +6243,15 @@ function demandOf(n) {
 // per lit candle in the party. The lines are still drawn — routing by SHAPE stays — and a node
 // once seen STAYS seen (a snuffed candle does not un-see the road). The tutorial map is fully lit.
 // ⚠️ The bot must read only what a player could see (solver's mapRoute asks nodeSeen).
+// 🕯️ SIGHT = the next row ALWAYS, plus one row per lit candle (2026-09-03, Thomas: *"lets make
+// candle lit +1 more row, for solo and co op. sucks not being able to see almost anything"*).
+// The 467 rule showed NOTHING with the candle out — a blind walk, the thing the map replaced.
 function partySight() {
-  if (!isTwoHanded()) return S.candle ? 1 : 0;
-  return S.hands.reduce((t, h, i) => t + ((i === S.handIdx ? S.candle : h.candle) ? 1 : 0), 0);
+  const lit = !isTwoHanded() ? (S.candle ? 1 : 0)
+    : S.hands.reduce((t, h, i) => t + ((i === S.handIdx ? S.candle : h.candle) ? 1 : 0), 0);
+  return SIGHT_BASE + lit;
 }
+let SIGHT_BASE = 1;   // 🕯️ rows you see with every candle out
 function nodeSeen(n) { return !!(n && (n.seen || n.done || (S && S.tutorial))); }
 function revealMap() {
   const m = S && S.map; if (!m || !m.floors) return;
@@ -12450,9 +12460,9 @@ function renderControls() {
       `<b>You are carrying ${S.hand.length === 0 ? 'nothing' :
         S.hand.map(c => displayName(c)).join(', ')}</b> — the rest of your hand is dealt once you set off. ` +
       (() => { const k = partySight();
-        return k >= 2 ? '🕯️🕯️ Both candles are lit — you can see two rows ahead.'
-          : k === 1 ? '🕯️ Your candle is lit — you can see the next row of the road.'
-          : '<b>Your candle is out</b> — the road ahead is dark until a hearth or a clean win lights it.'; })() +
+        return k >= 3 ? '🕯️🕯️ Both candles are lit — you can see three rows ahead.'
+          : k === 2 ? (isTwoHanded() ? '🕯️ One candle is lit — you can see two rows ahead.' : '🕯️ Your candle is lit — you can see two rows ahead.')
+          : (isTwoHanded() ? '<b>Both candles are out</b>' : '<b>Your candle is out</b>') + ' — you can see only the next row until a hearth or a clean win lights one.'; })() +
       `</div>` + mapHTML() +
       `<div class="mp-legend">◇ an encounter · 💀 dangerous · ❓ an event · 🕯️ a hearth · <b>·</b> unseen</div>` +
       // 🔑 ONE line that follows the pointer, instead of a list of every road at once. A list

@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 474 — You always see the next row
+*2026-09-03*
+
+**Changed**
+- 🕯️ **The next row of the map is always visible.** A lit candle shows one more row (two in solo). In Two-Handed, both candles lit show three.
+
 ## build 473 — The Alchemist
 *2026-09-03*
 
