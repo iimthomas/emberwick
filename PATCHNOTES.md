@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 469 — Two-Handed runs save
+*2026-09-02*
+
+**Changed**
+- 💾 **A Two-Handed run saves and continues** like any other — mid-fight, at the Wheel, in the duel. Both characters come back exactly as you left them.
+
 ## build 468 — Two-Handed at the lair
 *2026-09-02*
 
