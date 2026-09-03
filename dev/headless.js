@@ -104,7 +104,7 @@ sandbox.Math.random = function () {
 
 vm.createContext(sandbox);
 // 🔑 ONE script, not two — see gotcha (1). The epilogue is gotcha (2); it cannot change the game.
-const EXPORTS = ['STAGE_FLOORS', 'DEV_DECKS', 'DRAGON_HP_ADD', 'ARCH_MARK', 'STATUSES', 'CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE', 'GUARDIAN', 'ALCHEMIST', 'RECIPES',
+const EXPORTS = ['STAGE_FLOORS', 'DEV_DECKS', 'DRAGON_HP_ADD', 'ARCH_MARK', 'STATUSES', 'CARD_DEFS', 'ROGUE_DEFS', 'DRAGONS', 'REGIONS', 'ROADS', 'MAGE', 'ROGUE', 'GUARDIAN', 'ALCHEMIST', 'RECIPES', 'DRAGON_ATTACKS',
                  'RUNSIM', 'CHARMS', 'POTIONS', 'EVENTS', 'MATERIALS', 'CREATURE_INDEX', 'ARMOUR', 'ARMOUR_SLOTS', 'RECIPE', 'MOMENTUM_CAP', 'BUILD',
                  'SETOUT', 'SETOUT_BUCKETS', 'CONTRACTS', 'ARMOUR_POWER', 'ARMOUR_UP_COST', 'ARMOUR_UP_MAX', 'PATCH_NOTES', 'SLOT_LABEL', 'CLASS_KEY', 'UNLOCKS', 'UNLOCK_AT', 'LEVEL_CAP', 'XP_AWARD', 'XP_KEY', 'TUTORIAL', 'CLASSES', 'ARMOUR_SLOTS'];
 // the `let` tuning constants a sweep is allowed to move. Add a name here and it becomes sweepable;

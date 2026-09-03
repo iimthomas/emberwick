@@ -1,0 +1,2667 @@
+{
+ "1": [
+  {
+   "name": "Verdant Edge",
+   "hardshipChance": 0,
+   "hardships": [],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Spark Kit",
+     "hp": 7,
+     "init": 4,
+     "atk": 1,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 3,
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Skitter"
+      },
+      {
+       "a": "lunge",
+       "name": "Pounce"
+      },
+      {
+       "a": "windup",
+       "name": "Spark Burst"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Cinder Ape",
+     "hp": 11,
+     "init": 2,
+     "atk": 2,
+     "atkEl": "Fire",
+     "resist": "burn",
+     "weak": "frost",
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Overhand"
+      },
+      {
+       "a": "flurry",
+       "name": "Ash Fury"
+      },
+      {
+       "a": "blur",
+       "name": "Cinder Haze"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Mist Crane",
+     "hp": 16,
+     "init": 6,
+     "atk": 2,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Wingbeat"
+      },
+      {
+       "a": "lunge",
+       "name": "Stoop"
+      },
+      {
+       "a": "quicken",
+       "name": "Rising Air"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Cairnstag",
+     "hp": 22,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Stone",
+     "shape": "armour",
+     "shapeV": 1,
+     "xp": 6,
+     "par": 3,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Stonehide"
+      },
+      {
+       "a": "set",
+       "name": "Antlers Down"
+      },
+      {
+       "a": "circle",
+       "name": "Bellow"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Highland Pass",
+     "mp": 12,
+     "timePenalty": 1,
+     "element": "Lightning",
+     "nightfall": 4,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Fern Crossing",
+     "mp": 8,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 3,
+     "xp": 2
+    },
+    {
+     "type": "journey",
+     "name": "Sunwarm Trail",
+     "mp": 11,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 4,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "Quarry Hollow",
+     "mp": 10,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 3,
+     "xp": 2
+    }
+   ]
+  },
+  {
+   "name": "Wilding Marches",
+   "hardshipChance": 0.35,
+   "hardships": [
+    "Ambush",
+    "Mire",
+    "Night Travel"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Flintwisp",
+     "hp": 9,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Stone",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "ability": "Ranged",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Wisp Away"
+      },
+      {
+       "a": "lunge",
+       "name": "Flare Out"
+      },
+      {
+       "a": "windup",
+       "name": "Kindled Blow"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Stormtoad",
+     "hp": 10,
+     "init": 6,
+     "atk": 2,
+     "atkEl": "Lightning",
+     "xp": 3,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Bellow Slam"
+      },
+      {
+       "a": "flurry",
+       "name": "Thunderclap"
+      },
+      {
+       "a": "blur",
+       "name": "Stormskin"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Ashen Boar",
+     "hp": 26,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Fire",
+     "pack": [
+      {
+       "name": "Cinder Whelp",
+       "icon": "🐗",
+       "hp": 3,
+       "atk": 1,
+       "rule": "rally"
+      },
+      {
+       "name": "Cinder Whelp",
+       "icon": "🐗",
+       "hp": 3,
+       "atk": 1,
+       "rule": "rally"
+      }
+     ],
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 6,
+     "par": 3,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Tusk Charge"
+      },
+      {
+       "a": "harden",
+       "name": "Cinder Crust"
+      },
+      {
+       "a": "quicken",
+       "name": "Blood Up"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Frostbark Elder",
+     "hp": 22,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Water",
+     "resist": "frost",
+     "weak": "burn",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Freeze",
+     "par": 3,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Rimeplate"
+      },
+      {
+       "a": "circle",
+       "name": "Drift"
+      },
+      {
+       "a": "lunge",
+       "name": "Deep Freeze"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Mirefen Road",
+     "mp": 10,
+     "timePenalty": 1,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 3,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "Drowned Meadow",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 4,
+     "xp": 5
+    },
+    {
+     "type": "journey",
+     "name": "Stormwash",
+     "mp": 11,
+     "timePenalty": 3,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Scree Track",
+     "mp": 9,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 4,
+     "xp": 3,
+     "peril": "Steep"
+    }
+   ]
+  },
+  {
+   "name": "Deepdark Hollows",
+   "hardshipChance": 0.5,
+   "hardships": [
+    "Dead Air",
+    "Hazards",
+    "Night Travel",
+    "Storm"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Basalt Basilisk",
+     "hp": 28,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Stone",
+     "resist": "expose",
+     "weak": "burn",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 6,
+     "par": 4,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Stoneskin"
+      },
+      {
+       "a": "set",
+       "name": "Coil Tight"
+      },
+      {
+       "a": "lunge",
+       "name": "Gaze"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Grotto Hydra",
+     "hp": 20,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Water",
+     "pack": [
+      {
+       "name": "Hydra Head",
+       "icon": "🐍",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      },
+      {
+       "name": "Hydra Head",
+       "icon": "🐍",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      }
+     ],
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 6,
+     "par": 3,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Coil"
+      },
+      {
+       "a": "circle",
+       "name": "Second Head"
+      },
+      {
+       "a": "lunge",
+       "name": "Snap"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Sulfur Crawler",
+     "hp": 11,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Poison",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Sidle"
+      },
+      {
+       "a": "lunge",
+       "name": "Snap"
+      },
+      {
+       "a": "windup",
+       "name": "Fume Burst"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Storm Prowler",
+     "hp": 9,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "ability": "Ranged",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Pad Around"
+      },
+      {
+       "a": "lunge",
+       "name": "Spring"
+      },
+      {
+       "a": "windup",
+       "name": "Storm Rake"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Sunken Causeway",
+     "mp": 14,
+     "timePenalty": 1,
+     "element": "Water",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Steep"
+    },
+    {
+     "type": "journey",
+     "name": "Echo Basin",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Cinder Ravine",
+     "mp": 10,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 4,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "Granite Cut",
+     "mp": 11,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 6,
+     "xp": 4
+    }
+   ]
+  },
+  {
+   "name": "The Dragon's Shadow",
+   "hardshipChance": 0.65,
+   "hardships": [
+    "Dead Weight",
+    "Dead Air",
+    "Ambush",
+    "Hazards",
+    "Storm"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Cairntide Warden",
+     "hp": 8,
+     "init": 5,
+     "atk": 2,
+     "atkEl": "Stone",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Poison",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Brace"
+      },
+      {
+       "a": "lunge",
+       "name": "Halberd"
+      },
+      {
+       "a": "blur",
+       "name": "Tide Veil"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Flarecaller",
+     "hp": 9,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "ability": "Ranged",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Wheel Round"
+      },
+      {
+       "a": "quicken",
+       "name": "Rising Cry"
+      },
+      {
+       "a": "windup",
+       "name": "Flare"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Stormcrown Stag",
+     "hp": 14,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Lightning",
+     "resist": "daze",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Freeze",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Circle Wide"
+      },
+      {
+       "a": "quicken",
+       "name": "Gather Speed"
+      },
+      {
+       "a": "windup",
+       "name": "Antler Sweep"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Mirewyrm Elder",
+     "hp": 17,
+     "init": 5,
+     "atk": 5,
+     "atkEl": "Water",
+     "resist": "frost",
+     "weak": "daze",
+     "shape": "armour",
+     "shapeV": 4,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "dig",
+       "name": "Bed Down"
+      },
+      {
+       "a": "quicken",
+       "name": "Uncoil"
+      },
+      {
+       "a": "windup",
+       "name": "Coil Strike"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Drowned Vale",
+     "mp": 14,
+     "timePenalty": 1,
+     "element": "Water",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "Stoneward Road",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 6,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Emberfall Path",
+     "mp": 12,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 6,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Tempest Ridge",
+     "mp": 11,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 7,
+     "xp": 4,
+     "peril": "Steep"
+    }
+   ]
+  }
+ ],
+ "2": [
+  {
+   "name": "Windward Steps",
+   "hardshipChance": 0,
+   "hardships": [],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Kite Hawk",
+     "hp": 8,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Lightning",
+     "pack": [
+      {
+       "name": "Kite Fledgling",
+       "icon": "🐦",
+       "hp": 3,
+       "atk": 1
+      },
+      {
+       "name": "Kite Fledgling",
+       "icon": "🐦",
+       "hp": 3,
+       "atk": 1
+      },
+      {
+       "name": "Kite Fledgling",
+       "icon": "🐦",
+       "hp": 3,
+       "atk": 1
+      }
+     ],
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 3,
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Wheel"
+      },
+      {
+       "a": "lunge",
+       "name": "Stoop"
+      },
+      {
+       "a": "windup",
+       "name": "Talon"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Gale Colt",
+     "hp": 12,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Water",
+     "xp": 4,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Kick"
+      },
+      {
+       "a": "flurry",
+       "name": "Bolt"
+      },
+      {
+       "a": "blur",
+       "name": "Duststreak"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Rill Otter",
+     "hp": 10,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Slip Past"
+      },
+      {
+       "a": "lunge",
+       "name": "Lunge"
+      },
+      {
+       "a": "windup",
+       "name": "Tail Slap"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Scarp Ram",
+     "hp": 14,
+     "init": 2,
+     "atk": 3,
+     "atkEl": "Stone",
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Set Horns"
+      },
+      {
+       "a": "lunge",
+       "name": "Charge"
+      },
+      {
+       "a": "windup",
+       "name": "Ram Home"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Kestrel Stair",
+     "mp": 11,
+     "timePenalty": 1,
+     "element": "Lightning",
+     "nightfall": 4,
+     "xp": 4,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "Whistling Gap",
+     "mp": 9,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 3,
+     "xp": 2
+    },
+    {
+     "type": "journey",
+     "name": "Sunlit Terrace",
+     "mp": 12,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 4,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "Cloudmere Path",
+     "mp": 10,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 4,
+     "xp": 3
+    }
+   ]
+  },
+  {
+   "name": "The Shrike Downs",
+   "hardshipChance": 0.35,
+   "hardships": [
+    "Ambush",
+    "Vertigo",
+    "Night Travel"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Downs Shrike",
+     "hp": 9,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "ability": "Ranged",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Ring Round"
+      },
+      {
+       "a": "quicken",
+       "name": "Dive"
+      },
+      {
+       "a": "windup",
+       "name": "Impale"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Gorse Lurcher",
+     "hp": 13,
+     "init": 3,
+     "atk": 3,
+     "atkEl": "Stone",
+     "pack": [
+      {
+       "name": "Gorse Hound",
+       "icon": "🐕",
+       "hp": 3,
+       "atk": 2,
+       "rule": "rally"
+      },
+      {
+       "name": "Gorse Hound",
+       "icon": "🐕",
+       "hp": 3,
+       "atk": 2,
+       "rule": "rally"
+      }
+     ],
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Thornhide"
+      },
+      {
+       "a": "lunge",
+       "name": "Snag"
+      },
+      {
+       "a": "windup",
+       "name": "Haul In"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Quillback",
+     "hp": 7,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Stone",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Windshear",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Quills Up"
+      },
+      {
+       "a": "lunge",
+       "name": "Barb"
+      },
+      {
+       "a": "blur",
+       "name": "Bristle Haze"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Thistle Drake",
+     "hp": 13,
+     "init": 4,
+     "atk": 3,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Freeze",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Bank"
+      },
+      {
+       "a": "lunge",
+       "name": "Dart In"
+      },
+      {
+       "a": "windup",
+       "name": "Frost Breath"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Harrow Ride",
+     "mp": 13,
+     "timePenalty": 1,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 4,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "Longbarrow Track",
+     "mp": 10,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 4,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "Gorsewind Run",
+     "mp": 12,
+     "timePenalty": 3,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Cairn Ladder",
+     "mp": 11,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 4,
+     "xp": 3,
+     "peril": "Steep"
+    }
+   ]
+  },
+  {
+   "name": "Thunderhead Reach",
+   "hardshipChance": 0.5,
+   "hardships": [
+    "Squall",
+    "Storm",
+    "Night Travel",
+    "Vertigo"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Levinbeast",
+     "hp": 12,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Lightning",
+     "resist": "daze",
+     "weak": "frost",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Windshear",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Prowl"
+      },
+      {
+       "a": "quicken",
+       "name": "Charge Up"
+      },
+      {
+       "a": "windup",
+       "name": "Levin Bolt"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Anvil Toad",
+     "hp": 18,
+     "init": 2,
+     "atk": 4,
+     "atkEl": "Stone",
+     "resist": "expose",
+     "weak": "daze",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Anvil Skin"
+      },
+      {
+       "a": "lunge",
+       "name": "Tongue"
+      },
+      {
+       "a": "windup",
+       "name": "Dead Drop"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Fulgurite Wolf",
+     "hp": 13,
+     "init": 4,
+     "atk": 3,
+     "atkEl": "Fire",
+     "resist": "burn",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Poison",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Flank"
+      },
+      {
+       "a": "lunge",
+       "name": "Run Down"
+      },
+      {
+       "a": "windup",
+       "name": "Glass Fang"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Skylash Serpent",
+     "hp": 13,
+     "init": 4,
+     "atk": 4,
+     "atkEl": "Water",
+     "resist": "frost",
+     "weak": "burn",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Ranged",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Coil Round"
+      },
+      {
+       "a": "lunge",
+       "name": "Whip Out"
+      },
+      {
+       "a": "windup",
+       "name": "Skylash"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Thunder Stair",
+     "mp": 13,
+     "timePenalty": 1,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 5,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "Static Flats",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Rainshadow",
+     "mp": 11,
+     "timePenalty": 3,
+     "element": "Water",
+     "nightfall": 6,
+     "xp": 4,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "The Long Gale",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 4
+    }
+   ]
+  },
+  {
+   "name": "The Riven Sky",
+   "hardshipChance": 0.65,
+   "hardships": [
+    "Squall",
+    "Vertigo",
+    "Ambush",
+    "Storm",
+    "Dead Weight"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Riven Hatchling",
+     "hp": 12,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Lightning",
+     "resist": "daze",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Windshear",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Scramble"
+      },
+      {
+       "a": "quicken",
+       "name": "Fledge"
+      },
+      {
+       "a": "windup",
+       "name": "Shard Spray"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Stormcrown Roc",
+     "hp": 14,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Ranged",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Circle High"
+      },
+      {
+       "a": "quicken",
+       "name": "Stoop"
+      },
+      {
+       "a": "windup",
+       "name": "Talon Fall"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Riven Warden",
+     "hp": 12,
+     "init": 4,
+     "atk": 4,
+     "atkEl": "Stone",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Shieldwall"
+      },
+      {
+       "a": "lunge",
+       "name": "Spear"
+      },
+      {
+       "a": "blur",
+       "name": "Shard Mist"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Tempest Lynx",
+     "hp": 13,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Freeze",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Stalk"
+      },
+      {
+       "a": "quicken",
+       "name": "Pounce"
+      },
+      {
+       "a": "windup",
+       "name": "Rime Claw"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "Skyfall Verge",
+     "mp": 14,
+     "timePenalty": 1,
+     "element": "Water",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "The Riven Stair",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 6,
+     "xp": 4,
+     "peril": "Steep"
+    },
+    {
+     "type": "journey",
+     "name": "Cloudbreak Run",
+     "mp": 13,
+     "timePenalty": 3,
+     "element": "Lightning",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "Wingshadow Pass",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 7,
+     "xp": 4
+    }
+   ]
+  }
+ ],
+ "3": [
+  {
+   "name": "The Sloughs",
+   "hardshipChance": 0,
+   "hardships": [],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Sump Toad",
+     "hp": 10,
+     "init": 3,
+     "atk": 2,
+     "atkEl": "Water",
+     "xp": 4,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Belly Slam"
+      },
+      {
+       "a": "flurry",
+       "name": "Croaking Fit"
+      },
+      {
+       "a": "blur",
+       "name": "Bog Haze"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Peat Warden",
+     "hp": 14,
+     "init": 2,
+     "atk": 3,
+     "atkEl": "Stone",
+     "pack": [
+      {
+       "name": "Peat Wisp",
+       "icon": "👁️",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      },
+      {
+       "name": "Peat Wisp",
+       "icon": "👁️",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      }
+     ],
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Peat Skin"
+      },
+      {
+       "a": "lunge",
+       "name": "Long Reach"
+      },
+      {
+       "a": "windup",
+       "name": "Heave"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Bittern",
+     "hp": 9,
+     "init": 4,
+     "atk": 2,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 4,
+     "ability": "Backlash",
+     "par": 1,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Sidestep"
+      },
+      {
+       "a": "lunge",
+       "name": "Stab"
+      },
+      {
+       "a": "windup",
+       "name": "Reed Strike"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Fen Ox",
+     "hp": 16,
+     "init": 2,
+     "atk": 3,
+     "atkEl": "Stone",
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Mudplate"
+      },
+      {
+       "a": "lunge",
+       "name": "Gore"
+      },
+      {
+       "a": "windup",
+       "name": "Trample"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Slow Ford",
+     "mp": 12,
+     "timePenalty": 1,
+     "element": "Water",
+     "nightfall": 4,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Turfcutter Way",
+     "mp": 10,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 4,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "Reedlight Path",
+     "mp": 11,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 4,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "The Long Bank",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 4
+    }
+   ]
+  },
+  {
+   "name": "Grindstone Vale",
+   "hardshipChance": 0.35,
+   "hardships": [
+    "Rationed",
+    "Dead Weight",
+    "Night Travel"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Quarry Hound",
+     "hp": 34,
+     "init": 4,
+     "atk": 3,
+     "atkEl": "Stone",
+     "resist": "expose",
+     "weak": "burn",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "par": 3,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Slag Crust"
+      },
+      {
+       "a": "windup",
+       "name": "Set Jaw"
+      },
+      {
+       "a": "circle",
+       "name": "Run Down"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Millstone Crab",
+     "hp": 11,
+     "init": 2,
+     "atk": 3,
+     "atkEl": "Water",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Shell Down"
+      },
+      {
+       "a": "lunge",
+       "name": "Pincer"
+      },
+      {
+       "a": "blur",
+       "name": "Grit Cloud"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Grindtooth",
+     "hp": 14,
+     "init": 3,
+     "atk": 4,
+     "atkEl": "Fire",
+     "resist": "burn",
+     "weak": "frost",
+     "shape": "armour",
+     "shapeV": 2,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Grindplate"
+      },
+      {
+       "a": "lunge",
+       "name": "Bite Down"
+      },
+      {
+       "a": "windup",
+       "name": "Millstone"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Slagmoth",
+     "hp": 11,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Poison",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Flutter"
+      },
+      {
+       "a": "quicken",
+       "name": "Rise"
+      },
+      {
+       "a": "windup",
+       "name": "Ash Beat"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Whetway",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 5,
+     "xp": 4,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Ashfall Steps",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Cold Furrow",
+     "mp": 11,
+     "timePenalty": 3,
+     "element": "Water",
+     "nightfall": 5,
+     "xp": 3
+    },
+    {
+     "type": "journey",
+     "name": "The Iron Cut",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 5,
+     "xp": 5,
+     "peril": "Steep"
+    }
+   ]
+  },
+  {
+   "name": "The Unquiet Deep",
+   "hardshipChance": 0.5,
+   "hardships": [
+    "Rationed",
+    "Dead Air",
+    "Night Travel",
+    "Dead Weight"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Deepdelver",
+     "hp": 18,
+     "init": 3,
+     "atk": 4,
+     "atkEl": "Stone",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Burrow In"
+      },
+      {
+       "a": "lunge",
+       "name": "Claw Out"
+      },
+      {
+       "a": "windup",
+       "name": "Cave-In"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Cavern Shrike",
+     "hp": 12,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Ranged",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Ring"
+      },
+      {
+       "a": "quicken",
+       "name": "Stoop"
+      },
+      {
+       "a": "windup",
+       "name": "Skewer"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Glasswing Moth",
+     "hp": 10,
+     "init": 4,
+     "atk": 3,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Drift"
+      },
+      {
+       "a": "lunge",
+       "name": "Alight"
+      },
+      {
+       "a": "windup",
+       "name": "Wing Beat"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Hollow Bull",
+     "hp": 17,
+     "init": 2,
+     "atk": 5,
+     "atkEl": "Fire",
+     "pack": [
+      {
+       "name": "Hollow Calf",
+       "icon": "🐂",
+       "hp": 4,
+       "atk": 2
+      },
+      {
+       "name": "Hollow Calf",
+       "icon": "🐂",
+       "hp": 4,
+       "atk": 2
+      }
+     ],
+     "resist": "burn",
+     "weak": "daze",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Hollowplate"
+      },
+      {
+       "a": "lunge",
+       "name": "Horn"
+      },
+      {
+       "a": "windup",
+       "name": "Stampede"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Deadfall",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Blackwater Run",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 6,
+     "xp": 4,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "The Winding Cut",
+     "mp": 14,
+     "timePenalty": 3,
+     "element": "Lightning",
+     "nightfall": 6,
+     "xp": 5
+    },
+    {
+     "type": "journey",
+     "name": "Emberdown",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 6,
+     "xp": 4
+    }
+   ]
+  },
+  {
+   "name": "Cragmourn's Shoulder",
+   "hardshipChance": 0.6,
+   "hardships": [
+    "Exacting",
+    "Rationed",
+    "Dead Weight",
+    "Storm",
+    "Ambush"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Scree Warden",
+     "hp": 12,
+     "init": 3,
+     "atk": 5,
+     "atkEl": "Stone",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Screewall"
+      },
+      {
+       "a": "lunge",
+       "name": "Pike"
+      },
+      {
+       "a": "blur",
+       "name": "Dust Screen"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Fault Lurker",
+     "hp": 14,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Water",
+     "resist": "frost",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Shift"
+      },
+      {
+       "a": "quicken",
+       "name": "Slip"
+      },
+      {
+       "a": "windup",
+       "name": "Fault Line"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Cinderjaw",
+     "hp": 17,
+     "init": 4,
+     "atk": 5,
+     "atkEl": "Fire",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 7,
+     "ability": "Freeze",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "dig",
+       "name": "Slag Crust"
+      },
+      {
+       "a": "quicken",
+       "name": "Stoke"
+      },
+      {
+       "a": "windup",
+       "name": "Jaw Snap"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Stonewake Elk",
+     "hp": 15,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Lightning",
+     "resist": "daze",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Windshear",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Wide Turn"
+      },
+      {
+       "a": "quicken",
+       "name": "Bound"
+      },
+      {
+       "a": "windup",
+       "name": "Stone Antler"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Grinding Pass",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Shoulderfall",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Steep"
+    },
+    {
+     "type": "journey",
+     "name": "The Last Furrow",
+     "mp": 14,
+     "timePenalty": 3,
+     "element": "Water",
+     "nightfall": 7,
+     "xp": 5
+    },
+    {
+     "type": "journey",
+     "name": "Thunderfoot Road",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Treacherous"
+    }
+   ]
+  }
+ ],
+ "4": [
+  {
+   "name": "The Tidewrack",
+   "hardshipChance": 0,
+   "hardships": [],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Wrackling",
+     "hp": 10,
+     "init": 4,
+     "atk": 3,
+     "atkEl": "Water",
+     "shapes": [
+      "armour",
+      "evasion"
+     ],
+     "shapeV": 1,
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Lash"
+      },
+      {
+       "a": "flurry",
+       "name": "Thrash"
+      },
+      {
+       "a": "blur",
+       "name": "Weedcoat"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Shoal Drifter",
+     "hp": 15,
+     "init": 3,
+     "atk": 3,
+     "atkEl": "Water",
+     "resist": "frost",
+     "weak": "daze",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Silt Coat"
+      },
+      {
+       "a": "lunge",
+       "name": "Sweep"
+      },
+      {
+       "a": "windup",
+       "name": "Roll Over"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Glass Eel",
+     "hp": 12,
+     "init": 5,
+     "atk": 3,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 5,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Weave"
+      },
+      {
+       "a": "quicken",
+       "name": "Surge"
+      },
+      {
+       "a": "windup",
+       "name": "Glass Lash"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Barnacle Ox",
+     "hp": 12,
+     "init": 2,
+     "atk": 4,
+     "atkEl": "Stone",
+     "resist": "expose",
+     "weak": "burn",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Crust Up"
+      },
+      {
+       "a": "lunge",
+       "name": "Butt"
+      },
+      {
+       "a": "blur",
+       "name": "Brine Haze"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Wrackline",
+     "mp": 13,
+     "timePenalty": 1,
+     "element": "Water",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Saltmarsh Road",
+     "mp": 12,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 5,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "Lantern Shallows",
+     "mp": 14,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 5,
+     "xp": 5,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "The Ebb Path",
+     "mp": 11,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 6,
+     "xp": 4
+    }
+   ]
+  },
+  {
+   "name": "Drowned Kell",
+   "hardshipChance": 0.35,
+   "hardships": [
+    "Riptide",
+    "Vertigo",
+    "Rationed",
+    "Night Travel"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Kell Warden",
+     "hp": 12,
+     "init": 4,
+     "atk": 4,
+     "atkEl": "Water",
+     "shapes": [
+      "armour",
+      "evasion"
+     ],
+     "shapeV": 1,
+     "xp": 6,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Haft Blow"
+      },
+      {
+       "a": "flurry",
+       "name": "Onslaught"
+      },
+      {
+       "a": "blur",
+       "name": "Kelp Shroud"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Silt Crawler",
+     "hp": 17,
+     "init": 2,
+     "atk": 4,
+     "atkEl": "Stone",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Siltplate"
+      },
+      {
+       "a": "lunge",
+       "name": "Reach"
+      },
+      {
+       "a": "windup",
+       "name": "Bear Down"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Drowned Piper",
+     "hp": 12,
+     "init": 5,
+     "atk": 4,
+     "atkEl": "Lightning",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Ranged",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Circle Close"
+      },
+      {
+       "a": "quicken",
+       "name": "Keening"
+      },
+      {
+       "a": "windup",
+       "name": "Drowned Note"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Anchorback",
+     "hp": 16,
+     "init": 3,
+     "atk": 4,
+     "atkEl": "Fire",
+     "resist": "burn",
+     "weak": "frost",
+     "shape": "armour",
+     "shapeV": 3,
+     "xp": 6,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Anchor Down"
+      },
+      {
+       "a": "lunge",
+       "name": "Chain Lash"
+      },
+      {
+       "a": "windup",
+       "name": "Heave To"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Kell Stair",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Bell Causeway",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Steep"
+    },
+    {
+     "type": "journey",
+     "name": "Weedlight Reach",
+     "mp": 12,
+     "timePenalty": 3,
+     "element": "Fire",
+     "nightfall": 6,
+     "xp": 4
+    },
+    {
+     "type": "journey",
+     "name": "The Undertow",
+     "mp": 15,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Updraft"
+    }
+   ]
+  },
+  {
+   "name": "The Black Shelf",
+   "hardshipChance": 0.5,
+   "hardships": [
+    "Riptide",
+    "Squall",
+    "Dead Air",
+    "Ambush"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Shelf Sentinel",
+     "hp": 13,
+     "init": 4,
+     "atk": 4,
+     "atkEl": "Stone",
+     "pack": [
+      {
+       "name": "Shelf Barnacle",
+       "icon": "🐚",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      },
+      {
+       "name": "Shelf Barnacle",
+       "icon": "🐚",
+       "hp": 3,
+       "atk": 1,
+       "rule": "shield"
+      }
+     ],
+     "shapes": [
+      "armour",
+      "evasion"
+     ],
+     "shapeV": 2,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Overhead"
+      },
+      {
+       "a": "flurry",
+       "name": "Cascade"
+      },
+      {
+       "a": "blur",
+       "name": "Silt Cloud"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Fathom Ray",
+     "hp": 13,
+     "init": 6,
+     "atk": 4,
+     "atkEl": "Water",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Windshear",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Glide Round"
+      },
+      {
+       "a": "quicken",
+       "name": "Sweep Up"
+      },
+      {
+       "a": "windup",
+       "name": "Mantle Blow"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Coldvein Worm",
+     "hp": 12,
+     "init": 2,
+     "atk": 5,
+     "atkEl": "Stone",
+     "shape": "guard",
+     "shapeV": 1,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "set",
+       "name": "Coil Tight"
+      },
+      {
+       "a": "lunge",
+       "name": "Bore"
+      },
+      {
+       "a": "blur",
+       "name": "Cold Vein"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Lanternjaw",
+     "hp": 14,
+     "init": 4,
+     "atk": 4,
+     "atkEl": "Fire",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 6,
+     "ability": "Backlash",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Circle Dark"
+      },
+      {
+       "a": "lunge",
+       "name": "Snap To"
+      },
+      {
+       "a": "windup",
+       "name": "Lure and Bite"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Shelf Road",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Stone",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Nightcurrent",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "The Sounding",
+     "mp": 14,
+     "timePenalty": 3,
+     "element": "Lightning",
+     "nightfall": 6,
+     "xp": 5,
+     "peril": "Updraft"
+    },
+    {
+     "type": "journey",
+     "name": "Emberdrown",
+     "mp": 13,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 7,
+     "xp": 5
+    }
+   ]
+  },
+  {
+   "name": "Fathomdread's Trench",
+   "hardshipChance": 0.6,
+   "hardships": [
+    "Riptide",
+    "Exacting",
+    "Squall",
+    "Vertigo",
+    "Dead Weight",
+    "Rationed"
+   ],
+   "encounters": [
+    {
+     "type": "fight",
+     "name": "Trench Warden",
+     "hp": 15,
+     "init": 5,
+     "atk": 5,
+     "atkEl": "Water",
+     "pack": [
+      {
+       "name": "Trench Eel",
+       "icon": "🐍",
+       "hp": 4,
+       "atk": 2,
+       "rule": "rally"
+      },
+      {
+       "name": "Trench Eel",
+       "icon": "🐍",
+       "hp": 4,
+       "atk": 2,
+       "rule": "rally"
+      }
+     ],
+     "shapes": [
+      "armour",
+      "evasion"
+     ],
+     "shapeV": 2,
+     "xp": 7,
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Guard Blow"
+      },
+      {
+       "a": "flurry",
+       "name": "Rout"
+      },
+      {
+       "a": "blur",
+       "name": "Trench Murk"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Hadal Serpent",
+     "hp": 15,
+     "init": 6,
+     "atk": 5,
+     "atkEl": "Lightning",
+     "resist": "daze",
+     "weak": "expose",
+     "shape": "evasion",
+     "shapeV": 1,
+     "xp": 7,
+     "ability": "Windshear",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "circle",
+       "name": "Coil About"
+      },
+      {
+       "a": "quicken",
+       "name": "Race Down"
+      },
+      {
+       "a": "windup",
+       "name": "Deep Strike"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "Pressureback",
+     "hp": 19,
+     "init": 3,
+     "atk": 5,
+     "atkEl": "Stone",
+     "resist": "expose",
+     "weak": "burn",
+     "shape": "armour",
+     "shapeV": 4,
+     "xp": 7,
+     "ability": "Backlash",
+     "par": 3,
+     "attacks": [
+      {
+       "a": "harden",
+       "name": "Bear Weight"
+      },
+      {
+       "a": "lunge",
+       "name": "Crush"
+      },
+      {
+       "a": "windup",
+       "name": "Sounding"
+      }
+     ]
+    },
+    {
+     "type": "fight",
+     "name": "The Pale Herald",
+     "hp": 14,
+     "init": 5,
+     "atk": 5,
+     "atkEl": "Fire",
+     "resist": "burn",
+     "weak": "daze",
+     "shapes": [
+      "armour",
+      "evasion"
+     ],
+     "shapeV": 1,
+     "xp": 7,
+     "ability": "Freeze",
+     "par": 2,
+     "attacks": [
+      {
+       "a": "windup",
+       "name": "Pronouncement"
+      },
+      {
+       "a": "flurry",
+       "name": "Chorus"
+      },
+      {
+       "a": "blur",
+       "name": "Pale Shroud"
+      }
+     ]
+    },
+    {
+     "type": "journey",
+     "name": "The Trench Road",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Water",
+     "nightfall": 7,
+     "xp": 6,
+     "peril": "Toll"
+    },
+    {
+     "type": "journey",
+     "name": "Deadlight Deep",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Fire",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Treacherous"
+    },
+    {
+     "type": "journey",
+     "name": "The Long Descent",
+     "mp": 14,
+     "timePenalty": 3,
+     "element": "Stone",
+     "nightfall": 7,
+     "xp": 5,
+     "peril": "Steep"
+    },
+    {
+     "type": "journey",
+     "name": "Stormfathom",
+     "mp": 14,
+     "timePenalty": 2,
+     "element": "Lightning",
+     "nightfall": 7,
+     "xp": 6,
+     "peril": "Updraft"
+    }
+   ]
+  }
+ ]
+}

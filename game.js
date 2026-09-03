@@ -3343,6 +3343,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 477, date: '2026-09-03', title: 'Under the hood',
+    changed: [
+      "📦 No change to play. The game's card, creature and dragon tables are now also written out as data files for the engine port.",
+    ] },
+
   { build: 476, date: '2026-09-03', title: 'Balance instrument only',
     changed: [
       "🔧 No change to play. The test bot now drinks the Alchemist's brews only on the turn they change something, so her numbers are honest.",

@@ -1,0 +1,12 @@
+{
+ "dew+herb": "balm",
+ "herb+salt": "nightshade",
+ "ash+herb": "wildfire",
+ "dew+salt": "quicksilver",
+ "ash+salt": "glass",
+ "ash+dew": "tar",
+ "herb+herb": "elixir",
+ "salt+salt": "brimstone",
+ "dew+dew": "stillwater",
+ "ash+ash": "ashglass"
+}

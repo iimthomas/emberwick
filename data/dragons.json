@@ -1,0 +1,71 @@
+[
+ {
+  "stage": 1,
+  "name": "Cindermaw",
+  "par": 34,
+  "element": "Fire",
+  "resist": "burn",
+  "weak": "frost",
+  "init": 10,
+  "breath": 6,
+  "hp": 60,
+  "shapes": [
+   "armour"
+  ],
+  "shapeV": 4,
+  "teaches": "HIT BIG",
+  "brief": "Slag has cooled over every scale. Small blows spatter and die on it — only a fully fuelled strike reaches anything underneath."
+ },
+ {
+  "stage": 2,
+  "name": "Skyrender",
+  "par": 33,
+  "element": "Lightning",
+  "resist": "daze",
+  "weak": "expose",
+  "init": 10,
+  "breath": 8,
+  "hp": 60,
+  "shapes": [
+   "evasion"
+  ],
+  "shapeV": 0,
+  "teaches": "HIT FIRST",
+  "brief": "It is never where you struck. Reach it before it moves and the blow lands whole; arrive late and you catch half a wing."
+ },
+ {
+  "stage": 3,
+  "name": "Cragmourn",
+  "par": 30,
+  "element": "Stone",
+  "resist": "expose",
+  "weak": "burn",
+  "init": 7,
+  "breath": 5,
+  "hp": 68,
+  "shapes": [
+   "relentless"
+  ],
+  "shapeV": 0,
+  "teaches": "WASTE NOTHING",
+  "brief": "The mountain does not tire. Every beat it draws a deeper breath than the last — a long duel is a duel you have already lost."
+ },
+ {
+  "stage": 4,
+  "name": "Fathomdread",
+  "par": 29,
+  "element": "Water",
+  "resist": "frost",
+  "weak": "daze",
+  "init": 10,
+  "breath": 7,
+  "hp": 50,
+  "shapes": [
+   "armour",
+   "evasion"
+  ],
+  "shapeV": 4,
+  "teaches": "BIG *AND* FIRST",
+  "brief": "Plated as the trench floor and quick as the current over it. It asks for the one thing your four cards cannot give at once."
+ }
+]

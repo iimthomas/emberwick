@@ -1,0 +1,72 @@
+[
+ {
+  "id": "shard",
+  "icon": "🦴",
+  "name": "Bone Shard",
+  "tier": "common",
+  "from": "any creature"
+ },
+ {
+  "id": "slag",
+  "icon": "🪨",
+  "name": "Slagplate",
+  "tier": "shape",
+  "from": "🛡️ Armour creatures"
+ },
+ {
+  "id": "quill",
+  "icon": "🪶",
+  "name": "Windquill",
+  "tier": "shape",
+  "from": "🌀 Evasion creatures"
+ },
+ {
+  "id": "hide",
+  "icon": "🧱",
+  "name": "Wardhide",
+  "tier": "shape",
+  "from": "🧱 Guard creatures"
+ },
+ {
+  "id": "sinew",
+  "icon": "🔩",
+  "name": "Prime Sinew",
+  "tier": "elite",
+  "from": "💀 dangerous foes"
+ },
+ {
+  "id": "heart",
+  "icon": "🔆",
+  "name": "Emberheart",
+  "tier": "rare",
+  "from": "a felled dragon — rarely"
+ },
+ {
+  "id": "d1",
+  "icon": "🔥",
+  "name": "Cindermaw Scale",
+  "tier": "dragon",
+  "from": "felling Cindermaw"
+ },
+ {
+  "id": "d2",
+  "icon": "⚡",
+  "name": "Skyrender Pinion",
+  "tier": "dragon",
+  "from": "felling Skyrender"
+ },
+ {
+  "id": "d3",
+  "icon": "🪨",
+  "name": "Cragmourn Core",
+  "tier": "dragon",
+  "from": "felling Cragmourn"
+ },
+ {
+  "id": "d4",
+  "icon": "🌊",
+  "name": "Fathomdread Pearl",
+  "tier": "dragon",
+  "from": "felling Fathomdread"
+ }
+]

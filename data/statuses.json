@@ -1,0 +1,51 @@
+{
+ "poison": {
+  "el": null,
+  "icon": "☠️",
+  "name": "Poison",
+  "text": "it loses <b>N</b> at the start of its turn",
+  "decay": ""
+ },
+ "bleed": {
+  "el": null,
+  "icon": "🩸",
+  "name": "Bleed",
+  "text": "it loses <b>N</b> each time it attacks",
+  "decay": ""
+ },
+ "knife": {
+  "el": null,
+  "icon": "🔪",
+  "name": "Knives",
+  "text": "its Armour and Initiative are <b>N</b> lower while they stay in",
+  "decay": ""
+ },
+ "burn": {
+  "el": "Fire",
+  "icon": "🔥",
+  "name": "Burn",
+  "text": "it loses <b>N</b> at the start of its turn",
+  "decay": ", then halves"
+ },
+ "frost": {
+  "el": "Water",
+  "icon": "❄️",
+  "name": "Frost",
+  "text": "its Initiative is <b>N</b> lower",
+  "decay": " next turn"
+ },
+ "daze": {
+  "el": "Lightning",
+  "icon": "⚡",
+  "name": "Daze",
+  "text": "the creature's next attack deals <b>N</b> less damage",
+  "decay": " — once"
+ },
+ "expose": {
+  "el": "Stone",
+  "icon": "🪨",
+  "name": "Exposed",
+  "text": "your blow against it lands for <b>+N</b>",
+  "decay": " — once"
+ }
+}

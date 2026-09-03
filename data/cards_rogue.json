@@ -1,0 +1,402 @@
+[
+ {
+  "name": "Viper Strike",
+  "element": null,
+  "arch": null,
+  "pair": "RUSH",
+  "role": "tool",
+  "combo": "Second Fang",
+  "energy": 2,
+  "paid": 3,
+  "verb": "draw",
+  "hits": 1,
+  "lv": [
+   [
+    4,
+    7,
+    6,
+    null,
+    1,
+    null,
+    2
+   ],
+   [
+    3,
+    6,
+    7,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    3,
+    6,
+    8,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    3,
+    6,
+    9,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Second Fang",
+  "element": null,
+  "arch": null,
+  "pair": "RUSH",
+  "role": "blade",
+  "combo": "Viper Strike",
+  "energy": 3,
+  "paid": 4,
+  "verb": "fangs",
+  "hits": 2,
+  "lv": [
+   [
+    4,
+    8,
+    2,
+    null,
+    1,
+    null,
+    2
+   ],
+   [
+    6,
+    10,
+    1,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    8,
+    12,
+    1,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    10,
+    14,
+    1,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Venom Needle",
+  "element": null,
+  "arch": null,
+  "pair": "OPENING",
+  "role": "tool",
+  "combo": "Lethal Dose",
+  "energy": 1,
+  "paid": 3,
+  "verb": "pierce",
+  "hits": 1,
+  "lv": [
+   [
+    4,
+    7,
+    5,
+    null,
+    2,
+    null,
+    2
+   ],
+   [
+    3,
+    6,
+    6,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    3,
+    6,
+    7,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    3,
+    6,
+    8,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Lethal Dose",
+  "element": null,
+  "arch": null,
+  "pair": "OPENING",
+  "role": "blade",
+  "combo": "Venom Needle",
+  "energy": 4,
+  "paid": 4,
+  "verb": "lethal",
+  "hits": 1,
+  "lv": [
+   [
+    5,
+    9,
+    2,
+    null,
+    1,
+    null,
+    2
+   ],
+   [
+    7,
+    11,
+    1,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    9,
+    13,
+    1,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    11,
+    15,
+    1,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Sleight of Hand",
+  "element": null,
+  "arch": null,
+  "pair": "HOLD",
+  "role": "tool",
+  "combo": "Slow Poison",
+  "energy": 2,
+  "paid": 3,
+  "verb": "cycle2",
+  "hits": 1,
+  "lv": [
+   [
+    4,
+    7,
+    6,
+    null,
+    1,
+    null,
+    2
+   ],
+   [
+    3,
+    6,
+    7,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    3,
+    6,
+    8,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    3,
+    6,
+    9,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Slow Poison",
+  "element": null,
+  "arch": null,
+  "pair": "HOLD",
+  "role": "blade",
+  "combo": "Sleight of Hand",
+  "energy": 3,
+  "paid": 4,
+  "verb": "nocounter",
+  "hits": 1,
+  "lv": [
+   [
+    4,
+    8,
+    2,
+    null,
+    3,
+    null,
+    2
+   ],
+   [
+    6,
+    10,
+    1,
+    null,
+    2,
+    null,
+    3
+   ],
+   [
+    8,
+    12,
+    1,
+    null,
+    2,
+    null,
+    4
+   ],
+   [
+    10,
+    14,
+    1,
+    null,
+    2,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Shadow Double",
+  "element": null,
+  "arch": null,
+  "pair": "PAYOFF",
+  "role": "tool",
+  "combo": "Ghostblade",
+  "energy": 1,
+  "paid": 3,
+  "verb": "surge",
+  "hits": 1,
+  "lv": [
+   [
+    4,
+    7,
+    5,
+    null,
+    2,
+    null,
+    2
+   ],
+   [
+    3,
+    6,
+    4,
+    null,
+    3,
+    null,
+    3
+   ],
+   [
+    3,
+    6,
+    4,
+    null,
+    4,
+    null,
+    4
+   ],
+   [
+    3,
+    6,
+    4,
+    null,
+    5,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Ghostblade",
+  "element": null,
+  "arch": null,
+  "pair": "PAYOFF",
+  "role": "blade",
+  "combo": "Shadow Double",
+  "energy": 5,
+  "paid": 4,
+  "verb": "unspent",
+  "hits": 1,
+  "lv": [
+   [
+    5,
+    9,
+    2,
+    null,
+    1,
+    null,
+    2
+   ],
+   [
+    7,
+    11,
+    1,
+    null,
+    1,
+    null,
+    3
+   ],
+   [
+    9,
+    13,
+    1,
+    null,
+    1,
+    null,
+    4
+   ],
+   [
+    11,
+    15,
+    1,
+    null,
+    1,
+    null,
+    null
+   ]
+  ]
+ }
+]

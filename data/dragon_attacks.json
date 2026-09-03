@@ -1,0 +1,98 @@
+{
+ "Cindermaw": [
+  {
+   "id": "slag",
+   "name": "Slagfall",
+   "tell": "molten rock sheets off its plates",
+   "fx": {}
+  },
+  {
+   "id": "forge",
+   "name": "Bank the Forge",
+   "tell": "it hunkers down and the scales knit — 🛡️ Armour +2",
+   "fx": {
+    "armour": 2
+   }
+  },
+  {
+   "id": "blast",
+   "name": "Cinderblast",
+   "tell": "ash chokes the air — the card you SURGE with will burn up",
+   "fx": {
+    "burn": "Boost"
+   }
+  }
+ ],
+ "Skyrender": [
+  {
+   "id": "shear",
+   "name": "Windshear",
+   "tell": "it wheels for another pass",
+   "fx": {}
+  },
+  {
+   "id": "stoop",
+   "name": "Stoop",
+   "tell": "it climbs to dive — 💨 its Initiative +4",
+   "fx": {
+    "init": 4
+   }
+  },
+  {
+   "id": "clap",
+   "name": "Thunderclap",
+   "tell": "the air splits — the card you CATALYSE with will be struck from your hand",
+   "fx": {
+    "burn": "Element"
+   }
+  }
+ ],
+ "Cragmourn": [
+  {
+   "id": "grind",
+   "name": "Grind",
+   "tell": "it leans into you without hurrying",
+   "fx": {}
+  },
+  {
+   "id": "bind",
+   "name": "Rockbind",
+   "tell": "stone closes on your pack — whatever you hold in ARSENAL will be taken",
+   "fx": {
+    "burn": "Reserve"
+   }
+  },
+  {
+   "id": "settle",
+   "name": "Settle",
+   "tell": "it draws a longer breath — ⏳ the escalation takes an extra step",
+   "fx": {
+    "breathStep": 1
+   }
+  }
+ ],
+ "Fathomdread": [
+  {
+   "id": "under",
+   "name": "Undertow",
+   "tell": "the current gathers under you",
+   "fx": {}
+  },
+  {
+   "id": "silt",
+   "name": "Silt",
+   "tell": "the water goes thick and dull — ✦ nothing will attune",
+   "fx": {
+    "noAttune": true
+   }
+  },
+  {
+   "id": "press",
+   "name": "Deep Pressure",
+   "tell": "the weight of the trench settles — ⚔️ every card strikes −2",
+   "fx": {
+    "value": -2
+   }
+  }
+ ]
+}
