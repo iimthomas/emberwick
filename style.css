@@ -321,6 +321,15 @@ label.radio { margin-right: 14px; cursor: pointer; }
 .s-mark { opacity: .8; }
 .s-mark.mark-live { color: #ffe9a8; opacity: 1; font-weight: bold; }
 .s-mark.mark-off { opacity: .3; }
+.s-mark.mark-idle { opacity: .55; }
+/* 📍 the effect's address — which slot it fires from, and whether it will (build 470) */
+.s-where { font-size: 9.5px; letter-spacing: .8px; line-height: 1.2; margin: -2px 2px 3px; color: #8a8577; text-transform: uppercase; }
+.s-where i { font-style: normal; font-weight: bold; }
+.s-where.mark-live { color: #ffe9a8; }
+.s-where.mark-idle { color: #d8b86a; }
+.s-where.mark-off { opacity: .4; }
+.s-where .h-Spell { color: #d16a4a; } .s-where .h-Element { color: #58a6d1; }
+.s-where .h-Boost { color: #c9b458; } .s-where .h-soak { color: #b8b2a3; }
 /* ⚠️ anything tippable says so quietly — a dotted underline is the one affordance that does
    not compete with the number it sits under. */
 [data-tip] { cursor: help; }

@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 470 — Cards say where their effect fires
+*2026-09-02*
+
+**Changed**
+- 🏷️ **Every card with an effect now says which slot it fires from**, under its stats. In a fight it reads **fires from here** when the card is seated right, **→ CATALYST** (or the slot it wants) when it is not, and dims when there is nothing to affect. Ward cards say **when it blocks**.
+
 ## build 469 — Two-Handed runs save
 *2026-09-02*
 
