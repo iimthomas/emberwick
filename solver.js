@@ -62,7 +62,37 @@ const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
 // the old never-banks bot exactly.
 let TAUNT_FREE = 6;
 // ⚗️ BOT POLICY: the bot has never priced a consumable; for the Alchemist it drinks every non-targeted brew the moment it can, so a brew counts for SOMETHING rather than nothing
-function drinkBrews() { if (!CLASS.brews || !isAssignPhase()) return; for (const id of (S.potions || []).slice()) { const p = potionById(id); if (p && p.brew && !p.pick && (!p.when || p.when())) usePotion(id); } }   // 🛡️ BOT POLICY, not a rule: a taunted blow up to this size costs the bot nothing (it comes back as Wrath). A lexicographic scorer would otherwise never take damage on purpose — the Emberwake blindness again
+// ⚗️ BOT POLICY (476): a brew is drunk on the TURN IT CHANGES SOMETHING, never on sight. Called AFTER the
+// arrangement is chosen, with the resolved turn in hand; returns how many it drank (the caller re-arranges).
+//   Quicksilver / Stillwater — only when this turn's race is lost (and the counter would land)
+//   Glass / Wildfire / their strong forms / Ashglass — only when they turn the blow into a KILL, or at the lair's end
+//   Nightshade / Brimstone / Tar — a fresh creature that will outlive this blow (lasting effects pay over turns), or the dragon's first beats
+//   Elixir — whenever a card is lost. Balm is a pick and the bot never targets; it holds it.
+function drinkBrews(r) {
+  if (!CLASS.brews || !isAssignPhase()) return 0;
+  const kit = (S.potions || []).slice(); if (!kit.length) return 0;
+  const duel = !!(S.finalMode && S.finalPhase === 'duel');
+  const hpLeft = duel ? (S.dragonState ? S.dragonState.hp : 0) : (S.foeState ? S.foeState.hp : 0);
+  const fresh = duel ? S.duelBeat <= 2 : !!(S.foeState && S.foeState.turn <= 1);
+  const value = r ? r.value : 0, lost = !!(r && r.initLost), early = r ? (r.early || 0) : 0;
+  const nearEnd = duel && (S.deck.length <= 6);
+  let drank = 0;
+  const drink = id => { usePotion(id); drank++; };
+  for (const id of kit) {
+    const p = potionById(id); if (!p || !p.brew || p.pick || (p.when && !p.when())) continue;
+    const bonus = { glass: 8, glass2: 16, wildfire: 4, wildfire2: 8 }[id] || 0;
+    if (id === 'quicksilver' || id === 'stillwater') { if (lost && early > 0) drink(id); }
+    else if (id === 'glass' || id === 'glass2' || id === 'wildfire' || id === 'wildfire2' || id === 'ashglass') {
+      const kills = hpLeft > 0 && value < hpLeft && value + bonus + (id === 'ashglass' ? 4 : 0) >= hpLeft;
+      if (kills || nearEnd) drink(id);
+    }
+    else if (id === 'nightshade' || id === 'nightshade2' || id === 'brimstone' || id === 'brimstone2' || id === 'tar' || id === 'tar2') {
+      if (fresh && hpLeft > value * 2) drink(id);
+    }
+    else if (id === 'elixir') drink(id);
+  }
+  return drank;
+}
 let EFFECT_WEIGHT = 1;   // 🏷️ how much the bot values an effect it would leave on the creature (0 = blind, the pre-451 bot)
   let BANK_WEIGHT = 0.6;
 function setBankWeight(w) { BANK_WEIGHT = w; }
@@ -705,8 +735,16 @@ const RUNSIM = (() => {
       // 📏 the LAIR — the deck you actually fight the dragon with, after the road has taken its cut
       if (HOOK.onLair && S.finalMode && S.finalPhase === 'duel' && !m._lair) { m._lair = true; HOOK.onLair(m); }
       if (p === 'assign') {
-        if (S.finalMode && S.finalPhase === 'duel') { drinkBrews(); chooseBestDuel(); if (HOOK.onDuelAssign) HOOK.onDuelAssign(m); resolveDuel(); }
-        else { drinkBrews(); chooseBest(); useArmourActives(); if (HOOK.onAssign) HOOK.onAssign(m); resolve(); }
+        if (S.finalMode && S.finalPhase === 'duel') {
+          chooseBestDuel();
+          if (drinkBrews(computeAction(cardById(S.assign.Reserve)))) chooseBestDuel();   // ⚗️ a brew changed the turn — arrange again
+          if (HOOK.onDuelAssign) HOOK.onDuelAssign(m); resolveDuel();
+        }
+        else {
+          chooseBest();
+          if (drinkBrews(computeAction(cardById(S.assign.Reserve)))) chooseBest();
+          useArmourActives(); if (HOOK.onAssign) HOOK.onAssign(m); resolve();
+        }
         m.turns++;
       }
       else if (p === 'reveal') advanceBeat();
