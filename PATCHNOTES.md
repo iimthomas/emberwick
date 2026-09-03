@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 472 — A way back, and a dev unlock
+*2026-09-03*
+
+**Changed**
+- ✕ **What's New, the Stash and the Workshop have a close button at the top.** The Menu button at the bottom stays.
+- 🔧 Dev screen: **unlock everything** (all stages, every level, every piece, materials) and **reset everything**.
+
 ## build 471 — The Guardian
 *2026-09-02*
 

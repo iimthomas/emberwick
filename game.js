@@ -3206,6 +3206,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 472, date: '2026-09-03', title: 'A way back, and a dev unlock',
+    changed: [
+      "✕ <b>What's New, the Stash and the Workshop have a close button at the top.</b> The Menu button at the bottom stays.",
+      "🔧 Dev screen: <b>unlock everything</b> (all stages, every level, every piece, materials) and <b>reset everything</b>.",
+    ] },
+
   { build: 471, date: '2026-09-02', title: 'The Guardian',
     changed: [
       "🛡️ <b>A third character: the Guardian.</b> Unlocks when you clear stage 2. Damage they take in a fight becomes <b>Wrath</b>, and their <b>Bulwark</b> hits that much harder. Their <b>Shield</b> card can <b>Brace</b> (block with its armour, the card unharmed) or <b>Taunt</b> (the creature strikes them whatever the race — in Two-Handed a partner is spared). Six charms of their own.",
@@ -3983,7 +3989,7 @@ function stashHTML() {
           `</div>`;
       }).join('') + `</div>`;
   }
-  return `<div class="phase-label">📦 STASH</div>` +
+  return `<div class="phase-label">📦 STASH${backTopHTML()}</div>` +
     `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
     `<span class="dim"> · every recipe wants them, and even a lost encounter carves one</span></div>` +
     body +
@@ -4113,7 +4119,7 @@ function workshopHTML() {
       `<span class="stash-tally">${list.filter(d => st.owned.includes(d.id)).length}/${list.length}</span></div>` +
       `<div class="wk-grid">` + list.map(d => pieceCardHTML(d, st, worn.includes(d.id))).join('') + `</div>`;
   }
-  return `<div class="phase-label">⚒️ THE WORKSHOP</div>` +
+  return `<div class="phase-label">⚒️ THE WORKSHOP${backTopHTML()}</div>` +
     `<div class="stash"><div class="stash-gold">🦴 <b>${st.mats.shard || 0}</b> Bone Shard` +
     `<span class="dim"> · ${st.owned.length} of ${ARMOUR.length} pieces forged</span></div>` +
     body +
@@ -4141,6 +4147,37 @@ function devLevel(n) {
 }
 // 🎭 and the class bar, separately — the whole point of the hybrid is that they move apart, so a
 // dev tool that only moved them together could not reproduce the state it exists to test.
+// 🔓 UNLOCK EVERYTHING (2026-09-03, Thomas: *"i need a way for me to unlock everything to test
+// easier. workshop, stash, and all that"*). Writes the REAL keys a played account would — stages,
+// account bar, every class bar, every piece of equipment, a pile of every material and part — so
+// what you test is the game a maxed player has, not a pinned instrument.
+function devUnlockAll() {
+  if (!DEV_ENABLED) return;
+  clearStage(DRAGONS.length);
+  ACCOUNT_XP = Math.max(0, LEVEL_CAP - 1) * XP_PER_LEVEL; saveXP(ACCOUNT_XP);
+  for (const id of Object.keys(CLASSES)) saveClassXP(id, Math.max(0, classCap(id) - 1) * CLASS_XP_PER_LEVEL);
+  const st = loadStash();
+  for (const m of MATERIALS) st.mats[m.id] = Math.max(st.mats[m.id] || 0, 99);
+  for (const c of Object.values(CREATURE_INDEX)) if (c.quarry) { const id = partIdOf(c.name); st.mats[id] = Math.max(st.mats[id] || 0, 9); }
+  for (const a of ARMOUR) if (!st.owned.includes(a.id)) st.owned.push(a.id);
+  saveStash(st);
+  log('🔓 DEV — everything unlocked: all stages, every bar at its cap, every piece owned, 99 of every material.', 'good');
+  render();
+}
+// 🧹 and the opposite: every key this game writes, gone — a fresh phone
+function devResetAll() {
+  if (!DEV_ENABLED) return;
+  if (!confirm('Reset EVERYTHING — stages, levels, stash, saves, class choice? This cannot be undone.')) return;
+  try {
+    const dead = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('emberwick-') && k.endsWith(KEY_NS)) dead.push(k); }
+    dead.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  ACCOUNT_XP = 0;
+  for (const id of Object.keys(CLASSES)) CLASS_XP[id] = 0;
+  S = null;
+  showMenu();
+}
 function devClassLevel(n) {
   saveClassXP(CLASS.id, Math.max(0, (n - 1)) * CLASS_XP_PER_LEVEL);
   render();
@@ -4377,7 +4414,7 @@ function notesHTML() {
       sec('➕ added', n.added) + sec('♻️ changed', n.changed) + sec('🐛 fixed', n.fixed) +
     `</div>`;
   }).join('');
-  return `<div class="phase-label">📋 WHAT'S NEW</div>` +
+  return `<div class="phase-label">📋 WHAT'S NEW${backTopHTML()}</div>` +
     `<div class="notes">` +
     // ⚠️ IT SAYS SO RATHER THAN PRETENDING. Showing the previous build's notes under this build's
     // number is the same lie as a Continue button that silently fails.
@@ -4388,6 +4425,10 @@ function notesHTML() {
     `<p class="dev-note">History before build 385 is not recorded.</p>` +
     `<button onclick="showMenu()">← Menu</button></div>`;
 }
+// ⬅️ A WAY BACK AT THE TOP (2026-09-03, Thomas: *"theres no X button to go back to main menu"*).
+// The button was there — at the BOTTOM of a page that runs to several screens on a phone, which is
+// the same as not there. A shell screen carries its exit in its title.
+function backTopHTML() { return `<button class="back-top" onclick="showMenu()" title="Menu">✕</button>`; }
 function showMenu() {
   S = S || {};
   S.phase = 'menu';
@@ -12762,6 +12803,10 @@ function renderControls() {
       `</div></div>` +
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
+      `<div class="dev-row"><span>🔓 Account</span><div>` +
+        `<button class="dev-pick" onclick="devUnlockAll()">unlock everything</button>` +
+        `<button class="dev-pick" onclick="devResetAll()">reset everything</button>` +
+      `</div></div>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
       devSlotsHTML() +
       `<button onclick="showMenu()">← Menu</button>` +
