@@ -1159,6 +1159,12 @@ button.stage.locked .stage-shape { font-style: italic; }
 .class-row.is-soon .class-line { line-height: 1.35; }
 /* the emblem does the identifying at a glance; the sentence is for whoever leans in */
 .soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
+/* ⬅️ a shell screen's exit, in its title */
+.phase-label { display: flex; align-items: center; gap: 8px; }
+.back-top { margin: 0 0 0 auto; padding: 4px 12px; min-height: 32px; font-size: 14px; line-height: 1;
+  background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; letter-spacing: 0; }
+.back-top:hover { border-color: #c9a24a; color: #f0d9a8; }
+
 /* 🛡️ the Guardian's slot ③ row shares the channel row's look */
 .stance-row .wake-btn.on { border-color: #d16a4a; color: #f2c4b0; }
 
