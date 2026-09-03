@@ -60,6 +60,7 @@ const approachValue = r => (r && r.lastMile === 'unseen' ? UNSEEN_WEIGHT : 0);
 // how often a human who can read the candle would want it.
 // ⚠️ Every number produced with this must be reported alongside BANK_WEIGHT = 0, which reproduces
 // the old never-banks bot exactly.
+let TAUNT_FREE = 6;   // 🛡️ BOT POLICY, not a rule: a taunted blow up to this size costs the bot nothing (it comes back as Wrath). A lexicographic scorer would otherwise never take damage on purpose — the Emberwake blindness again
 let EFFECT_WEIGHT = 1;   // 🏷️ how much the bot values an effect it would leave on the creature (0 = blind, the pre-451 bot)
   let BANK_WEIGHT = 0.6;
 function setBankWeight(w) { BANK_WEIGHT = w; }
@@ -457,16 +458,17 @@ function forEachArrangement(hand, o, fn) {
 function searchArrangements(o) {
   let best = null;
   forEachArrangement(o.hand, o, (spell, spark, tinder, ember) => {
-    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) for (const rip of (o.rips || [undefined])) {
+    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) for (const rip of (o.rips || [undefined])) for (const stance of (o.stances || [undefined])) {
       S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                    Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
       S.boostTarget = bt; if (arm !== undefined) S.bankArmed = arm;
       if (t !== undefined) S.foeTarget = t;       // 🎯 packs: which body the Spell is aimed at
       if (rip !== undefined) S.ripArmed = rip;    // 🔪 the rogue: rip the knives out, or leave them
+      if (stance !== undefined) S.guardStance = stance;   // 🛡️ the Guardian: brace or taunt
       const r = computeAction(ember); if (!r) continue;
       const sc = o.score(r);
-      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t, rip });
-      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, rip, sc };
+      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t, rip, stance });
+      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, rip, stance, sc };
     }
   });
   return best;
@@ -485,9 +487,11 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0)), r.value + bankValue(r) + effectValue(r) + targetValue(r) + chainValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + guardDmg(r)), r.value + bankValue(r) + effectValue(r) + targetValue(r) + chainValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
        approachValue(r), r.value + bankValue(r) + chainValue(r)];
+  // 🛡️ the Guardian prices her fork: a brace TURNS damage, a taunt FEEDS it (WRATH_WEIGHT of it comes back as a blow)
+  const guardDmg = r => !r.guardian ? 0 : r.guardian.taunt ? -Math.min(r.early || 0, TAUNT_FREE) : -Math.min(r.early || 0, r.guardian.brace || 0);
   const better = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return a[i] > b[i]; } return false; };
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 
@@ -551,10 +555,11 @@ const RUNSIM = (() => {
       boostTargets: isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'],
       arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better,
       targets: (typeof packTargets === 'function') ? packTargets() : [undefined],
-      rips: CLASS.knives ? [false, true] : [undefined] });
+      rips: CLASS.knives ? [false, true] : [undefined], stances: CLASS.stances ? ['taunt', 'brace'] : [undefined] });
     S.ripArmed = false;
     if (best && best.t !== undefined) S.foeTarget = best.t;
     if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
+    if (best && best.stance !== undefined) S.guardStance = best.stance;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
@@ -615,6 +620,7 @@ const RUNSIM = (() => {
       rips: CLASS.knives ? [false, true] : [undefined], score: evalDuelPlay, better });
     S.ripArmed = false;
     if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
+    if (best && best.stance !== undefined) S.guardStance = best.stance;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
   }

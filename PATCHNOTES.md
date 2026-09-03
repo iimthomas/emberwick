@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 471 — The Guardian
+*2026-09-02*
+
+**Changed**
+- 🛡️ **A third character: the Guardian.** Unlocks when you clear stage 2. Damage they take in a fight becomes **Wrath**, and their **Bulwark** hits that much harder. Their **Shield** card can **Brace** (block with its armour, the card unharmed) or **Taunt** (the creature strikes them whatever the race — in Two-Handed a partner is spared). Six charms of their own.
+
 ## build 470 — Cards say where their effect fires
 *2026-09-02*
 

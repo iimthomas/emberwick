@@ -1159,6 +1159,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 .class-row.is-soon .class-line { line-height: 1.35; }
 /* the emblem does the identifying at a glance; the sentence is for whoever leans in */
 .soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
+/* 🛡️ the Guardian's slot ③ row shares the channel row's look */
+.stance-row .wake-btn.on { border-color: #d16a4a; color: #f2c4b0; }
+
 /* 🕯️ an unseen road on the map */
 .mp-node.is-fog { opacity: .5; color: #6a6355; border-style: dotted; }
 

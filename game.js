@@ -1179,6 +1179,7 @@ const MAGE = {
   // give every class a gift; it spends the only room each class had.
   // So: flag it, and gate every consumer. A rogue's ③ is its own (extend the chain, or cycle).
   name: 'Mage',
+  tagline: 'elements agree',
   emberwake: true,
   // 🎭 THE PASSIVE TRAIT (2026-08-18). Thomas: *"lets give them a passive trait, just so
   // players can see what they do at a glance on the character select screen."*
@@ -1821,6 +1822,7 @@ const ROGUE = {
   boosts: false,           // ➕ no Surge stat either
   energy: true,            // ⚡ the Strike costs, slot ③ pays
   name: 'Rogue',
+  tagline: 'cards pay for cards',
   momentum: false,         // ● RETIRED 2026-09-02 — measured dead in multi-turn fights (78% break rate)
   knives: true,            // 🔪 her hook: stick with a tool, rip with a blade — see Rogue_Knives.md
   trait: { icon: '🔪', name: 'Knives',
@@ -1939,7 +1941,122 @@ const ROGUE = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE };
+// ============================================================
+// 🛡️ THE GUARDIAN (2026-09-02, build 471) — [[The_Guardian]]. Source of power: RETALIATION.
+// Both other classes want to WIN the Initiative race; she wants to LOSE it. Damage she takes in a
+// fight becomes WRATH, and her Bulwark hits that much harder. Her slot ③ is the SHIELD card and
+// its fork: BRACE (block with its armour, the card unharmed, nothing fed) or TAUNT (it strikes her
+// whatever the race — in Two-Handed a partner is spared — and all of it becomes Wrath).
+// 🔑 She fills the slots: ① Bulwark = her blow + Wrath · ② Stance = her Initiative, read backwards
+// · ③ Shield = brace or taunt · ④ Arsenal. Two roles × two spikes, 8 cards × 2 like the rogue.
+// ⚠️ Deck-as-health is the risk on record: a class that wants to be hit spends her deck to fuel
+// her kit. Her plates are thick for that reason; WRATH_CAP bounds the payoff.
+// ============================================================
+let WRATH_CAP = 12;         // 🛡️ the most Wrath she can hold. 📏 first cut, unmeasured
+let GUARD_VALUE_STEP = 3;   // 🛡️ a bulwark's blow grows this much a level (the mage's spike rule)
+const GUARDIAN_SPEC = [
+  // role      name            spike     base [value, init, armour]
+  { role: 'bulwark', name: 'Anvil Fall',   spike: 'value', base: [7, 1, 3] },
+  { role: 'bulwark', name: 'Ironbrand',    spike: 'value', base: [6, 3, 2] },
+  { role: 'bulwark', name: 'Cinder Ram',   spike: 'value', base: [5, 2, 4] },
+  { role: 'bulwark', name: 'Millstone',    spike: 'armor', base: [5, 1, 5] },
+  { role: 'shield',  name: 'Tower Shield', spike: 'armor', base: [2, 2, 7] },
+  { role: 'shield',  name: 'Palisade',     spike: 'armor', base: [3, 3, 5] },
+  { role: 'shield',  name: 'Hearthguard',  spike: 'init',  base: [3, 5, 4] },
+  { role: 'shield',  name: 'Vigil',        spike: 'init',  base: [2, 6, 3] },
+];
+// generated from the spec, never hand-authored — the weakness drops ONCE (Lv1→Lv2) then holds,
+// the spike rises every level (levelling = sharpening)
+const GUARDIAN_DEFS = GUARDIAN_SPEC.map(s => {
+  const ix = { value: 0, init: 1, armor: 2 };
+  const step = s.spike === 'value' ? GUARD_VALUE_STEP : 1;
+  const lv = [0, 1, 2, 3].map(L => {
+    const st = s.base.map((v, i) => (i === ix[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+    st[2] = Math.max(1, st[2]);
+    return [st[0], null, st[1], null, st[2], null, null];
+  });
+  return { name: s.name, element: null, arch: null, role: s.role, hits: 1, lv, guardian: true };
+});
+
+const GUARDIAN = {
+  id: 'guardian',
+  mark: '🛡️',
+  multi: null,
+  labels: { Spell: 'Bulwark', Element: 'Stance', Boost: 'Shield', Reserve: 'Arsenal' },
+  defs: GUARDIAN_DEFS,
+  deck() { return shuffle(GUARDIAN_DEFS.concat(GUARDIAN_DEFS).map(newCard)); },   // 8 x 2
+  emberwake: false, pairs: false, boosts: false, energy: false, momentum: false, knives: false,
+  stances: true,           // 🛡️ her slot ③ fork: brace or taunt
+  name: 'Guardian',
+  tagline: 'every blow comes back',
+  unlock: '🔒 clear stage 2 to unlock them',
+  trait: { icon: '🛡️', name: 'Wrath',
+    text: 'Damage you take in a fight becomes <b>Wrath</b>, and your <b>Bulwark</b> hits that much harder. Your <b>Shield</b> card can <b>Brace</b> (block with its armour, unharmed) or <b>Taunt</b> (it strikes you whatever the race — and a partner is spared).' },
+  hitsOf(c, isStrike) {
+    return (c.def.hits || 1) + (isStrike && hasCharm('lastword') && (S.wrath || 0) >= 8 ? 1 : 0) + extraHits(isStrike);
+  },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'struck back', gate: 'strike back with Wrath',
+    avail() { return (S.wrath || 0) > 0; },
+    found(r) { return !!(r.guardian && r.guardian.wrath > 0); },
+  },
+  tokens() {
+    if (!(S.wrath > 0)) return null;
+    return [{ id: 'wrath', icon: '🛡️', name: 'Wrath', count: S.wrath, cap: WRATH_CAP,
+      worth: `your Bulwark hits <b>+${S.wrath}</b>`,
+      note: hasCharm('ironwill') ? 'half of it carries to the next fight' : 'fades when the fight ends', tap: null }];
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  // 🛡️ what the Shield turns when bracing (0 while taunting)
+  braceRaw() { const c = cardById(S.assign.Boost); return c ? eff(c).armor + (hasCharm('stonestance') ? 2 : 0) : 0; },
+  braceValue() { return S.guardStance === 'taunt' ? 0 : GUARDIAN.braceRaw(); },
+  // the creature's blow, after the Shield. ⚠️ Called at the ONE place the blow becomes damage.
+  shield(n) {
+    const cut = Math.min(n, GUARDIAN.braceValue());
+    if (cut > 0) {
+      const sh = cardById(S.assign.Boost);
+      log(`🛡️ You brace behind <b>${sh ? sh.def.name : 'your Shield'}</b> — <b>${cut}</b> of the blow is turned.`, 'good');
+      if (hasCharm('thornmail') && S.foeState && S.foeState.hp > 0) {
+        const back = Math.floor(cut / 2);
+        if (back > 0) { S.foeState.hp = Math.max(0, S.foeState.hp - back); log(`🌵 Thornmail — it takes <b>${back}</b> back.`, 'good'); }
+      }
+    }
+    return n - cut;
+  },
+  // damage that reached her deck becomes Wrath
+  onHit(n) {
+    if (!(n > 0)) return;
+    const was = S.wrath || 0; S.wrath = Math.min(WRATH_CAP, was + n);
+    if (S.wrath > was) log(`🛡️ <b>Wrath ${S.wrath}</b> — your next Bulwark hits +${S.wrath}.`, 'good');
+  },
+  compose() {
+    const b = spellCard(); if (!b) return null;
+    const stance = cardById(S.assign.Element), sh = cardById(S.assign.Boost);
+    const st = eff(b);
+    const taunt = S.guardStance === 'taunt' && !!sh;
+    const wrath = S.wrath || 0;
+    return {
+      value: Math.max(0, st.value + wrath + (duelFx().value || 0)),
+      element: null,
+      // 📣 taunting is standing still: she throws the race, and the engine does the rest
+      init: taunt ? -1 : (stance ? eff(stance).init : 0),
+      boost: 0,
+      hits: CLASS.hitsOf(b, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: b, elem: stance, boostC: sh,
+      attuner: null, loose: false,
+      guardian: { wrath, taunt, brace: taunt ? 0 : GUARDIAN.braceRaw(), shieldName: sh ? sh.def.name : null },
+    };
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -2493,7 +2610,7 @@ function wallSummary() {
 // you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
 // ============================================================
 const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
-function classUnlocked(id) { return id === 'mage' || stagesCleared() >= 1; }
+function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : stagesCleared() >= 1); }
 function pickedClassId() {
   try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
   catch (e) { return 'mage'; }
@@ -2868,6 +2985,19 @@ const RULE_CHARMS = [
   // A charm may bend the class's question, never answer it.
   { id: 'secondnature', tier: 4, name: 'Second Nature', rarity: 'rare', cost: 12, rule: true, cls: 'rogue',
     text: '🔪 A lost race shakes <b>no knife</b> loose' },
+  // 🛡️ THE GUARDIAN'S — all starters for now (no rungs on her ladder yet)
+  { id: 'ironwill', tier: 1, name: 'Iron Will',        rarity: 'uncommon', cost: 9, rule: true, cls: 'guardian',
+    text: '🛡️ <b>Half</b> your Wrath carries into the next fight' },
+  { id: 'thornmail', tier: 1, name: 'Thornmail',       rarity: 'uncommon', cost: 9, rule: true, cls: 'guardian',
+    text: '🌵 When you <b>Brace</b>, it takes <b>half</b> the turned damage back' },
+  { id: 'bellow', tier: 1, name: 'Bellow',             rarity: 'uncommon', cost: 8, rule: true, cls: 'guardian',
+    text: '📣 When you <b>Taunt</b>, it is <b>2 slower</b> next turn' },
+  { id: 'stonestance', tier: 2, name: 'Stone Stance',  rarity: 'rare', cost: 12, rule: true, cls: 'guardian',
+    text: '🛡️ Your <b>Shield</b> turns <b>2 more</b> when you Brace' },
+  { id: 'lastword', tier: 3, name: 'Last Word',        rarity: 'rare', cost: 13, rule: true, cls: 'guardian',
+    text: '🛡️ At <b>8+ Wrath</b> your Bulwark <b>hits twice</b>' },
+  { id: 'bulwarkheart', tier: 4, name: 'Bulwark Heart', rarity: 'rare', cost: 12, rule: true, cls: 'guardian',
+    text: '🐉 Your Wrath is <b>not</b> reset at the lair' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
     text: '🔪 A tool Strike sticks <b>two</b> knives' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
@@ -3076,6 +3206,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 471, date: '2026-09-02', title: 'The Guardian',
+    changed: [
+      "🛡️ <b>A third character: the Guardian.</b> Unlocks when you clear stage 2. Damage they take in a fight becomes <b>Wrath</b>, and their <b>Bulwark</b> hits that much harder. Their <b>Shield</b> card can <b>Brace</b> (block with its armour, the card unharmed) or <b>Taunt</b> (the creature strikes them whatever the race — in Two-Handed a partner is spared). Six charms of their own.",
+    ] },
+
   { build: 470, date: '2026-09-02', title: 'Cards say where their effect fires',
     changed: [
       "🏷️ <b>Every card with an effect now says which slot it fires from</b>, under its stats. In a fight it reads <b>fires from here</b> when the card is seated right, <b>→ CATALYST</b> (or the slot it wants) when it is not, and dims when there is nothing to affect. Ward cards say <b>when it blocks</b>.",
@@ -5989,7 +6124,7 @@ function takeMapNode(f, c) {
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
@@ -6652,6 +6787,7 @@ function beginEncounter(e) {
     S.foeTarget = -1;
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
+  S.wrath = hasCharm('ironwill') ? Math.floor((S.wrath || 0) / 2) : 0;   // 🛡️ Wrath is per fight
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
   let list = S.encounter.type === 'fight' ? FIGHT_HARDSHIPS : JOURNEY_HARDSHIPS;
@@ -7108,7 +7244,7 @@ function startFoeBeat() {
   // third loop skipped the resets the other two shared. A beat IS a turn.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
@@ -7138,7 +7274,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 // 💾 a hand's record on disk. Cards by index into the hand's OWN class table (names duplicate
 // across elements, and a rogue index means nothing in the mage's table). Per-turn scratch
@@ -7148,7 +7284,7 @@ const HAND_SKIP_FIELDS = ['potionFx', 'potionPick', 'upgradePick', 'selectedId']
 function encodeHand(h) {
   const cls = CLASSES[h.cls] || MAGE;
   const card = c => ({ id: c.id, n: cls.defs.indexOf(c.def), lv: c.level });
-  const o = { cls: h.cls, struck: !!h.struck, out: !!h.out };
+  const o = { cls: h.cls, struck: !!h.struck, out: !!h.out, tauntQueued: h.tauntQueued || 0 };
   for (const f of HAND_FIELDS) {
     if (HAND_SKIP_FIELDS.includes(f)) continue;
     const v = h[f];
@@ -7161,7 +7297,7 @@ function encodeHand(h) {
 function decodeHand(o) {
   const cls = CLASSES[o && o.cls]; if (!cls) return null;
   const mk = s => { const def = cls.defs[s.n]; return def ? { id: s.id, def, level: s.lv } : null; };
-  const h = { cls: o.cls, struck: !!o.struck, out: !!o.out };
+  const h = { cls: o.cls, struck: !!o.struck, out: !!o.out, tauntQueued: o.tauntQueued || 0 };
   for (const f of HAND_FIELDS) {
     if (HAND_CARD_FIELDS.includes(f)) { h[f] = (o[f] || []).map(mk); if (h[f].some(c => !c)) return null; }
     else if (f === 'downgraded') h[f] = new Set(o[f] || []);
@@ -7186,7 +7322,7 @@ function handTurnReset() {
   S.boostTarget = 'Attack'; S.loseReserve = null; S.afterSoak = 'foeNext';
   S.damage = 0; S.damageEl = null; S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 // a new creature turn: every hand draws up and is reset; a hand with no cards is OUT (the
@@ -7202,6 +7338,7 @@ function twoHandedTurnStart(base, st) {
       S.deck = shuffle([...S.deck, ...S.discard]); S.discard = [];
     }
     if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+    if (st.turn === 0 && i !== cur) S.wrath = hasCharm('ironwill') ? Math.floor((S.wrath || 0) / 2) : 0;   // 🛡️ the partner's Wrath resets too
     h.struck = false;
     const out = S.hand.length === 0;
     if (out && !h.out) log(`🙌 The <b>${CLASS.name}</b>'s cards are spent — out of this fight.`, 'bad');
@@ -7303,6 +7440,15 @@ function foeCleanupAndNext() {
     if (next >= 0) {
       loadHand(next); handTurnReset(); S.phase = 'assign';
       log(`🙌 <b>The ${CLASS.name}</b> arranges against the ${S.foeBase.name} as it now stands.`);
+      // 📣 what she drew onto herself lands now, from her own deck, before she arranges
+      const q = S.hands[next].tauntQueued || 0;
+      if (q > 0) {
+        S.hands[next].tauntQueued = 0;
+        log(`📣 The ${S.foeBase.name} comes for <b>you</b> — <b>${q}</b> to block.`, 'bad');
+        if (CLASS.onHit) CLASS.onHit(q);
+        S.damage = q; S.damageEl = null; S.afterSoak = 'foeArrange';
+        startSoak(); return;
+      }
       render(); return;
     }
   }
@@ -7311,6 +7457,7 @@ function foeCleanupAndNext() {
   for (const b of [S.foeState, ...packBodies()]) {
     const fb = b && b.status;
     if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
+    if (fb) fb.taunt = -1;   // 📣 a taunt lasts the creature's turn
   }
   startFoeBeat();
 }
@@ -7409,7 +7556,7 @@ function nextTurn() {
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-    S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
+    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
     S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
     S.phase = 'fork';
     logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
@@ -7424,7 +7571,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
@@ -7620,7 +7767,7 @@ function computeAction(reserve) {
   // field, so anything a class returns that the engine does not name is silently dropped — which
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
   // hands it straight back to the class. One line, so a third class needs no change here.
-  const classPayload = a.rogue ? { rogue: a.rogue } : null;
+  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : null;
   // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
   // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
@@ -8168,8 +8315,26 @@ function resolve() {
       // you the hit. You did not out-speed it; you traded.
       // ⚠️ The blow is deferred to `foeLandBlow()` and reached through the soak's exit, so the
       // order on screen is: it strikes → you block → your blow → the verdict.
-      const first = foeCounter(r);
+      let first = foeCounter(r);
       if (r.initLost || foeFx().unstoppable) { spendDaze(); shakeKnife(r); bleedTick(); }   // ⚡ it swung; the Daze did its work · 🔪 a knife may fall
+      // 🛡️ the Guardian: a taunt is a status on the creature (a partner sees it), and 📣 Bellow slows it
+      if (r.guardian && r.guardian.taunt) {
+        const tb = fightStatus();
+        if (tb) { tb.taunt = S.handIdx || 0; if (hasCharm('bellow')) { tb.frost = (tb.frost || 0) + 2; log(`📣 Bellow — it is <b>2 slower</b> next turn.`, 'good'); } }
+      }
+      // 🙌 a partner who lost the race is spared while the Guardian's taunt stands: the blow is
+      // queued on her and she blocks it when her turn comes
+      if (first > 0 && isTwoHanded()) {
+        const tb = fightStatus(), tg = tb && tb.taunt != null ? tb.taunt : -1;
+        const gh = tg >= 0 ? S.hands[tg] : null;
+        if (gh && tg !== S.handIdx && !gh.out) {
+          gh.tauntQueued = (gh.tauntQueued || 0) + first;
+          log(`📣 It turns on the <b>${(CLASSES[gh.cls] || MAGE).name}</b> instead — <b>${first}</b> goes to them.`, 'good');
+          first = 0;
+        }
+      }
+      if (first > 0 && CLASS.shield) first = CLASS.shield(first);
+      if (first > 0 && CLASS.onHit) CLASS.onHit(first);
       if (first > 0) {
         S.pendingR = r; S.beats = null; S.beatIndex = -1;
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
@@ -9842,6 +10007,8 @@ function exitSoak() {
   if (dest === 'turnEnd') finishTurn();
   else if (dest === 'duelNext') duelCleanupAndNext();
   else if (dest === 'foeNext') foeCleanupAndNext();
+  // 📣 a taunted blow blocked before arranging: back to the row, this hand still to strike
+  else if (dest === 'foeArrange') { S.afterSoak = 'foeNext'; S.phase = 'assign'; render(); }
   // ⚔️ it struck first and you blocked it; NOW your blow lands
   else if (dest === 'foeBlow') foeLandBlow(null);
   else startUpgrade();
@@ -12234,7 +12401,7 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      bankRowHTML() +
+      bankRowHTML() + stanceRowHTML() +
       knifeRowHTML() +
       strikePromptHTML() +
       boostRow +
@@ -12644,7 +12811,7 @@ function renderControls() {
               ? `<span class="class-lv">🎭 ${classLevel(id)}<i>/${classCap(id)}</i></span>` : '') +
             `<span class="class-line">${line}</span>` +
             (t ? `<span class="class-trait"><b>${t.icon} ${t.name}</b> ${t.text}</span>` : '') +
-            (open ? '' : `<span class="class-trait dim">🔒 fell a dragon to unlock her</span>`) +
+            (open ? '' : `<span class="class-trait dim">${(cls && cls.unlock) || '🔒 fell a dragon to unlock her'}</span>`) +
             `</button>`;
         };
         // 🎭 THE PLANNED ROSTER, SHOWN LOCKED (2026-08-23, Thomas: *"i also want to add the classes
@@ -12694,8 +12861,8 @@ function renderControls() {
             `<img class="hero-img" alt="" src="art/classes/${picked}.jpg?v=${BUILD}" ` +
               `onerror="this.remove()">` +
             `<div class="hero-fallback">${(CLASSES[picked] && CLASSES[picked].mark) || '✦'}</div>` +
-            `<div class="hero-cap"><b>${picked === 'rogue' ? '🗡️ The Rogue' : '✦ The Mage'}</b>` +
-            `<span>${picked === 'rogue' ? 'cards pay for cards' : 'elements agree'}</span></div>` +
+            `<div class="hero-cap"><b>${(CLASSES[picked] || MAGE).mark} The ${(CLASSES[picked] || MAGE).name}</b>` +
+            `<span>${(CLASSES[picked] || MAGE).tagline || ''}</span></div>` +
           `</div>`;
         })();
         // 🖼️ ART LEFT, ROSTER RIGHT — the classic character-select layout, and the panel was already
@@ -12706,6 +12873,7 @@ function renderControls() {
           `<div class="class-row">` +
           row('mage', '✦ The Mage', 'A travelling spellcaster who draws her power from the elements.') +
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
+          row('guardian', '🛡️ The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -12745,7 +12913,6 @@ function renderControls() {
           soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
-          soon('🛡️', 'The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           soon('🏹', 'The Ranger', 'A hunter who always knows what is coming next.') +
           soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
           `</div></div></div>`;
@@ -12902,6 +13069,7 @@ function attunedLineText(r, spell, verb) {
 function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   if (CLASS.id === 'rogue') return rogueZoneHint(zone, isFight);
+  if (CLASS.id === 'guardian') return guardianZoneHint(zone, isFight);
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -12990,6 +13158,32 @@ function strikePromptHTML() {
   return `<div class="wake-row bank-row"><span class="wake-lab">🗡️ Put a card under <b>STRIKE</b>.</span></div>`;
 }
 
+// 🛡️ THE GUARDIAN'S SLOT ③ — the same shape as the mage's channel row: both terms on screen.
+function stanceRowHTML() {
+  if (!CLASS.stances || !isAssignPhase()) return '';
+  const sh = cardById(S.assign.Boost); if (!sh) return '';
+  const e = S.encounter, atk = e && e.type === 'fight' ? (e.atk || 0) : 0;
+  const taunt = S.guardStance === 'taunt', raw = GUARDIAN.braceRaw();
+  return `<div class="wake-row stance-row"><span class="wake-lab" data-tip="stance">🛡️ Your <b>Shield</b> — ` +
+    (taunt ? `<b>TAUNT</b>: it strikes you whatever the race (<b>${atk}</b>), and all of it becomes Wrath`
+           : `<b>BRACE</b>: turns <b>${Math.min(atk, raw)}</b> of its ${atk}, the card unharmed`) + `</span>` +
+    `<button class="wake-btn${taunt ? ' on' : ''}" onclick="toggleStance()">${taunt ? 'brace instead' : '📣 taunt it'}</button>` +
+    `<span class="wake-note">${taunt ? (isTwoHanded() ? 'a partner is spared this turn' : 'hit back harder next turn') : 'or taunt: take it whole, hit back harder'}</span></div>`;
+}
+function toggleStance() {
+  if (!CLASS.stances || !isAssignPhase()) return;
+  S.guardStance = S.guardStance === 'taunt' ? 'brace' : 'taunt';
+  render();
+}
+function guardianZoneHint(zone, isFight) {
+  const w = S.wrath || 0;
+  switch (zone) {
+    case 'Spell': { const b = spellCard(); return b ? `your blow: <b>${eff(b).value}</b>${w ? ` + <b>${w}</b> Wrath` : ''}` : 'your blow, plus your Wrath'; }
+    case 'Element': return S.guardStance === 'taunt' ? 'you stand still — it strikes you' : 'your Initiative — beat its number and it cannot strike';
+    case 'Boost': return S.guardStance === 'taunt' ? '📣 taunting — it strikes you whatever the race' : `🛡️ braces: turns <b>${GUARDIAN.braceRaw()}</b> of its blow`;
+    default: return 'carried to next turn';
+  }
+}
 function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
   const sc = cardById(S.assign.Boost);
@@ -13145,6 +13339,8 @@ const TIPS = {
 
   // — and what a card's kind does to its effect —
   mkforce:['⚔️ Twice as strong', 'This card applies its effect at double strength. The number shown already includes it.'],
+  stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
+  wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
   mkflow: ['∞ It never ends', 'This card\'s effect is never removed or reduced.'],
   mkward: ['🛡️ Applied by blocking', 'This card applies its effect when you block damage with it.'],
@@ -13469,7 +13665,7 @@ function cardHTML(card) {
     // 🔑 `elChip` had NO slot logic: it rendered what the card IS, unconditionally, so it was
     // saying exactly what the foot says. And the card's TINT already encodes the element, which is
     // why the vault's note says the dimmed half is never deleted - the colour keeps carrying it.
-    (CLASS.pairs ? (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : '')
+    (CLASS.pairs || !CLASS.energy ? (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : '')
                  // ⚠️ LABELLED, NOT JUST GLYPHED (2026-08-18). Thomas, reading a reveal:
                  // *"how was second fang paid, it costs 3, viper strike has 2 energy to pay"* -
                  // and he was reading the card exactly as it was written. ⚡2 is what Viper Strike
@@ -13662,7 +13858,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -13807,6 +14003,7 @@ function startDuel() {
   // RUN OUT, not when a health bar empties — the single most important fact about the fight, and
   // nothing on screen said it. Remember what you arrived with so the race can be drawn.
   S.duelStamina0 = S.deck.length;
+  if (!hasCharm('bulwarkheart')) S.wrath = 0;   // 🛡️ the lair is a new fight
   // 🙌 the partner steels themselves too — their own deck, gathered the same way
   if (isTwoHanded()) {
     const cur = S.handIdx; stashHand();
@@ -13815,6 +14012,7 @@ function startDuel() {
       loadHand(i);
       S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]); S.hand = []; S.discard = [];
       S.duelStamina0 = S.deck.length; h.struck = false; h.out = false;
+      if (!hasCharm('bulwarkheart')) S.wrath = 0;
       log(`🙌 The ${CLASS.name} steels themselves: ${S.deck.length} cards for the duel.`);
       stashHand();
     });
@@ -13877,7 +14075,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -13910,7 +14108,9 @@ function resolveDuel() {
 
   const counter = kill ? 0 : duelCounter(ds.hp);
   const early = kill ? 0 : r.early; // r.early = the bite when you lose Initiative, else 0
-  const damage = early + counter;
+  let damage = early + counter;
+  if (damage > 0 && CLASS.shield) damage = CLASS.shield(damage);   // 🛡️ the Guardian braces
+  if (damage > 0 && CLASS.onHit) CLASS.onHit(damage);
   if (ds.boon.unseen > 0) ds.boon.unseen--;   // the surprise lasts a fixed number of beats
   // 🐉 A DENIAL SHOULD COST A CARD, NOT A TURN (2026-07-29, Thomas: "blocking slots might be too
   // much... you can't really do anything about it"). He is right, and the reason is the telegraph:
@@ -14015,7 +14215,7 @@ function duelHandReset() {
   S.loseReserve = null; S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.moTarget = null;
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.moTarget = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 function duelTurnStartTwo() {
