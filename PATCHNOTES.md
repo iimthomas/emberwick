@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 464 — Two-Handed (dev)
+*2026-09-02*
+
+> ⚠️ Two-Handed runs do not save yet, and only the fights are two-handed — shops, hearths and the dragon still use one hand.
+
+**Changed**
+- 🙌 **Two-Handed** — one player, two classes, one creature. Pick a partner on the 🔧 Dev screen and set out. Each hand races the creature with its own cards and blocks from its own deck; **whoever strikes first goes first**, and the other hand arranges against the creature as it now is. Tap the other hand's tab to arrange it first. A hand with no cards left sits the fight out; both out is a defeat.
+- ❤️ **Creatures have more HP when two hands fight them.** Their attack and speed do not change.
+
 ## build 463 — Poison and Bleed
 *2026-09-02*
 
