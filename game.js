@@ -3076,6 +3076,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 470, date: '2026-09-02', title: 'Cards say where their effect fires',
+    changed: [
+      "🏷️ <b>Every card with an effect now says which slot it fires from</b>, under its stats. In a fight it reads <b>fires from here</b> when the card is seated right, <b>→ CATALYST</b> (or the slot it wants) when it is not, and dims when there is nothing to affect. Ward cards say <b>when it blocks</b>.",
+    ] },
+
   { build: 469, date: '2026-09-02', title: 'Two-Handed runs save',
     changed: [
       "💾 <b>A Two-Handed run saves and continues</b> like any other — mid-fight, at the Wheel, in the duel. Both characters come back exactly as you left them.",
@@ -13524,8 +13529,25 @@ function cardHTML(card) {
     // just read numbers. The mark broke that grammar on every card, every turn.
     // 🔑 *Flavour belongs where it is read ONCE, never in text re-read every encounter* — and an
     // explanation is flavour the moment you have learned it. The sentence lives in the tooltip.
-    (markLine ? `<span class="s-mark${markLit ? ' mark-live' : ''}${canMark ? '' : ' mark-off'}" data-tip="${markLine.tip}">` +
+    (markLine ? `<span class="s-mark${markLit ? ' mark-live' : canMark ? ' mark-idle' : ' mark-off'}" data-tip="${markLine.tip}">` +
       `${markLine.icon} ${markLine.n}${markLine.suffix}</span>` : '') + `</div>` +
+    // 📍 THE EFFECT PRINTS ITS ADDRESS (2026-09-02, Thomas: *"the mage card abilities, when are they
+    // active, i thought they had to be in certain slots for it to go off"*). He was right about the
+    // rule and the face never said it: `where` was computed and never printed, and the only signal
+    // was the stat going from 80% to 100% opacity when seated at home. Three states, all visible:
+    //   LIVE  — seated where it fires, in a fight:   "❄️ fires from here"
+    //   IDLE  — in a fight, seated elsewhere:        "❄️ → CATALYST"   (where to move it)
+    //   OFF   — no creature to mark:                 "❄️ in CATALYST"  (dim)
+    // The slot word comes from SLOT_LABEL, so a rogue reads STRIKE where a mage reads SPELL.
+    (markLine ? (() => {
+      const homeKey = markLine.rogue ? 'Spell' : markHome;
+      const word = homeKey === 'soak' ? 'BLOCK' : String(SLOT_LABEL[homeKey] || homeKey).toUpperCase();
+      const state = markLit ? 'mark-live' : canMark ? 'mark-idle' : 'mark-off';
+      const text = markLit ? (homeKey === 'soak' ? 'fires when it blocks' : 'fires from here')
+        : canMark ? (homeKey === 'soak' ? `→ when it <i class="h-soak">BLOCKS</i>` : `→ <i class="h-${homeKey}">${word}</i>`)
+        : (homeKey === 'soak' ? `when it <i class="h-soak">BLOCKS</i>` : `in <i class="h-${homeKey}">${word}</i>`);
+      return `<div class="s-where ${state}" data-tip="${markLine.tip}">${markLine.icon} ${text}</div>`;
+    })() : '') +
     `<div class="card-vals" data-tip="${attV != null ? 'attune' : 'value'}">${vals}</div>` +
     (verb ? `<div class="card-verb${verbLit ? ' verb-live' : ''}" title="${verb.text}">` +
       `<b>✦ ${verb.name}</b><span>${verbLit ? verb.text : (verb.slot === 'soak' ? 'fires when it blocks' : 'fires in ' + SLOT_LABEL[verb.slot])}</span></div>` : '') +
