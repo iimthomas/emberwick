@@ -3057,6 +3057,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 464, date: '2026-09-02', title: 'Two-Handed (dev)',
+    changed: [
+      "🙌 <b>Two-Handed</b> — one player, two classes, one creature. Pick a partner on the 🔧 Dev screen and set out. Each hand races the creature with its own cards and blocks from its own deck; <b>whoever strikes first goes first</b>, and the other hand arranges against the creature as it now is. Tap the other hand's tab to arrange it first. A hand with no cards left sits the fight out; both out is a defeat.",
+      "❤️ <b>Creatures have more HP when two hands fight them.</b> Their attack and speed do not change.",
+    ],
+    warn: "Two-Handed runs do not save yet, and only the fights are two-handed — shops, hearths and the dragon still use one hand." },
+
   { build: 463, date: '2026-09-02', title: 'Poison and Bleed',
     changed: [
       "☠️ <b>Lethal Dose poisons</b> — the creature loses that much at the start of every turn. 🩸 <b>Slow Poison bleeds</b> — it loses that much every time it attacks. Neither fades. The amount is the card's level, printed on the card.",
@@ -3443,6 +3450,7 @@ const SAVE_VERSION = 8;   // 👣 journeys cut, encounters carry a `where`
 // which is the worst possible bug in a TESTING tool: it would make you chase ghosts in the game.
 function saveGame(key) {
   if (!S || S.phase === 'reveal') return; // mid-reveal saves would lose the pending resolution
+  if (isTwoHanded()) return;   // 🙌 a save that stored one hand would resume as a lie — off until the container is in the schema
   try {
     const card = c => { // by index — names duplicate across elements. mods (am/at/ee) only when set.
       // ⚠️ INDEXED INTO THE CLASS'S OWN TABLE. Cards are stored by index because names duplicate;
@@ -6525,6 +6533,9 @@ function beginEncounter(e) {
                    status: carried ? Object.assign({}, carried) : {},
                    atks: foeAttacksOf(e), bag: null, active: null, next: null, spent: 0,
                    minions: packMinionsOf(e) };
+    // 🙌 two hands land two blows a turn: the creature's HP scales, its attack and Initiative do
+    // not (each hand races it alone and the loser takes the solo-sized hit). Minions are not scaled.
+    if (isTwoHanded()) { S.foeState.hp = S.foeState.maxHp = Math.round(e.hp * COOP_HP_MULT); }
     S.foeTarget = -1;
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
@@ -6611,6 +6622,7 @@ function beginEncounter(e) {
 let PACK_LEAD_HP = 0.7;    // the lead's HP, as a fraction of its printed HP, when it has a pack
 let PACK_LEAD_ATK = 0.8;   // the lead's attack, likewise
 let PACK_RALLY = 1;        // what a 📣 rally minion adds to the lead's attack while it lives
+let COOP_HP_MULT = 2.2;    // 🙌 a creature's HP when two hands fight it (attack, Initiative and par stay flat — the race does the rest). A number to sweep with the bot holding both hands.
 let PACK_MINION_HP = 1;    // minion HP multiplier (1 = as authored; 0.5 = *any hit kills*)
 function packLead(e) {
   if (!e || !e.pack || !e.pack.length) return e;
@@ -6943,10 +6955,13 @@ function startFoeBeat() {
   const st = S.foeState, base = S.foeBase;
   // 🃏 THE DECK IS THE FIGHT'S AMMUNITION. No reshuffle mid-fight (Thomas: *"discard doesn't
   // come back"*), so a long fight visibly drains you and running dry is a real death.
-  if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
-  if (S.hand.length === 0) {
-    defeat(`Your cards are spent — the ${base.name} still stands at ${st.hp} of ${st.maxHp} HP.`);
-    return;
+  if (isTwoHanded()) { if (!twoHandedTurnStart(base, st)) return; }
+  else {
+    if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+    if (S.hand.length === 0) {
+      defeat(`Your cards are spent — the ${base.name} still stands at ${st.hp} of ${st.maxHp} HP.`);
+      return;
+    }
   }
   st.turn++;
   dealFx();          // 🃏 you were dealt back up — say so
@@ -6987,13 +7002,123 @@ function startFoeBeat() {
   render();
 }
 
+// ============================================================
+// 🙌 TWO-HANDED (2026-09-02, build 464) — one player, two classes, one creature.
+// [[Two_Handed_Mode]]. Every rule of co-op applies: each hand races the creature with its own
+// Catalyst, soaks from its own deck, and leaves its effects on the shared body. Whoever strikes
+// first resolves first; the second hand arranges against the creature as it now is; the turn ends
+// when every hand has struck (Thomas's rule, §3b).
+//
+// 🔑 THE CONTAINER IS A HOT-SEAT SWAP, ON PURPOSE. The engine reads player state off `S` in a
+// few hundred places, and the port needs that state in a container — but a rewrite of every read
+// site is an excavation. So the ACTIVE hand's fields stay exactly where every reader expects them,
+// and `S.hands[i]` holds the other hand's copy; switching hands stashes one set and loads the
+// other. Zero read sites change. HAND_FIELDS is the honest list of what is per-player, which is
+// the document the Godot container is written from.
+// ⚠️ SHARED, deliberately: the creature (foeState/foeBase/foeTarget), the map, coins, the log.
+// ⚠️ NOT YET PER HAND (first cut = one encounter, one device): the Wheel, hearth and events act
+// on whichever hand is loaded when the fight ends; the duel is one-handed. Saves are OFF while
+// two hands are live — a save that stored one hand would resume as a lie.
+// ============================================================
+const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetIds', 'reserveId', 'downgraded',
+  'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
+  'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
+  'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick'];
+function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
+function handSnapshot(cls) { const h = { cls, struck: false, out: false }; for (const f of HAND_FIELDS) h[f] = S[f]; return h; }
+function stashHand() { const h = S.hands[S.handIdx]; for (const f of HAND_FIELDS) h[f] = S[f]; }
+function loadHand(i) {
+  const h = S.hands[i]; S.handIdx = i;
+  for (const f of HAND_FIELDS) if (f in h) S[f] = h[f];
+  setClass(CLASSES[h.cls] || MAGE);
+}
+// the per-turn resets a fight turn gives a hand (the same list startFoeBeat() applies)
+function handTurnReset() {
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.boostTarget = 'Attack'; S.loseReserve = null; S.afterSoak = 'foeNext';
+  S.damage = 0; S.damageEl = null; S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false;
+  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+}
+// a new creature turn: every hand draws up and is reset; a hand with no cards is OUT (the
+// other fights on); both out is the defeat. Returns false when the fight is over.
+function twoHandedTurnStart(base, st) {
+  stashHand();
+  const cur = S.handIdx;
+  S.hands.forEach((h, i) => {
+    loadHand(i);
+    // 🃏 between fights a dry hand gathers its discard (the map's own rule) — the stashed hand
+    // never walked backToMap(), so it gathers here, at the first turn of the next fight
+    if (st.turn === 0 && S.hand.length + S.deck.length < REGION_END_THRESHOLD && S.discard.length) {
+      S.deck = shuffle([...S.deck, ...S.discard]); S.discard = [];
+    }
+    if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+    h.struck = false;
+    const out = S.hand.length === 0;
+    if (out && !h.out) log(`🙌 The <b>${CLASS.name}</b>'s cards are spent — out of this fight.`, 'bad');
+    h.out = out;
+    handTurnReset();
+    stashHand();
+  });
+  const live = S.hands.map((h, i) => i).filter(i => !S.hands[i].out);
+  if (!live.length) { loadHand(cur); defeat(`Both hands are spent — the ${base.name} still stands at ${st.hp} of ${st.maxHp} HP.`); return false; }
+  loadHand(live.includes(cur) ? cur : live[0]);
+  return true;
+}
+// 🙌 the swap button: arrange the other hand first. Only while arranging, only to a hand that
+// has not struck and is not out. Order of striking IS the choice, so nothing else is asked.
+function swapHand(i) {
+  if (!isTwoHanded() || i === S.handIdx || S.phase !== 'assign' || !S.foeState) return;
+  const h = S.hands[i]; if (!h || h.struck || h.out) return;
+  stashHand(); loadHand(i);
+  log(`🙌 You turn to the <b>${CLASS.name}</b>.`);
+  render();
+}
+// the tab strip above the card row — a STATE per hand, never cards; the partner's hand is
+// card backs (present and hidden — the quarterback fix, drawn)
+function handTabsHTML() {
+  if (!isTwoHanded() || !S.foeState) return '';
+  return '<div class="hands">' + S.hands.map((h, i) => {
+    const cls = CLASSES[h.cls] || MAGE, on = i === S.handIdx;
+    const st = h.out ? 'out of cards' : h.struck ? 'struck' : on ? 'arranging' : 'waiting';
+    const canSwap = !on && S.phase === 'assign' && !h.struck && !h.out;
+    const n = on ? S.hand.length : (h.hand || []).length;
+    const backs = on ? '' : `<span class="hand-backs">${'<span class="hand-back"></span>'.repeat(Math.min(6, n))}</span>`;
+    return `<button class="hand-tab${on ? ' on' : ''}${h.struck ? ' struck' : ''}${h.out ? ' out' : ''}" ` +
+      (canSwap ? `onclick="swapHand(${i})"` : 'disabled') +
+      ` data-tip="${cls.name} — ${st}${canSwap ? '. Tap to arrange this hand first.' : ''}">` +
+      `<span>${cls.mark || ''} ${cls.name}</span>${backs}<span class="hand-st">${st.toUpperCase()}</span></button>`;
+  }).join('') + '</div>';
+}
+// the second character on the scene (bottom-right, mirrored; hand 0 is always left)
+function partnerArt() {
+  if (!isTwoHanded()) return '';
+  const h = S.hands[1]; if (!h) return '';
+  const cls = CLASSES[h.cls] || MAGE;
+  return `<div class="mage partner${S.handIdx === 1 ? ' active' : ''}" id="partner-slot" data-anim="partner">${ART.mage}` +
+    `<img class="mage-img" alt="" src="art/hero/${cls.id}-${heroPose()}.png?v=${BUILD}" ` +
+    `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()"></div>`;
+}
+// 🔧 dev: set out on the road with a partner. Two fresh runs of the same stage, one per class;
+// the second becomes hand 1. ⚠️ Dev only — the real mode wants a class picker on the stage screen.
+function devTwoHanded() {
+  const d = S.dev, partner = CLASSES[d.partner]; if (!partner) return;
+  const main = CLASSES[pickedClassId()] || MAGE;
+  const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
+  MAP_FLOORS = floorsForStage(stage);
+  setClass(partner); freshGame(stage); const rec = handSnapshot(partner.id);
+  setClass(main); freshGame(stage);
+  S.dev = d;
+  S.hands = [handSnapshot(main.id), rec]; S.handIdx = 0;
+  log(`🙌 <b>TWO-HANDED</b> — the ${main.name} and the ${partner.name} set out together. Every creature has ×${COOP_HP_MULT} HP; each hand races it on its own, and whoever strikes first goes first.`, 'good');
+  S.phase = 'map';
+  render();
+}
+
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
 function foeCleanupAndNext() {
-  // ❄️ Frost is spent on the turn it slowed — unless it came from a 🌊 FLOW card, which never fades
-  for (const b of [S.foeState, ...packBodies()]) {
-    const fb = b && b.status;
-    if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
-  }
   // ⚠️ THE GUARD, not just the caller. Three things route here (a soak exiting, a turn with no
   // damage, and the fight loop itself) and only one of them knows whether the creature is still
   // alive. A loop that can be re-entered from several places has to check its own precondition.
@@ -7003,6 +7128,24 @@ function foeCleanupAndNext() {
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
   S.discard.push(...setCards);
   S.foeState.spent += setCards.length;
+  // 🙌 this hand has struck; if another has not, it arranges now — against the creature as it
+  // stands after this blow (knives in, Exposed on, its Daze spent). The creature's turn is not
+  // over until every hand has struck.
+  if (isTwoHanded()) {
+    S.hands[S.handIdx].struck = true; stashHand();
+    const next = S.hands.findIndex(h => !h.struck && !h.out);
+    if (next >= 0) {
+      loadHand(next); handTurnReset(); S.phase = 'assign';
+      log(`🙌 <b>The ${CLASS.name}</b> arranges against the ${S.foeBase.name} as it now stands.`);
+      render(); return;
+    }
+  }
+  // ❄️ Frost is spent on the turn it slowed — unless it came from a 🌊 FLOW card, which never fades.
+  // 🙌 Here, after EVERY hand has struck: a Frost one hand landed slows it for the partner too.
+  for (const b of [S.foeState, ...packBodies()]) {
+    const fb = b && b.status;
+    if (fb && !(fb.lasting && fb.lasting.frost)) fb.frost = 0;
+  }
   startFoeBeat();
 }
 
@@ -10694,7 +10837,9 @@ function heroPose() {
   return (S.encounter && S.encounter.type === 'journey') ? 'walk' : 'cast';
 }
 function heroArt() {
-  return `<img class="mage-img" alt="" src="art/hero/${CLASS.id}-${heroPose()}.png?v=${BUILD}" ` +
+  // 🙌 hand 0 stands on the left whichever hand is arranging
+  const id = isTwoHanded() ? (S.hands[0].cls) : CLASS.id;
+  return `<img class="mage-img" alt="" src="art/hero/${id}-${heroPose()}.png?v=${BUILD}" ` +
     `onload="this.parentNode.classList.add('has-art'); stageFloor();" onerror="this.remove()">`;
 }
 // 🗺️ A PLACE, NOT A THING (2026-08-10). A creature is an object IN the scene; a journey IS
@@ -10762,7 +10907,9 @@ function renderScene() {
   const cls = isFight ? 'is-fight' : 'is-journey';
   const style = sceneVars(e, isFight);
   const key = [cls, style, S.finalMode ? 1 : 0, S.finalPhase || '',
-               S.dragon && S.dragon.name, e && e.name, e && e.type, heroPose()].join('|');
+               S.dragon && S.dragon.name, e && e.name, e && e.type, heroPose(),
+               isTwoHanded() ? S.hands.map(h => h.cls).join('+') + S.handIdx : ''].join('|');
+  try { document.body.classList.toggle('two-handed', isTwoHanded()); } catch (err) {}
   if (el.dataset.sceneKey === key) { stageFloor(); return; }   // layout can still shift under it
   el.dataset.sceneKey = key;
   el.className = cls;
@@ -10786,7 +10933,8 @@ function renderScene() {
       : null) +
     `<div class="scene-glow"></div><div class="scene-floor"></div><div class="scene-night"></div>` +
     foe +
-    `<div class="mage" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
+    `<div class="mage${isTwoHanded() && S.handIdx === 0 ? ' active' : ''}" id="mage-slot" data-anim="mage">${ART.mage}${heroArt()}</div>` +
+    partnerArt() +
     `<div class="scene-name">${S.finalMode ? S.dragon.name : e ? e.name : ''}</div>` +
     `<div class="scene-vig"></div>`;
   stageFloor();
@@ -11854,7 +12002,7 @@ function renderControls() {
       : `PHASE 2 — ACTION`;
     const resolveBtn = duel
       ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
-      : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>Resolve ${isFight ? 'Fight' : 'Journey'}</button>`;
+      : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>${isTwoHanded() && isFight ? `Strike as the ${CLASS.name}` : `Resolve ${isFight ? 'Fight' : 'Journey'}`}</button>`;
     // 👁️ WHAT YOU ARE FACING, RESTATED AT THE BUTTON (2026-08-18).
     // Thomas: *"the encounter info also seems small in the top left. since my gaze is always at my
     // hand, and the resolve button is near my hand. thats where im looking at, and i don't see the
@@ -12275,7 +12423,12 @@ function renderControls() {
       `</div></div>` +
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
+      `<div class="dev-row"><span>🙌 Partner</span><div>` +
+        pick('partner', '', 'none', !d.partner) +
+        Object.values(CLASSES).map(x => pick('partner', x.id, `${x.mark || ''} ${x.name}`, d.partner === x.id)).join('') +
+      `</div></div>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
+      (d.partner ? `<button class="primary" onclick="devTwoHanded()">🙌 Two-Handed — set out with the ${CLASSES[d.partner].name}</button>` : '') +
       devSlotsHTML() +
       `<button onclick="showMenu()">← Menu</button>` +
       `</div>`;
@@ -12688,7 +12841,7 @@ function renderSlots() {
   const panel = $('slots-panel');
   if (S.phase === 'summary' || S.phase === 'defeat' || S.phase === 'victory') { panel.innerHTML = ''; return; }
   const dnd = isAssignPhase();
-  panel.innerHTML = ZONES.map(zone => {
+  panel.innerHTML = handTabsHTML() + ZONES.map(zone => {
     const cards = [cardById(S.assign[zone])].filter(Boolean);
     const head = `<div class="slot-head"><span class="slot-name">${SLOT_LABEL[zone].toUpperCase()}` +
       `</span><span class="slot-hint">${zoneHint(zone)}</span></div>`;

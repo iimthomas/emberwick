@@ -548,6 +548,27 @@ label.radio { margin-right: 14px; cursor: pointer; }
 }
 .slot.drag-over .slot-empty, .slot.drag-over { border-color: #c9b458; }
 
+/* 🙌 TWO-HANDED (build 464): a tab per hand above the row — a STATE, never cards */
+.hands { grid-column: 1 / -1; display: flex; gap: 6px; margin-bottom: 2px; }
+.hand-tab {
+  flex: 1 1 0; min-height: 40px; margin: 0; padding: 5px 9px; text-align: left;
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; font-size: 12px;
+}
+.hand-tab.on { border-color: #e0b04a; color: #f2e6c8; background: rgba(224,176,74,.14); }
+.hand-tab.struck { opacity: .7; }
+.hand-tab.out { opacity: .4; text-decoration: line-through; }
+.hand-tab:disabled { cursor: default; }
+.hand-tab .hand-st { font-size: 10px; color: #8a8577; letter-spacing: 1px; }
+.hand-backs { display: flex; gap: 2px; }
+.hand-back { width: 9px; height: 13px; border-radius: 2px; background: #3a3126; border: 1px solid #5a4e3a; }
+/* the partner stands bottom-right, mirrored; the creature moves to the centre between them */
+.mage.partner { left: auto; right: 1%; transform: scaleX(-1); }
+.mage.partner .mage-img { object-position: top left; }
+body.two-handed .mage:not(.active) { filter: brightness(.7); }
+body.two-handed .foe-beast { right: 30%; }
+body.two-handed .foe-dragon { right: 23%; }
+
 /* role buttons — tap a card, then tap where it goes (the easy path) */
 .role-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .rolebtn {
