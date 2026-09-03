@@ -2498,6 +2498,25 @@ function pickedClassId() {
   try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
   catch (e) { return 'mage'; }
 }
+// 🙌 THE PARTY — Solo or Two-Handed, and who stands on the right. Remembered like the class.
+// Two-Handed opens with the second class (a partner needs unlocking like anything else).
+function twoHandedOpen() { return Object.keys(CLASSES).filter(classUnlocked).length >= 2; }
+function pickedMode() {
+  try { return localStorage.getItem('emberwick-mode-1' + KEY_NS) === 'two' && twoHandedOpen() ? 'two' : 'solo'; }
+  catch (e) { return 'solo'; }
+}
+function pickMode(m) { try { localStorage.setItem('emberwick-mode-1' + KEY_NS, m === 'two' ? 'two' : 'solo'); } catch (e) {} render(); }
+function pickedPartnerId() {
+  const main = pickedClassId();
+  const fits = id => !!id && !!CLASSES[id] && classUnlocked(id) && id !== main;
+  try { const v = localStorage.getItem('emberwick-partner-1' + KEY_NS); if (fits(v)) return v; } catch (e) {}
+  return Object.keys(CLASSES).find(fits) || null;
+}
+function pickPartner(id) {
+  if (!CLASSES[id] || !classUnlocked(id) || id === pickedClassId()) return;
+  try { localStorage.setItem('emberwick-partner-1' + KEY_NS, id); } catch (e) {}
+  render();
+}
 function pickClass(id) {
   if (!CLASSES[id] || !classUnlocked(id)) return;
   try { localStorage.setItem(CLASS_KEY, id); } catch (e) {}
@@ -3057,6 +3076,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 466, date: '2026-09-02', title: 'Two-Handed on the Stages screen',
+    changed: [
+      "🙌 <b>Two-Handed is on the Stages screen.</b> Under Character, pick <b>Solo</b> or <b>Two-Handed</b>, then who stands on the right. It opens once you have a second character. Setting Out packs each character's own charm in turn.",
+      "🔧 The dev menu no longer has a partner row.",
+    ] },
+
   { build: 465, date: '2026-09-02', title: 'Two-Handed on the road',
     changed: [
       "🙌 <b>The character tabs work on the Wheel and at the hearth.</b> Tap a tab to sharpen that character's cards, buy charms and potions into their kit, or work the coals for them. Gold is one purse for both. One <b>Move on</b> closes the Wheel for the party.",
@@ -4253,7 +4278,9 @@ function startStage(n, confirmed) {
   // 🗺️ the road's length is a property of the STAGE. ⚠️ Must be set before freshGame(), which
   // is what builds the map.
   MAP_FLOORS = floorsForStage(n);
-  freshGame(n);
+  // 🙌 the party switch on the stages screen; the tutorial is always one character
+  if (n > 0 && pickedMode() === 'two' && pickedPartnerId()) startTwoHanded(n, pickedClassId(), pickedPartnerId());
+  else freshGame(n);
   // 📖 Stage 0 opens on the brief. You read it before a card is dealt — it is the only place that
   // can explain what an ENCOUNTER is, because every in-play lesson arrives once you are in one.
   if (n === 0) { S.introPage = 0; S.phase = 'intro'; }
@@ -4476,6 +4503,19 @@ function pickSetout(id) {
   const def = setoutById(id); if (!def) return;
   log(def.apply(off), 'good');
   S.setout = null;
+  // 🙌 each character packs their own — the offers are rolled for THEIR class once it is their turn
+  if (isTwoHanded()) {
+    S.setoutDone = [...(S.setoutDone || []), S.handIdx];
+    const next = S.hands.findIndex((h, i) => !S.setoutDone.includes(i));
+    if (next >= 0) {
+      stashHand(); loadHand(next);
+      const more = rollSetout();
+      if (more.length) { S.setout = more; render(); return; }
+      S.setoutDone.push(next);
+    }
+    S.setoutDone = [];
+    stashHand(); loadHand(0);   // hand 0 walks first
+  }
   // 🛤️ HAND THE RUN BACK TO THE FORK, NOT TO A TURN THAT HAS NO ENCOUNTER (fixed 2026-08-18).
   // 🐛 `freshGame` runs nextTurn, which now OPENS A FORK - phase 'fork', S.encounter still null.
   // startStage then overwrote that phase with 'setout', orphaning the fork; picking a charm jumped
@@ -7119,11 +7159,12 @@ function swapHand(i) {
 function handTabsHTML() {
   if (!isTwoHanded()) return '';
   const fight = !!S.foeState && S.phase === 'assign';
-  if (!fight && !SWAP_PHASES.includes(S.phase) && S.phase !== 'eliteboon') return '';
+  if (!fight && !SWAP_PHASES.includes(S.phase) && S.phase !== 'eliteboon' && S.phase !== 'setout') return '';
+  const done = S.phase === 'eliteboon' ? (S.boonDone || []) : (S.setoutDone || []);
   return '<div class="hands">' + S.hands.map((h, i) => {
     const cls = CLASSES[h.cls] || MAGE, on = i === S.handIdx;
     const st = fight ? (h.out ? 'out of cards' : h.struck ? 'struck' : on ? 'arranging' : 'waiting')
-      : S.phase === 'eliteboon' ? (on ? 'choosing' : (S.boonDone || []).includes(i) ? 'chosen' : 'next')
+      : (S.phase === 'eliteboon' || S.phase === 'setout') ? (on ? 'choosing' : done.includes(i) ? 'chosen' : 'next')
       : (on ? 'choosing' : 'tap to switch');
     const canSwap = canSwapTo(i);
     const n = on ? S.hand.length : (h.hand || []).length;
@@ -7143,20 +7184,15 @@ function partnerArt() {
     `<img class="mage-img" alt="" src="art/hero/${cls.id}-${heroPose()}.png?v=${BUILD}" ` +
     `onload="this.parentNode.classList.add('has-art')" onerror="this.remove()"></div>`;
 }
-// 🔧 dev: set out on the road with a partner. Two fresh runs of the same stage, one per class;
-// the second becomes hand 1. ⚠️ Dev only — the real mode wants a class picker on the stage screen.
-function devTwoHanded() {
-  const d = S.dev, partner = CLASSES[d.partner]; if (!partner) return;
-  const main = CLASSES[pickedClassId()] || MAGE;
-  const stage = Math.max(1, Math.min(DRAGONS.length, d.stage));
+// 🙌 SET OUT WITH A PARTNER — two fresh runs of the same stage, one per class; the second
+// becomes hand 1. Called by startStage() when the party switch says Two-Handed.
+function startTwoHanded(stage, mainId, partnerId) {
+  const main = CLASSES[mainId] || MAGE, partner = CLASSES[partnerId]; if (!partner) { setClass(main); freshGame(stage); return; }
   MAP_FLOORS = floorsForStage(stage);
   setClass(partner); freshGame(stage); const rec = handSnapshot(partner.id);
   setClass(main); freshGame(stage);
-  S.dev = d;
-  S.hands = [handSnapshot(main.id), rec]; S.handIdx = 0;
-  log(`🙌 <b>TWO-HANDED</b> — the ${main.name} and the ${partner.name} set out together. Every creature has ×${COOP_HP_MULT} HP; each hand races it on its own, and whoever strikes first goes first.`, 'good');
-  S.phase = 'map';
-  render();
+  S.hands = [handSnapshot(main.id), rec]; S.handIdx = 0; S.setoutDone = [];
+  log(`🙌 <b>TWO-HANDED</b> — the ${main.name} and the ${partner.name} set out together. Every creature has more HP; each hand races it on its own, and whoever strikes first goes first.`, 'good');
 }
 
 // end of a beat: the spent set goes to the discard and does not come back until the fight ends.
@@ -12171,7 +12207,7 @@ function renderControls() {
     // three RULES, so all three rules are on screen in full, with what each one is FOR underneath.
     const offers = (S.setout || []).map(o => ({ o, d: setoutById(o.k) })).filter(x => x.d);
     c.innerHTML =
-      `<div class="phase-label">SETTING OUT</div>` +
+      `<div class="phase-label">SETTING OUT${isTwoHanded() ? ` — THE ${CLASS.name.toUpperCase()}` : ''}</div>` +
       `<div class="setout">` +
       `<p class="setout-story">The workshop door closes behind you and the latch settles. ` +
       `Four regions of road, and then <b>${S.dragon.name}</b> at the end of them — ` +
@@ -12468,12 +12504,7 @@ function renderControls() {
       `</div></div>` +
       `<p class="dev-note">${dragon.name} — ${dragon.hp} HP · ${dragonShapeText(dragon)} · par <b>${dragon.par}</b>. ` +
       `<b>${cfg.label}</b>: ${cfg.cards} cards, about ${(dragon.par || 44) + cfg.offset} levels — <i>${cfg.hint}</i>.</p>` +
-      `<div class="dev-row"><span>🙌 Partner</span><div>` +
-        pick('partner', '', 'none', !d.partner) +
-        Object.values(CLASSES).map(x => pick('partner', x.id, `${x.mark || ''} ${x.name}`, d.partner === x.id)).join('') +
-      `</div></div>` +
       `<button class="primary" onclick="devJump()">🐉 Jump to the lair</button>` +
-      (d.partner ? `<button class="primary" onclick="devTwoHanded()">🙌 Two-Handed — set out with the ${CLASSES[d.partner].name}</button>` : '') +
       devSlotsHTML() +
       `<button onclick="showMenu()">← Menu</button>` +
       `</div>`;
@@ -12585,6 +12616,23 @@ function renderControls() {
           row('mage', '✦ The Mage', 'A travelling spellcaster who draws her power from the elements.') +
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           `</div>` +
+          // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
+          // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
+          // switch is remembered like the class is; Two-Handed opens with the second class.
+          (() => {
+            const open = twoHandedOpen(), mode = pickedMode(), main = pickedClassId();
+            const partners = Object.keys(CLASSES).filter(id => classUnlocked(id) && id !== main);
+            return `<div class="wall-line">🙌 <b>Party</b></div><div class="mode-row">` +
+              `<button class="mode-pick${mode === 'solo' ? ' on' : ''}" onclick="pickMode('solo')"><b>🧍 Solo</b><span>One character.</span></button>` +
+              `<button class="mode-pick${mode === 'two' ? ' on' : ''}${open ? '' : ' locked'}" ${open ? `onclick="pickMode('two')"` : 'disabled'}>` +
+              `<b>🙌 Two-Handed</b><span>${open ? 'Play two characters at once. Each fights with their own cards; whoever strikes first goes first.' : '🔒 fell a dragon to unlock a partner'}</span></button>` +
+              `</div>` +
+              (mode === 'two' && open ? `<div class="wall-line">🎭 <b>Partner</b></div><div class="class-row">` +
+                partners.map(id => { const cls = CLASSES[id];
+                  return `<button class="class-pick${pickedPartnerId() === id ? ' on' : ''}" onclick="pickPartner('${id}')">` +
+                    `<b>${cls.mark || ''} The ${cls.name}</b><span class="class-line">Stands on the right. Their own deck, their own charms.</span></button>`; }).join('') +
+                `</div>` : '');
+          })() +
           `<div class="class-row is-soon">` +
           // 🔑 **TEN VISIBLE, AND THAT IS THE POINT** (Thomas, 2026-08-25). A roster is a promise,
           // and a promise gets less credible the longer it runs — twelve names with two playable

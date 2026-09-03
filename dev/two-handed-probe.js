@@ -50,8 +50,7 @@ function driveFight(trace) {
 for (let run = 0; run < N; run++) {
   S.setClass(S.MAGE);
   S.freshGame(1);
-  H.getS().dev = { stage: 1, deck: 'mediocre', candle: true, charm: '', partner: 'rogue' };
-  S.devTwoHanded();
+  S.startTwoHanded(1, 'mage', 'rogue');
   const s = H.getS();
   ok(s.hands && s.hands.length === 2, 'two hands not set');
   ok(s.hands[0].cls === 'mage' && s.hands[1].cls === 'rogue', 'hand classes wrong');
