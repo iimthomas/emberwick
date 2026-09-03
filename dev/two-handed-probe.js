@@ -10,8 +10,9 @@ H.useClass('mage'); H.seed(+(process.argv[3] || 20260902));
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
+let wheelBuys = 0, boons = 0;
 let fights = 0, handTurns = 0, byCls = { mage: 0, rogue: 0 }, deaths = 0, kills = 0, turnsSum = 0, outs = 0;
-const clsOfHand = s => (s.hand[0] && S.ROGUE.defs.includes(s.hand[0].def)) ? 'rogue' : 'mage';
+const clsOfHand = s => { const c = s.hand[0] || s.deck[0] || s.discard[0]; return (c && S.ROGUE.defs.includes(c.def)) ? 'rogue' : 'mage'; };
 
 function driveFight(trace) {
   const s = H.getS();
@@ -68,15 +69,39 @@ for (let run = 0; run < N; run++) {
     if (trace) console.log(`  → ${r} on turn ${s.foeState ? s.foeState.turn : '?'}`);
     outs += s.hands.filter(h => h.out).length;
     if (r === 'defeat') break;
+    let wheelSwapped = false;
     for (let k = 0; k < 30 && s.phase !== 'map' && s.phase !== 'defeat'; k++) {
       const p = s.phase;
       if (p === 'reveal') S.advanceBeat();
-      else if (p === 'wheel') S.wheelDone();
-      else if (p === 'eliteboon') { const b = s.boon || []; if (b.length) S.pickBoon(b[0]); else { s.boon = null; S.backToMap(); } }
+      else if (p === 'wheel') {
+        // 🛒 the road: step the OTHER character up to the Wheel, check it rolled them their own shelf
+        if (!wheelSwapped) {
+          wheelSwapped = true;
+          const other = 1 - s.handIdx, before = s.handIdx;
+          S.swapHand(other);
+          ok(s.handIdx === other, 'swap on the Wheel refused');
+          ok(s.wheel && s.wheel.offers && s.wheel.offers.length > 0, 'no shelf rolled for the other character');
+          ok(clsOfHand(s) === s.hands[other].cls, 'Wheel swap loaded the wrong cards');
+          const up = s.hand.filter(c => S.upgradable(c))[0];
+          if (up && s.coins >= S.eff(up).cost) { const lv = up.level; S.buyUpgrade(up.id); ok(up.level === lv + 1, 'sharpen on the swapped hand did not land'); wheelBuys++; }
+          S.swapHand(before);
+          ok(s.handIdx === before && s.wheel, 'swap back lost the first shelf');
+        }
+        S.wheelDone();
+        ok(s.hands.every(h => !h.wheel), 'a shelf stayed open after Move on');
+      }
+      else if (p === 'eliteboon') {
+        const charms0 = s.hands.map((h, i) => (i === s.handIdx ? s.charms : h.charms).length);
+        let g2 = 0;
+        while (s.phase === 'eliteboon' && g2++ < 4) { const b = s.boon || []; if (b.length) S.pickBoon(b[0]); else { s.boon = null; S.backToMap(); } }
+        const charms1 = s.hands.map((h, i) => (i === s.handIdx ? s.charms : h.charms).length);
+        boons += charms1.reduce((t, n, i) => t + (n - charms0[i]), 0);
+        ok(charms1.every((n, i) => n === charms0[i] + 1), `elite charm not picked for both: ${charms0} → ${charms1}`);
+      }
       else if (p === 'upgrade') S.doneUpgrades();
       else break;
     }
   }
 }
-console.log(`runs ${N} · fights ${fights} · hand-turns ${handTurns} (mage ${byCls.mage} / rogue ${byCls.rogue}) · kills ${kills} · defeats ${deaths} · avg turns ${(turnsSum / Math.max(1, kills + deaths)).toFixed(1)} · hands out ${outs}`);
+console.log(`runs ${N} · fights ${fights} · hand-turns ${handTurns} (mage ${byCls.mage} / rogue ${byCls.rogue}) · kills ${kills} · defeats ${deaths} · avg turns ${(turnsSum / Math.max(1, kills + deaths)).toFixed(1)} · hands out ${outs} · sharpened on the swapped hand ${wheelBuys} · elite charms picked ${boons}`);
 console.log(fails.length ? `🔴 ${fails.length} FAILS\n` + fails.slice(0, 12).join('\n') : '✅ every assertion held');

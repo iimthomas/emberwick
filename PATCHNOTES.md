@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 465 — Two-Handed on the road
+*2026-09-02*
+
+**Changed**
+- 🙌 **The character tabs work on the Wheel and at the hearth.** Tap a tab to sharpen that character's cards, buy charms and potions into their kit, or work the coals for them. Gold is one purse for both. One **Move on** closes the Wheel for the party.
+- 💀 **After an elite, each character picks their own charm.**
+- ⭐ Both characters' level bars earn from a Two-Handed run.
+
 ## build 464 — Two-Handed (dev)
 *2026-09-02*
 

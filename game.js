@@ -3057,6 +3057,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 465, date: '2026-09-02', title: 'Two-Handed on the road',
+    changed: [
+      "🙌 <b>The character tabs work on the Wheel and at the hearth.</b> Tap a tab to sharpen that character's cards, buy charms and potions into their kit, or work the coals for them. Gold is one purse for both. One <b>Move on</b> closes the Wheel for the party.",
+      "💀 <b>After an elite, each character picks their own charm.</b>",
+      "⭐ Both characters' level bars earn from a Two-Handed run.",
+    ] },
+
   { build: 464, date: '2026-09-02', title: 'Two-Handed (dev)',
     changed: [
       "🙌 <b>Two-Handed</b> — one player, two classes, one creature. Pick a partner on the 🔧 Dev screen and set out. Each hand races the creature with its own cards and blocks from its own deck; <b>whoever strikes first goes first</b>, and the other hand arranges against the creature as it now is. Tap the other hand's tab to arrange it first. A hand with no cards left sits the fight out; both out is a defeat.",
@@ -4354,7 +4361,19 @@ function pickBoon(id) {
   const c = charmById(id); if (!c) return;
   S.charms.push(id);
   S.boon = null;
-  log(`💀 You take <b>${c.name}</b> off the thing you killed — ${classText(c.text)}`, 'good');
+  log(`💀 ${isTwoHanded() ? `The <b>${CLASS.name}</b> takes` : 'You take'} <b>${c.name}</b> off the thing you killed — ${classText(c.text)}`, 'good');
+  // 🙌 each character picks their own — the offer is rolled for THEIR class once it is their turn
+  if (isTwoHanded()) {
+    S.boonDone = [...(S.boonDone || []), S.handIdx];
+    const next = S.hands.findIndex((h, i) => !S.boonDone.includes(i));
+    if (next >= 0) {
+      stashHand(); loadHand(next);
+      const offers = rollBoon();
+      if (offers.length) { S.boon = offers; render(); return; }
+      S.boonDone.push(next);
+    }
+    S.boonDone = [];
+  }
   backToMap();
 }
 
@@ -7024,7 +7043,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 function handSnapshot(cls) { const h = { cls, struck: false, out: false }; for (const f of HAND_FIELDS) h[f] = S[f]; return h; }
 function stashHand() { const h = S.hands[S.handIdx]; for (const f of HAND_FIELDS) h[f] = S[f]; }
@@ -7069,24 +7088,47 @@ function twoHandedTurnStart(base, st) {
 }
 // 🙌 the swap button: arrange the other hand first. Only while arranging, only to a hand that
 // has not struck and is not out. Order of striking IS the choice, so nothing else is asked.
+// 🛣️ THE ROAD IS SHARED, THE DECK IS YOURS (Thomas, 2026-09-02: *"during the wheel and upgrade
+// and stuff, i should be able to swap back and forth to get the upgrades and spend my gold… for
+// events and stuff, 1 person picks where to go… pick my rewards on each character individually"*).
+// Gold, the map, the candle, the haul and events belong to the PARTY and one person answers them.
+// Cards, charms, potions and equipment belong to a CHARACTER, and the tab is the only control:
+// on the Wheel and at the hearth it decides whose cards are sharpened and whose kit is bought for.
+const SWAP_PHASES = ['wheel', 'hearth', 'hearthpick', 'mendpick'];
+function canSwapTo(i) {
+  if (!isTwoHanded() || i === S.handIdx) return false;
+  const h = S.hands[i]; if (!h) return false;
+  if (S.phase === 'assign') return !!S.foeState && !h.struck && !h.out;
+  return SWAP_PHASES.includes(S.phase);
+}
 function swapHand(i) {
-  if (!isTwoHanded() || i === S.handIdx || S.phase !== 'assign' || !S.foeState) return;
-  const h = S.hands[i]; if (!h || h.struck || h.out) return;
+  if (!canSwapTo(i)) return;
+  const rich = !!(S.phase === 'wheel' && S.wheel && S.wheel.rich);
   stashHand(); loadHand(i);
+  // 🛒 each character has their own shelf, rolled the first time they step up to it — the class
+  // filter on charms and potions follows the loaded hand, so the rogue never sees a mage charm
+  if (S.phase === 'wheel' && !S.wheel) S.wheel = { offers: spinWheel(rich), rich, bought: [] };
+  // 🕯️ a picker that has nothing to pick for this character falls back to the fork
+  if (S.phase === 'hearthpick' && !hearthForgeable().length) S.phase = 'hearth';
+  if (S.phase === 'mendpick' && !S.trashed.length) S.phase = 'hearth';
   log(`🙌 You turn to the <b>${CLASS.name}</b>.`);
   render();
 }
 // the tab strip above the card row — a STATE per hand, never cards; the partner's hand is
 // card backs (present and hidden — the quarterback fix, drawn)
 function handTabsHTML() {
-  if (!isTwoHanded() || !S.foeState) return '';
+  if (!isTwoHanded()) return '';
+  const fight = !!S.foeState && S.phase === 'assign';
+  if (!fight && !SWAP_PHASES.includes(S.phase) && S.phase !== 'eliteboon') return '';
   return '<div class="hands">' + S.hands.map((h, i) => {
     const cls = CLASSES[h.cls] || MAGE, on = i === S.handIdx;
-    const st = h.out ? 'out of cards' : h.struck ? 'struck' : on ? 'arranging' : 'waiting';
-    const canSwap = !on && S.phase === 'assign' && !h.struck && !h.out;
+    const st = fight ? (h.out ? 'out of cards' : h.struck ? 'struck' : on ? 'arranging' : 'waiting')
+      : S.phase === 'eliteboon' ? (on ? 'choosing' : (S.boonDone || []).includes(i) ? 'chosen' : 'next')
+      : (on ? 'choosing' : 'tap to switch');
+    const canSwap = canSwapTo(i);
     const n = on ? S.hand.length : (h.hand || []).length;
-    const backs = on ? '' : `<span class="hand-backs">${'<span class="hand-back"></span>'.repeat(Math.min(6, n))}</span>`;
-    return `<button class="hand-tab${on ? ' on' : ''}${h.struck ? ' struck' : ''}${h.out ? ' out' : ''}" ` +
+    const backs = on || !fight ? '' : `<span class="hand-backs">${'<span class="hand-back"></span>'.repeat(Math.min(6, n))}</span>`;
+    return `<button class="hand-tab${on ? ' on' : ''}${fight && h.struck ? ' struck' : ''}${fight && h.out ? ' out' : ''}" ` +
       (canSwap ? `onclick="swapHand(${i})"` : 'disabled') +
       ` data-tip="${cls.name} — ${st}${canSwap ? '. Tap to arrange this hand first.' : ''}">` +
       `<span>${cls.mark || ''} ${cls.name}</span>${backs}<span class="hand-st">${st.toUpperCase()}</span></button>`;
@@ -9522,7 +9564,8 @@ function bankRun(won) {
   if (XP_LEVEL_FORCE || CLASS_LEVEL_FORCE) return;   // a pinned bar is not a real account
   ACCOUNT_XP += (S.xpRun || 0);
   saveXP(ACCOUNT_XP);
-  saveClassXP(CLASS.id, S.clsXpBefore + (S.xpRun || 0));
+  // 🙌 both characters fought, both bars earn
+  for (const cid of (isTwoHanded() ? S.hands.map(h => h.cls) : [CLASS.id])) saveClassXP(cid, loadClassXP(cid) + (S.xpRun || 0));
 }
 
 // ---------- Phase 3: soak damage by downgrading ----------
@@ -9911,6 +9954,8 @@ function wheelDone() {
   }
   S.wheel = null;
   S.upgradePick = null;
+  // 🙌 one MOVE ON for the party: the other character's shelf closes and their countdown ticks too
+  if (isTwoHanded()) { stashHand(); S.hands.forEach((h, i) => { if (i !== S.handIdx) { h.wheel = null; h.upgradePick = null; if (h.delayed > 0) h.delayed--; } }); }
   if (camp) { S.phase = 'summary'; render(); return; }   // camp sits on the region break
   // 🐛 THIS BRANCH SKIPPED CLEANUP ENTIRELY AND SHIPPED FOR SIX BUILDS (fixed 2026-08-18).
   // It read: `if (S.map) { backToMap(); return; }` - written when the Wheel was briefly a map NODE
@@ -10214,7 +10259,7 @@ function backToMap() {
   if (S.boonOwed) {
     S.boonOwed = false;
     const offers = rollBoon();
-    if (offers.length) { S.boon = offers; S.phase = 'eliteboon'; render(); return; }
+    if (offers.length) { S.boon = offers; S.boonDone = []; S.phase = 'eliteboon'; render(); return; }
   }
   // 🗺️ THE MAP IS THE CLOCK, SO ONLY THE TOP FLOOR ENDS THE ROAD.
   // ⚠️ Running dry used to end a REGION, and the region break reshuffled your discard back in
