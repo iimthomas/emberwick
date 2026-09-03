@@ -512,6 +512,7 @@ const RUNSIM = (() => {
   // 🗺️ best route from each reachable node to the top, by dynamic programming up the floors.
   // Returns the immediate step that begins the best route.
   function mapRoute(m, opts) {
+    if (typeof revealMap === 'function') revealMap();   // 🕯️ what the party can see from here
     // ⚠️ THE MAP'S OWN HEIGHT AND WIDTH, never the globals — the tutorial's map is 8×2 while
     // MAP_FLOORS/MAP_COLS say 16×5, and `F[f][c]` on a floor that does not exist throws before the
     // bot has routed a single node. **Fourth reader of this same mistake today** (solver's
@@ -528,7 +529,8 @@ const RUNSIM = (() => {
           const t = F[f + 1] && F[f + 1][nc];
           if (t && best[t.f + ',' + t.c] > onward) onward = best[t.f + ',' + t.c];
         }
-        best[f + ',' + c] = nodeValue(n) + onward;
+        // 🕯️ THE BOT SEES ONLY WHAT A PLAYER COULD (build 467): an unseen node is worth a plain encounter
+        best[f + ',' + c] = ((typeof nodeSeen === 'function' && !nodeSeen(n)) ? nodeValue({ type: 'normal', kind: 'fight', next: [], enc: null }) : nodeValue(n)) + onward;
       }
     }
     return opts.slice().sort((a2, b2) =>
