@@ -3076,6 +3076,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 468, date: '2026-09-02', title: 'Two-Handed at the lair',
+    changed: [
+      "🐉 <b>The dragon fight is two-handed.</b> Both characters gather their decks at the lair and fight it the same way as any creature: each races it with their own cards, whoever strikes first goes first, and the other arranges against it as it now is. The dragon has more HP for two.",
+    ] },
+
   { build: 467, date: '2026-09-02', title: 'The road is dark',
     changed: [
       "🕯️ <b>The map no longer shows what each road is.</b> A lit candle shows the next row. In Two-Handed, two lit candles show two rows. A road you have seen stays seen. The paths are still drawn.",
@@ -6707,7 +6712,8 @@ function beginEncounter(e) {
 let PACK_LEAD_HP = 0.7;    // the lead's HP, as a fraction of its printed HP, when it has a pack
 let PACK_LEAD_ATK = 0.8;   // the lead's attack, likewise
 let PACK_RALLY = 1;        // what a 📣 rally minion adds to the lead's attack while it lives
-let COOP_HP_MULT = 2.2;    // 🙌 a creature's HP when two hands fight it (attack, Initiative and par stay flat — the race does the rest). A number to sweep with the bot holding both hands.
+let COOP_HP_MULT = 2.2;
+let COOP_DRAGON_HP_MULT = 1.8;   // 🐉 the dragon's, separately: the duel is a STAMINA race (both decks drain while the pool waits), so the creature number is too high there. 📏 strong decks n=32: ×2.0 → 34/0/0/0 · ×1.8 → 53/6/0/0 · ×1.7 → 63/6/0/0 vs solo mage 16/22/3/0    // 🙌 a creature's HP when two hands fight it (attack, Initiative and par stay flat — the race does the rest). A number to sweep with the bot holding both hands.
 let PACK_MINION_HP = 1;    // minion HP multiplier (1 = as authored; 0.5 = *any hit kills*)
 function packLead(e) {
   if (!e || !e.pack || !e.pack.length) return e;
@@ -7109,7 +7115,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 function handSnapshot(cls) { const h = { cls, struck: false, out: false }; for (const f of HAND_FIELDS) h[f] = S[f]; return h; }
 function stashHand() { const h = S.hands[S.handIdx]; for (const f of HAND_FIELDS) h[f] = S[f]; }
@@ -7164,7 +7170,7 @@ const SWAP_PHASES = ['wheel', 'hearth', 'hearthpick', 'mendpick'];
 function canSwapTo(i) {
   if (!isTwoHanded() || i === S.handIdx) return false;
   const h = S.hands[i]; if (!h) return false;
-  if (S.phase === 'assign') return !!S.foeState && !h.struck && !h.out;
+  if (S.phase === 'assign') return (!!S.foeState || (S.finalMode && S.finalPhase === 'duel')) && !h.struck && !h.out;
   return SWAP_PHASES.includes(S.phase);
 }
 function swapHand(i) {
@@ -7184,7 +7190,7 @@ function swapHand(i) {
 // card backs (present and hidden — the quarterback fix, drawn)
 function handTabsHTML() {
   if (!isTwoHanded()) return '';
-  const fight = !!S.foeState && S.phase === 'assign';
+  const fight = (!!S.foeState || (S.finalMode && S.finalPhase === 'duel')) && S.phase === 'assign';
   if (!fight && !SWAP_PHASES.includes(S.phase) && S.phase !== 'eliteboon' && S.phase !== 'setout') return '';
   const done = S.phase === 'eliteboon' ? (S.boonDone || []) : (S.setoutDone || []);
   return '<div class="hands">' + S.hands.map((h, i) => {
@@ -12111,7 +12117,7 @@ function renderControls() {
       ? (duel ? `🐉 THE DUEL — beat ${S.duelBeat}` : `🐉 THE LAIR`)
       : `PHASE 2 — ACTION`;
     const resolveBtn = duel
-      ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}</button>`
+      ? `<button class="primary" onclick="resolveDuel()" ${rolesValid() ? '' : 'disabled'}>Strike the ${S.dragon.name}${isTwoHanded() ? ` as the ${CLASS.name}` : ''}</button>`
       : `<button class="primary" onclick="resolve()" ${rolesValid() ? '' : 'disabled'}>${isTwoHanded() && isFight ? `Strike as the ${CLASS.name}` : `Resolve ${isFight ? 'Fight' : 'Journey'}`}</button>`;
     // 👁️ WHAT YOU ARE FACING, RESTATED AT THE BUTTON (2026-08-18).
     // Thomas: *"the encounter info also seems small in the top left. since my gaze is always at my
@@ -13538,7 +13544,8 @@ function beginFinalBattle() {
   // the dragon becomes a persistent enemy: one HP pool + its armor list as breakable shields
   // 🐉 the dragon becomes a persistent enemy: an HP pool plus its SHAPE. `boon` is what a
   // the boon fields survive the Approach's deletion because the duel maths reads them.
-  const dhp = Math.max(10, S.dragon.hp + (DRAGON_HP_ADD[S.dragon.stage] || 0));
+  // 🙌 two hands, two blows a beat: the same multiplier a creature gets (attack and Initiative flat)
+  const dhp = Math.round(Math.max(10, S.dragon.hp + (DRAGON_HP_ADD[S.dragon.stage] || 0)) * (isTwoHanded() ? COOP_DRAGON_HP_MULT : 1));
   S.dragonState = {
     hp: dhp, maxHp: dhp,
     // ⚠️ the clean-Approach boon is GONE with the Approach (2026-08-05). The fields stay at 0
@@ -13727,6 +13734,19 @@ function startDuel() {
   // RUN OUT, not when a health bar empties — the single most important fact about the fight, and
   // nothing on screen said it. Remember what you arrived with so the race can be drawn.
   S.duelStamina0 = S.deck.length;
+  // 🙌 the partner steels themselves too — their own deck, gathered the same way
+  if (isTwoHanded()) {
+    const cur = S.handIdx; stashHand();
+    S.hands.forEach((h, i) => {
+      if (i === cur) return;
+      loadHand(i);
+      S.deck = shuffle([...S.deck, ...S.discard, ...S.hand]); S.hand = []; S.discard = [];
+      S.duelStamina0 = S.deck.length; h.struck = false; h.out = false;
+      log(`🙌 The ${CLASS.name} steels themselves: ${S.deck.length} cards for the duel.`);
+      stashHand();
+    });
+    loadHand(cur);
+  }
   log(`The ${S.dragon.name} rears — ${S.dragonState.hp} HP. ${shapeStateText()}. You steel yourself: ${S.deck.length} cards for the duel. It asks one thing of you: ${S.dragon.teaches}. Fell it before your cards run dry.`);
   log(`🔁 It fights in a cycle: ${attacksFor(S.dragon).map(a => `<b>${a.name}</b>`).join(' → ')} → and again.`);
   startDuelBeat();
@@ -13736,10 +13756,13 @@ function startDuelBeat() {
   // DECK-AS-HEALTH, finite (no reshuffle — deliberate, see Dragons.md): each beat spends its
   // set and soaks from the same dwindling pool. The deck visibly drains; you win by felling the
   // dragon before it runs dry. A duel that outlasts your cards is the legible, developed loss.
-  if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
-  if (S.hand.length === 0) { // deck and hand both spent — the loss has developed over the duel
-    defeat(`Your cards are spent — the ${S.dragon.name} still stands at ${S.dragonState.hp} of ${S.dragonState.maxHp} HP. You wounded it, but the deck ran dry first.`);
-    return;
+  if (isTwoHanded()) { if (!duelTurnStartTwo()) return; }
+  else {
+    if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+    if (S.hand.length === 0) { // deck and hand both spent — the loss has developed over the duel
+      defeat(`Your cards are spent — the ${S.dragon.name} still stands at ${S.dragonState.hp} of ${S.dragonState.maxHp} HP. You wounded it, but the deck ran dry first.`);
+      return;
+    }
   }
   S.duelBeat++;
   // 🔥 the dragon burns exactly like a creature does
@@ -13910,12 +13933,55 @@ function finishDuel() {
   startSoak(); // soakable → player downgrades; else knockout (downgrade all + burn deck) then continue
 }
 
+// 🙌 THE DUEL TAKES TWO HANDS (build 468) — the same rule as a creature fight: each hand draws
+// and is reset at the beat's start, a dry hand is OUT, both out is the defeat; after a hand
+// strikes (and blocks the dragon's answer) the other arranges against the dragon as it now is.
+function duelHandReset() {
+  S.assign = { Spell: null, Element: null, Boost: null, Reserve: null };
+  S.boostTarget = 'Attack'; S.hardship = null; S.rangedDodge = false;
+  S.loseReserve = null; S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
+  S.emberguardUsed = false;
+  S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
+  S.bankArmed = false; S.ripArmed = false; S.moTarget = null;
+  S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
+}
+function duelTurnStartTwo() {
+  stashHand();
+  const cur = S.handIdx;
+  S.hands.forEach((h, i) => {
+    loadHand(i);
+    if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
+    h.struck = false;
+    const out = S.hand.length === 0;
+    if (out && !h.out) log(`🙌 The <b>${CLASS.name}</b>'s cards are spent — out of the duel.`, 'bad');
+    h.out = out;
+    duelHandReset();
+    stashHand();
+  });
+  const live = S.hands.map((h, i) => i).filter(i => !S.hands[i].out);
+  if (!live.length) {
+    loadHand(cur);
+    defeat(`Both hands are spent — the ${S.dragon.name} still stands at ${S.dragonState.hp} of ${S.dragonState.maxHp} HP. You wounded it, but the decks ran dry first.`);
+    return false;
+  }
+  loadHand(live.includes(cur) ? cur : live[0]);
+  return true;
+}
 function duelCleanupAndNext() {
   rollTurnTokens();   // 🔥 end of a beat IS end of a turn — before the set leaves the hand, so Deepwell can still read it
   const setCards = S.hand.filter(c => S.actionSetIds.includes(c.id));
   S.hand = S.hand.filter(c => !S.actionSetIds.includes(c.id));
   S.discard.push(...setCards);
   log(`You regroup — spent set to the discard; ${S.hand.length} card${S.hand.length === 1 ? '' : 's'} still in hand, ${S.deck.length} in deck.`);
+  if (isTwoHanded()) {
+    S.hands[S.handIdx].struck = true; stashHand();
+    const next = S.hands.findIndex(h => !h.struck && !h.out);
+    if (next >= 0) {
+      loadHand(next); duelHandReset(); S.phase = 'assign';
+      log(`🙌 <b>The ${CLASS.name}</b> arranges against the ${S.dragon.name} as it now stands.`);
+      render(); return;
+    }
+  }
   startDuelBeat();
 }
 
