@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 476 — Balance instrument only
+*2026-09-03*
+
+**Changed**
+- 🔧 No change to play. The test bot now drinks the Alchemist's brews only on the turn they change something, so her numbers are honest.
+
 ## build 475 — Two-Handed is a little easier
 *2026-09-03*
 

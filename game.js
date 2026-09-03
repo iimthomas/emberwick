@@ -3343,6 +3343,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 476, date: '2026-09-03', title: 'Balance instrument only',
+    changed: [
+      "🔧 No change to play. The test bot now drinks the Alchemist's brews only on the turn they change something, so her numbers are honest.",
+    ] },
+
   { build: 475, date: '2026-09-03', title: 'Two-Handed is a little easier',
     changed: [
       "🙌 <b>Creatures and dragons have less extra HP against two characters</b> (creatures ×1.8, dragons ×1.5, were ×2.2 and ×1.8). With the old numbers a pair lost more often than one character alone past stage 1.",
