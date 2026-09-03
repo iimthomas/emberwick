@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 473 — The Alchemist
+*2026-09-03*
+
+**Changed**
+- ⚗️ **A fourth character: the Alchemist.** Unlocks when you clear stage 3. Her cards are **reagents**. The card in her **Still** either fires (its ➕ feeds her blow) or is thrown in; **two reagents brew a potion** at the turn's end from a fixed recipe table, and brewing the same one twice **concentrates** it. Her brews are stronger and stranger than the shop's. Her kit holds 5. Six charms of her own.
+- 🙌 **In Two-Handed any character can hand a potion to their partner** from the kit row.
+
 ## build 472 — A way back, and a dev unlock
 *2026-09-03*
 

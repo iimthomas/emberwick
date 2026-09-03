@@ -2056,7 +2056,131 @@ const GUARDIAN = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN };
+// ============================================================
+// ⚗️ THE ALCHEMIST (2026-09-03, build 473) — [[The_Alchemist]]. Source of power: PREPARATION —
+// what you make now for a turn you cannot see yet. The first class whose power lives in her KIT,
+// not her hand. Thomas: *"support focused… some sort of brewing minigame… give potions, buff a
+// potion… make potions, have potions do crazy things."*
+// 🔑 Her cards are REAGENTS (🌿 herb · 🧂 salt · 💧 dew · 🪨 ash — her one element-like fact).
+// Slot ③ is the STILL: the card there is FIRED (its ➕ feeds her blow, like a Surge) or THROWN IN
+// (its reagent goes into the Still, no damage this turn). Two reagents BREW at the turn's end from
+// a fixed table — no dice anywhere; the only randomness is which reagents the road dealt her.
+// Brewing the same thing twice CONCENTRATES it (the strong version) — "buff your own potions".
+// Her brews are wilder than the shop's because she paid a turn for each. Potions cross between
+// players by rule, so in Two-Handed the kit row hands a brew to a partner: the support class.
+// ⚠️ Her blow is small BY DESIGN, so half her brews are damage — a solo run with her is a run.
+// ============================================================
+let ALCH_CAP = 5;      // ⚗️ her kit holds more than the shop's three
+let BREW_WEIGHT = 3;   // 📏 the bot's price for a reagent thrown in (doubled when it completes a brew). 📏 2 → throws 24%, 3 → 48%, 5 → 74%; the duel read 0 at every setting until the bot drank in the duel
+const REAGENT = { herb: { icon: '🌿', name: 'herb' }, salt: { icon: '🧂', name: 'salt' }, dew: { icon: '💧', name: 'dew' }, ash: { icon: '🪨', name: 'ash' } };
+// the recipe table: a pair of reagents (order-free) → a brew; a doubled reagent → its own brew
+const RECIPES = {
+  'dew+herb': 'balm', 'herb+salt': 'nightshade', 'ash+herb': 'wildfire',
+  'dew+salt': 'quicksilver', 'ash+salt': 'glass', 'ash+dew': 'tar',
+  'herb+herb': 'elixir', 'salt+salt': 'brimstone', 'dew+dew': 'stillwater', 'ash+ash': 'ashglass',
+};
+function recipeOf(a, b) { return RECIPES[[a, b].sort().join('+')] || null; }
+const ALCHEMIST_SPEC = [
+  // reagent   name              spike     base [value, init, boost, armour]
+  { reagent: 'herb', name: 'Foxglove',      spike: 'value', base: [4, 3, 3, 2] },
+  { reagent: 'herb', name: 'Moonwort',      spike: 'init',  base: [2, 6, 2, 2] },
+  { reagent: 'salt', name: 'Saltpetre',     spike: 'value', base: [5, 2, 4, 1] },
+  { reagent: 'salt', name: 'Brimstone Salt',spike: 'boost', base: [3, 3, 5, 2] },
+  { reagent: 'dew',  name: 'Dewdrop',       spike: 'init',  base: [3, 5, 3, 3] },
+  { reagent: 'dew',  name: 'Riverdew',      spike: 'boost', base: [2, 4, 4, 1] },
+  { reagent: 'ash',  name: 'Kilnash',       spike: 'value', base: [5, 1, 4, 3] },
+  { reagent: 'ash',  name: 'Bonemeal',      spike: 'armor', base: [3, 2, 3, 5] },
+];
+const ALCHEMIST_DEFS = ALCHEMIST_SPEC.map(s => {
+  const ix = { value: 0, init: 1, boost: 2, armor: 3 };
+  const step = s.spike === 'value' ? 3 : s.spike === 'boost' ? 2 : 1;
+  const lv = [0, 1, 2, 3].map(L => {
+    const st = s.base.map((v, i) => (i === ix[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+    st[3] = Math.max(1, st[3]);
+    return [st[0], null, st[1], st[2], st[3], null, null];
+  });
+  return { name: s.name, element: null, arch: null, reagent: s.reagent, hits: 1, lv, alchemist: true };
+});
+function reagentTag(d) { const r = REAGENT[d.reagent]; return r ? `<span class="fork-tag rg-${d.reagent}">${r.icon} ${r.name}</span>` : ''; }
+function stillPreview() {
+  const c = cardById(S.assign.Boost); if (!c || !c.def.reagent) return null;
+  const held = (S.still || [])[0];
+  return held ? recipeOf(held, c.def.reagent) : null;
+}
+// ⚗️ the turn's end: what was thrown in goes into the Still, and a pair brews. Called from
+// rollTurnTokens(), the one function all three turn loops reach.
+function alchemistTurnEnd() {
+  if (!CLASS.brews || !S.stillArmed) return;
+  const c = cardById(S.assign.Boost); if (!c || !c.def.reagent) return;
+  S.still = S.still || [];
+  S.still.push(c.def.reagent);
+  const r = REAGENT[c.def.reagent];
+  if (S.still.length < 2) { log(`⚗️ ${r.icon} ${c.def.name} goes into the Still — one more reagent brews.`, 'good'); return; }
+  const [a, b] = S.still; S.still = hasCharm('residue') ? [b] : [];
+  const id = recipeOf(a, b); const p = id && potionById(id); if (!p) return;
+  const strong = potionById(id + '2');
+  const kit = (S.potions = S.potions || []);
+  if (kit.includes(id) && strong) { kit[kit.indexOf(id)] = strong.id; log(`⚗️ <b>${p.name}</b> again — it concentrates into <b>${strong.name}</b>.`, 'good result'); return; }
+  if (hasCharm('mortar') && strong && !kit.includes(strong.id)) { if (kit.length >= ALCH_CAP) { log(`⚗️ The Still brews <b>${strong.name}</b>, but your kit is full — it is lost.`, 'bad'); return; } kit.push(strong.id); log(`⚗️ 🪨 Mortar — the Still brews <b>${strong.name}</b> outright.`, 'good result'); return; }
+  const n = hasCharm('doublebrew') ? 2 : 1;
+  let made = 0; for (let i = 0; i < n; i++) if (kit.length < ALCH_CAP) { kit.push(id); made++; }
+  if (made) log(`⚗️ <b>${p.name}</b> — ${classText(p.text)}${made > 1 ? ' (×2)' : ''}. It is in your kit.`, 'good result');
+  else log(`⚗️ The Still brews <b>${p.name}</b>, but your kit is full — it is lost.`, 'bad');
+}
+const ALCHEMIST = {
+  id: 'alchemist',
+  mark: '⚗️',
+  multi: null,
+  labels: { Spell: 'Draught', Element: 'Vial', Boost: 'Still', Reserve: 'Arsenal' },
+  defs: ALCHEMIST_DEFS,
+  deck() { return shuffle(ALCHEMIST_DEFS.concat(ALCHEMIST_DEFS).map(newCard)); },   // 8 x 2
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false,
+  brews: true,             // ⚗️ her slot ③ fork: fire it or throw it in
+  name: 'Alchemist',
+  tagline: 'what you make now',
+  unlock: '🔒 clear stage 3 to unlock her',
+  trait: { icon: '⚗️', name: 'The Still',
+    text: 'Your cards are <b>reagents</b>. The card in your <b>Still</b> either fires (its ➕ feeds your blow) or is <b>thrown in</b>. <b>Two reagents brew a potion</b> at the turn\'s end; brew the same one twice and it <b>concentrates</b>. Your kit holds <b>5</b>, and in Two-Handed you can hand a brew to a partner.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'brewed', gate: 'have a brew in your kit',
+    avail(hand) { return hand.some(c => c.def.reagent) && ((S.still || []).length > 0 || hand.filter(c => c.def.reagent).length >= 2); },
+    found(r) { return !!(r.alchemist && r.alchemist.throws); },
+  },
+  tokens() {
+    const st = S.still || [];
+    if (!st.length) return null;
+    return [{ id: 'still', icon: '⚗️', name: 'The Still', count: st.length, cap: 2,
+      worth: `holding ${st.map(k => REAGENT[k].icon).join(' ')} — one more reagent brews`,
+      note: 'reagents wait in the Still between fights', tap: null }];
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const d = spellCard(); if (!d) return null;
+    const vial = cardById(S.assign.Element), still = cardById(S.assign.Boost);
+    const throws = !!(S.stillArmed && still && still.def.reagent);
+    const boost = still && !throws ? eff(still).boost : 0;
+    return {
+      value: Math.max(0, eff(d).value + (duelFx().value || 0)),
+      element: null,
+      init: vial ? eff(vial).init : 0,
+      boost,
+      hits: CLASS.hitsOf(d, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: d, elem: vial, boostC: still,
+      attuner: null, loose: false,
+      alchemist: { throws, reagent: throws ? still.def.reagent : null, brews: throws ? stillPreview() : null, held: (S.still || []).length },
+    };
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -2610,7 +2734,7 @@ function wallSummary() {
 // you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
 // ============================================================
 const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
-function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : stagesCleared() >= 1); }
+function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : id === 'alchemist' ? stagesCleared() >= 3 : stagesCleared() >= 1); }
 function pickedClassId() {
   try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
   catch (e) { return 'mage'; }
@@ -2998,6 +3122,19 @@ const RULE_CHARMS = [
     text: '🛡️ At <b>8+ Wrath</b> your Bulwark <b>hits twice</b>' },
   { id: 'bulwarkheart', tier: 4, name: 'Bulwark Heart', rarity: 'rare', cost: 12, rule: true, cls: 'guardian',
     text: '🐉 Your Wrath is <b>not</b> reset at the lair' },
+  // ⚗️ THE ALCHEMIST'S — all starters for now
+  { id: 'quickhands', tier: 1, name: 'Quick Hands',     rarity: 'uncommon', cost: 8, rule: true, cls: 'alchemist',
+    text: '⚗️ Drinking a brew gives <b>+2 Initiative</b>' },
+  { id: 'tonic', tier: 1, name: 'Tonic',                rarity: 'uncommon', cost: 9, rule: true, cls: 'alchemist',
+    text: '⚗️ Drinking a brew makes every card <b>block +2</b> this turn' },
+  { id: 'residue', tier: 1, name: 'Residue',            rarity: 'uncommon', cost: 9, rule: true, cls: 'alchemist',
+    text: '⚗️ After a brew, the Still <b>keeps the second reagent</b>' },
+  { id: 'deepkit', tier: 2, name: 'Deep Kit',           rarity: 'rare', cost: 10, rule: true, cls: 'alchemist',
+    text: '🧪 Your kit holds <b>2 more</b>' },
+  { id: 'doublebrew', tier: 3, name: 'Double Brew',     rarity: 'rare', cost: 13, rule: true, cls: 'alchemist',
+    text: '⚗️ Every brew makes <b>two</b>' },
+  { id: 'mortar', tier: 4, name: 'Mortar',              rarity: 'rare', cost: 13, rule: true, cls: 'alchemist',
+    text: '⚗️ Every brew comes out <b>concentrated</b>' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
     text: '🔪 A tool Strike sticks <b>two</b> knives' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
@@ -3206,6 +3343,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 473, date: '2026-09-03', title: 'The Alchemist',
+    changed: [
+      "⚗️ <b>A fourth character: the Alchemist.</b> Unlocks when you clear stage 3. Her cards are <b>reagents</b>. The card in her <b>Still</b> either fires (its ➕ feeds her blow) or is thrown in; <b>two reagents brew a potion</b> at the turn's end from a fixed recipe table, and brewing the same one twice <b>concentrates</b> it. Her brews are stronger and stranger than the shop's. Her kit holds 5. Six charms of her own.",
+      "🙌 <b>In Two-Handed any character can hand a potion to their partner</b> from the kit row.",
+    ] },
+
   { build: 472, date: '2026-09-03', title: 'A way back, and a dev unlock',
     changed: [
       "✕ <b>What's New, the Stash and the Workshop have a close button at the top.</b> The Menu button at the bottom stays.",
@@ -3704,7 +3847,7 @@ function saveGame(key) {
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0,
+      wake: S.wake, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0, still: S.still || [],
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       splitPending: S.splitPending || 0, armourWinInit: !!S.armourWinInit,
@@ -3834,7 +3977,7 @@ function loadGame(key) {
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       // ⚠️ clamped: before 454 a wake was a DAMAGE figure (could be 9); now it is a strength ≤ 2
-      wake: Math.min(2, d.wake || 0), wakePending: Math.min(2, d.wakePending || 0),
+      wake: Math.min(2, d.wake || 0), wakePending: Math.min(2, d.wakePending || 0), still: d.still || [],
       // 🛡️ filtered against the live table, so a piece removed in a later build cannot
       // resurrect as `undefined` and throw on armourBlock().
       loot: d.loot || {}, encountersDone: d.encountersDone || 0,
@@ -5351,6 +5494,23 @@ const POTIONS = [
     when: () => (S.trashed || []).length > 0,
     text: '✨ the last card you <b>lost returns</b>, at Lv1' },
   // ---- mage: it names an ELEMENT, which is the mage's suit ----
+  // ⚗️ THE ALCHEMIST'S BREWS — never sold (`brew`), made in the Still; the '2' ids are the concentrated versions
+  { id: 'balm',        name: 'Balm',           cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, pick: true,
+    text: '✨ <b>restore a card a level</b>', can: c => c.level < MAX_LEVEL, why: 'already at its brightest' },
+  { id: 'nightshade',  name: 'Nightshade',     cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '☠️ it is <b>poisoned 5</b>' },
+  { id: 'nightshade2', name: 'Black Nightshade', cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '☠️ it is <b>poisoned 10</b>' },
+  { id: 'wildfire',    name: 'Wildfire',       cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '🔥 <b>+4</b> and your blow <b>splits in two</b> this turn' },
+  { id: 'wildfire2',   name: 'Greenfire',      cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '🔥 <b>+8</b> and your blow <b>splits in two</b> this turn' },
+  { id: 'quicksilver', name: 'Quicksilver',    cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '💨 <b>you win the race</b> this turn, whatever your cards' },
+  { id: 'glass',       name: 'Glass',          cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '💎 <b>+8</b> this turn' },
+  { id: 'glass2',      name: 'Dragonglass',    cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '💎 <b>+16</b> this turn, and its <b>defence does nothing</b>' },
+  { id: 'tar',         name: 'Tar',            cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '❄️ it is <b>4 slower</b> and its next blow <b>3 weaker</b>' },
+  { id: 'tar2',        name: 'Pitch',          cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '❄️ it is <b>8 slower</b> and its next blow <b>6 weaker</b>' },
+  { id: 'elixir',      name: 'Elixir',         cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, when: () => (S.trashed || []).length > 0, text: '✨ the last card you <b>lost returns</b>, at Lv1' },
+  { id: 'brimstone',   name: 'Brimstone',      cost: 0, rarity: 'uncommon', cls: 'alchemist', brew: true, text: '🔥 it <b>burns 6</b>' },
+  { id: 'brimstone2',  name: 'Hellsalt',       cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '🔥 it <b>burns 12</b>' },
+  { id: 'stillwater',  name: 'Stillwater',     cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '🛡️ <b>nothing strikes back</b> this turn' },
+  { id: 'ashglass',    name: 'Ashglass',       cost: 0, rarity: 'rare', cls: 'alchemist', brew: true, text: '🛡️ its <b>defence does nothing</b> and it <b>cannot slip</b> your blow this turn' },
   { id: 'prism',   name: 'Prism Vial',       cost: 7, rarity: 'uncommon', cls: 'mage', pick: true,
     text: "✦ one card's <b>element becomes your Spell's</b>",
     can: c => S.assign.Spell && c.id !== S.assign.Spell && elOf(c) !== elOf(spellCard()),
@@ -5532,12 +5692,13 @@ const charmFitsClass = c =>
 
 const potionById = id => POTIONS.find(p => p.id === id) || null;
 // 🗺️ tiered like the charms: a land's own potion is not on the shelf before that stage
-const potionPool = () => POTIONS.filter(p => (!p.cls || p.cls === CLASS.id) && (!p.when || p.when()) &&
+const potionPool = () => POTIONS.filter(p => !p.brew && (!p.cls || p.cls === CLASS.id) && (!p.when || p.when()) &&
                                              (!p.tier || p.tier <= stageTier()));
 function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
 
 // 🧪 drink it. Untargeted potions fire at once; a `pick` potion arms a card picker.
+function potionCap() { return CLASS.brews ? ALCH_CAP + (hasCharm('deepkit') ? 2 : 0) : POTION_CAP; }
 function usePotion(id) {
   if (!isAssignPhase()) return;
   const p = potionById(id); if (!p || !(S.potions || []).includes(id)) return;
@@ -5589,6 +5750,26 @@ function applyPotion(p, card) {
   if (p.id === 'solvent')  { fx.holdCatalyst = true; log(`🧪 ${p.name} — ✦ your Catalyst stays in hand.`, 'good'); }
   if (p.id === 'gravewax') { log(`🧪 ${p.name} — ` + evRecoverCard('last'), 'good'); }
   if (p.id === 'salve')    { card.level++; log(`🧪 ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
+  // ⚗️ the brews. Statuses go on the creature through the same bag every effect uses.
+  const bag = fightStatus();
+  const onIt = (k, n) => { if (bag) bag[k] = (bag[k] || 0) + n; };
+  if (p.id === 'balm')       { card.level++; log(`⚗️ ${p.name} — ${displayName(card)} is mended to Lv${card.level}.`, 'good'); }
+  if (p.id === 'nightshade') { onIt('poison', 5);  log(`⚗️ ${p.name} — ☠️ it is poisoned 5.`, 'good'); }
+  if (p.id === 'nightshade2'){ onIt('poison', 10); log(`⚗️ ${p.name} — ☠️ it is poisoned 10.`, 'good'); }
+  if (p.id === 'wildfire')   { fx.value += 4; fx.hits = (fx.hits || 0) + 1; log(`⚗️ ${p.name} — 🔥 +4 and your blow splits in two.`, 'good'); }
+  if (p.id === 'wildfire2')  { fx.value += 8; fx.hits = (fx.hits || 0) + 1; log(`⚗️ ${p.name} — 🔥 +8 and your blow splits in two.`, 'good'); }
+  if (p.id === 'quicksilver'){ fx.winInit = true; log(`⚗️ ${p.name} — 💨 you win the race this turn.`, 'good'); }
+  if (p.id === 'glass')      { fx.value += 8;  log(`⚗️ ${p.name} — 💎 +8 this turn.`, 'good'); }
+  if (p.id === 'glass2')     { fx.value += 16; fx.noShape = true; log(`⚗️ ${p.name} — 💎 +16, and its guard means nothing.`, 'good'); }
+  if (p.id === 'tar')        { onIt('frost', 4); onIt('daze', 3); log(`⚗️ ${p.name} — ❄️ it is 4 slower, its next blow 3 weaker.`, 'good'); }
+  if (p.id === 'tar2')       { onIt('frost', 8); onIt('daze', 6); log(`⚗️ ${p.name} — ❄️ it is 8 slower, its next blow 6 weaker.`, 'good'); }
+  if (p.id === 'elixir')     { log(`⚗️ ${p.name} — ` + evRecoverCard('last'), 'good'); }
+  if (p.id === 'brimstone')  { onIt('burn', 6);  log(`⚗️ ${p.name} — 🔥 it burns 6.`, 'good'); }
+  if (p.id === 'brimstone2') { onIt('burn', 12); log(`⚗️ ${p.name} — 🔥 it burns 12.`, 'good'); }
+  if (p.id === 'stillwater') { fx.noCounter = true; log(`⚗️ ${p.name} — 🛡️ nothing strikes back this turn.`, 'good'); }
+  if (p.id === 'ashglass')   { fx.noShape = true; fx.noEvade = true; log(`⚗️ ${p.name} — 🛡️ its guard means nothing and it cannot slip you.`, 'good'); }
+  if (p.brew && hasCharm('quickhands')) { fx.init += 2; log(`⚗️ Quick Hands — 💨 +2 Initiative.`, 'good'); }
+  if (p.brew && hasCharm('tonic')) { fx.soak += 2; log(`⚗️ Tonic — 🛡️ every card blocks +2 this turn.`, 'good'); }
   if (p.id === 'prism')    {
     const el = elOf(spellCard());
     fx.swap[card.id] = el;
@@ -6165,7 +6346,7 @@ function takeMapNode(f, c) {
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
@@ -7285,7 +7466,7 @@ function startFoeBeat() {
   // third loop skipped the resets the other two shared. A beat IS a turn.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
@@ -7315,7 +7496,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance', 'still', 'stillArmed'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 // 💾 a hand's record on disk. Cards by index into the hand's OWN class table (names duplicate
 // across elements, and a rogue index means nothing in the mage's table). Per-turn scratch
@@ -7363,7 +7544,7 @@ function handTurnReset() {
   S.boostTarget = 'Attack'; S.loseReserve = null; S.afterSoak = 'foeNext';
   S.damage = 0; S.damageEl = null; S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 // a new creature turn: every hand draws up and is reset; a hand with no cards is OUT (the
@@ -7597,7 +7778,7 @@ function nextTurn() {
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace';
+    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;
     S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
     S.phase = 'fork';
     logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
@@ -7612,7 +7793,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
@@ -7808,7 +7989,7 @@ function computeAction(reserve) {
   // field, so anything a class returns that the engine does not name is silently dropped — which
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
   // hands it straight back to the class. One line, so a third class needs no change here.
-  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : null;
+  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : a.alchemist ? { alchemist: a.alchemist } : null;
   // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
   // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
@@ -10238,7 +10419,7 @@ function wheelBuy(i) {
   const w = S.wheel; if (!w) return;
   const o = w.offers[i];
   if (!o || o.kind === 'none' || o.bought || o.cost > S.coins) return;
-  if (o.kind === 'potion' && (S.potions || []).length >= POTION_CAP) {
+  if (o.kind === 'potion' && (S.potions || []).length >= potionCap()) {
     log(`You can carry only ${POTION_CAP} potions.`, 'bad'); render(); return;
   }
   S.coins -= o.cost;
@@ -10411,6 +10592,7 @@ function rollTurnTokens() {
     log(`🛡️ <b>Slowwick Treads</b> — 🔥 your Emberwake holds.`, 'good');
   }
   else if (S.wake > 0 && !S.wakeUsed) log(`Your Emberwake gutters out unspent.`, 'bad');
+  alchemistTurnEnd();   // ⚗️ the Still brews at the turn's end — here, in the one function every loop reaches
   S.wakeDeep = verbLive('Wellspring', 'Boost') && banksNow();
   S.wake = S.wakePending || 0;
   S.wakePending = 0;
@@ -12424,7 +12606,8 @@ function renderControls() {
         `<span class="dim">Each is one use, and lasts only the turn you drink it.</span></div>` +
         kit.map((p, i) =>
           `<button class="kit-potion${S.potionPick === p.id ? ' arming' : ''}" onclick="usePotion('${p.id}')">` +
-          `<b>🧪 ${p.name}</b><span class="kit-text">${classText(p.text)}</span></button>`).join('') +
+          `<b>🧪 ${p.name}</b><span class="kit-text">${classText(p.text)}</span></button>` +
+          (isTwoHanded() && !S.potionPick ? `<button class="kit-give" onclick="givePotion('${p.id}')" title="hand it to your partner">→ 🙌</button>` : '')).join('') +
         (S.potionPick ? `<div class="kit-ask">Tap a card to use the <b>${potionById(S.potionPick).name}</b> on it — ` +
           `<button onclick="cancelPotion()">cancel</button></div>` : '') +
         `</div>`
@@ -12442,7 +12625,7 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      bankRowHTML() + stanceRowHTML() +
+      bankRowHTML() + stanceRowHTML() + stillRowHTML() +
       knifeRowHTML() +
       strikePromptHTML() +
       boostRow +
@@ -12919,6 +13102,7 @@ function renderControls() {
           row('mage', '✦ The Mage', 'A travelling spellcaster who draws her power from the elements.') +
           row('rogue', '🗡️ The Rogue', 'A duellist who fights with a pair of poisoned blades.') +
           row('guardian', '🛡️ The Guardian', 'A heavy defender who turns every blow back on its owner.') +
+          row('alchemist', '⚗️ The Alchemist', 'A brewer whose kit does what her cards cannot.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -12954,7 +13138,6 @@ function renderControls() {
           // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
           // resource you hold and spend*.
           soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
-          soon('⚗️', 'The Alchemist', 'A brewer who makes her own answers before she needs them.') +
           soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
@@ -13115,6 +13298,7 @@ function zoneHint(zone) {
   const isFight = S.encounter && S.encounter.type === 'fight';
   if (CLASS.id === 'rogue') return rogueZoneHint(zone, isFight);
   if (CLASS.id === 'guardian') return guardianZoneHint(zone, isFight);
+  if (CLASS.id === 'alchemist') return alchemistZoneHint(zone, isFight);
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -13228,6 +13412,45 @@ function guardianZoneHint(zone, isFight) {
     case 'Boost': return S.guardStance === 'taunt' ? '📣 taunting — it strikes you whatever the race' : `🛡️ braces: turns <b>${GUARDIAN.braceRaw()}</b> of its blow`;
     default: return 'carried to next turn';
   }
+}
+// ⚗️ THE ALCHEMIST'S SLOT ③ — the Still. Both terms on screen: what firing gives now, what
+// throwing in makes (the recipe is printed BEFORE you commit — legible math always).
+function stillRowHTML() {
+  if (!CLASS.brews || !isAssignPhase()) return '';
+  const c = cardById(S.assign.Boost); if (!c || !c.def.reagent) return '';
+  const r = REAGENT[c.def.reagent], held = (S.still || [])[0];
+  const brew = held ? potionById(recipeOf(held, c.def.reagent)) : null;
+  const on = !!S.stillArmed, now = eff(c).boost;
+  return `<div class="wake-row still-row"><span class="wake-lab" data-tip="still">⚗️ Your <b>Still</b>${held ? ` holds ${REAGENT[held].icon}` : ' is empty'} — ` +
+    (on ? (brew ? `throwing in ${r.icon}: brews <b>${brew.name}</b> at the turn's end <span class="dim">(nothing now)</span>`
+                : `throwing in ${r.icon}: it waits for a second reagent <span class="dim">(nothing now)</span>`)
+        : `<b>+${now}</b> now <span class="dim">— or throw ${r.icon} in${brew ? `: brews <b>${brew.name}</b>` : ''}</span>`) + `</span>` +
+    `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleStill()">${on ? 'fire it instead' : '⚗️ throw it in'}</button>` +
+    `<span class="wake-note">${on ? 'a turn spent brewing' : (brew ? classText(brew.text) : 'two reagents brew a potion')}</span></div>`;
+}
+function toggleStill() {
+  if (!CLASS.brews || !isAssignPhase()) return;
+  S.stillArmed = !S.stillArmed;
+  render();
+}
+function alchemistZoneHint(zone, isFight) {
+  switch (zone) {
+    case 'Spell': { const d = spellCard(); return d ? `your blow: <b>${eff(d).value}</b>` : 'your blow'; }
+    case 'Element': return 'your Initiative — beat its number and it cannot strike';
+    case 'Boost': return S.stillArmed ? '⚗️ thrown in — brewing, no damage' : 'fires: its ➕ feeds your blow';
+    default: return 'carried to next turn';
+  }
+}
+// 🙌 hand a potion to a partner — any class; potions cross by rule
+function givePotion(id) {
+  if (!isTwoHanded() || !(S.potions || []).includes(id)) return;
+  const other = S.hands.findIndex((h, i) => i !== S.handIdx); if (other < 0) return;
+  const h = S.hands[other]; h.potions = h.potions || [];
+  const cap = (CLASSES[h.cls] || MAGE).brews ? ALCH_CAP : POTION_CAP;
+  if (h.potions.length >= cap) { log(`The ${(CLASSES[h.cls] || MAGE).name}'s kit is full.`, 'bad'); render(); return; }
+  spendPotion(id); h.potions.push(id);
+  log(`🧪 You hand <b>${potionById(id).name}</b> to the ${(CLASSES[h.cls] || MAGE).name}.`, 'good');
+  render();
 }
 function bankRowHTML() {
   if (!hasEmberwake() || !isAssignPhase()) return '';
@@ -13384,6 +13607,7 @@ const TIPS = {
 
   // — and what a card's kind does to its effect —
   mkforce:['⚔️ Twice as strong', 'This card applies its effect at double strength. The number shown already includes it.'],
+  still:  ['⚗️ The Still', 'Fire the card: its ➕ feeds your blow. Throw it in: its reagent goes into the Still and it deals nothing this turn. Two reagents brew a potion at the turn\'s end. Brew the same potion twice and it concentrates.'],
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
@@ -13710,7 +13934,7 @@ function cardHTML(card) {
     // 🔑 `elChip` had NO slot logic: it rendered what the card IS, unconditionally, so it was
     // saying exactly what the foot says. And the card's TINT already encodes the element, which is
     // why the vault's note says the dimmed half is never deleted - the colour keeps carrying it.
-    (CLASS.pairs || !CLASS.energy ? (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : '')
+    (CLASS.pairs || !CLASS.energy ? ((d.reagent ? `<div class="el-identity">${reagentTag(d)}</div>` : '') + (d.hits > 1 ? `<div class="el-identity"><span class="fork-tag">⚡ ${d.hits} hits</span></div>` : ''))
                  // ⚠️ LABELLED, NOT JUST GLYPHED (2026-08-18). Thomas, reading a reveal:
                  // *"how was second fang paid, it costs 3, viper strike has 2 energy to pay"* -
                  // and he was reading the card exactly as it was written. ⚡2 is what Viper Strike
@@ -13903,7 +14127,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14120,7 +14344,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace';   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14260,7 +14484,7 @@ function duelHandReset() {
   S.loseReserve = null; S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.moTarget = null;
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.moTarget = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 function duelTurnStartTwo() {
