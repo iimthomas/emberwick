@@ -1165,6 +1165,11 @@ button.stage.locked .stage-shape { font-style: italic; }
   background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; letter-spacing: 0; }
 .back-top:hover { border-color: #c9a24a; color: #f0d9a8; }
 
+/* ⚗️ the Alchemist: reagent tags on the face, the give button in the kit */
+.fork-tag.rg-herb { color: #9ed07a; } .fork-tag.rg-salt { color: #e8dcb0; } .fork-tag.rg-dew { color: #8fc4e8; } .fork-tag.rg-ash { color: #c9b8a6; }
+.still-row .wake-btn.on { border-color: #9ed07a; color: #d8f0c0; }
+.kit-give { margin: 0 6px 0 -4px; padding: 4px 8px; min-height: 32px; font-size: 12px; background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; }
+
 /* 🛡️ the Guardian's slot ③ row shares the channel row's look */
 .stance-row .wake-btn.on { border-color: #d16a4a; color: #f2c4b0; }
 
