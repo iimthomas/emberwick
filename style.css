@@ -1165,6 +1165,10 @@ button.stage.locked .stage-shape { font-style: italic; }
   background: #1d1a15; border: 1px solid #3a3126; border-radius: 8px; color: #b8b2a3; letter-spacing: 0; }
 .back-top:hover { border-color: #c9a24a; color: #f0d9a8; }
 
+/* 🏹 the Ranger's slot ③ row */
+.mark-row .wake-btn.on { border-color: #8fc4e8; color: #cfe6f5; }
+.foe-st-mark { border-color: #3a6a8a; background: rgba(58, 106, 138, .30); }
+
 /* ⚗️ the Alchemist: reagent tags on the face, the give button in the kit */
 .fork-tag.rg-herb { color: #9ed07a; } .fork-tag.rg-salt { color: #e8dcb0; } .fork-tag.rg-dew { color: #8fc4e8; } .fork-tag.rg-ash { color: #c9b8a6; }
 .still-row .wake-btn.on { border-color: #9ed07a; color: #d8f0c0; }

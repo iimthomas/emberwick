@@ -13,6 +13,13 @@
   "text": "it loses <b>N</b> each time it attacks",
   "decay": ""
  },
+ "mark": {
+  "el": null,
+  "icon": "🏹",
+  "name": "Marked",
+  "text": "the next <b>N</b> blow on it is certain — no Armour, no Evasion",
+  "decay": ""
+ },
  "knife": {
   "el": null,
   "icon": "🔪",
