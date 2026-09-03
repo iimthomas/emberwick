@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 468 — Two-Handed at the lair
+*2026-09-02*
+
+**Changed**
+- 🐉 **The dragon fight is two-handed.** Both characters gather their decks at the lair and fight it the same way as any creature: each races it with their own cards, whoever strikes first goes first, and the other arranges against it as it now is. The dragon has more HP for two.
+
 ## build 467 — The road is dark
 *2026-09-02*
 
