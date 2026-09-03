@@ -154,9 +154,19 @@ const useClass = name => {
   // is not pretending to have earned her, it is being told which class to measure.
   sandbox.pickedClassId = () => id;
   try { sandbox.localStorage.setItem(sandbox.CLASS_KEY, id); } catch (e) {}
-  return sandbox.setClass(id === 'rogue' ? sandbox.ROGUE : sandbox.MAGE);
+  sandbox.pickedMode = () => 'solo';
+  return sandbox.setClass(sandbox.CLASSES[id] || sandbox.MAGE);
 };
-module.exports = { sandbox, seed, useClass, DIR, els, getS: () => sandbox.getS(),
+// 🙌 a PARTY: main + partner through the real switch (startStage reads pickedMode/pickedPartnerId)
+const useParty = (main, partner) => {
+  useClass(main);
+  if (!partner || !sandbox.CLASSES[partner]) return;
+  if (partner === 'guardian') { try { sandbox.clearStage(2); } catch (e) {} }
+  if (partner === 'alchemist') { try { sandbox.clearStage(3); } catch (e) {} }
+  sandbox.pickedMode = () => 'two';
+  sandbox.pickedPartnerId = () => partner;
+};
+module.exports = { sandbox, seed, useClass, useParty, DIR, els, getS: () => sandbox.getS(),
   setS: v => sandbox.setS(v),
   getRng, setRng,
   setTunable: (k, v) => sandbox.setTunable(k, v), getTunable: k => sandbox.getTunable(k) };

@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 475 — Two-Handed is a little easier
+*2026-09-03*
+
+**Changed**
+- 🙌 **Creatures and dragons have less extra HP against two characters** (creatures ×1.8, dragons ×1.5, were ×2.2 and ×1.8). With the old numbers a pair lost more often than one character alone past stage 1.
+
 ## build 474 — You always see the next row
 *2026-09-03*
 
