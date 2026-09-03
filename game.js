@@ -3076,6 +3076,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 467, date: '2026-09-02', title: 'The road is dark',
+    changed: [
+      "🕯️ <b>The map no longer shows what each road is.</b> A lit candle shows the next row. In Two-Handed, two lit candles show two rows. A road you have seen stays seen. The paths are still drawn.",
+      "🙌 In Two-Handed each character carries their own candle: a clean win lights the one who struck, and at a hearth the tab picks whose candle takes the light.",
+    ] },
+
   { build: 466, date: '2026-09-02', title: 'Two-Handed on the Stages screen',
     changed: [
       "🙌 <b>Two-Handed is on the Stages screen.</b> Under Character, pick <b>Solo</b> or <b>Two-Handed</b>, then who stands on the right. It opens once you have a second character. Setting Out packs each character's own charm in turn.",
@@ -3533,7 +3539,7 @@ function saveGame(key) {
       map: S.map ? {
         pos: S.map.pos, taken: S.map.taken,
         floors: S.map.floors.map(row => row.map(n => n ? {
-          t: n.type, k: n.kind, x: n.next, d: n.done,
+          t: n.type, k: n.kind, x: n.next, d: n.done, s: n.seen,
           e: n.enc ? (n.enc.baseName || n.enc.name) : null,
         } : null)),
       } : null,
@@ -3566,7 +3572,7 @@ function reviveMap(m) {
       // ⚠️ the column comes from the map INDEX, not indexOf - identical node shapes would
       // otherwise all resolve to the first matching column.
       const n = mapNode(f, c);
-      n.type = sn.t; n.kind = sn.k || 'fight'; n.next = sn.x || []; n.done = !!sn.d;
+      n.type = sn.t; n.kind = sn.k || 'fight'; n.next = sn.x || []; n.done = !!sn.d; n.seen = !!sn.s;
       if (sn.e) {
         const region = RUN()[bandOf(f) - 1] || RUN()[0];
         const base = region.encounters.find(e => e.name === sn.e);
@@ -5840,7 +5846,26 @@ function demandOf(n) {
 // SHOWS WHAT IS IN THE NEXT STEP. That is what makes a lit candle worth routing toward.
 // ✅ And with ⚔️/👣 merged there are exactly four things a node can be, which is a map you can
 // read at a glance instead of a wall of symbols.
+// 🕯️ THE MAP IS DARK (2026-09-02, Thomas: *"hide what each node is on the map, and if the candle
+// is lit, then they can see what icons the next row of nodes are. in co op, if both candles are
+// lit, then they can see the next two rows"*).
+// 🔑 The candle's biggest job yet: a node's TYPE is hidden until a lit candle reaches it, one row
+// per lit candle in the party. The lines are still drawn — routing by SHAPE stays — and a node
+// once seen STAYS seen (a snuffed candle does not un-see the road). The tutorial map is fully lit.
+// ⚠️ The bot must read only what a player could see (solver's mapRoute asks nodeSeen).
+function partySight() {
+  if (!isTwoHanded()) return S.candle ? 1 : 0;
+  return S.hands.reduce((t, h, i) => t + ((i === S.handIdx ? S.candle : h.candle) ? 1 : 0), 0);
+}
+function nodeSeen(n) { return !!(n && (n.seen || n.done || (S && S.tutorial))); }
+function revealMap() {
+  const m = S && S.map; if (!m || !m.floors) return;
+  const from = m.pos ? m.pos.f + 1 : 0;
+  const to = Math.min(mapFloors(m), from + partySight());
+  for (let f = from; f < to; f++) for (const n of m.floors[f]) if (n) n.seen = true;
+}
 function mapIcon(n) {
+  if (!nodeSeen(n)) return '·';
   if (n.type === 'event')  return '❓';
   if (n.type === 'wheel')  return '🎰';
   if (n.type === 'hearth') return '🕯️';
@@ -5848,6 +5873,7 @@ function mapIcon(n) {
   return '◇';                                  // an encounter. What kind is the candle's business.
 }
 function mapTitle(n) {
+  if (!nodeSeen(n)) return 'a road you cannot see';
   if (n.type === 'event' || n.type === 'wheel' || n.type === 'hearth') return MAP_LABEL[n.type];
   if (n.type === 'elite') return 'something dangerous';
   return 'an encounter';
@@ -5880,11 +5906,11 @@ function peekHTML() {
   const n = m.floors[p.f] && m.floors[p.f][p.c];
   if (!n) return '';
   return mapPeek(n) ||
-    `<span class="dim">${mapTitle(n)} — your candle is out, so you cannot see what is on it.</span>`;
+    `<span class="dim">${mapTitle(n)} — ${nodeSeen(n) ? 'your candle is out, so you cannot see what is on it.' : 'the dark hides it. A lit candle shows the next row of the road.'}</span>`;
 }
 
 function mapPeek(n) {
-  if (!S.candle || !n.enc) return '';
+  if (!S.candle || !n.enc || !nodeSeen(n)) return '';
   const e = n.enc, d = demandOf(n);
   const nums = e.type === 'fight'
     ? `❤️ ${e.hp} · 💨 ${e.init} · ⚔️ ${e.atk} · 🪙 ${e.xp}`
@@ -7083,7 +7109,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 function handSnapshot(cls) { const h = { cls, struck: false, out: false }; for (const f of HAND_FIELDS) h[f] = S[f]; return h; }
 function stashHand() { const h = S.hands[S.handIdx]; for (const f of HAND_FIELDS) h[f] = S[f]; }
@@ -11906,6 +11932,7 @@ function forkBranchHTML(e, i) {
 // still matters - it tells you what is INSIDE the step you are about to take.
 function mapHTML() {
   const m = S.map; if (!m) return '';
+  revealMap();
   const reach = mapChoices(m).map(n => n.f + ',' + n.c);
   const rows = [];
   // ⚠️ THE MAP'S OWN HEIGHT AND WIDTH, never the globals. The tutorial's map is 8x2 while
@@ -11921,7 +11948,7 @@ function mapHTML() {
       const here = m.pos && m.pos.f === f && m.pos.c === c;
       const can = reach.includes(key);
       const past = m.taken.includes(key);
-      const cls = 'mp-node' + (here ? ' is-here' : '') + (can ? ' is-open' : '') + (past ? ' is-past' : '');
+      const cls = 'mp-node' + (here ? ' is-here' : '') + (can ? ' is-open' : '') + (past ? ' is-past' : '') + (nodeSeen(n) ? '' : ' is-fog');
       // ⚠️ data-f/data-c are what the edge layer measures against - the lines are drawn from the
       // real rendered positions rather than computed geometry, so they cannot drift from the grid.
       const at = `data-f="${f}" data-c="${c}"`;
@@ -11970,10 +11997,12 @@ function renderControls() {
       `<div class="hint">${S.map && S.map.pos ? 'Choose where to go next.' : 'Choose where to begin.'} ` +
       `<b>You are carrying ${S.hand.length === 0 ? 'nothing' :
         S.hand.map(c => displayName(c)).join(', ')}</b> — the rest of your hand is dealt once you set off. ` +
-      (S.candle ? '🕯️ Your candle is lit — you can see what waits at the next step.'
-                : '<b>Your candle is out</b> — you can read the road, but not what is on it.') +
+      (() => { const k = partySight();
+        return k >= 2 ? '🕯️🕯️ Both candles are lit — you can see two rows ahead.'
+          : k === 1 ? '🕯️ Your candle is lit — you can see the next row of the road.'
+          : '<b>Your candle is out</b> — the road ahead is dark until a hearth or a clean win lights it.'; })() +
       `</div>` + mapHTML() +
-      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ❓ an event · 🕯️ a hearth</div>` +
+      `<div class="mp-legend">◇ an encounter · 💀 dangerous · ❓ an event · 🕯️ a hearth · <b>·</b> unseen</div>` +
       // 🔑 ONE line that follows the pointer, instead of a list of every road at once. A list
       // states three things you did not ask about; a hover states the one you are considering.
       `<div class="mp-detail" id="mp-detail">${peekHTML()}</div>` +

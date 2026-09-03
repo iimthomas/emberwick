@@ -1150,6 +1150,9 @@ button.stage.locked .stage-shape { font-style: italic; }
 .class-row.is-soon .class-line { line-height: 1.35; }
 /* the emblem does the identifying at a glance; the sentence is for whoever leans in */
 .soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
+/* 🕯️ an unseen road on the map */
+.mp-node.is-fog { opacity: .5; color: #6a6355; border-style: dotted; }
+
 /* 🙌 the party switch on the stages screen */
 .mode-row { display: flex; gap: 8px; margin: 0 0 10px; }
 .mode-pick { flex: 1 1 0; display: flex; flex-direction: column; gap: 3px; text-align: left; margin: 0;

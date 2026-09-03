@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 467 — The road is dark
+*2026-09-02*
+
+**Changed**
+- 🕯️ **The map no longer shows what each road is.** A lit candle shows the next row. In Two-Handed, two lit candles show two rows. A road you have seen stays seen. The paths are still drawn.
+- 🙌 In Two-Handed each character carries their own candle: a clean win lights the one who struck, and at a hearth the tab picks whose candle takes the light.
+
 ## build 466 — Two-Handed on the Stages screen
 *2026-09-02*
 
