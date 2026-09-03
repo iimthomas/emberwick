@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 466 — Two-Handed on the Stages screen
+*2026-09-02*
+
+**Changed**
+- 🙌 **Two-Handed is on the Stages screen.** Under Character, pick **Solo** or **Two-Handed**, then who stands on the right. It opens once you have a second character. Setting Out packs each character's own charm in turn.
+- 🔧 The dev menu no longer has a partner row.
+
 ## build 465 — Two-Handed on the road
 *2026-09-02*
 

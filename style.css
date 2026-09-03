@@ -1150,6 +1150,13 @@ button.stage.locked .stage-shape { font-style: italic; }
 .class-row.is-soon .class-line { line-height: 1.35; }
 /* the emblem does the identifying at a glance; the sentence is for whoever leans in */
 .soon-icon { font-size: 26px; line-height: 1; opacity: .92; }
+/* 🙌 the party switch on the stages screen */
+.mode-row { display: flex; gap: 8px; margin: 0 0 10px; }
+.mode-pick { flex: 1 1 0; display: flex; flex-direction: column; gap: 3px; text-align: left; margin: 0;
+  padding: 10px 12px; background: #1d1a15; border: 1px solid #3a3126; border-radius: 10px; color: #b8b2a3; font-size: 12px; }
+.mode-pick b { font-size: 14px; color: #f0d9a8; }
+.mode-pick.on { border-color: #e0b04a; color: #f2e6c8; background: rgba(224,176,74,.14); }
+.mode-pick.locked { border-style: dashed; opacity: .6; cursor: default; }
 .class-pick.locked { cursor: default; border-style: dashed; }
 .class-pick.locked:hover { background: inherit; }
 
