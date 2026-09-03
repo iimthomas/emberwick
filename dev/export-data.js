@@ -40,7 +40,9 @@ for (const [name, table] of Object.entries(TABLES)) {
   const file = path.join(OUT, name + '.json');
   if (check) {
     const cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-    if (cur !== json) { stale++; console.log(`🔴 ${name}.json is stale`); }
+    if (cur !== null && cur.replace(/
+/g, '
+') !== json) { stale++; console.log(`🔴 ${name}.json is stale`); }   // ⚠️ EOL-insensitive: git rewrites the working copy to CRLF on checkout
   } else { fs.writeFileSync(file, json); written++; }
   const count = Array.isArray(table) ? table.length : Object.keys(table).length;
   console.log(`${check ? '·' : '✅'} ${name}: ${count} entries, ${(json.length / 1024).toFixed(1)} KB`);
