@@ -5,7 +5,7 @@
 const H = require('./headless.js');
 const S = H.sandbox;
 const N = +(process.argv[2] || 3);
-const M = 2.2;   // COOP_HP_MULT is a `let` and never lands on the sandbox — pin the value the build ships
+const M = 1.8;   // COOP_HP_MULT, pinned (a `let` never lands on the sandbox)
 H.useClass('mage'); H.seed(+(process.argv[3] || 20260902));
 
 const fails = [];

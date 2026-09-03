@@ -5,7 +5,7 @@
 const H = require('./headless.js');
 const S = H.sandbox;
 const N = +(process.argv[2] || 3);
-const M = 1.8;   // COOP_DRAGON_HP_MULT, pinned (a `let` never lands on the sandbox)
+const M = 1.5;   // COOP_DRAGON_HP_MULT, pinned (a `let` never lands on the sandbox)
 H.useClass('mage'); H.seed(+(process.argv[3] || 20260902));
 const fails = []; const ok = (c, m) => { if (!c) fails.push(m); };
 const clsOfHand = s => { const c = s.hand[0] || s.deck[0] || s.discard[0]; return (c && S.ROGUE.defs.includes(c.def)) ? 'rogue' : 'mage'; };

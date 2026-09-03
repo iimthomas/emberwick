@@ -786,7 +786,16 @@ const RUNSIM = (() => {
           const up = canSharpenNow()
             ? S.hand.filter(cc => upgradable(cc)).sort((a, b) => eff(b).cost - eff(a).cost)[0]
             : null;
-          if (up) buyUpgrade(up.id); else wheelDone();
+          if (up) buyUpgrade(up.id);
+          else {
+            // 🙌 TWO-HANDED: this shelf is done — step the other character up before Move on, once
+            if (typeof isTwoHanded === 'function' && isTwoHanded()) {
+              S.wheel.botSeen = true;
+              const other = S.hands.findIndex((h, i) => i !== S.handIdx && !(h.wheel && h.wheel.botSeen));
+              if (other >= 0) { swapHand(other); continue; }
+            }
+            wheelDone();
+          }
         }
       }
       // 🗺️ THE MAP. ⚠️ Same rule as every other phase: teach it or autoRun silently breaks.

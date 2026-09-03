@@ -3343,6 +3343,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 475, date: '2026-09-03', title: 'Two-Handed is a little easier',
+    changed: [
+      "🙌 <b>Creatures and dragons have less extra HP against two characters</b> (creatures ×1.8, dragons ×1.5, were ×2.2 and ×1.8). With the old numbers a pair lost more often than one character alone past stage 1.",
+    ] },
+
   { build: 474, date: '2026-09-03', title: 'You always see the next row',
     changed: [
       "🕯️ <b>The next row of the map is always visible.</b> A lit candle shows one more row (two in solo). In Two-Handed, both candles lit show three.",
@@ -7103,8 +7108,8 @@ function beginEncounter(e) {
 let PACK_LEAD_HP = 0.7;    // the lead's HP, as a fraction of its printed HP, when it has a pack
 let PACK_LEAD_ATK = 0.8;   // the lead's attack, likewise
 let PACK_RALLY = 1;        // what a 📣 rally minion adds to the lead's attack while it lives
-let COOP_HP_MULT = 2.2;
-let COOP_DRAGON_HP_MULT = 1.8;   // 🐉 the dragon's, separately: the duel is a STAMINA race (both decks drain while the pool waits), so the creature number is too high there. 📏 strong decks n=32: ×2.0 → 34/0/0/0 · ×1.8 → 53/6/0/0 · ×1.7 → 63/6/0/0 vs solo mage 16/22/3/0    // 🙌 a creature's HP when two hands fight it (attack, Initiative and par stay flat — the race does the rest). A number to sweep with the bot holding both hands.
+let COOP_HP_MULT = 1.8;   // 📏 SWEPT WITH THE PAIR BOT (475): 2.2 left every pair under a solo mage past stage 1; two hands take TWO hits a turn, so two blows buy less than double. Was 2.2.
+let COOP_DRAGON_HP_MULT = 1.5;   // 🐉 the dragon's, separately (📏 475: 1.8 → pair finale 13%, 1.5 → 49% for mage+rogue vs solo 13%): the duel is a STAMINA race (both decks drain while the pool waits), so the creature number is too high there. 📏 strong decks n=32: ×2.0 → 34/0/0/0 · ×1.8 → 53/6/0/0 · ×1.7 → 63/6/0/0 vs solo mage 16/22/3/0    // 🙌 a creature's HP when two hands fight it (attack, Initiative and par stay flat — the race does the rest). A number to sweep with the bot holding both hands.
 let PACK_MINION_HP = 1;    // minion HP multiplier (1 = as authored; 0.5 = *any hit kills*)
 function packLead(e) {
   if (!e || !e.pack || !e.pack.length) return e;
