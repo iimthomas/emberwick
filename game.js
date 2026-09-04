@@ -3454,6 +3454,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 480, date: '2026-09-03', title: 'Online co-op reconnects',
+    changed: [
+      "🌐 <b>A dropped connection no longer ends an online game.</b> The guest reconnects on its own; if either of you closes the page, the Stages screen offers <b>Rejoin</b> (guest) or <b>Reopen the room</b> (host) with the same code, and the host's save carries the run.",
+      "🙌 In Two-Handed the hit animation now lands on the character who took the hit.",
+      "🏹 The Ranger's <b>after that</b> line is on the creature panel, under the next attack.",
+    ] },
+
   { build: 479, date: '2026-09-03', title: 'Online co-op, first cut',
     changed: [
       "🌐 <b>Play Two-Handed with a friend online.</b> On the Stages screen: one of you presses <b>Host a game</b> and reads out the 4-letter room code; the other picks their character and <b>Joins</b> with it. The host chooses the stage and walks the map; in fights and shops, whoever's turn it is plays while the other waits with cards hidden. Needs both of you online; the game data goes browser to browser.",
@@ -8730,7 +8737,7 @@ function resolve() {
         beatSt.untouched = false;                 // ❤️ gone for the rest of this fight
         tickMomentum(first, r);
         fx('foe-slot', 'fx-strikes-first', 620);  // 💥 it comes at you — see the impact note
-        fx('mage-slot', 'fx-hurt', 460);
+        fx(heroSlotId(), 'fx-hurt', 460);
         log(`⚡ ${S.foeBase.name} is faster — it strikes first for <b>${first}</b>.`, 'bad');
         S.damage = first; S.damageEl = null;
         S.afterSoak = 'foeBlow';                  // …and THEN your blow lands
@@ -8854,11 +8861,11 @@ function beatFx(beat) {
   } else if (beat.label.includes('MOVE')) {
     if (r.outcome === 'Complete') fx('scene', 'fx-surge', 900);
   } else if (beat.label.includes('INITIATIVE')) {
-    if (r.early > 0) { fx('mage-slot', 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
+    if (r.early > 0) { fx(heroSlotId(), 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
   } else if (beat.label.includes('PACE')) {
     if (r.nightCaught) fx('scene', 'fx-dark', 700);
   }
-  if (beat.outcomeBeat && r.combatDmg > 0) { fx('mage-slot', 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
+  if (beat.outcomeBeat && r.combatDmg > 0) { fx(heroSlotId(), 'fx-hurt', 460); fx('scene', 'fx-shake', 300); }
 }
 
 function advanceBeat() {
@@ -11563,6 +11570,8 @@ function heroPose() {
   if (S.finalMode) return 'cast';
   return (S.encounter && S.encounter.type === 'journey') ? 'walk' : 'cast';
 }
+// 🙌 which figure is the ACTIVE hand's — hand 0 stands left, the partner right
+function heroSlotId() { return isTwoHanded() && S.handIdx === 1 ? 'partner-slot' : 'mage-slot'; }
 function heroArt() {
   // 🙌 hand 0 stands on the left whichever hand is arranging
   const id = isTwoHanded() ? (S.hands[0].cls) : CLASS.id;
@@ -12497,7 +12506,8 @@ function renderEncounter() {
         `<span data-tip="foeatk">⚔️ Atk <b>${e.atk}</b></span>` +
         `<span>🪙 <b>${e.xp}</b></span></div>` +
         (S.foeState.active ? `<div class="foe-now">${S.foeState.active.icon} <b>${S.foeState.active.name}</b> — ${S.foeState.active.now}</div>` : '') +
-        (S.foeState.next ? `<div class="foe-tell" data-tip="foenext">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '')
+        (S.foeState.next ? `<div class="foe-tell" data-tip="foenext">↷ next: ${S.foeState.next.icon} <b>${S.foeState.next.name}</b> — ${S.foeState.next.tell}</div>` : '') +
+        (() => { const a2 = foeAfterNext(); return a2 ? `<div class="foe-tell foe-after" data-tip="foenext">🏹 after that: ${a2.icon} <b>${a2.name}</b></div>` : ''; })()
       : '') +
       (S.foeState ? '' :
       // ❤️ the same bar, with the half mark on it — one creature, one way of reading its health

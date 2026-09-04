@@ -28,31 +28,39 @@ const NET_ALLOW = /^(tap(Card|Zone|Node)|assignRole|resolve(Duel)?|soakWith(Armo
 // phases where the ACTIVE HAND's owner acts; everything else (the map, events, the shell) is the host's
 const NET_HAND_PHASES = ['assign', 'soak', 'reveal', 'wheel', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'setout', 'stack', 'upgrade'];
 
+// 💾 the room is remembered per browser, so a reload can offer Rejoin / Reopen with the same code
+function netRemember() { try { localStorage.setItem('emberwick-net-1' + KEY_NS, JSON.stringify({ role: NET.role, code: NET.code })); } catch (e) {} }
+function netForget() { try { localStorage.removeItem('emberwick-net-1' + KEY_NS); } catch (e) {} }
+function netRemembered() { try { const d = JSON.parse(localStorage.getItem('emberwick-net-1' + KEY_NS) || 'null'); return d && d.code ? d : null; } catch (e) { return null; } }
 function netCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 function netPeerId(code) { return 'emberwick-' + code.toUpperCase(); }
 function netSet(status) { NET.status = status; try { render(); } catch (e) {} }
 
 // ---------- host ----------
-function netHost() {
+function netHost(code) {
   if (typeof Peer === 'undefined') { netSet('The connection library did not load — are you online?'); return; }
   netLeave();
-  NET.role = 'host'; NET.myIdx = 0; NET.code = netCode();
+  NET.role = 'host'; NET.myIdx = 0; NET.code = code ? String(code).toUpperCase() : netCode();
+  netRemember();
   netSet('Opening a room…');
   const peer = new Peer(netPeerId(NET.code));
   NET.peer = peer;
   peer.on('open', () => netSet(`Room <b>${NET.code}</b> — waiting for a partner to join.`));
-  peer.on('error', e => { if (String(e.type) === 'unavailable-id') { NET.code = netCode(); netHost(); return; } netSet('Connection error: ' + (e.type || e)); });
+  peer.on('error', e => { if (String(e.type) === 'unavailable-id') { if (!code) { NET.code = netCode(); netHost(); } else netSet('That room is still open somewhere else — close it there, or host a new one.'); return; } netSet('Connection error: ' + (e.type || e)); });
   peer.on('connection', conn => {
+    // 🔁 a returning partner replaces a dead connection; a second stranger is refused
     if (NET.conn && NET.conn.open) { conn.close(); return; }
     NET.conn = conn;
     conn.on('data', m => netOnHostMessage(m));
-    conn.on('close', () => netSet('Your partner left.'));
-    conn.on('open', () => netSet(`Partner connected to room <b>${NET.code}</b>. Choose a stage.`));
+    conn.on('close', () => netSet(`Your partner's connection dropped — the room <b>${NET.code}</b> stays open for them to rejoin.`));
+    conn.on('open', () => { netSet(`Partner connected to room <b>${NET.code}</b>.${S && S.hands ? '' : ' Choose a stage.'}`); netBroadcast(); });
   });
 }
 function netOnHostMessage(m) {
   if (!m || typeof m !== 'object') return;
   if (m.t === 'hello') {
+    // 🔁 a live run keeps the class the guest joined with — a rejoin never re-rolls the party
+    if (S && S.hands && S.hands.length > 1) { NET.guestCls = S.hands[1].cls; netSet(`Partner is back in room <b>${NET.code}</b>.`); netBroadcast(); return; }
     NET.guestCls = (typeof CLASSES !== 'undefined' && CLASSES[m.cls]) ? m.cls : 'rogue';
     // the party switch, answered by the wire instead of the picker
     pickedMode = () => 'two';
@@ -94,7 +102,8 @@ function netJoin(code) {
   if (code.length < 4) { netSet('Enter the 4-letter room code.'); return; }
   if (typeof Peer === 'undefined') { netSet('The connection library did not load — are you online?'); return; }
   netLeave();
-  NET.role = 'guest'; NET.myIdx = 1; NET.code = code;
+  NET.role = 'guest'; NET.myIdx = 1; NET.code = code; NET.retries = 0;
+  netRemember();
   netSet(`Joining room <b>${code}</b>…`);
   const peer = new Peer();
   NET.peer = peer;
@@ -104,8 +113,15 @@ function netJoin(code) {
     NET.conn = conn;
     conn.on('open', () => { const cls = pickedClassId(); conn.send({ t: 'hello', cls }); netSet(`Joined room <b>${code}</b> as the <b>${(CLASSES[cls] || MAGE).name}</b>. Waiting for the host to choose a stage…`); });
     conn.on('data', m => netOnGuestMessage(m));
-    conn.on('close', () => netSet('The host left.'));
+    // 🔁 a dropped channel is retried on its own; the host keeps the room open
+    conn.on('close', () => { if (NET.role !== 'guest') return; netSet('Connection dropped — reconnecting…'); netRetry(); });
   });
+}
+function netRetry() {
+  if (NET.role !== 'guest' || !NET.code) return;
+  if ((NET.retries = (NET.retries || 0) + 1) > 20) { netSet('Could not reconnect. Press Rejoin to try again.'); return; }
+  const code = NET.code, tries = NET.retries;
+  setTimeout(() => { if (NET.role === 'guest' && !NET.live) { const r = NET.retries; netJoin(code); NET.retries = r; } }, Math.min(15000, 2000 * tries));
 }
 function netOnGuestMessage(m) {
   if (!m || m.t !== 'state' || !m.d) return;
@@ -121,10 +137,11 @@ function netSendCommand(fn, args) {
   if (!NET.guest || !NET.live) return;
   NET.conn.send({ t: 'cmd', fn, args });
 }
-function netLeave() {
+function netLeave(forget) {
   try { if (NET.conn) NET.conn.close(); } catch (e) {}
   try { if (NET.peer) NET.peer.destroy(); } catch (e) {}
   NET.conn = null; NET.peer = null; NET.role = null; NET.status = '';
+  if (forget) netForget();
 }
 
 // ---------- the guest's clicks become commands ----------
@@ -171,9 +188,13 @@ function netDecorate() {
 }
 function onlinePartyHTML() {
   const st = NET.status ? `<div class="net-status">${NET.status}</div>` : '';
-  if (NET.role === 'host') return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">${st}<button onclick="netLeave(); render()">close the room</button></div>`;
-  if (NET.role === 'guest') return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">${st}<button onclick="netLeave(); render()">leave</button></div>`;
-  return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">` +
+  if (NET.role === 'host') return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">${st}<button onclick="netLeave(true); render()">close the room</button></div>`;
+  if (NET.role === 'guest') return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">${st}<button onclick="netLeave(true); render()">leave</button></div>`;
+  const rem = netRemembered();
+  const back = rem ? (rem.role === 'host'
+    ? `<div class="net-row"><button class="primary" onclick="netHost('${rem.code}')">Reopen room ${rem.code}</button><span class="dim">your save carries the run; your partner rejoins with the same code</span></div>`
+    : `<div class="net-row"><button class="primary" onclick="netJoin('${rem.code}')">Rejoin room ${rem.code}</button><span class="dim">the host's game continues where it was</span></div>`) : '';
+  return `<div class="wall-line">🌐 <b>Online</b></div><div class="net-box">` + back +
     `<div class="net-row"><button class="primary" onclick="netHost()">Host a game</button><span class="dim">you pick the stage; your partner joins with a code</span></div>` +
     `<div class="net-row"><input id="net-code" maxlength="4" placeholder="CODE" autocapitalize="characters"><button onclick="netJoin(document.getElementById('net-code').value)">Join</button><span class="dim">with the character you have picked above</span></div>` +
     st + `</div>`;

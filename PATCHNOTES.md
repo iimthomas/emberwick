@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 480 — Online co-op reconnects
+*2026-09-03*
+
+**Changed**
+- 🌐 **A dropped connection no longer ends an online game.** The guest reconnects on its own; if either of you closes the page, the Stages screen offers **Rejoin** (guest) or **Reopen the room** (host) with the same code, and the host's save carries the run.
+- 🙌 In Two-Handed the hit animation now lands on the character who took the hit.
+- 🏹 The Ranger's **after that** line is on the creature panel, under the next attack.
+
 ## build 479 — Online co-op, first cut
 *2026-09-03*
 
