@@ -156,6 +156,9 @@ const useClass = name => {
   sandbox.pickedClassId = () => id;
   try { sandbox.localStorage.setItem(sandbox.CLASS_KEY, id); } catch (e) {}
   sandbox.pickedMode = () => 'solo';
+  // ⭐ PIN THE ACCOUNT (2026-09-04): batch() never pinned it, and the sandbox's own XP key grew from every probe's payouts —
+  // a day of '⭐1' numbers were taken at ⭐9–15. Every probe is a fresh account unless it asks otherwise.
+  try { setTunable('XP_LEVEL_FORCE', 1); setTunable('CLASS_LEVEL_FORCE', 1); } catch (e) {}
   return sandbox.setClass(sandbox.CLASSES[id] || sandbox.MAGE);
 };
 // 🙌 a PARTY: main + partner through the real switch (startStage reads pickedMode/pickedPartnerId)
