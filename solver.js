@@ -653,7 +653,9 @@ const RUNSIM = (() => {
     // Initiative −1, for the rest of the fight) is priced INSIDE the damage term like the bank, or
     // the one-beat scorer never opens with a tool (measured: 0.6 sticks a duel, race lost 74%).
     const knifeDuel = (r.rogue && r.rogue.sticks && !kill) ? KNIFE_DUEL_WEIGHT : 0;
-    return [kill ? 1 : 0, st.toHp + bankValue(r) + effectValue(r) + knifeDuel, -incoming];
+    // 🐛 487: the duel scorer never priced a Mark, a brew, a taunt or any class after the Ranger's fork — the dims were walked and worth 0, so slot ③ was dead at every dragon for five classes
+    const forkDuel = kill ? 0 : (markValue(r) + brewValue(r) + forkValue(r));
+    return [kill ? 1 : 0, st.toHp + bankValue(r) + effectValue(r) + knifeDuel + forkDuel, -incoming - guardDmg(r)];
   }
   // 🚨 THIS IS THE **FOURTH** COPY OF THE ARRANGEMENT SEARCH, and it is the one that proves the
   // point the other three keep making. It silently omitted `bankArmed` AND the wake's aim, so the
@@ -663,7 +665,9 @@ const RUNSIM = (() => {
   function chooseBestDuel() {
     const best = searchArrangements({ hand: S.hand, legal: false, duel: true,
       boostTargets: ['Attack', 'Initiative'], arms: CLASS.emberwake ? [false, true] : [false],
-      rips: CLASS.knives ? [false, true] : [undefined], forks: CLASS.fork ? [false, true] : [undefined], score: evalDuelPlay, better });
+      rips: CLASS.knives ? [false, true] : [undefined], forks: CLASS.fork ? [false, true] : [undefined],
+      // 🐛 487: the duel search never walked the Guardian's stance, the Alchemist's Still or the Ranger's Mark — three classes fought every dragon with slot ③ off
+      stances: CLASS.stances ? ['taunt', 'brace'] : [undefined], brews: CLASS.brews ? [false, true] : [undefined], marks: CLASS.marks ? [false, true] : [undefined], score: evalDuelPlay, better });
     S.ripArmed = false;
     if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
     if (best && best.stance !== undefined) S.guardStance = best.stance;

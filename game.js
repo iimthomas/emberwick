@@ -2218,6 +2218,14 @@ const RANGER_DEFS = RANGER_SPEC.map(s => {
 });
 // what a Mark would save the NEXT blow, against this creature's shape — the bot's price and the row's promise
 function markWorth(e) {
+  // 🐉 487: in the DUEL the shape is the dragon's, not the encounter's — read it there, or a Mark is worth 0 at every
+  // dragon and the bot never marks (it measured 4% of duel turns; her blow was already the mage's size)
+  if (S.finalMode && S.finalPhase === 'duel' && S.dragon) {
+    let w = 0;
+    if (hasShape('armour')) w += duelArmour();
+    if (hasShape('evasion')) w += Math.max(3, Math.round(((S.dragonState && S.dragonState.hp) || 20) / 4));
+    return w;
+  }
   if (!e) return 0;
   if (foeHas(e, 'armour')) return Math.max(0, e.shapeV || 0);
   if (foeHas(e, 'evasion')) return Math.max(3, Math.round(((S.foeState && S.foeState.hp) || 12) / 4));
@@ -2530,7 +2538,7 @@ const ILLUSIONIST = {
       vSpell: null, vElem: null,
       spell, elem: cat, boostC: fig,
       attuner: null, loose: false,
-      klass: { summons, name: fig ? fig.def.name : null, kind: fig ? fig.def.kind : null, power,
+      klass: { summons, name: fig ? fig.def.name : null, kind: fig ? fig.def.kind : null, power, cardId: fig ? fig.id : null,
                body: fig && fig.def.body ? fig.def.body[fig.level - 1] + (hasCharm('shroud') ? 2 : 0) - (fig.def.kind === 'blow' && hasCharm('glasscannon') ? 1 : 0) : 0,
                blowBonus, initBonus,
                // 🔑 the bot's price: the illusion's power for SUMMON_WEIGHT future turns, less the ➕ it gave up
@@ -2540,7 +2548,7 @@ const ILLUSIONIST = {
   // 🎭 the summon lands whether or not the blow killed — the card leaves the deck for the board
   afterTurn(r) {
     if (!r || !r.klass || !r.klass.summons) return;
-    const fig = cardById(S.assign.Boost); if (!fig) return;
+    const fig = cardById(r.klass.cardId); if (!fig || !fig.def.kind || !S.hand.includes(fig)) return;   // the card the turn resolved with (see the Gardener)
     const k = kbag(); k.illusions = k.illusions || [];
     S.hand = S.hand.filter(c => c.id !== fig.id);
     S.actionSetIds = (S.actionSetIds || []).filter(id => id !== fig.id);
@@ -2967,14 +2975,17 @@ const GARDENER = {
       vSpell: null, vElem: null,
       spell: blow, elem: foot, boostC: seed,
       attuner: null, loose: false,
-      klass: { plants, crop: plants ? seed.def.crop : null, name: seed ? seed.def.name : null,
-               botValue: plants ? PLANT_WEIGHT - (hasCharm('harvestmoon') ? 0 : eff(seed).boost) : 0 },
+      klass: { plants, crop: plants ? seed.def.crop : null, name: seed ? seed.def.name : null, cardId: seed ? seed.id : null,
+               // 🐉 never plant at the dragon: a plot takes a card out of the fight's ammunition and nothing ripens in time to matter
+               botValue: plants ? (S.finalMode ? -99 : PLANT_WEIGHT - (hasCharm('harvestmoon') ? 0 : eff(seed).boost)) : 0 },
     };
   },
   // 🌱 the planted card leaves the deck for the plot — kill or not
   afterTurn(r) {
     if (!r || !r.klass || !r.klass.plants) return;
-    const seed = cardById(S.assign.Boost); if (!seed) return;
+    // 🐛 the card the turn was RESOLVED with, never what sits in the slot now — a soak between the
+    // blow and its landing can destroy the Plot card and reseat another there (found by the sweep)
+    const seed = cardById(r.klass.cardId); if (!seed || !seed.def.crop || !S.hand.includes(seed)) return;
     S.hand = S.hand.filter(c => c.id !== seed.id);
     S.actionSetIds = (S.actionSetIds || []).filter(id => id !== seed.id);
     plots().push({ n: GARDENER_DEFS.indexOf(seed.def), lv: seed.level, name: seed.def.name, crop: seed.def.crop, ripe: PLANT_TURNS - (hasCharm('greenthumb') ? 1 : 0) });
@@ -3009,6 +3020,23 @@ const GARDENER = {
 };
 
 const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST, merchant: MERCHANT, engineer: ENGINEER, gardener: GARDENER };
+// ⚔️ THE BLOW LADDER (2026-09-05, build 487). Every class after the mage measured 0 at stages 2–4 for
+// ONE reason: the dragons' HP (104/104/102) was set to the mage's attuned blow (10–13 + an effect),
+// and a smaller blow cannot reach it inside the deck's ammunition — a cliff, not a slope. The mage
+// has attuning (+level +2 every paired turn) on top of the +3-a-level spike everyone shares; the
+// others' forks pay in other currencies. Same finding as the rogue on 08-22, mirrored. 🔑 Dragons
+// are content and content is class-blind, so the fix is the CLASS's blow, never a per-class dragon.
+// Swept (dev/blow-sweep.js, n=40/stage, +0/+3/+4 on each class's blow cards — the ones whose value
+// grows ≥6 over four levels): guardian 7→15→21% · berserker 11→17→21 · engineer 7→15→20 ·
+// alchemist 3→7→11 · illusionist 3→6→9 · merchant 13→26→30 (her purse already scales; left at 0) ·
+// ranger 0→4→4 and gardener 1→3 barely moved — their limit is elsewhere (see Balance_Log).
+// The mage's reference is 15%. Applied here, ONCE, after every class's table is built.
+const BLOW_ADD = { guardian: 3, alchemist: 4, ranger: 4, berserker: 3, illusionist: 4, merchant: 0, engineer: 3, gardener: 3 };
+function isBlowCard(d) { return d.lv[3][0] - d.lv[0][0] >= 6; }
+for (const [id, n] of Object.entries(BLOW_ADD)) {
+  const c = CLASSES[id]; if (!c || !n) continue;
+  for (const d of c.defs) if (isBlowCard(d)) for (const r of d.lv) r[0] += n;
+}
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -4256,6 +4284,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 487, date: '2026-09-05', title: 'The new characters hit harder',
+    changed: [
+      "⚔️ <b>Every character after the Mage hits harder at the dragons.</b> Their main attack cards are up by 3 or 4 at every level (Guardian, Berserker, Engineer, Gardener +3 · Alchemist, Illusionist, Ranger +4). The Merchant is unchanged. Past stage 1 their blows could not reach a dragon before the deck ran out.",
+    ],
+    fixed: [
+      "🌱🎭 A card planted or summoned right after a hit that destroyed the card in that slot could plant the wrong card.",
+    ] },
+
   { build: 486, date: '2026-09-04', title: 'A tenth character: the Gardener',
     added: [
       "🌱 <b>The Gardener.</b> Unlocks at account level 11. A seed card in her <b>Plot</b> plays (its ➕ feeds her Blow) or is <b>planted</b>: it leaves her deck, ripens over 2 turns, and comes back with its crop — grain, wood, stone or honey. Spend crops to <b>build</b> for the run, in tiers: a Hedge (hits are weaker), a Hive (Initiative), a Mill (bigger harvests), a Bramble (every creature you meet is slower, for everyone).",
