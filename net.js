@@ -24,7 +24,7 @@ const NET = {
   get live() { return !!(this.conn && this.conn.open); },
 };
 // what a guest may ask the host to run — the game's own UI verbs, never the shell or the dev tools
-const NET_ALLOW = /^(tap(Card|Zone|Node)|assignRole|resolve(Duel)?|soakWith(Armour)?|advanceBeat|toggle(Bank|Stance|Still|Mark|Rip|Fork)|setFront|bribe|cycleWake|use(Potion|PotionOn|ArmourActive)|cancel(Potion|HearthPick|MendPick)|givePotion|pick(Setout|Boon)|wheel(Buy|Done|Reroll|Spin)|buyUpgrade|previewUpgrade|doneUpgrades|swapHand|peekNode|takeMapNode|hearth(Light|Forge|MendPick)|start(HearthPick|MendPick)|stackPick|setFoeTarget|event(Choose|Continue|PickCard|CancelPick)|backToMap|nextRegion|beginFinalBattle|finishStack|takeBoon)$/;
+const NET_ALLOW = /^(tap(Card|Zone|Node)|assignRole|resolve(Duel)?|soakWith(Armour)?|advanceBeat|toggle(Bank|Stance|Still|Mark|Rip|Fork)|setFront|bribe|setBuild|cycleWake|use(Potion|PotionOn|ArmourActive)|cancel(Potion|HearthPick|MendPick)|givePotion|pick(Setout|Boon)|wheel(Buy|Done|Reroll|Spin)|buyUpgrade|previewUpgrade|doneUpgrades|swapHand|peekNode|takeMapNode|hearth(Light|Forge|MendPick)|start(HearthPick|MendPick)|stackPick|setFoeTarget|event(Choose|Continue|PickCard|CancelPick)|backToMap|nextRegion|beginFinalBattle|finishStack|takeBoon)$/;
 // phases where the ACTIVE HAND's owner acts; everything else (the map, events, the shell) is the host's
 const NET_HAND_PHASES = ['assign', 'soak', 'reveal', 'wheel', 'hearth', 'hearthpick', 'mendpick', 'eliteboon', 'setout', 'stack', 'upgrade'];
 

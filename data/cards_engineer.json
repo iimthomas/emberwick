@@ -1,0 +1,370 @@
+[
+ {
+  "name": "Piston Hammer",
+  "element": null,
+  "arch": null,
+  "role": "wrench",
+  "hits": 1,
+  "lv": [
+   [
+    6,
+    null,
+    2,
+    2,
+    2,
+    null,
+    null
+   ],
+   [
+    9,
+    null,
+    1,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    12,
+    null,
+    1,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    15,
+    null,
+    1,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Rivet Gun",
+  "element": null,
+  "arch": null,
+  "role": "wrench",
+  "hits": 1,
+  "lv": [
+   [
+    5,
+    null,
+    5,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    8,
+    null,
+    4,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    11,
+    null,
+    4,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    14,
+    null,
+    4,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Cogblade",
+  "element": null,
+  "arch": null,
+  "role": "wrench",
+  "hits": 1,
+  "lv": [
+   [
+    7,
+    null,
+    1,
+    2,
+    2,
+    null,
+    null
+   ],
+   [
+    10,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    13,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    16,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Spanner",
+  "element": null,
+  "arch": null,
+  "role": "wrench",
+  "hits": 1,
+  "lv": [
+   [
+    3,
+    null,
+    7,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    8,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    9,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    10,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Brass Gear",
+  "element": null,
+  "arch": null,
+  "role": "gear",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    3,
+    5,
+    2,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    7,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    9,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    11,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Flywheel",
+  "element": null,
+  "arch": null,
+  "role": "gear",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    5,
+    3,
+    2,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    4,
+    5,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    4,
+    7,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    4,
+    9,
+    1,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Copper Coil",
+  "element": null,
+  "arch": null,
+  "role": "gear",
+  "hits": 1,
+  "lv": [
+   [
+    3,
+    null,
+    2,
+    4,
+    3,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    1,
+    6,
+    2,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    1,
+    8,
+    2,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    1,
+    10,
+    2,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ },
+ {
+  "name": "Iron Plate",
+  "element": null,
+  "arch": null,
+  "role": "gear",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    3,
+    3,
+    5,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    2,
+    6,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    2,
+    7,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    2,
+    8,
+    null,
+    null
+   ]
+  ],
+  "engineer": true
+ }
+]

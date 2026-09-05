@@ -2716,7 +2716,132 @@ const MERCHANT = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST, merchant: MERCHANT };
+// ============================================================
+// 🏗️ THE ENGINEER (2026-09-04, build 485) — [[Euro_Classes]] §1. Source of power: PERSISTENCE —
+// what you left behind. Thomas: *"he builds a turret, and you can upgrade it and stuff and it
+// persists through rounds, maybe it decays or something and you gotta rebuild it."*
+// ③ THE WORKBENCH: the card there SWINGS (its ➕ feeds the blow) or is spent to BUILD — the turret
+// gains a level (cap TURRET_CAP), and every turn it stands it adds TURRET_DMG × level to his blow.
+// ⚠️ The turret hits WITHOUT a decision, so its damage is capped small: the class's power lives in
+// the turns spent building. 🔩 DECAY: it loses a level every new fight unless tended (Oiled Gears
+// keeps it) — which is what makes "tend it or swing" a live question every fight, not once.
+// 🙌 Co-op: build a SNARE instead — the creature is Frost 2 for the whole fight, for everyone.
+// The bot builds the turret (klass.botValue prices it over BUILD_TURNS); it never sets a snare.
+// ============================================================
+let TURRET_CAP = 3;
+let TURRET_DMG = 2;       // 🏗️ per turret level, added to his blow every turn
+let SNARE_FROST = 2;
+let BUILD_TURNS = 3;      // the bot's horizon for a turret level
+const ENGINEER_SPEC = [
+  // role      name             spike     base [value, init, boost, armour]
+  { role: 'wrench', name: 'Piston Hammer', spike: 'value', base: [6, 2, 2, 2] },
+  { role: 'wrench', name: 'Rivet Gun',     spike: 'value', base: [5, 5, 2, 1] },
+  { role: 'wrench', name: 'Cogblade',      spike: 'value', base: [7, 1, 2, 2] },
+  { role: 'wrench', name: 'Spanner',       spike: 'init',  base: [3, 7, 2, 1] },
+  { role: 'gear',   name: 'Brass Gear',    spike: 'boost', base: [2, 3, 5, 2] },
+  { role: 'gear',   name: 'Flywheel',      spike: 'boost', base: [2, 5, 3, 2] },
+  { role: 'gear',   name: 'Copper Coil',   spike: 'boost', base: [3, 2, 4, 3] },
+  { role: 'gear',   name: 'Iron Plate',    spike: 'armor', base: [2, 3, 3, 5] },
+];
+const ENGINEER_DEFS = specDefs(ENGINEER_SPEC, 'engineer');
+function turretLv() { return (S.k && S.k.turret) || 0; }
+function turretCap() { return TURRET_CAP + (hasCharm('siege') ? 1 : 0); }
+function turretDmg() { const lv = turretLv(); return lv ? lv * (TURRET_DMG + (hasCharm('overclock') ? 1 : 0)) : 0; }
+function setBuild(kind) { const k = kbag(); k.build = kind; S.forkOn = true; render(); }
+const ENGINEER = {
+  id: 'engineer',
+  mark: '🏗️',
+  multi: null,
+  labels: { Spell: 'Blow', Element: 'Footing', Boost: 'Workbench', Reserve: 'Arsenal' },
+  defs: ENGINEER_DEFS,
+  deck() { return shuffle(ENGINEER_DEFS.concat(ENGINEER_DEFS).map(newCard)); },
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false, brews: false, marks: false,
+  name: 'Engineer',
+  tagline: 'he leaves working machines behind',
+  unlock: '🔒 reach account level 9 to unlock him',
+  trait: { icon: '🏗️', name: 'The Turret',
+    text: 'The card on your <b>Workbench</b> either swings (its ➕ feeds your Blow) or is spent to <b>build</b>: your turret gains a level, and every turn it stands it adds <b>2 per level</b> to your Blow. It <b>loses a level every new fight</b> unless you tend it. Or set a <b>snare</b> instead: the creature is 2 slower for the whole fight, for everyone.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'built', gate: 'build it',
+    avail() { return !!(S.encounter && S.encounter.type === 'fight'); },
+    found(r) { return !!(r.klass && r.klass.builds); },
+  },
+  // 🔩 decay: a level a fight, unless tended (or Oiled Gears); Foundation starts a run's first fight at Lv1
+  onEncounter() {
+    const k = kbag();
+    if (k.turret > 0 && !hasCharm('oiledgears')) { k.turret--; log(`🔩 Your turret <b>wears</b> — Lv${k.turret}${k.turret ? '' : ', it is scrap'}.`, 'bad'); }
+    if (!k.turret && hasCharm('foundation') && !k.founded) { k.turret = 1; k.founded = true; log('🏗️ Foundation — a Lv1 turret stands ready.', 'good'); }
+    k.build = 'turret';
+  },
+  tokens() {
+    const lv = turretLv(); if (!lv) return null;
+    return [{ id: 'turret', icon: '🏗️', name: 'Turret', count: lv, cap: turretCap(), worth: `your Blow <b>+${turretDmg()}</b> every turn`, note: hasCharm('oiledgears') ? 'it does not wear' : 'loses a level every new fight unless tended' }];
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const blow = spellCard(); if (!blow) return null;
+    const foot = cardById(S.assign.Element), gear = cardById(S.assign.Boost);
+    const k = S.k || {}, kind = k.build || 'turret';
+    const builds = !!(S.forkOn && gear && (kind === 'snare' || turretLv() < turretCap()));
+    const boost = gear && (!builds || hasCharm('scrap')) ? eff(gear).boost : 0;
+    const tdmg = turretDmg();
+    return {
+      value: Math.max(0, eff(blow).value + tdmg + (duelFx().value || 0)),
+      element: null,
+      init: foot ? eff(foot).init : 0,
+      boost,
+      hits: CLASS.hitsOf(blow, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: blow, elem: foot, boostC: gear,
+      attuner: null, loose: false,
+      klass: { builds, kind: builds ? kind : null, turret: tdmg,
+               botValue: builds && kind === 'turret' ? BUILD_TURNS * (TURRET_DMG + (hasCharm('overclock') ? 1 : 0)) - (hasCharm('scrap') ? 0 : (gear ? eff(gear).boost : 0)) : 0 },
+    };
+  },
+  afterTurn(r) {
+    if (!r || !r.klass || !r.klass.builds) return;
+    const k = kbag();
+    if (r.klass.kind === 'snare') {
+      const bag = fightStatus();
+      if (bag) { const n = SNARE_FROST + (hasCharm('tripwire') ? 2 : 0); bag.frost = (bag.frost || 0) + n; bag.lasting = Object.assign({}, bag.lasting, { frost: true }); log(`🪤 You set a snare — it is <b>${n} slower</b> for the whole fight, for everyone.`, 'good'); }
+    } else {
+      k.turret = Math.min(turretCap(), (k.turret || 0) + 1);
+      log(`🏗️ You build — the turret is <b>Lv${k.turret}</b>: your Blow <b>+${turretDmg()}</b> every turn it stands.`, 'good');
+    }
+  },
+  fork: {
+    row() {
+      const gear = cardById(S.assign.Boost); if (!gear) return '';
+      const k = S.k || {}, on = !!S.forkOn, now = eff(gear).boost, lv = turretLv(), full = lv >= turretCap(), kind = k.build || 'turret';
+      const bag = fightStatus();
+      const what = kind === 'snare' ? `setting a snare: it is <b>${SNARE_FROST + (hasCharm('tripwire') ? 2 : 0)} slower</b> all fight` : `building: turret <b>Lv${Math.min(turretCap(), lv + 1)}</b>, your Blow +${Math.min(turretCap(), lv + 1) * (TURRET_DMG + (hasCharm('overclock') ? 1 : 0))} every turn`;
+      return `<div class="wake-row bench-row"><span class="wake-lab" data-tip="workbench">🏗️ Your <b>Workbench</b> — ` +
+        (on ? `${what} <span class="dim">(${hasCharm('scrap') ? 'and its ➕ still fires' : 'nothing now'})</span>`
+            : `<b>+${now}</b> now <span class="dim">— or spend it: build the turret${lv ? ` (Lv${lv})` : ''}, or set a snare</span>`) + `</span>` +
+        (on ? `<button class="wake-btn on" onclick="toggleFork()">swing it instead</button>`
+            : (full ? '' : `<button class="wake-btn" onclick="setBuild('turret')">🏗️ build</button>`) + (bag ? `<button class="wake-btn" onclick="setBuild('snare')">🪤 snare</button>` : '')) +
+        `<span class="wake-note">${lv ? `turret Lv${lv}: +${turretDmg()} to every Blow` : 'no turret standing'}</span></div>`;
+    },
+  },
+  zoneHint(zone, isFight) {
+    const t = turretDmg();
+    switch (zone) {
+      case 'Spell': { const b = spellCard(); return b ? `your Blow: <b>${eff(b).value}</b>${t ? ` + 🏗️ <b>${t}</b>` : ''}` : 'your Blow, plus your turret'; }
+      case 'Element': return 'your Initiative — beat its number and it cannot strike';
+      case 'Boost': return S.forkOn ? ((S.k && S.k.build) === 'snare' ? '🪤 setting a snare' : '🏗️ building the turret') : 'swings: its ➕ feeds your Blow';
+      default: return 'carried to next turn';
+    }
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST, merchant: MERCHANT, engineer: ENGINEER };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -3694,6 +3819,19 @@ const RULE_CHARMS = [
   // 🎲 THE BERSERKER'S — all starters for now
   // 🎭 THE ILLUSIONIST'S — all starters for now
   // 🪙 THE MERCHANT'S — all starters for now
+  // 🏗️ THE ENGINEER'S — all starters for now
+  { id: 'oiledgears', tier: 1, name: 'Oiled Gears',     rarity: 'uncommon', cost: 9, rule: true, cls: 'engineer',
+    text: '🔩 Your turret <b>does not wear</b> between fights' },
+  { id: 'overclock', tier: 1, name: 'Overclock',        rarity: 'uncommon', cost: 9, rule: true, cls: 'engineer',
+    text: '🏗️ Your turret adds <b>3</b> per level, not 2' },
+  { id: 'foundation', tier: 1, name: 'Foundation',      rarity: 'uncommon', cost: 8, rule: true, cls: 'engineer',
+    text: '🏗️ Your first fight starts with a <b>Lv1 turret</b>' },
+  { id: 'tripwire', tier: 2, name: 'Tripwire',          rarity: 'rare', cost: 10, rule: true, cls: 'engineer',
+    text: '🪤 A snare makes it <b>2 slower</b> still' },
+  { id: 'scrap', tier: 3, name: 'Scrap Drive',          rarity: 'rare', cost: 12, rule: true, cls: 'engineer',
+    text: '🏗️ Building also fires the card\'s ➕ this turn' },
+  { id: 'siege', tier: 4, name: 'Siege Engine',         rarity: 'rare', cost: 13, rule: true, cls: 'engineer',
+    text: '🏗️ Your turret\'s cap is <b>4</b>' },
   { id: 'haggler', tier: 1, name: 'Haggler',            rarity: 'uncommon', cost: 8, rule: true, cls: 'merchant',
     text: '🪙 The Wheel is <b>10% cheaper</b> still' },
   { id: 'deeppockets', tier: 1, name: 'Deep Pockets',   rarity: 'uncommon', cost: 9, rule: true, cls: 'merchant',
@@ -3938,6 +4076,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 485, date: '2026-09-04', title: 'A ninth character: the Engineer',
+    added: [
+      "🏗️ <b>The Engineer.</b> Unlocks at account level 9. The card on his <b>Workbench</b> swings (its ➕ feeds his Blow) or is spent to <b>build</b>: his turret gains a level, and every turn it stands it adds 2 per level to his Blow. It loses a level every new fight unless he tends it. Or set a <b>snare</b> instead: the creature is 2 slower for the whole fight, for everyone.",
+    ] },
+
   { build: 484, date: '2026-09-04', title: 'An eighth character: the Merchant',
     added: [
       "🪙 <b>The Merchant.</b> Unlocks at account level 7. The Wheel is 20% cheaper for her. The card in her <b>Purse</b> holds (its ➕ feeds her Strike) or is <b>paid for</b>: spend coins equal to its ➕ and it is doubled. Her Strike is +1 for every 16 coins she has spent this run. Once a fight she can <b>bribe</b> the creature: it is 3 slower for the whole fight, for everyone.",
@@ -6245,7 +6388,8 @@ const UNLOCKS = [
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
   { level: 3,  kind: 'class', id: 'berserker', label: '🎲 The Berserker' },
   { level: 5,  kind: 'class', id: 'illusionist', label: '🎭 The Illusionist' },
-  { level: 7,  kind: 'class', id: 'merchant', label: '🪙 The Merchant' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
+  { level: 7,  kind: 'class', id: 'merchant', label: '🪙 The Merchant' },
+  { level: 9,  kind: 'class', id: 'engineer', label: '🏗️ The Engineer' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
   // 🛡️ 🔒 THE LOAD-TIME GUARD EARNED ITS PLACE AGAIN. Deleting 🏮 Lantern-Bearer as dead
   // journey content threw *"UNLOCKS names a charm that does not exist"* on the very next boot —
   // exactly what it was written for. Without it level 3 would have unlocked NOTHING, silently,
@@ -13825,6 +13969,7 @@ function renderControls() {
           row('berserker', '🎲 The Berserker', 'A reckless fighter who leaves everything to chance.') +
           row('illusionist', '🎭 The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
           row('merchant', '🪙 The Merchant', 'A trader who pays for every blow out of her own purse.') +
+          row('engineer', '🏗️ The Engineer', 'A builder who leaves working machines behind on the road.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -13860,7 +14005,6 @@ function renderControls() {
           // ❌ Euro_Classes' 🪵 Forager stays out for the same reason it always did — the doc calls
           // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
           // resource you hold and spend*.
-          soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
           soon('🌱', 'The Gardener', 'A grower who plants today and reaps it in the fights to come.') +
           `</div></div></div>`;
       })() +
@@ -14382,6 +14526,7 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
+  workbench: ['🏗️ Workbench', 'Swing: the card\'s ➕ feeds your Blow. Build: the card is spent and your turret gains a level. Snare: the creature is slower for the whole fight.'],
   purse:  ['🪙 Purse', 'Hold: the card\'s ➕ feeds your Strike. Pay: spend coins equal to its ➕ and it is doubled. A bribe makes the creature slower for the whole fight.'],
   summon: ['🎭 Summon', 'The card leaves your deck and stands beside you as an illusion. A blow illusion adds to your Spell every turn; a swift one adds to your Initiative. It takes hits before your cards do. When it falls its card comes back one level lower.'],
   die:    ['🎲 The Die', 'Rolled before you arrange. It is added to your Blow this turn.'],
