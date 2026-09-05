@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 488 — The Gardener grows faster
+*2026-09-05*
+
+**Changed**
+- 🌱 **A planted seed ripens at the next fight**, not two turns later, and every harvest gives **2** crops.
+- 🧺 **Every build costs two of one crop**: 🏚️ Granary (grain, your Blow +2 per tier — new) · 🪵 Mill (wood) · 🌿 Hedge (stone) · 🐝 Hive (honey). The Bramble still takes a stone and a honey, and slows the creature by 2 per tier.
+- 🌱 Green Thumb now keeps a planted seed in your deck.
+
 ## build 487 — The new characters hit harder
 *2026-09-05*
 
