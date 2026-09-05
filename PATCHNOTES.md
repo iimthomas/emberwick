@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 486 — A tenth character: the Gardener
+*2026-09-04*
+
+**Added**
+- 🌱 **The Gardener.** Unlocks at account level 11. A seed card in her **Plot** plays (its ➕ feeds her Blow) or is **planted**: it leaves her deck, ripens over 2 turns, and comes back with its crop — grain, wood, stone or honey. Spend crops to **build** for the run, in tiers: a Hedge (hits are weaker), a Hive (Initiative), a Mill (bigger harvests), a Bramble (every creature you meet is slower, for everyone).
+- 🎭 That is the whole planned roster: ten characters.
+
 ## build 485 — A ninth character: the Engineer
 *2026-09-04*
 
