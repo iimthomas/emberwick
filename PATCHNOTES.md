@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 483 — A seventh character: the Illusionist
+*2026-09-04*
+
+**Added**
+- 🎭 **The Illusionist.** Unlocks at account level 5. The card in her **Veil** fires (its ➕ feeds her Spell) or is **summoned** as an illusion. A blow illusion adds to her Spell every turn; a swift one adds to her Initiative, and to a partner's. **Her cards all block 1 — the illusions take the hits first.** Tap an illusion to put it in front. When one falls, its card comes back one level lower.
+
 ## build 482 — A sixth character: the Berserker
 *2026-09-04*
 

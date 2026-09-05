@@ -1,0 +1,398 @@
+[
+ {
+  "name": "Glimmer Bolt",
+  "element": null,
+  "arch": null,
+  "role": "spell",
+  "hits": 1,
+  "lv": [
+   [
+    6,
+    null,
+    3,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    9,
+    null,
+    2,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    12,
+    null,
+    2,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    15,
+    null,
+    2,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true
+ },
+ {
+  "name": "Phantom Lance",
+  "element": null,
+  "arch": null,
+  "role": "spell",
+  "hits": 1,
+  "lv": [
+   [
+    7,
+    null,
+    1,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    10,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    13,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    16,
+    null,
+    0,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true
+ },
+ {
+  "name": "Veilstrike",
+  "element": null,
+  "arch": null,
+  "role": "spell",
+  "hits": 1,
+  "lv": [
+   [
+    5,
+    null,
+    4,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    8,
+    null,
+    3,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    11,
+    null,
+    3,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    14,
+    null,
+    3,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true
+ },
+ {
+  "name": "Mindshear",
+  "element": null,
+  "arch": null,
+  "role": "spell",
+  "hits": 1,
+  "lv": [
+   [
+    3,
+    null,
+    7,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    8,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    9,
+    1,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    10,
+    1,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true
+ },
+ {
+  "name": "Shade",
+  "element": null,
+  "arch": null,
+  "role": "figment",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    2,
+    5,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    7,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    9,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    11,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true,
+  "kind": "blow",
+  "body": [
+   2,
+   2,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "Wisp",
+  "element": null,
+  "arch": null,
+  "role": "figment",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    3,
+    4,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    6,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    8,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    2,
+    10,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true,
+  "kind": "init",
+  "body": [
+   2,
+   2,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "Stone Twin",
+  "element": null,
+  "arch": null,
+  "role": "figment",
+  "hits": 1,
+  "lv": [
+   [
+    3,
+    null,
+    1,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    0,
+    4,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    0,
+    6,
+    1,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    0,
+    8,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true,
+  "kind": "blow",
+  "body": [
+   6,
+   5,
+   4,
+   3
+  ]
+ },
+ {
+  "name": "Fleet Shadow",
+  "element": null,
+  "arch": null,
+  "role": "figment",
+  "hits": 1,
+  "lv": [
+   [
+    2,
+    null,
+    2,
+    2,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    4,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    6,
+    1,
+    null,
+    null
+   ],
+   [
+    1,
+    null,
+    1,
+    8,
+    1,
+    null,
+    null
+   ]
+  ],
+  "illusionist": true,
+  "kind": "init",
+  "body": [
+   5,
+   4,
+   3,
+   2
+  ]
+ }
+]
