@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 485 — A ninth character: the Engineer
+*2026-09-04*
+
+**Added**
+- 🏗️ **The Engineer.** Unlocks at account level 9. The card on his **Workbench** swings (its ➕ feeds his Blow) or is spent to **build**: his turret gains a level, and every turn it stands it adds 2 per level to his Blow. It loses a level every new fight unless he tends it. Or set a **snare** instead: the creature is 2 slower for the whole fight, for everyone.
+
 ## build 484 — An eighth character: the Merchant
 *2026-09-04*
 
