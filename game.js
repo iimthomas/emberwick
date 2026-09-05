@@ -2438,7 +2438,160 @@ const BERSERKER = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER };
+// ============================================================
+// 🎭 THE ILLUSIONIST (2026-09-04, build 483) — [[The_Illusionist]]. Source of power: SUMMONING —
+// her strength is what she has PUT DOWN, not what she holds. Thomas: *"those objects add to either
+// attack or initiative depending on which you decide to summon."* Two kinds of illusion: one that
+// adds to her Blow every turn while it stands, one that adds to her Initiative. 🔴 HER CARDS ALL
+// BLOCK 1; THE ILLUSIONS CARRY THE REAL BLOCK — the creature must go through them before it
+// touches her cards (the designated-victim fix, class-sized). ⚠️ THE RULE FROM THE BRIEF: an
+// illusion's BODY must NOT track its POWER — the strongest buff on the flimsiest body, deliberately,
+// and sharpening a figment raises its power and LOWERS its body (spike up, weakness down).
+// ③ SUMMON or spend: the card in the Veil is fired (its ➕ feeds the Spell) or becomes an illusion.
+// A summoned card leaves the deck; when the illusion falls the card comes back SOFTENED a level
+// (Lv1 → lost) — so the board is stored deck-health, and deck-as-health holds.
+// 🙌 Co-op: an Initiative illusion speeds a PARTNER too (lendInit) — the one buff allowed.
+// 👤 The FRONT illusion takes the hit; tap a token to put it in front (the player picks — Thomas).
+// ============================================================
+let ILLUSION_CAP = 3;
+let SUMMON_WEIGHT = 2;    // 🎭 the bot's price for a summon: its power, this many future turns
+const ILLUSIONIST_SPEC = [
+  // role       name             spike     base [value, init, boost, armour]   figments: kind + body per level
+  { role: 'spell',   name: 'Glimmer Bolt',  spike: 'value', base: [6, 3, 2, 1] },
+  { role: 'spell',   name: 'Phantom Lance', spike: 'value', base: [7, 1, 2, 1] },
+  { role: 'spell',   name: 'Veilstrike',    spike: 'value', base: [5, 4, 2, 1] },
+  { role: 'spell',   name: 'Mindshear',     spike: 'init',  base: [3, 7, 2, 1] },
+  { role: 'figment', name: 'Shade',         spike: 'boost', base: [2, 2, 5, 1], kind: 'blow', body: [2, 2, 1, 1] },
+  { role: 'figment', name: 'Wisp',          spike: 'boost', base: [2, 3, 4, 1], kind: 'init', body: [2, 2, 1, 1] },
+  { role: 'figment', name: 'Stone Twin',    spike: 'boost', base: [3, 1, 2, 1], kind: 'blow', body: [6, 5, 4, 3] },
+  { role: 'figment', name: 'Fleet Shadow',  spike: 'boost', base: [2, 2, 2, 1], kind: 'init', body: [5, 4, 3, 2] },
+];
+const ILLUSIONIST_DEFS = specDefs(ILLUSIONIST_SPEC, 'illusionist').map((d, i) => {
+  const s = ILLUSIONIST_SPEC[i];
+  d.lv.forEach(r => { r[4] = 1; });   // 🔴 every card blocks 1 — the illusions are the block
+  if (s.kind) { d.kind = s.kind; d.body = s.body; }
+  return d;
+});
+function illusionCap() { return ILLUSION_CAP + (hasCharm('veil') ? 1 : 0); }
+function illusions() { return (S.k && S.k.illusions) || []; }
+function illusionPower(i) { return i.power + (i.kind === 'blow' && hasCharm('glasscannon') ? 2 : 0); }
+function setFront(i) { const k = kbag(); if (!illusions()[i]) return; k.front = i; render(); }
+function frontIndex() { const ill = illusions(); if (!ill.length) return -1; const k = S.k || {}; return (k.front != null && ill[k.front]) ? k.front : ill.length - 1; }
+const ILLUSIONIST = {
+  id: 'illusionist',
+  mark: '🎭',
+  multi: null,
+  labels: { Spell: 'Spell', Element: 'Catalyst', Boost: 'Veil', Reserve: 'Arsenal' },
+  defs: ILLUSIONIST_DEFS,
+  deck() { return shuffle(ILLUSIONIST_DEFS.concat(ILLUSIONIST_DEFS).map(newCard)); },
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false, brews: false, marks: false,
+  name: 'Illusionist',
+  tagline: 'she fights from behind her illusions',
+  unlock: '🔒 reach account level 5 to unlock her',
+  trait: { icon: '🎭', name: 'The Veil',
+    text: 'The card in your <b>Veil</b> either fires (its ➕ feeds your Spell) or is <b>summoned</b> as an illusion that stands beside you. A <b>👤 blow</b> illusion adds its power to your Spell every turn; a <b>💨 swift</b> illusion adds it to your Initiative — yours and a partner\'s. <b>Your cards all block 1: the illusions take the hits first.</b> When one falls, its card comes back softened.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'summoned', gate: 'summon first',
+    avail() { return !!(S.encounter && S.encounter.type === 'fight' && illusions().length < illusionCap() && (S.hand || []).some(c => c.def.kind)); },
+    found(r) { return !!(r.klass && r.klass.summons); },
+  },
+  // 🙌 what a partner gets from her being here: her swift illusions' Initiative
+  lendInit(hd) { return ((hd.k && hd.k.illusions) || []).filter(i => i.kind === 'init').reduce((t, i) => t + i.power, 0); },
+  tokens() {
+    const ill = illusions(); if (!ill.length) return null;
+    const f = frontIndex();
+    return ill.map((i, n) => ({ id: 'ill' + n, icon: i.kind === 'blow' ? '👤' : '💨', name: i.name, count: i.body, cap: i.maxBody,
+      worth: i.kind === 'blow' ? `your Spell <b>+${illusionPower(i)}</b>` : `Initiative <b>+${i.power}</b>, yours and a partner\'s`,
+      note: n === f ? '<b>in front</b> — it takes the hit' : 'tap to put it in front', tap: n === f ? null : `setFront(${n})` }));
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const spell = spellCard(); if (!spell) return null;
+    const cat = cardById(S.assign.Element), fig = cardById(S.assign.Boost);
+    const ill = illusions();
+    const summons = !!(S.forkOn && fig && fig.def.kind && ill.length < illusionCap());
+    const boost = fig && (!summons || hasCharm('mirrorimage')) ? eff(fig).boost : 0;
+    const blowBonus = ill.filter(i => i.kind === 'blow').reduce((t, i) => t + illusionPower(i), 0);
+    const initBonus = ill.filter(i => i.kind === 'init').reduce((t, i) => t + i.power, 0);
+    const power = fig ? eff(fig).boost : 0;
+    return {
+      value: Math.max(0, eff(spell).value + blowBonus + (duelFx().value || 0)),
+      element: null,
+      init: (cat ? eff(cat).init : 0) + initBonus,
+      boost,
+      hits: CLASS.hitsOf(spell, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell, elem: cat, boostC: fig,
+      attuner: null, loose: false,
+      klass: { summons, name: fig ? fig.def.name : null, kind: fig ? fig.def.kind : null, power,
+               body: fig && fig.def.body ? fig.def.body[fig.level - 1] + (hasCharm('shroud') ? 2 : 0) - (fig.def.kind === 'blow' && hasCharm('glasscannon') ? 1 : 0) : 0,
+               blowBonus, initBonus,
+               // 🔑 the bot's price: the illusion's power for SUMMON_WEIGHT future turns, less the ➕ it gave up
+               botValue: summons ? SUMMON_WEIGHT * power - (hasCharm('mirrorimage') ? 0 : power) : 0 },
+    };
+  },
+  // 🎭 the summon lands whether or not the blow killed — the card leaves the deck for the board
+  afterTurn(r) {
+    if (!r || !r.klass || !r.klass.summons) return;
+    const fig = cardById(S.assign.Boost); if (!fig) return;
+    const k = kbag(); k.illusions = k.illusions || [];
+    S.hand = S.hand.filter(c => c.id !== fig.id);
+    S.actionSetIds = (S.actionSetIds || []).filter(id => id !== fig.id);
+    const body = Math.max(1, r.klass.body);
+    k.illusions.push({ n: ILLUSIONIST_DEFS.indexOf(fig.def), lv: fig.level, name: fig.def.name, kind: fig.def.kind, power: r.klass.power, body, maxBody: body });
+    k.front = k.illusions.length - 1;
+    log(`🎭 <b>${fig.def.name}` + `</b> steps out of the deck — ${fig.def.kind === 'blow' ? `your Spell <b>+${r.klass.power}</b>` : `Initiative <b>+${r.klass.power}</b>`} while it stands (body ${body}).`, 'good');
+  },
+  // 🛡️ the illusions take the hit first, front one first; a fallen illusion's card returns softened
+  shield(n) {
+    const k = kbag(); const ill = k.illusions || [];
+    while (n > 0 && ill.length) {
+      const f = frontIndex(), i = ill[f];
+      const hit = Math.min(i.body, n); i.body -= hit; n -= hit;
+      if (i.body > 0) { log(`🎭 <b>${i.name}</b> takes <b>${hit}</b> — ${i.body} left.`, 'bad'); break; }
+      ill.splice(f, 1); k.front = null;
+      const def = ILLUSIONIST_DEFS[i.n];
+      const lv = hasCharm('afterimage') ? i.lv : i.lv - 1;
+      if (def && lv >= 1) { const c = newCard(def); c.level = lv; S.discard.push(c); log(`🎭 <b>${i.name}</b> shatters — its card returns${lv < i.lv ? ' softened' : ''} (Lv${lv}).`, 'bad'); }
+      else { const c = newCard(def); c.level = 1; S.trashed.push(c); log(`🎭 <b>${i.name}</b> shatters — its card is <b>lost</b>.`, 'bad'); }
+      if (hasCharm('lastlight')) { const bag = fightStatus(); if (bag) { bag.daze = (bag.daze || 0) + 2; log('🎭 Last Light — it reels: its next blow is <b>2 weaker</b>.', 'good'); } }
+    }
+    return n;
+  },
+  fork: {
+    row() {
+      const fig = cardById(S.assign.Boost); if (!fig) return '';
+      const on = !!S.forkOn, now = eff(fig).boost, ill = illusions(), full = ill.length >= illusionCap();
+      if (!fig.def.kind) return `<div class="wake-row veil-row"><span class="wake-lab" data-tip="summon">🎭 Your <b>Veil</b> — <b>+${now}</b> now <span class="dim">— a spell card cannot be summoned</span></span></div>`;
+      const body = fig.def.body[fig.level - 1] + (hasCharm('shroud') ? 2 : 0);
+      const what = fig.def.kind === 'blow' ? `your Spell <b>+${now}</b> every turn` : `Initiative <b>+${now}</b> every turn`;
+      return `<div class="wake-row veil-row"><span class="wake-lab" data-tip="summon">🎭 Your <b>Veil</b> — ` +
+        (on && !full ? `summoning <b>${fig.def.name}</b>: ${what} while it stands (body ${body}) <span class="dim">(${hasCharm('mirrorimage') ? 'and its ➕ still fires' : 'nothing now'})</span>`
+                     : `<b>+${now}</b> now <span class="dim">— or summon it: ${what}, body ${body}</span>`) + `</span>` +
+        (full ? '' : `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleFork()">${on ? 'fire it instead' : '🎭 summon it'}</button>`) +
+        `<span class="wake-note">${full ? `your veil is full (${ill.length})` : on ? 'its card leaves the deck until it falls' : `${ill.length} of ${illusionCap()} standing`}</span></div>`;
+    },
+  },
+  zoneHint(zone, isFight) {
+    const ill = illusions();
+    const b = ill.filter(i => i.kind === 'blow').reduce((t, i) => t + illusionPower(i), 0), q = ill.filter(i => i.kind === 'init').reduce((t, i) => t + i.power, 0);
+    switch (zone) {
+      case 'Spell': { const s = spellCard(); return s ? `your Spell: <b>${eff(s).value}</b>${b ? ` + 👤 <b>${b}</b>` : ''}` : 'your Spell, plus your blow illusions'; }
+      case 'Element': return `your Initiative${q ? ` + 💨 <b>${q}</b>` : ''} — beat its number and it cannot strike`;
+      case 'Boost': return S.forkOn ? '🎭 summoning — it steps out of the deck' : 'fires: its ➕ feeds your Spell';
+      default: return 'carried to next turn';
+    }
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -3414,6 +3567,19 @@ const RULE_CHARMS = [
   { id: 'twinmark', tier: 4, name: 'Twin Mark',         rarity: 'rare', cost: 13, rule: true, cls: 'ranger',
     text: '🏹 A mark makes the next <b>two</b> blows certain' },
   // 🎲 THE BERSERKER'S — all starters for now
+  // 🎭 THE ILLUSIONIST'S — all starters for now
+  { id: 'veil', tier: 1, name: 'Wide Veil',            rarity: 'uncommon', cost: 8, rule: true, cls: 'illusionist',
+    text: '🎭 You may keep <b>one more</b> illusion' },
+  { id: 'shroud', tier: 1, name: 'Shroud',              rarity: 'uncommon', cost: 9, rule: true, cls: 'illusionist',
+    text: '🎭 Your illusions have <b>+2 body</b>' },
+  { id: 'afterimage', tier: 1, name: 'Afterimage',      rarity: 'uncommon', cost: 9, rule: true, cls: 'illusionist',
+    text: '🎭 A fallen illusion\'s card comes back <b>unsoftened</b>' },
+  { id: 'glasscannon', tier: 2, name: 'Glass Cannon',   rarity: 'rare', cost: 11, rule: true, cls: 'illusionist',
+    text: '👤 Blow illusions hit <b>+2</b> and have <b>1 less</b> body' },
+  { id: 'lastlight', tier: 3, name: 'Last Light',       rarity: 'rare', cost: 12, rule: true, cls: 'illusionist',
+    text: '🎭 When an illusion falls, the creature\'s next blow is <b>2 weaker</b>' },
+  { id: 'mirrorimage', tier: 4, name: 'Mirror Image',   rarity: 'rare', cost: 13, rule: true, cls: 'illusionist',
+    text: '🎭 Summoning also fires the card\'s ➕ this turn' },
   { id: 'hotblood', tier: 1, name: 'Hot Blood',         rarity: 'uncommon', cost: 8, rule: true, cls: 'berserker',
     text: '💢 Your Rage cap is <b>2 higher</b>' },
   { id: 'steadyhand', tier: 1, name: 'Steady Hand',     rarity: 'uncommon', cost: 9, rule: true, cls: 'berserker',
@@ -3634,6 +3800,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 483, date: '2026-09-04', title: 'A seventh character: the Illusionist',
+    added: [
+      "🎭 <b>The Illusionist.</b> Unlocks at account level 5. The card in her <b>Veil</b> fires (its ➕ feeds her Spell) or is <b>summoned</b> as an illusion. A blow illusion adds to her Spell every turn; a swift one adds to her Initiative, and to a partner's. <b>Her cards all block 1 — the illusions take the hits first.</b> Tap an illusion to put it in front. When one falls, its card comes back one level lower.",
+    ] },
+
   { build: 482, date: '2026-09-04', title: 'A sixth character: the Berserker',
     added: [
       "🎲 <b>The Berserker.</b> Unlocks at account level 3. Every fight turn opens with a <b>die</b>, rolled before you arrange, and her Blow is her card plus the die. The card in her <b>Gamble</b> is the sure thing (its ➕ feeds the Blow) — or go <b>reckless</b> and roll a second die instead. A 6 rolls again. A 1 costs you the race. Each reckless turn adds <b>Rage</b>, and Rage adds to the die she opens with. An exploding blow leaves the creature reeling, for you or a partner.",
@@ -5926,7 +6097,8 @@ const POTIONS = [
 const UNLOCKS = [
   // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
-  { level: 3,  kind: 'class', id: 'berserker', label: '🎲 The Berserker' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
+  { level: 3,  kind: 'class', id: 'berserker', label: '🎲 The Berserker' },
+  { level: 5,  kind: 'class', id: 'illusionist', label: '🎭 The Illusionist' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
   // 🛡️ 🔒 THE LOAD-TIME GUARD EARNED ITS PLACE AGAIN. Deleting 🏮 Lantern-Bearer as dead
   // journey content threw *"UNLOCKS names a charm that does not exist"* on the very next boot —
   // exactly what it was written for. Without it level 3 would have unlocked NOTHING, silently,
@@ -7725,6 +7897,7 @@ function foeApplyBlow(r) {
   // 🏷️ effects land on the body you AIMED at, after the blow, if it still stands
   if (first && first.hp > 0) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (first && CLASS.afterBlow) CLASS.afterBlow(r, first);          // 🔪 what her cards leave behind
+  if (CLASS.afterTurn) CLASS.afterTurn(r);                          // 🎭 kill or not — a summon still lands
   if (!targetBody() || targetBody() === st) S.foeTarget = -1;
   if (st.hp > 0) return false;                       // the LEAD still stands — the fight goes on
 
@@ -8375,7 +8548,7 @@ function computeAction(reserve) {
 
   const h = S.hardship;
   const ability = e.ability || null;
-  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0) + (S.armourPace || 0);   // 🧪 Draught of Haste · 👞 Quickstep
+  const elemInit = a.init + (S.potionFx ? S.potionFx.init : 0) + (S.armourPace || 0) + partnerInit();   // 🧪 Draught of Haste · 👞 Quickstep · 🎭 a partner's Initiative illusion
   // Night Travel: Boost reduced by the Catalyst's Initiative, min 0
   const boostRaw = boostVal + (S.potionFx && boostVal > 0 ? S.potionFx.boost : 0);   // 🧪 Bitterroot
   const boostEff = h === 'Rationed' ? 0                                   // ⏳ nothing is spare
@@ -13488,6 +13661,7 @@ function renderControls() {
           row('alchemist', '⚗️ The Alchemist', 'A brewer whose kit does what her cards cannot.') +
           row('ranger', '🏹 The Ranger', 'A hunter who sees what is coming and shoots where it will be.') +
           row('berserker', '🎲 The Berserker', 'A reckless fighter who leaves everything to chance.') +
+          row('illusionist', '🎭 The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -13523,7 +13697,6 @@ function renderControls() {
           // ❌ Euro_Classes' 🪵 Forager stays out for the same reason it always did — the doc calls
           // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
           // resource you hold and spend*.
-          soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
           soon('🌱', 'The Gardener', 'A grower who plants today and reaps it in the fights to come.') +
@@ -13866,6 +14039,14 @@ function toggleFork() {
   render();
 }
 function kbag() { return (S.k = S.k || {}); }   // the class's own per-hand state, saved and swapped with the hand
+// 🙌 INITIATIVE IS THE ONE THING A PARTNER MAY LEND (StS2 rule: help lands on the creature, or it is
+// the race). A class exposes lendInit(hand) and every other hand's Initiative reads it.
+function partnerInit() {
+  if (!isTwoHanded()) return 0;
+  let t = 0;
+  S.hands.forEach((hd, i) => { if (i === S.handIdx) return; const c = CLASSES[hd.cls]; if (c && c.lendInit) t += c.lendInit(hd); });
+  return t;
+}
 function toggleMark() {
   if (!CLASS.marks || !isAssignPhase()) return;
   S.markArmed = !S.markArmed;
@@ -14039,6 +14220,7 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
+  summon: ['🎭 Summon', 'The card leaves your deck and stands beside you as an illusion. A blow illusion adds to your Spell every turn; a swift one adds to your Initiative. It takes hits before your cards do. When it falls its card comes back one level lower.'],
   die:    ['🎲 The Die', 'Rolled before you arrange. It is added to your Blow this turn.'],
   gamble: ['🎲 Gamble', 'Sure: the card\'s ➕ feeds your Blow. Reckless: roll a second die instead. A 6 rolls again. A 1 costs you the race.'],
   rage:   ['💢 Rage', 'One per reckless turn, up to your cap. Each point adds 1 to the die you roll at the start of a turn. It fades when the fight ends.'],
@@ -14853,6 +15035,7 @@ function resolveDuel() {
   if (dbag2 && dbag2.mark > 0 && toHp > 0) dbag2.mark--;   // 🏹
   if (!kill) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (!kill && CLASS.afterBlow) CLASS.afterBlow(r, S.dragonState);   // 🔪
+  if (CLASS.afterTurn) CLASS.afterTurn(r);
 
   // 🔤 THE WEAVE LINE SPEAKS THE CLASS (482): slot words from SLOT_LABEL, and no element bracket
   // for a class that has none — it used to print "(null)" and "colorless" at every class after the mage.
