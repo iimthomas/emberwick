@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 487 — The new characters hit harder
+*2026-09-05*
+
+**Changed**
+- ⚔️ **Every character after the Mage hits harder at the dragons.** Their main attack cards are up by 3 or 4 at every level (Guardian, Berserker, Engineer, Gardener +3 · Alchemist, Illusionist, Ranger +4). The Merchant is unchanged. Past stage 1 their blows could not reach a dragon before the deck ran out.
+
+**Fixed**
+- 🌱🎭 A card planted or summoned right after a hit that destroyed the card in that slot could plant the wrong card.
+
 ## build 486 — A tenth character: the Gardener
 *2026-09-04*
 

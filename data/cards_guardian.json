@@ -7,20 +7,11 @@
   "hits": 1,
   "lv": [
    [
-    7,
+    10,
     null,
     1,
     null,
     3,
-    null,
-    null
-   ],
-   [
-    10,
-    null,
-    0,
-    null,
-    2,
     null,
     null
    ],
@@ -41,6 +32,15 @@
     2,
     null,
     null
+   ],
+   [
+    19,
+    null,
+    0,
+    null,
+    2,
+    null,
+    null
    ]
   ],
   "guardian": true
@@ -53,20 +53,11 @@
   "hits": 1,
   "lv": [
    [
-    6,
+    9,
     null,
     3,
     null,
     2,
-    null,
-    null
-   ],
-   [
-    9,
-    null,
-    2,
-    null,
-    1,
     null,
     null
    ],
@@ -87,6 +78,15 @@
     1,
     null,
     null
+   ],
+   [
+    18,
+    null,
+    2,
+    null,
+    1,
+    null,
+    null
    ]
   ],
   "guardian": true
@@ -99,20 +99,11 @@
   "hits": 1,
   "lv": [
    [
-    5,
+    8,
     null,
     2,
     null,
     4,
-    null,
-    null
-   ],
-   [
-    8,
-    null,
-    1,
-    null,
-    3,
     null,
     null
    ],
@@ -127,6 +118,15 @@
    ],
    [
     14,
+    null,
+    1,
+    null,
+    3,
+    null,
+    null
+   ],
+   [
+    17,
     null,
     1,
     null,
