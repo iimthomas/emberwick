@@ -2854,7 +2854,7 @@ const ENGINEER = {
 // sow, wait, reap. Thomas: *"i want it to feel like a euro board game, building up resources, and
 // then doing resource management and using those resources… sorta like an engine builder."*
 // ③ THE PLOT: the card there is PLAYED (its ➕ feeds the Blow) or PLANTED — a seed card leaves the
-// deck and ripens over PLANT_TURNS fight turns; when it ripens it is HARVESTED: its crop lands in
+// deck and ripens at the NEXT fight (488; it was two turns); when it ripens it is HARVESTED: its crop lands in
 // her store (🌾 grain · 🪵 wood · 🪨 stone · 🍯 honey) and the card comes back unsoftened. The
 // board is stored deck-health, and the tempo is the cost.
 // 🏗️ THE ENGINE lives in the RUN layer, so the turn stays reactive: resources buy BUILDS, permanent
@@ -2865,15 +2865,19 @@ const ENGINEER = {
 // 🤖 The bot plants through the fork flag and BUILDS on a stated policy (Bramble > Hedge > Hive >
 // Mill, whatever it can afford, at each fight's start) behind BOT_POLICY.
 // ============================================================
-let PLANT_TURNS = 2;
+let PLANT_FIGHTS = 1;    // 🌱 488: a plot ripens at the start of the NEXT fight (was 2 turns — an engine that never turned over in twelve floors)
+let HARVEST = 2;         // crops per harvest
 let PLOT_CAP = 2;
-let PLANT_WEIGHT = 3;     // the bot's price for a planted card (a resource two turns out)
+let PLANT_WEIGHT = 12;    // the bot's price for a planted card (📏 488: 3 → planted 14%, 9%; 6 → 38%, 9%; 9 → 55%, 13%; 12 → 68%, ten build tiers by the lair, 16% — the mage's floor). A stated policy, not a rule.
 const CROP = { grain: { icon: '🌾', name: 'grain' }, wood: { icon: '🪵', name: 'wood' }, stone: { icon: '🪨', name: 'stone' }, honey: { icon: '🍯', name: 'honey' } };
 const BUILDS = {
-  hedge:   { icon: '🌿', name: 'Hedge',   cost: { stone: 1, wood: 1 },  text: 'every hit on you is <b>1 weaker</b> per tier' },
-  hive:    { icon: '🐝', name: 'Hive',    cost: { honey: 1, grain: 1 }, text: '<b>+1 Initiative</b> per tier' },
-  mill:    { icon: '🌾', name: 'Mill',    cost: { grain: 1, wood: 1 },  text: 'every harvest yields <b>+1</b> per tier' },
-  bramble: { icon: '🌹', name: 'Bramble', cost: { stone: 1, honey: 1 }, text: 'every creature you meet starts <b>Frost 1</b> per tier, all fight, for everyone' },
+  // 🔑 488: ONE crop each, TWO of it — every crop has its own sink, so nothing sits unspent (4.9 crops a
+  // run did, at the lair, when every build wanted a pair). The Bramble is the one mixed build.
+  granary: { icon: '🏚️', name: 'Granary', cost: { grain: 2 },           text: 'your Blow is <b>+2</b> per tier' },
+  mill:    { icon: '🪵', name: 'Mill',    cost: { wood: 2 },            text: 'every harvest yields <b>+1</b> per tier' },
+  hedge:   { icon: '🌿', name: 'Hedge',   cost: { stone: 2 },           text: 'every hit on you is <b>1 weaker</b> per tier' },
+  hive:    { icon: '🐝', name: 'Hive',    cost: { honey: 2 },           text: '<b>+1 Initiative</b> per tier' },
+  bramble: { icon: '🌹', name: 'Bramble', cost: { stone: 1, honey: 1 }, text: 'every creature you meet starts <b>Frost 2</b> per tier, all fight, for everyone' },
 };
 let BUILD_CAP = 3;
 const GARDENER_SPEC = [
@@ -2889,7 +2893,7 @@ const GARDENER_SPEC = [
 ];
 const GARDENER_DEFS = specDefs(GARDENER_SPEC, 'gardener').map((d, i) => { if (GARDENER_SPEC[i].crop) d.crop = GARDENER_SPEC[i].crop; return d; });
 function gardenRes() { const k = kbag(); return (k.res = k.res || { grain: 0, wood: 0, stone: 0, honey: 0 }); }
-function gardenBuilds() { const k = kbag(); return (k.builds = k.builds || { hedge: 0, hive: 0, mill: 0, bramble: 0 }); }
+function gardenBuilds() { const k = kbag(); const b = (k.builds = k.builds || {}); for (const id of Object.keys(BUILDS)) b[id] = b[id] || 0; return b; }
 function plots() { const k = kbag(); return (k.plots = k.plots || []); }
 function plotCap() { return PLOT_CAP + (hasCharm('deeproots') ? 1 : 0); }
 function canBuild(id) { const b = BUILDS[id], res = gardenRes(), t = gardenBuilds(); return !!b && t[id] < BUILD_CAP && Object.entries(b.cost).every(([r, n]) => res[r] >= n); }
@@ -2913,7 +2917,7 @@ const GARDENER = {
   tagline: 'she plants today and reaps it later',
   unlock: '🔒 reach account level 11 to unlock her',
   trait: { icon: '🌱', name: 'The Plot',
-    text: 'A <b>seed</b> card in your <b>Plot</b> either plays (its ➕ feeds your Blow) or is <b>planted</b>: it leaves your deck, ripens over <b>2 turns</b>, and comes back with its crop — 🌾 grain, 🪵 wood, 🪨 stone or 🍯 honey. Spend crops to <b>build</b>, in tiers, for the run: a Hedge, a Hive, a Mill, a Bramble that slows every creature you meet, for everyone.' },
+    text: 'A <b>seed</b> card in your <b>Plot</b> either plays (its ➕ feeds your Blow) or is <b>planted</b>: it leaves your deck and comes back at the <b>next fight</b> with <b>2</b> of its crop — 🌾 grain, 🪵 wood, 🪨 stone or 🍯 honey. Spend two of a crop to <b>build</b>, in tiers, for the run: a Granary (your Blow), a Mill (bigger harvests), a Hedge, a Hive, and a Bramble that slows every creature you meet, for everyone.' },
   hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
   perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
   cardEffect() { return null; },
@@ -2927,27 +2931,31 @@ const GARDENER = {
     const k = kbag(); const inFight = !!(S.foeState || (S.finalMode && S.finalPhase === 'duel'));
     if (hasCharm('orchard') && !k.orchard) { k.orchard = true; const r = gardenRes(); for (const c of Object.keys(r)) r[c]++; }
     if (!inFight) return;
+    // 🌹 the Bramble: every creature you meet starts slowed, once per fight
+    const br = gardenBuilds().bramble;
+    if (br > 0 && !k.brambled) { const bag = fightStatus(); if (bag) { k.brambled = true; bag.frost = (bag.frost || 0) + br; bag.lasting = Object.assign({}, bag.lasting, { frost: true }); log(`🌹 The Bramble — it is <b>${br} slower</b> for the whole fight, for everyone.`, 'good'); if (hasCharm('thorns')) bag.daze = (bag.daze || 0) + 1; } }
+    // 🤖 the bot's stated build policy — a human builds from the Plot row
+    if (BOT_POLICY) for (const id of ['granary', 'bramble', 'mill', 'hedge', 'hive']) while (canBuild(id)) garden(id);
+  },
+  // 🌱 488: SOW IN THIS FIGHT, REAP AT THE NEXT — a plot ripens per FIGHT, not per turn, so a twelve-floor
+  // run is eight or nine harvests instead of two. Called at every fight's start and at the lair.
+  onEncounter() {
+    const k = kbag(); k.brambled = false;
     const ps = plots();
     for (const p of ps.slice()) {
       p.ripe--;
       if (p.ripe > 0) continue;
       ps.splice(ps.indexOf(p), 1);
-      const res = gardenRes(), yieldN = 1 + gardenBuilds().mill + (hasCharm('compost') ? 1 : 0);
+      const res = gardenRes(), yieldN = HARVEST + gardenBuilds().mill + (hasCharm('compost') ? 1 : 0);
       res[p.crop] += yieldN;
-      const def = GARDENER_DEFS[p.n]; if (def) { const c = newCard(def); c.level = p.lv; S.discard.push(c); }
-      log(`🌱 <b>${p.name}</b> ripens — ${CROP[p.crop].icon} <b>+${yieldN}</b> ${CROP[p.crop].name}; the card returns.`, 'good');
+      if (!p.kept) { const def = GARDENER_DEFS[p.n]; if (def) { const c = newCard(def); c.level = p.lv; S.discard.push(c); } }
+      log(`🌱 <b>${p.name}</b> ripens — ${CROP[p.crop].icon} <b>+${yieldN}</b> ${CROP[p.crop].name}${p.kept ? '' : '; the card returns'}.`, 'good');
     }
-    // 🌹 the Bramble: every creature you meet starts slowed, once per fight
-    const br = gardenBuilds().bramble;
-    if (br > 0 && !k.brambled) { const bag = fightStatus(); if (bag) { k.brambled = true; bag.frost = (bag.frost || 0) + br; bag.lasting = Object.assign({}, bag.lasting, { frost: true }); log(`🌹 The Bramble — it is <b>${br} slower</b> for the whole fight, for everyone.`, 'good'); if (hasCharm('thorns')) bag.daze = (bag.daze || 0) + 1; } }
-    // 🤖 the bot's stated build policy — a human builds from the Plot row
-    if (BOT_POLICY) for (const id of ['bramble', 'hedge', 'hive', 'mill']) while (canBuild(id)) garden(id);
   },
-  onEncounter() { const k = kbag(); k.brambled = false; },
   lendInit() { return 0; },
   tokens() {
     const out = [];
-    for (const [i, p] of plots().entries()) out.push({ id: 'plot' + i, icon: CROP[p.crop].icon, name: p.name, count: p.ripe, timer: p.ripe, worth: `ripens in <b>${p.ripe}</b> turn${p.ripe === 1 ? '' : 's'}`, note: `then ${CROP[p.crop].name} and the card come back` });
+    for (const [i, p] of plots().entries()) out.push({ id: 'plot' + i, icon: CROP[p.crop].icon, name: p.name, timer: p.ripe, worth: `ripens at the <b>next fight</b>`, note: `then ${HARVEST + gardenBuilds().mill + (hasCharm('compost') ? 1 : 0)} ${CROP[p.crop].name}${p.kept ? '' : ' and the card come back'}` });
     const res = gardenRes(); const have = Object.entries(res).filter(([, n]) => n > 0);
     if (have.length) out.push({ id: 'store', icon: '🧺', name: 'Store', worth: have.map(([c, n]) => `${CROP[c].icon} ${n}`).join(' '), note: 'spend them on a build (the Plot row)' });
     const b = gardenBuilds(); const built = Object.entries(b).filter(([, t]) => t > 0);
@@ -2965,7 +2973,7 @@ const GARDENER = {
     const plants = !!(S.forkOn && seed && seed.def.crop && plots().length < plotCap());
     const boost = seed && (!plants || hasCharm('harvestmoon')) ? eff(seed).boost : 0;
     return {
-      value: Math.max(0, eff(blow).value + (duelFx().value || 0)),
+      value: Math.max(0, eff(blow).value + 2 * gardenBuilds().granary + (duelFx().value || 0)),
       element: null,
       init: (foot ? eff(foot).init : 0) + gardenBuilds().hive,
       boost,
@@ -2986,10 +2994,10 @@ const GARDENER = {
     // 🐛 the card the turn was RESOLVED with, never what sits in the slot now — a soak between the
     // blow and its landing can destroy the Plot card and reseat another there (found by the sweep)
     const seed = cardById(r.klass.cardId); if (!seed || !seed.def.crop || !S.hand.includes(seed)) return;
-    S.hand = S.hand.filter(c => c.id !== seed.id);
-    S.actionSetIds = (S.actionSetIds || []).filter(id => id !== seed.id);
-    plots().push({ n: GARDENER_DEFS.indexOf(seed.def), lv: seed.level, name: seed.def.name, crop: seed.def.crop, ripe: PLANT_TURNS - (hasCharm('greenthumb') ? 1 : 0) });
-    log(`🌱 You plant <b>${seed.def.name}</b> — it ripens in ${PLANT_TURNS - (hasCharm('greenthumb') ? 1 : 0)} turns.`, 'good');
+    const kept = hasCharm('greenthumb');   // 🌱 Green Thumb: the seed stays in the deck (it is spent like any card)
+    if (!kept) { S.hand = S.hand.filter(c => c.id !== seed.id); S.actionSetIds = (S.actionSetIds || []).filter(id => id !== seed.id); }
+    plots().push({ n: GARDENER_DEFS.indexOf(seed.def), lv: seed.level, name: seed.def.name, crop: seed.def.crop, ripe: PLANT_FIGHTS, kept });
+    log(`🌱 You plant <b>${seed.def.name}</b> — it ripens at the next fight.`, 'good');
   },
   fork: {
     row() {
@@ -3000,8 +3008,8 @@ const GARDENER = {
       const store = Object.entries(res).filter(([, n]) => n > 0).map(([c, n]) => `${CROP[c].icon}${n}`).join(' ') || 'nothing yet';
       const top = !seed.def.crop
         ? `🌱 Your <b>Plot</b> — <b>+${now}</b> now <span class="dim">— a sickle cannot be planted</span>`
-        : (on && !full ? `🌱 Your <b>Plot</b> — planting <b>${seed.def.name}</b>: ${CROP[seed.def.crop].icon} ${CROP[seed.def.crop].name} in ${PLANT_TURNS - (hasCharm('greenthumb') ? 1 : 0)} turns <span class="dim">(${hasCharm('harvestmoon') ? 'and its ➕ still fires' : 'nothing now'})</span>`
-                       : `🌱 Your <b>Plot</b> — <b>+${now}</b> now <span class="dim">— or plant it: ${CROP[seed.def.crop].icon} ${CROP[seed.def.crop].name} in ${PLANT_TURNS - (hasCharm('greenthumb') ? 1 : 0)} turns${full ? ' (plots full)' : ''}</span>`);
+        : (on && !full ? `🌱 Your <b>Plot</b> — planting <b>${seed.def.name}</b>: ${CROP[seed.def.crop].icon} ${CROP[seed.def.crop].name} at the next fight <span class="dim">(${hasCharm('harvestmoon') ? 'and its ➕ still fires' : 'nothing now'})</span>`
+                       : `🌱 Your <b>Plot</b> — <b>+${now}</b> now <span class="dim">— or plant it: ${CROP[seed.def.crop].icon} ${CROP[seed.def.crop].name} at the next fight${full ? ' (plots full)' : ''}</span>`);
       return `<div class="wake-row plot-row"><span class="wake-lab" data-tip="plot">${top}</span>` +
         (seed.def.crop && !full ? `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleFork()">${on ? 'play it instead' : '🌱 plant it'}</button>` : '') +
         `<span class="wake-note">store: ${store}</span></div>` +
@@ -3011,7 +3019,7 @@ const GARDENER = {
   zoneHint(zone, isFight) {
     const hive = gardenBuilds().hive;
     switch (zone) {
-      case 'Spell': { const b = spellCard(); return b ? `your Blow: <b>${eff(b).value}</b>` : 'your Blow'; }
+      case 'Spell': { const b = spellCard(), gr = gardenBuilds().granary; return b ? `your Blow: <b>${eff(b).value}</b>${gr ? ` + 🏚️ <b>${2 * gr}</b>` : ''}` : 'your Blow'; }
       case 'Element': return `your Initiative${hive ? ` + 🐝 <b>${hive}</b>` : ''} — beat its number and it cannot strike`;
       case 'Boost': return S.forkOn ? '🌱 planting — it leaves the deck to ripen' : 'plays: its ➕ feeds your Blow';
       default: return 'carried to next turn';
@@ -4017,7 +4025,7 @@ const RULE_CHARMS = [
   // 🏗️ THE ENGINEER'S — all starters for now
   // 🌱 THE GARDENER'S — all starters for now
   { id: 'greenthumb', tier: 1, name: 'Green Thumb',     rarity: 'uncommon', cost: 9, rule: true, cls: 'gardener',
-    text: '🌱 Plots ripen <b>a turn sooner</b>' },
+    text: '🌱 A planted seed <b>stays in your deck</b>' },
   { id: 'compost', tier: 1, name: 'Compost',            rarity: 'uncommon', cost: 9, rule: true, cls: 'gardener',
     text: '🌱 Every harvest yields <b>+1</b>' },
   { id: 'deeproots', tier: 1, name: 'Deep Roots',       rarity: 'uncommon', cost: 8, rule: true, cls: 'gardener',
@@ -4284,6 +4292,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 488, date: '2026-09-05', title: 'The Gardener grows faster',
+    changed: [
+      "🌱 <b>A planted seed ripens at the next fight</b>, not two turns later, and every harvest gives <b>2</b> crops.",
+      "🧺 <b>Every build costs two of one crop</b>: 🏚️ Granary (grain, your Blow +2 per tier — new) · 🪵 Mill (wood) · 🌿 Hedge (stone) · 🐝 Hive (honey). The Bramble still takes a stone and a honey, and slows the creature by 2 per tier.",
+      "🌱 Green Thumb now keeps a planted seed in your deck.",
+    ] },
+
   { build: 487, date: '2026-09-05', title: 'The new characters hit harder',
     changed: [
       "⚔️ <b>Every character after the Mage hits harder at the dragons.</b> Their main attack cards are up by 3 or 4 at every level (Guardian, Berserker, Engineer, Gardener +3 · Alchemist, Illusionist, Ranger +4). The Merchant is unchanged. Past stage 1 their blows could not reach a dragon before the deck ran out.",
@@ -14750,11 +14765,12 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
-  plot:   ['🌱 Plot', 'Play: the seed card\'s ➕ feeds your Blow. Plant: it leaves your deck, ripens over turns, and comes back with its crop.'],
-  'build-hedge': ['🌿 Hedge', 'Costs stone and wood. Every hit on you is 1 weaker per tier.'],
-  'build-hive': ['🐝 Hive', 'Costs honey and grain. +1 Initiative per tier.'],
-  'build-mill': ['🌾 Mill', 'Costs grain and wood. Every harvest yields +1 per tier.'],
-  'build-bramble': ['🌹 Bramble', 'Costs stone and honey. Every creature you meet starts Frost 1 per tier, for the whole fight, for everyone.'],
+  plot:   ['🌱 Plot', 'Play: the seed card\'s ➕ feeds your Blow. Plant: it leaves your deck and comes back at the next fight with two of its crop.'],
+  'build-granary': ['🏚️ Granary', 'Costs two grain. Your Blow is +2 per tier.'],
+  'build-mill': ['🪵 Mill', 'Costs two wood. Every harvest yields +1 per tier.'],
+  'build-hedge': ['🌿 Hedge', 'Costs two stone. Every hit on you is 1 weaker per tier.'],
+  'build-hive': ['🐝 Hive', 'Costs two honey. +1 Initiative per tier.'],
+  'build-bramble': ['🌹 Bramble', 'Costs a stone and a honey. Every creature you meet starts Frost 2 per tier, for the whole fight, for everyone.'],
   workbench: ['🏗️ Workbench', 'Swing: the card\'s ➕ feeds your Blow. Build: the card is spent and your turret gains a level. Snare: the creature is slower for the whole fight.'],
   purse:  ['🪙 Purse', 'Hold: the card\'s ➕ feeds your Strike. Pay: spend coins equal to its ➕ and it is doubled. A bribe makes the creature slower for the whole fight.'],
   summon: ['🎭 Summon', 'The card leaves your deck and stands beside you as an illusion. A blow illusion adds to your Spell every turn; a swift one adds to your Initiative. It takes hits before your cards do. When it falls its card comes back one level lower.'],
