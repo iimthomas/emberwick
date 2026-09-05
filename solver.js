@@ -302,6 +302,7 @@ const SOLVER = (() => {
 
   // ---- run the full sweep ----
   function run(level, N) {
+    BOT_POLICY = true;
     const perRegion = REGIONS.map(region => ({
       region: region.name,
       encounters: region.encounters.map(e => analyzeEncounter(e, level, N)),
@@ -1009,6 +1010,7 @@ const RUNSIM = (() => {
   }
 
   function batch(withEvents, N) {
+    BOT_POLICY = true;
     let C = 0, Nn = 0, L = 0, l4sum = 0, l4n = 0, ev = 0, tn = 0;
     const regA = [0, 0, 0, 0], regCount = [0, 0, 0, 0];
     let finaleN = 0, finaleWins = 0, beatsSum = 0, cleanN = 0;
