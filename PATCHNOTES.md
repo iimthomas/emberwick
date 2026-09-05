@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 484 — An eighth character: the Merchant
+*2026-09-04*
+
+**Added**
+- 🪙 **The Merchant.** Unlocks at account level 7. The Wheel is 20% cheaper for her. The card in her **Purse** holds (its ➕ feeds her Strike) or is **paid for**: spend coins equal to its ➕ and it is doubled. Her Strike is +1 for every 16 coins she has spent this run. Once a fight she can **bribe** the creature: it is 3 slower for the whole fight, for everyone.
+
+**Fixed**
+- 🎲 **The Wheel's Re-spin button works.** It had been doing nothing.
+
 ## build 483 — A seventh character: the Illusionist
 *2026-09-04*
 

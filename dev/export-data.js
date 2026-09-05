@@ -26,6 +26,7 @@ const TABLES = {
   cards_ranger: S.CLASSES.ranger.defs,
   cards_berserker: S.CLASSES.berserker.defs,
   cards_illusionist: S.CLASSES.illusionist.defs,
+  cards_merchant: S.CLASSES.merchant.defs,
   dragons: S.DRAGONS,
   dragon_attacks: S.DRAGON_ATTACKS,
   roads: S.ROADS,
