@@ -2591,7 +2591,132 @@ const ILLUSIONIST = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST };
+// ============================================================
+// 🪙 THE MERCHANT (2026-09-04, build 484) — [[The_Merchant]]. Source of power: WEALTH — the run
+// economy is the one big system with no class on it. Thomas: *"discounts on shop items… attacks
+// cost gold… some attacks scale on how much gold you have."* Three things, where they landed:
+//   • DISCOUNT — a passive: the Wheel is 20% cheaper for her (shopPrice, at the spin).
+//   • PAY — slot ③: the card in her Purse is HELD (its ➕ feeds the Strike) or PAID FOR — spend
+//     coins equal to its ➕ and it is DOUBLED. Bigger cards cost more to double. That is the fork.
+//   • SCALE — her Strike is +1 per PURSE_STEP coins SPENT this run. 🔴 SPENT, NEVER HELD: coins
+//     are the difficulty dial, and a weapon that reads the dial can never be tuned apart from it.
+//     Spending is also what the party does anyway, which softens the co-op tension below.
+// ⚠️ IN TWO-HANDED THE PURSE IS THE PARTY'S — her paid blows spend her partner's shop. Measure
+//     with the pair bot before calling it good; the brief flags it.
+// 🙌 Co-op: BRIBE — once a fight, pay BRIBE_COST and the creature is Frost 3 for the whole fight
+//     (lasting), for everyone. Help on the creature, in her currency.
+// ============================================================
+let PURSE_STEP = 16;      // 🪙 coins spent this run per +1 Strike (📏 484: 8 → finale 43% and +12 at the lair; 12 → 20%; 16 → 13% vs the mage's 15%; 24 → 7%)
+let BRIBE_COST = 5;
+let BRIBE_FROST = 3;
+let PAY_COIN_WEIGHT = 0.5;   // the bot's price for a coin, in blow points
+const MERCHANT_SPEC = [
+  // role     name             spike     base [value, init, boost, armour]
+  { role: 'ware', name: 'Ledger Blade',  spike: 'value', base: [6, 3, 2, 2] },
+  { role: 'ware', name: 'Tariff',        spike: 'value', base: [7, 1, 2, 2] },
+  { role: 'ware', name: 'Bargain Cut',   spike: 'value', base: [5, 4, 2, 1] },
+  { role: 'ware', name: 'Haggle',        spike: 'init',  base: [3, 7, 2, 1] },
+  { role: 'coin', name: 'Gilt Purse',    spike: 'boost', base: [2, 3, 5, 2] },
+  { role: 'coin', name: 'Silver Tongue', spike: 'boost', base: [2, 5, 3, 2] },
+  { role: 'coin', name: 'Iron Coin',     spike: 'boost', base: [3, 2, 4, 3] },
+  { role: 'coin', name: 'Escrow',        spike: 'armor', base: [2, 3, 3, 5] },
+];
+const MERCHANT_DEFS = specDefs(MERCHANT_SPEC, 'merchant');
+function purseStep() { return PURSE_STEP - (hasCharm('deeppockets') ? 2 : 0); }
+function purseBonus() { return Math.floor(((S.k && S.k.spent) || 0) / purseStep()); }
+function bribeCost() { return Math.max(1, BRIBE_COST - (hasCharm('insurance') ? 2 : 0)); }
+function bribe() {
+  if (CLASS.id !== 'merchant' || !isAssignPhase()) return;
+  const bag = fightStatus(); const k = kbag();
+  if (!bag || k.bribed || S.coins < bribeCost()) return;
+  spendCoins(bribeCost()); k.bribed = true;
+  bag.frost = (bag.frost || 0) + BRIBE_FROST; bag.lasting = Object.assign({}, bag.lasting, { frost: true });
+  log(`🪙 You bribe it (−${bribeCost()} coins) — it is <b>${BRIBE_FROST} slower</b> for the whole fight, for everyone.`, 'good');
+  render();
+}
+const MERCHANT = {
+  id: 'merchant',
+  mark: '🪙',
+  multi: null,
+  labels: { Spell: 'Strike', Element: 'Footwork', Boost: 'Purse', Reserve: 'Arsenal' },
+  defs: MERCHANT_DEFS,
+  deck() { return shuffle(MERCHANT_DEFS.concat(MERCHANT_DEFS).map(newCard)); },
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false, brews: false, marks: false,
+  name: 'Merchant',
+  tagline: 'she pays for every blow',
+  unlock: '🔒 reach account level 7 to unlock her',
+  trait: { icon: '🪙', name: 'The Purse',
+    text: 'The Wheel is <b>20% cheaper</b> for you. The card in your <b>Purse</b> either holds (its ➕ feeds your Strike) or is <b>paid for</b>: spend coins equal to its ➕ and it is <b>doubled</b>. Your Strike is <b>+1 for every 16 coins you have spent</b> this run. Once a fight, <b>bribe</b> the creature: it is 3 slower for the whole fight, for everyone.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  discount() { return 0.2 + (hasCharm('haggler') ? 0.1 : 0); },
+  craft: {
+    label: 'paid', gate: 'pay for it',
+    avail() { return !!(S.encounter && S.encounter.type === 'fight' && S.coins > 0); },
+    found(r) { return !!(r.klass && r.klass.pays); },
+  },
+  onEncounter() { const k = kbag(); k.bribed = false; },
+  tokens() {
+    const b = purseBonus(); if (!b) return null;
+    return [{ id: 'purse', icon: '🪙', name: 'Custom', count: b, worth: `your Strike <b>+${b}</b>`, note: `${(S.k && S.k.spent) || 0} coins spent this run · +1 per ${purseStep()}` }];
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const strike = spellCard(); if (!strike) return null;
+    const foot = cardById(S.assign.Element), purse = cardById(S.assign.Boost);
+    const base = purse ? eff(purse).boost : 0;
+    const price = base;
+    const pays = !!(S.forkOn && purse && price > 0 && S.coins >= price);
+    const boost = pays ? base * (hasCharm('bulkorder') ? 3 : 2) : base;
+    return {
+      value: Math.max(0, eff(strike).value + purseBonus() + (duelFx().value || 0)),
+      element: null,
+      init: (foot ? eff(foot).init : 0) + (pays && hasCharm('soundinvestment') ? 2 : 0),
+      boost,
+      hits: CLASS.hitsOf(strike, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: strike, elem: foot, boostC: purse,
+      attuner: null, loose: false,
+      klass: { pays, price: pays ? price : 0, bonus: purseBonus(), botValue: pays ? -PAY_COIN_WEIGHT * price : 0 },
+    };
+  },
+  // 🪙 the coins leave the purse when the blow lands (kill or not) — never inside computeAction
+  afterTurn(r) {
+    if (!r || !r.klass || !r.klass.pays) return;
+    spendCoins(r.klass.price);
+    log(`🪙 You pay <b>${r.klass.price}</b> for the blow (${S.coins} left).`);
+    if (hasCharm('windfall') && ((S.foeState && S.foeState.hp <= 0) || (S.dragonState && S.finalMode && S.dragonState.hp <= 0))) { S.coins += 2; log('🪙 Windfall — the kill pays <b>+2</b>.', 'good'); }
+  },
+  fork: {
+    row() {
+      const purse = cardById(S.assign.Boost); if (!purse) return '';
+      const on = !!S.forkOn, now = eff(purse).boost, price = now, can = S.coins >= price && price > 0;
+      const mult = hasCharm('bulkorder') ? 3 : 2, k = S.k || {}, bag = fightStatus();
+      const bribeBtn = (bag && !k.bribed) ? `<button class="wake-btn" onclick="bribe()" ${S.coins >= bribeCost() ? '' : 'disabled'}>🪙 bribe it — ${bribeCost()}</button>` : '';
+      return `<div class="wake-row purse-row"><span class="wake-lab" data-tip="purse">🪙 Your <b>Purse</b> — ` +
+        (on && can ? `paying <b>${price}</b> coins: <b>+${now * mult}</b> to the Strike <span class="dim">(${S.coins} in hand)</span>`
+                   : `<b>+${now}</b> now <span class="dim">— or pay ${price} coins for +${now * mult}${can ? '' : ' (short)'}</span>`) + `</span>` +
+        (price > 0 ? `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleFork()" ${can || on ? '' : 'disabled'}>${on ? 'hold it instead' : '🪙 pay for it'}</button>` : '') + bribeBtn +
+        `<span class="wake-note">${k.bribed ? 'bribed — it is slower all fight' : (bag ? `a bribe makes it ${BRIBE_FROST} slower all fight` : '')}</span></div>`;
+    },
+  },
+  zoneHint(zone, isFight) {
+    const b = purseBonus();
+    switch (zone) {
+      case 'Spell': { const s = spellCard(); return s ? `your Strike: <b>${eff(s).value}</b>${b ? ` + 🪙 <b>${b}</b>` : ''}` : 'your Strike, plus your custom'; }
+      case 'Element': return 'your Initiative — beat its number and it cannot strike';
+      case 'Boost': return S.forkOn ? '🪙 paid for — its ➕ is doubled' : 'held: its ➕ feeds your Strike';
+      default: return 'carried to next turn';
+    }
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER, illusionist: ILLUSIONIST, merchant: MERCHANT };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -3568,6 +3693,19 @@ const RULE_CHARMS = [
     text: '🏹 A mark makes the next <b>two</b> blows certain' },
   // 🎲 THE BERSERKER'S — all starters for now
   // 🎭 THE ILLUSIONIST'S — all starters for now
+  // 🪙 THE MERCHANT'S — all starters for now
+  { id: 'haggler', tier: 1, name: 'Haggler',            rarity: 'uncommon', cost: 8, rule: true, cls: 'merchant',
+    text: '🪙 The Wheel is <b>10% cheaper</b> still' },
+  { id: 'deeppockets', tier: 1, name: 'Deep Pockets',   rarity: 'uncommon', cost: 9, rule: true, cls: 'merchant',
+    text: '🪙 Your Strike grows every <b>14</b> coins spent, not 16' },
+  { id: 'soundinvestment', tier: 1, name: 'Sound Investment', rarity: 'uncommon', cost: 9, rule: true, cls: 'merchant',
+    text: '🪙 Paying for a blow gives <b>+2 Initiative</b>' },
+  { id: 'insurance', tier: 2, name: 'Insurance',        rarity: 'rare', cost: 10, rule: true, cls: 'merchant',
+    text: '🪙 A bribe costs <b>2 less</b>' },
+  { id: 'windfall', tier: 3, name: 'Windfall',          rarity: 'rare', cost: 12, rule: true, cls: 'merchant',
+    text: '🪙 A paid blow that kills pays <b>+2 coins</b> back' },
+  { id: 'bulkorder', tier: 4, name: 'Bulk Order',       rarity: 'rare', cost: 13, rule: true, cls: 'merchant',
+    text: '🪙 A paid card is <b>tripled</b>, not doubled' },
   { id: 'veil', tier: 1, name: 'Wide Veil',            rarity: 'uncommon', cost: 8, rule: true, cls: 'illusionist',
     text: '🎭 You may keep <b>one more</b> illusion' },
   { id: 'shroud', tier: 1, name: 'Shroud',              rarity: 'uncommon', cost: 9, rule: true, cls: 'illusionist',
@@ -3800,6 +3938,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 484, date: '2026-09-04', title: 'An eighth character: the Merchant',
+    added: [
+      "🪙 <b>The Merchant.</b> Unlocks at account level 7. The Wheel is 20% cheaper for her. The card in her <b>Purse</b> holds (its ➕ feeds her Strike) or is <b>paid for</b>: spend coins equal to its ➕ and it is doubled. Her Strike is +1 for every 16 coins she has spent this run. Once a fight she can <b>bribe</b> the creature: it is 3 slower for the whole fight, for everyone.",
+    ],
+    fixed: [
+      "🎲 <b>The Wheel's Re-spin button works.</b> It had been doing nothing.",
+    ] },
+
   { build: 483, date: '2026-09-04', title: 'A seventh character: the Illusionist',
     added: [
       "🎭 <b>The Illusionist.</b> Unlocks at account level 5. The card in her <b>Veil</b> fires (its ➕ feeds her Spell) or is <b>summoned</b> as an illusion. A blow illusion adds to her Spell every turn; a swift one adds to her Initiative, and to a partner's. <b>Her cards all block 1 — the illusions take the hits first.</b> Tap an illusion to put it in front. When one falls, its card comes back one level lower.",
@@ -6098,7 +6244,8 @@ const UNLOCKS = [
   // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
   { level: 3,  kind: 'class', id: 'berserker', label: '🎲 The Berserker' },
-  { level: 5,  kind: 'class', id: 'illusionist', label: '🎭 The Illusionist' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
+  { level: 5,  kind: 'class', id: 'illusionist', label: '🎭 The Illusionist' },
+  { level: 7,  kind: 'class', id: 'merchant', label: '🪙 The Merchant' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
   // 🛡️ 🔒 THE LOAD-TIME GUARD EARNED ITS PLACE AGAIN. Deleting 🏮 Lantern-Bearer as dead
   // journey content threw *"UNLOCKS names a charm that does not exist"* on the very next boot —
   // exactly what it was written for. Without it level 3 would have unlocked NOTHING, silently,
@@ -10867,7 +11014,8 @@ function rollOffer(rich) {
   }
 }
 
-function spinWheel(rich) {
+function spinWheel(rich) { return spinWheelRaw(rich).map(o => { if (o && o.cost) o.cost = shopPrice(o.cost); return o; }); }
+function spinWheelRaw(rich) {
   const offers = [];
   const taken = new Set();
   for (let i = 0; i < 3; i++) {
@@ -10952,7 +11100,7 @@ function buyUpgrade(id) {
   if (!canSharpenNow()) return;
   const card = cardById(id); if (!card || !upgradable(card)) return;
   const cost = eff(card).cost;
-  S.coins -= cost;
+  spendCoins(cost);
   card.level++;
   (S.sharpenedVisit = S.sharpenedVisit || []).push(card.id);
   log(`🔼 ${card.def.name} sharpens to Lv${card.level} (−${cost} coins, ${S.coins} left).` +
@@ -10962,6 +11110,20 @@ function buyUpgrade(id) {
 }
 function doneUpgrades() { S.sharpenedVisit = []; endTurn(); }
 
+// 🪙 EVERY SPEND GOES THROUGH HERE (484) — the Merchant's power reads coins SPENT this run, never
+// coins held, so the difficulty dial (coins) and her weapon are not the same variable.
+function spendCoins(n) { S.coins -= n; const k = kbag(); k.spent = (k.spent || 0) + n; }
+// 🪙 a class may discount the Wheel (the Merchant); applied at the SPIN, so every price on screen is the real one
+function shopPrice(c) { const d = CLASS.discount ? CLASS.discount() : 0; return d ? Math.max(1, Math.round(c * (1 - d))) : c; }
+// 🎲 THE RE-SPIN. 🐛 The button had called `wheelReroll()` for an unknown number of builds and no such
+// function existed — a dead button that looked like a short purse. It replaces the whole shelf.
+function wheelReroll() {
+  if (!S.wheel || S.phase !== 'wheel' || S.coins < REROLL_COST) return;
+  spendCoins(REROLL_COST);
+  S.wheel.offers = spinWheel(S.wheel.rich); S.wheel.bought = [];
+  log(`🎲 You re-spin the Wheel (−${REROLL_COST} coins, ${S.coins} left).`);
+  render();
+}
 function startWheel(rich) {
   S.wheel = { offers: spinWheel(rich), rich: !!rich, bought: [] };
   S.phase = 'wheel';
@@ -10975,7 +11137,7 @@ function wheelBuy(i) {
   if (o.kind === 'potion' && (S.potions || []).length >= potionCap()) {
     log(`You can carry only ${POTION_CAP} potions.`, 'bad'); render(); return;
   }
-  S.coins -= o.cost;
+  spendCoins(o.cost);
   if (o.kind === 'charm') {
     S.charms.push(o.id);
     log(`🎁 ${o.name} — ${o.text} (−${o.cost} coins)`, 'good result');
@@ -13662,6 +13824,7 @@ function renderControls() {
           row('ranger', '🏹 The Ranger', 'A hunter who sees what is coming and shoots where it will be.') +
           row('berserker', '🎲 The Berserker', 'A reckless fighter who leaves everything to chance.') +
           row('illusionist', '🎭 The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
+          row('merchant', '🪙 The Merchant', 'A trader who pays for every blow out of her own purse.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -13697,7 +13860,6 @@ function renderControls() {
           // ❌ Euro_Classes' 🪵 Forager stays out for the same reason it always did — the doc calls
           // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
           // resource you hold and spend*.
-          soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
           soon('🌱', 'The Gardener', 'A grower who plants today and reaps it in the fights to come.') +
           `</div></div></div>`;
@@ -14220,6 +14382,7 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
+  purse:  ['🪙 Purse', 'Hold: the card\'s ➕ feeds your Strike. Pay: spend coins equal to its ➕ and it is doubled. A bribe makes the creature slower for the whole fight.'],
   summon: ['🎭 Summon', 'The card leaves your deck and stands beside you as an illusion. A blow illusion adds to your Spell every turn; a swift one adds to your Initiative. It takes hits before your cards do. When it falls its card comes back one level lower.'],
   die:    ['🎲 The Die', 'Rolled before you arrange. It is added to your Blow this turn.'],
   gamble: ['🎲 Gamble', 'Sure: the card\'s ➕ feeds your Blow. Reckless: roll a second die instead. A 6 rolls again. A 1 costs you the race.'],
