@@ -4299,6 +4299,11 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 490, date: '2026-09-05', title: 'The Workshop stays one size',
+    changed: [
+      "⚒️ <b>The Workshop window is one fixed size</b> whichever tab you are on. Switching tabs changes what is inside it, not the box.",
+    ] },
+
   { build: 489, date: '2026-09-05', title: 'The Workshop in tabs, and gear for every character',
     added: [
       "🎭 <b>Two pieces of equipment for every character</b> — a rare chest and a legendary pair of boots each, keyed to what that character does: the Guardian's Wrath, the Alchemist's Still, the Ranger's mark, the Berserker's die, the Illusionist's veil, the Merchant's purse, the Engineer's turret, the Gardener's builds. Forged from shards and shape parts, like the Mage's and the Rogue's.",

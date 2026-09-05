@@ -6,6 +6,12 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 490 — The Workshop stays one size
+*2026-09-05*
+
+**Changed**
+- ⚒️ **The Workshop window is one fixed size** whichever tab you are on. Switching tabs changes what is inside it, not the box.
+
 ## build 489 — The Workshop in tabs, and gear for every character
 *2026-09-05*
 
