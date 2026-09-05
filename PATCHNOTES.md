@@ -6,6 +6,15 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 489 — The Workshop in tabs, and gear for every character
+*2026-09-05*
+
+**Added**
+- 🎭 **Two pieces of equipment for every character** — a rare chest and a legendary pair of boots each, keyed to what that character does: the Guardian's Wrath, the Alchemist's Still, the Ranger's mark, the Berserker's die, the Illusionist's veil, the Merchant's purse, the Engineer's turret, the Gardener's builds. Forged from shards and shape parts, like the Mage's and the Rogue's.
+
+**Changed**
+- ⚒️ **The Workshop has tabs**: Generic, then one for each character. A character's tab shows only their gear; a locked character's tab can still be read.
+
 ## build 488 — The Gardener grows faster
 *2026-09-05*
 
