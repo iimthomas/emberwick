@@ -23,6 +23,8 @@ const TABLES = {
   cards_rogue: S.ROGUE_DEFS,
   cards_guardian: S.CLASSES.guardian.defs,
   cards_alchemist: S.CLASSES.alchemist.defs,
+  cards_ranger: S.CLASSES.ranger.defs,
+  cards_berserker: S.CLASSES.berserker.defs,
   dragons: S.DRAGONS,
   dragon_attacks: S.DRAGON_ATTACKS,
   roads: S.ROADS,
