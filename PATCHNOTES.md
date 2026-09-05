@@ -6,6 +6,14 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 481 — Mage cards are easier to read
+*2026-09-04*
+
+**Changed**
+- 🌊 **A card in the Surge no longer leaves an effect on the creature.** The Surge is for its ➕ boost, or for channelling. Only your **Spell**, your **Catalyst** and a card that **blocks** leave Burn, Frost, Daze or Exposed now — at most two a turn.
+- ⚔️ **Every mage card hits for 2 more**, at every level, to make up for it.
+- 🃏 **A card's effect number only shows when the card is where it fires.** Elsewhere the card just points at the slot it wants.
+
 ## build 480 — Online co-op reconnects
 *2026-09-03*
 
