@@ -6,6 +6,13 @@ Play: https://iimthomas.github.io/emberwick/play/
      the game shows the same table, and a changelog that disagrees with the build is the
      version people quote. Add the entry in game.js and re-run this. -->
 
+## build 482 — A sixth character: the Berserker
+*2026-09-04*
+
+**Added**
+- 🎲 **The Berserker.** Unlocks at account level 3. Every fight turn opens with a **die**, rolled before you arrange, and her Blow is her card plus the die. The card in her **Gamble** is the sure thing (its ➕ feeds the Blow) — or go **reckless** and roll a second die instead. A 6 rolls again. A 1 costs you the race. Each reckless turn adds **Rage**, and Rage adds to the die she opens with. An exploding blow leaves the creature reeling, for you or a partner.
+- 🌱 **The Gardener** is on the roster in the Knight's place. Not built yet.
+
 ## build 481 — Mage cards are easier to read
 *2026-09-04*
 

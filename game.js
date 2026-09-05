@@ -2281,7 +2281,164 @@ const RANGER = {
   },
 };
 
-const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER };
+// ============================================================
+// 🎲 THE BERSERKER (2026-09-04, build 482) — [[The_Berserker]]. Source of power: RISK — randomness
+// you CHOSE at the character select, and the one class that argues with the deterministic turn.
+// 🔴 THE ROLL RESOLVES BEFORE YOU ARRANGE. Every fight turn opens with a die you can SEE, and your
+// Blow is your card plus that die — a low die is a weak turn you then solve around, which is a
+// PROBLEM, not a slot machine. The gamble lives in slot ③: the card there is the SURE THING (its
+// ➕ feeds the Blow) or you go RECKLESS — a second die is rolled at resolution instead. A 6 rolls
+// again; a 1 costs you the race (Initiative 0). 💢 RAGE: one per reckless turn, and each point
+// adds 1 to the opening die — she shapes her own distribution, which is where the skill lives.
+// 🙌 Co-op: an EXPLODED blow dazes the creature (its next blow 2 weaker) — help on the creature.
+// 🔑 The bot prices the gamble at its expectation minus the race it might lose (klass.botValue);
+// every number for her is EV-optimal, which a human should not always be — measure her SPREAD.
+// ============================================================
+let GAMBLE_EV = 3.5;      // 🎲 what the bot (and the row) expects from the reckless die
+let RAGE_CAP = 3;
+let RAGE_DIE = 1;         // 💢 each Rage point adds this to the opening die
+const BERSERKER_SPEC = [
+  // role     name           spike     base [value, init, boost, armour]
+  { role: 'blow', name: 'Cleaver',      spike: 'value', base: [6, 3, 2, 2] },
+  { role: 'blow', name: 'Maul',         spike: 'value', base: [7, 1, 2, 2] },
+  { role: 'blow', name: 'Skullsplitter',spike: 'value', base: [5, 4, 2, 1] },
+  { role: 'blow', name: 'Stomp',        spike: 'init',  base: [3, 7, 2, 1] },
+  { role: 'fury', name: 'Warcry',       spike: 'init',  base: [2, 6, 3, 2] },
+  { role: 'fury', name: 'Bloodrush',    spike: 'boost', base: [2, 3, 5, 2] },
+  { role: 'fury', name: 'Wildroar',     spike: 'boost', base: [3, 2, 4, 3] },
+  { role: 'fury', name: 'Bearhide',     spike: 'armor', base: [2, 3, 3, 5] },
+];
+// the same sharpening rule as the Ranger's spec: the spike climbs, the rest drop once
+function specDefs(spec, tag) {
+  return spec.map(s => {
+    const ix = { value: 0, init: 1, boost: 2, armor: 3 };
+    const step = s.spike === 'value' ? 3 : s.spike === 'boost' ? 2 : 1;
+    const lv = [0, 1, 2, 3].map(L => {
+      const st = s.base.map((v, i) => (i === ix[s.spike] ? v + step * L : (L === 0 ? v : Math.max(0, v - 1))));
+      st[3] = Math.max(1, st[3]);
+      return [st[0], null, st[1], st[2], st[3], null, null];
+    });
+    const d = { name: s.name, element: null, arch: null, role: s.role, hits: 1, lv }; d[tag] = true; return d;
+  });
+}
+const BERSERKER_DEFS = specDefs(BERSERKER_SPEC, 'berserker');
+function rollD6() { return 1 + Math.floor(rnd() * 6); }
+const BERSERKER = {
+  id: 'berserker',
+  mark: '🎲',
+  multi: null,
+  labels: { Spell: 'Blow', Element: 'Footing', Boost: 'Gamble', Reserve: 'Arsenal' },
+  defs: BERSERKER_DEFS,
+  deck() { return shuffle(BERSERKER_DEFS.concat(BERSERKER_DEFS).map(newCard)); },
+  emberwake: false, pairs: false, boosts: true, energy: false, momentum: false, knives: false, stances: false, brews: false, marks: false,
+  name: 'Berserker',
+  tagline: 'she rolls',
+  unlock: '🔒 reach account level 3 to unlock her',
+  trait: { icon: '🎲', name: 'The Roll',
+    text: 'Every fight turn opens with a <b>die</b>, rolled before you arrange, and your Blow is your card <b>plus the die</b>. The card in your <b>Gamble</b> is the sure thing (its ➕ feeds the Blow) — or go <b>reckless</b>: roll a second die instead. A <b>6</b> rolls again. A <b>1</b> costs you the race. 💢 Each reckless turn adds a point of Rage, and Rage adds to the die you open with.' },
+  hitsOf(c, isStrike) { return (c.def.hits || 1) + extraHits(isStrike); },
+  perHitBonus(card) { return (S.potionFx ? S.potionFx.value : 0) + charmStrike(card); },
+  cardEffect() { return null; },
+  craft: {
+    label: 'reckless', gate: 'roll for it',
+    avail() { return !!(S.encounter && S.encounter.type === 'fight'); },
+    found(r) { return !!(r.klass && r.klass.reckless); },
+  },
+  rageCap() { return RAGE_CAP + (hasCharm('hotblood') ? 2 : 0); },
+  // 🎲 the opening die — rolled where every turn loop resets, BEFORE anything is arranged
+  onTurnStart() {
+    const k = kbag();
+    k.gambleLive = false; k.gamble = 0; k.gambleOne = false; k.exploded = false;
+    const inFight = !!(S.foeState || (S.finalMode && S.finalPhase === 'duel'));
+    if (!inFight) { k.die = 0; return; }
+    let d = rollD6();
+    if (hasCharm('steadyhand')) d = Math.max(2, d);
+    const rage = Math.min(k.rage || 0, this.rageCap());
+    if (hasCharm('frenzy') && rage >= this.rageCap()) d *= 2;
+    k.die = d + rage * RAGE_DIE;
+    log(`🎲 You roll a <b>${d}</b>${rage ? ` (+${rage * RAGE_DIE} Rage)` : ''} — your Blow is <b>+${k.die}</b> this turn.`, d >= 5 ? 'good' : d === 1 ? 'bad' : '');
+  },
+  onEncounter() { const k = kbag(); k.rage = hasCharm('secondwind') ? Math.floor((k.rage || 0) / 2) : 0; },
+  // 🎲 the reckless die — rolled ONCE, at resolution, never inside computeAction (the bot calls that hundreds of times a turn)
+  onResolve() {
+    const k = kbag();
+    if (!(S.forkOn && cardById(S.assign.Boost))) { k.gambleLive = false; return; }
+    let total = 0, first = null, rolls = 0, exploded = false;
+    for (;;) {
+      const d = rollD6(); rolls++; if (first == null) first = d; total += d;
+      const again = d === 6 || (hasCharm('bloodlust') && d === 5);
+      if (!again || rolls >= 4) break;
+      exploded = true;
+    }
+    k.gambleLive = true; k.gamble = total; k.gambleOne = first === 1; k.exploded = exploded;
+    log(`🎲 Reckless — you roll <b>${total}</b>${exploded ? ' (it explodes!)' : first === 1 ? ' — a 1: you stumble and lose the race' : ''}.`, exploded ? 'good' : first === 1 ? 'bad' : '');
+  },
+  tokens() {
+    const k = S.k || {}; const out = [];
+    if (k.die > 0) out.push({ id: 'die', icon: '🎲', name: 'The Die', count: k.die, worth: `your Blow is <b>+${k.die}</b>`, note: 'this turn only' });
+    if (k.rage > 0) out.push({ id: 'rage', icon: '💢', name: 'Rage', count: k.rage, cap: this.rageCap(), worth: `your opening die is <b>+${k.rage * RAGE_DIE}</b>`, note: hasCharm('secondwind') ? 'half of it carries to the next fight' : 'fades when the fight ends' });
+    return out.length ? out : null;
+  },
+  canPlace() { return true; },
+  valid() { return !!spellCard(); },
+  spentIds() { return S.assign.Spell ? [S.assign.Spell] : []; },
+  compose() {
+    const blow = spellCard(); if (!blow) return null;
+    const foot = cardById(S.assign.Element), gam = cardById(S.assign.Boost);
+    const k = S.k || {};
+    const reckless = !!(S.forkOn && gam);
+    const boost = gam && !reckless ? eff(gam).boost : 0;
+    const gambleAdd = reckless ? (k.gambleLive ? k.gamble : GAMBLE_EV) : 0;
+    const stumble = reckless && k.gambleLive && k.gambleOne && !hasCharm('thickskull');
+    const atk = S.encounter && S.encounter.atk || 0;
+    return {
+      value: Math.max(0, eff(blow).value + (k.die || 0) + gambleAdd + (duelFx().value || 0)),
+      element: null,
+      init: stumble ? 0 : (foot ? eff(foot).init : 0),
+      boost,
+      hits: CLASS.hitsOf(blow, true),
+      attuned: false, attBonus: 0,
+      banks: false, bank: 0, wake: 0,
+      vSpell: null, vElem: null,
+      spell: blow, elem: foot, boostC: gam,
+      attuner: null, loose: false,
+      // 🔑 the bot's price for the gamble, stated by the class: the race it may lose, one turn in six
+      klass: { reckless, die: k.die || 0, gamble: k.gambleLive ? k.gamble : null, exploded: !!k.exploded,
+               botValue: reckless && !hasCharm('thickskull') ? -Math.round(atk / 6) : 0 },
+    };
+  },
+  afterBlow(r, body) {
+    if (!r || !r.klass || !r.klass.reckless) return;
+    const k = kbag(); k.rage = Math.min(this.rageCap(), (k.rage || 0) + 1);
+    if (r.klass.exploded && body && body.hp > 0) {
+      const bag = body.status = body.status || {};
+      bag.daze = (bag.daze || 0) + 2;
+      log('💢 The blow lands so hard it reels — its next blow is <b>2 weaker</b>.', 'good');
+    }
+  },
+  fork: {
+    row() {
+      const gam = cardById(S.assign.Boost); if (!gam) return '';
+      const k = S.k || {}, on = !!S.forkOn, now = eff(gam).boost;
+      return `<div class="wake-row gamble-row"><span class="wake-lab" data-tip="gamble">🎲 Your <b>Gamble</b> — ` +
+        (on ? `reckless: a second die, <b>1 to 6</b>, added to the Blow <span class="dim">(a 6 rolls again · a 1 loses the race)</span>`
+            : `<b>+${now}</b> now <span class="dim">— or go reckless: a second die, 1 to 6</span>`) + `</span>` +
+        `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleFork()">${on ? 'play it safe' : '🎲 go reckless'}</button>` +
+        `<span class="wake-note">${on ? '+1 Rage after' : (k.die ? `your Blow already carries the die: +${k.die}` : '')}</span></div>`;
+    },
+  },
+  zoneHint(zone, isFight) {
+    const k = S.k || {};
+    switch (zone) {
+      case 'Spell': { const b = spellCard(); return b ? `your Blow: <b>${eff(b).value}</b> + 🎲 <b>${k.die || 0}</b>` : 'your Blow, plus the die'; }
+      case 'Element': return 'your Initiative — beat its number and it cannot strike';
+      case 'Boost': return S.forkOn ? '🎲 reckless — a second die instead of its ➕' : 'sure: its ➕ feeds your Blow';
+      default: return 'carried to next turn';
+    }
+  },
+};
+
+const CLASSES = { mage: MAGE, rogue: ROGUE, guardian: GUARDIAN, alchemist: ALCHEMIST, ranger: RANGER, berserker: BERSERKER };
 let CLASS = MAGE;
 function setClass(c) { CLASS = c || MAGE; }
 
@@ -2835,7 +2992,14 @@ function wallSummary() {
 // you the many-small-hits class the moment you have internalised big-hits-win is the lesson.
 // ============================================================
 const CLASS_KEY = 'emberwick-class-1' + KEY_NS;
-function classUnlocked(id) { return id === 'mage' || (id === 'guardian' ? stagesCleared() >= 2 : id === 'alchemist' ? stagesCleared() >= 3 : id === 'ranger' ? stagesCleared() >= 4 : stagesCleared() >= 1); }
+// ⭐ CLASSES SIX AND UP UNLOCK ON THE ACCOUNT BAR (2026-08-23's rule: the account bar takes classes
+// three and up; the stage gates were used up by the Guardian, Alchemist and Ranger).
+const CLASS_UNLOCK_LEVEL = { berserker: 3, illusionist: 5, merchant: 7, engineer: 9, gardener: 11 };
+function classUnlocked(id) {
+  if (id === 'mage') return true;
+  if (CLASS_UNLOCK_LEVEL[id]) return accountLevel() >= CLASS_UNLOCK_LEVEL[id];
+  return id === 'guardian' ? stagesCleared() >= 2 : id === 'alchemist' ? stagesCleared() >= 3 : id === 'ranger' ? stagesCleared() >= 4 : stagesCleared() >= 1;
+}
 function pickedClassId() {
   try { const v = localStorage.getItem(CLASS_KEY); return (v && CLASSES[v] && classUnlocked(v)) ? v : 'mage'; }
   catch (e) { return 'mage'; }
@@ -3249,6 +3413,19 @@ const RULE_CHARMS = [
     text: '🏹 A certain blow bites <b>2 deeper</b>' },
   { id: 'twinmark', tier: 4, name: 'Twin Mark',         rarity: 'rare', cost: 13, rule: true, cls: 'ranger',
     text: '🏹 A mark makes the next <b>two</b> blows certain' },
+  // 🎲 THE BERSERKER'S — all starters for now
+  { id: 'hotblood', tier: 1, name: 'Hot Blood',         rarity: 'uncommon', cost: 8, rule: true, cls: 'berserker',
+    text: '💢 Your Rage cap is <b>2 higher</b>' },
+  { id: 'steadyhand', tier: 1, name: 'Steady Hand',     rarity: 'uncommon', cost: 9, rule: true, cls: 'berserker',
+    text: '🎲 Your opening die is never below <b>2</b>' },
+  { id: 'thickskull', tier: 1, name: 'Thick Skull',     rarity: 'uncommon', cost: 9, rule: true, cls: 'berserker',
+    text: '🎲 A reckless <b>1</b> no longer costs you the race' },
+  { id: 'bloodlust', tier: 2, name: 'Bloodlust',        rarity: 'rare', cost: 11, rule: true, cls: 'berserker',
+    text: '🎲 A reckless <b>5</b> rolls again too' },
+  { id: 'secondwind', tier: 3, name: 'Second Wind',     rarity: 'rare', cost: 12, rule: true, cls: 'berserker',
+    text: '💢 Half your Rage <b>carries</b> to the next fight' },
+  { id: 'frenzy', tier: 4, name: 'Frenzy',              rarity: 'rare', cost: 13, rule: true, cls: 'berserker',
+    text: '💢 At full Rage your opening die is <b>doubled</b>' },
   { id: 'deadhand', tier: 4, name: 'Dead Hand',      rarity: 'rare', cost: 14, rule: true, cls: 'rogue',
     text: '🔪 A tool Strike sticks <b>two</b> knives' },
   { id: 'heldember', tier: 1, name: 'Held Ember',    rarity: 'uncommon', cost: 9, rule: true, cls: 'mage',
@@ -3457,6 +3634,12 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 482, date: '2026-09-04', title: 'A sixth character: the Berserker',
+    added: [
+      "🎲 <b>The Berserker.</b> Unlocks at account level 3. Every fight turn opens with a <b>die</b>, rolled before you arrange, and her Blow is her card plus the die. The card in her <b>Gamble</b> is the sure thing (its ➕ feeds the Blow) — or go <b>reckless</b> and roll a second die instead. A 6 rolls again. A 1 costs you the race. Each reckless turn adds <b>Rage</b>, and Rage adds to the die she opens with. An exploding blow leaves the creature reeling, for you or a partner.",
+      "🌱 <b>The Gardener</b> is on the roster in the Knight's place. Not built yet.",
+    ] },
+
   { build: 481, date: '2026-09-04', title: 'Mage cards are easier to read',
     changed: [
       "🌊 <b>A card in the Surge no longer leaves an effect on the creature.</b> The Surge is for its ➕ boost, or for channelling. Only your <b>Spell</b>, your <b>Catalyst</b> and a card that <b>blocks</b> leave Burn, Frost, Daze or Exposed now — at most two a turn.",
@@ -4008,7 +4191,7 @@ function saveGame(key, force) {
       pendingEvent: S.pendingEvent, eventAt: S.eventAt, eventDone: S.eventDone,
       eventTurnPending: S.eventTurnPending, event: S.event,
       eventsSeen: S.eventsSeen, eventFlags: S.eventFlags,
-      wake: S.wake, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0, still: S.still || [],
+      wake: S.wake, wakePending: S.wakePending, setout: S.setout, candleGrace: S.candleGrace || 0, still: S.still || [], k: S.k || {},
       loot: S.loot, encountersDone: S.encountersDone, runBanked: S.runBanked,
       armour: S.armour, armourStrike: S.armourStrike, armourStrikePending: S.armourStrikePending,
       splitPending: S.splitPending || 0, armourWinInit: !!S.armourWinInit,
@@ -4146,7 +4329,7 @@ function loadGameData(d) {
       eventDone: d.eventDone || false, eventTurnPending: d.eventTurnPending || false, event: d.event || null,
       eventsSeen: d.eventsSeen || [], eventFlags: d.eventFlags || {},
       // ⚠️ clamped: before 454 a wake was a DAMAGE figure (could be 9); now it is a strength ≤ 2
-      wake: Math.min(2, d.wake || 0), wakePending: Math.min(2, d.wakePending || 0), still: d.still || [],
+      wake: Math.min(2, d.wake || 0), wakePending: Math.min(2, d.wakePending || 0), still: d.still || [], k: d.k || {},
       // 🛡️ filtered against the live table, so a piece removed in a later build cannot
       // resurrect as `undefined` and throw on armourBlock().
       loot: d.loot || {}, encountersDone: d.encountersDone || 0,
@@ -5743,6 +5926,7 @@ const POTIONS = [
 const UNLOCKS = [
   // ⭐ THE ACCOUNT LADDER — generic charms, engine rules, inherited by every class ever added
   { level: 2,  kind: 'charm', id: 'wardstone' },        // +2 armour on every card. Read once, done.
+  { level: 3,  kind: 'class', id: 'berserker', label: '🎲 The Berserker' },   // ⭐ a character on the ladder — the rung the 08-23 note was waiting for
   // 🛡️ 🔒 THE LOAD-TIME GUARD EARNED ITS PLACE AGAIN. Deleting 🏮 Lantern-Bearer as dead
   // journey content threw *"UNLOCKS names a charm that does not exist"* on the very next boot —
   // exactly what it was written for. Without it level 3 would have unlocked NOTHING, silently,
@@ -6521,7 +6705,7 @@ function takeMapNode(f, c) {
   S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 
   if (node.type === 'normal' || node.type === 'elite') {
@@ -7200,6 +7384,7 @@ function beginEncounter(e) {
   } else { S.foeState = null; S.foeBase = null; }
   S.boostTarget = S.encounter.type === 'fight' ? 'Attack' : 'Move';
   S.wrath = hasCharm('ironwill') ? Math.floor((S.wrath || 0) / 2) : 0;   // 🛡️ Wrath is per fight
+  if (CLASS.onEncounter) CLASS.onEncounter();   // 🎲 per-fight class state resets here, for every class after the Guardian
   S.rangedDodge = false;
   // roll a Hardship (density rises with the region)
   let list = S.encounter.type === 'fight' ? FIGHT_HARDSHIPS : JOURNEY_HARDSHIPS;
@@ -7657,7 +7842,7 @@ function startFoeBeat() {
   // third loop skipped the resets the other two shared. A beat IS a turn.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
   logHeader(`— ⚔️ ${base.name} · turn ${st.turn} —`);
@@ -7687,7 +7872,7 @@ const HAND_FIELDS = ['deck', 'hand', 'discard', 'trashed', 'assign', 'actionSetI
   'wake', 'wakePending', 'wakeUsed', 'wakeDeep', 'bankArmed', 'ripArmed', 'moTarget', 'momentum', 'drawExtra',
   'potions', 'potionFx', 'potionPick', 'charms', 'armour', 'armourTwin', 'armourStrike', 'armourStrikePending',
   'splitPending', 'armourWinInit', 'armourPace', 'armourPacePending', 'emberguardUsed',
-  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance', 'still', 'stillArmed', 'markArmed'];
+  'damage', 'damageEl', 'loseReserve', 'boostTarget', 'stats', 'poison', 'delayed', 'selectedId', 'upgradePick', 'wheel', 'candle', 'duelStamina0', 'wrath', 'guardStance', 'still', 'stillArmed', 'markArmed', 'forkOn', 'k'];
 function isTwoHanded() { return !!(S && S.hands && S.hands.length > 1); }
 // 💾 a hand's record on disk. Cards by index into the hand's OWN class table (names duplicate
 // across elements, and a rogue index means nothing in the mage's table). Per-turn scratch
@@ -7735,7 +7920,7 @@ function handTurnReset() {
   S.boostTarget = 'Attack'; S.loseReserve = null; S.afterSoak = 'foeNext';
   S.damage = 0; S.damageEl = null; S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
+  S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 // a new creature turn: every hand draws up and is reset; a hand with no cards is OUT (the
@@ -7751,7 +7936,7 @@ function twoHandedTurnStart(base, st) {
       S.deck = shuffle([...S.deck, ...S.discard]); S.discard = [];
     }
     if (S.hand.length < HAND_SIZE) draw(HAND_SIZE - S.hand.length);
-    if (st.turn === 0 && i !== cur) S.wrath = hasCharm('ironwill') ? Math.floor((S.wrath || 0) / 2) : 0;   // 🛡️ the partner's Wrath resets too
+    if (st.turn === 0 && i !== cur) { S.wrath = hasCharm('ironwill') ? Math.floor((S.wrath || 0) / 2) : 0; if (CLASS.onEncounter) CLASS.onEncounter(); }   // 🛡️ the partner's Wrath resets too
     h.struck = false;
     const out = S.hand.length === 0;
     if (out && !h.out) log(`🙌 The <b>${CLASS.name}</b>'s cards are spent — out of this fight.`, 'bad');
@@ -7969,7 +8154,7 @@ function nextTurn() {
     S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
     S.emberguardUsed = false;
     S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;
+    S.bankArmed = false; S.moTarget = null; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();
     S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
     S.phase = 'fork';
     logHeader(`— Turn ${S.turn} (Region ${S.region}) —`);
@@ -7984,7 +8169,7 @@ function nextTurn() {
   S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set();
   S.actionSetIds = [];
@@ -8180,7 +8365,7 @@ function computeAction(reserve) {
   // field, so anything a class returns that the engine does not name is silently dropped — which
   // is exactly what happened to `rogue` the first time. The engine never inspects it; cleanup
   // hands it straight back to the class. One line, so a third class needs no change here.
-  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : a.alchemist ? { alchemist: a.alchemist } : a.ranger ? { ranger: a.ranger } : null;
+  const classPayload = a.rogue ? { rogue: a.rogue } : a.guardian ? { guardian: a.guardian } : a.alchemist ? { alchemist: a.alchemist } : a.ranger ? { ranger: a.ranger } : a.klass ? { klass: a.klass } : null;
   // 🗡️ THE ROGUE'S LIVE COMBO ABILITY, read once here and OR'd into the checks that already exist.
   // 🔑 Deliberately NOT a second system: the verbs answer the same three questions
   // the mage's ✦ Outpace / Overwhelm / Landslide answer, so they hang off the same three lines
@@ -8540,6 +8725,7 @@ function perfectKillInfo(r) {
 
 function resolve() {
   if (!rolesValid()) return;
+  if (CLASS.onResolve) CLASS.onResolve();   // 🎲 the one place a class may roll — once, before the maths
   const e = S.encounter;
   const spell = spellCard();
   const elem = cardById(S.assign.Element);
@@ -8555,9 +8741,11 @@ function resolve() {
   r.perfect = pk.perfect && pk.contested;   // the PRIZE needs both
   r.perfectChance = pk.contested;           // ...and this is the grade's denominator
 
-  log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
-      ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
-      ` · Surge: ${boostC ? `${boostC.def.name} (+${boostVal} → ${S.boostTarget})` : '—'}` +
+  // 🔤 THE WEAVE LINE SPEAKS THE CLASS (482): slot words from SLOT_LABEL, and no element bracket
+  // for a class that has none — it used to print "(null)" and "colorless" at every class after the mage.
+  log(`The weave — ${SLOT_LABEL.Spell}: ${displayName(spell)} Lv${spell.level}${CLASS.pairs ? ` (${r.spellEl})` : ''} = ${r.base}` +
+      ` · ${SLOT_LABEL.Element}: ${elem ? `${elem.def.name} (${CLASS.pairs ? (elem.def.wild ? 'Wild' : elOf(elem) || 'colorless') + ', ' : ''}Init ${eff(elem).init})` : '—'}` +
+      ` · ${SLOT_LABEL.Boost}: ${boostC ? `${boostC.def.name}${CLASS.boosts ? ` (+${boostVal})` : ''}` : '—'}` +
       ` · Arsenal: ${reserve ? reserve.def.name : '—'}`);
 
   // ---- build the staged reveal (numbers only appear AFTER you commit) ----
@@ -8603,6 +8791,7 @@ function resolve() {
     // 🗡️ a rogue turn is not an attunement - it gets its own lines, in its own vocabulary
     if (r.rogue) rogueActionLines(r, spell, L, 'Atk').forEach(x => b1.push(x));
     else if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'Atk'), 'good'));
+    else if (!CLASS.pairs) b1.push(L(`${SLOT_LABEL.Spell}: ${r.base}`));
     else b1.push(L(`Attack: ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ' (no Catalyst)'}`));
     // the Surge ALWAYS feeds the action (the Attack/Initiative picker is gone), so this line must
  // never be gated on the retired boostTarget - it was silently adding damage the log didn't show.
@@ -12819,7 +13008,7 @@ function renderControls() {
       `<div class="phase-label">${phaseLabel}</div>` +
       lessonRow +
       potionRow +
-      bankRowHTML() + stanceRowHTML() + stillRowHTML() + markRowHTML() +
+      bankRowHTML() + stanceRowHTML() + stillRowHTML() + markRowHTML() + forkRowHTML() +
       knifeRowHTML() +
       strikePromptHTML() +
       boostRow +
@@ -13298,6 +13487,7 @@ function renderControls() {
           row('guardian', '🛡️ The Guardian', 'A heavy defender who turns every blow back on its owner.') +
           row('alchemist', '⚗️ The Alchemist', 'A brewer whose kit does what her cards cannot.') +
           row('ranger', '🏹 The Ranger', 'A hunter who sees what is coming and shoots where it will be.') +
+          row('berserker', '🎲 The Berserker', 'A reckless fighter who leaves everything to chance.') +
           `</div>` +
           // 🙌 THE PARTY (2026-09-02, Thomas: *"we don't need to have it in the dev menu, lets just
           // put it on the main screen"*). Solo or Two-Handed, then WHO stands on the right. The
@@ -13334,10 +13524,9 @@ function renderControls() {
           // it "the re-skin the axis exists to prevent", because the Merchant already claims *a
           // resource you hold and spend*.
           soon('🎭', 'The Illusionist', 'A conjurer who fights from behind a wall of illusions.') +
-          soon('🎲', 'The Berserker', 'A reckless fighter who leaves everything to chance.') +
           soon('🪙', 'The Merchant', 'A trader who pays for every blow out of her own purse.') +
           soon('🏗️', 'The Engineer', 'A builder who leaves working machines behind on the road.') +
-          soon('⚔️', 'The Knight', 'A disciplined fighter who shifts between combat stances.') +
+          soon('🌱', 'The Gardener', 'A grower who plants today and reaps it in the fights to come.') +
           `</div></div></div>`;
       })() +
       // 📖 the tutorial lives on the MENU now — one door per thing
@@ -13495,6 +13684,7 @@ function zoneHint(zone) {
   if (CLASS.id === 'guardian') return guardianZoneHint(zone, isFight);
   if (CLASS.id === 'alchemist') return alchemistZoneHint(zone, isFight);
   if (CLASS.id === 'ranger') return rangerZoneHint(zone, isFight);
+  if (CLASS.zoneHint) return CLASS.zoneHint(zone, isFight);   // every class after the Ranger owns its own
   switch (zone) {
     case 'Spell': return (isFight ? 'your Attack' : 'your Move') +
       (hasCharm('unspent') ? ' — ✦ SPENT only if you fall short' : ' — SPENT, gone for the region');
@@ -13662,6 +13852,20 @@ function markRowHTML() {
     (already ? '' : `<button class="wake-btn${on ? ' on' : ''}" onclick="toggleMark()">${on ? 'loose it instead' : '🏹 mark it'}</button>`) +
     `<span class="wake-note">${already ? 'it is already marked' : on ? 'for you or a partner, next blow' : (worth ? `worth about ${worth} next blow` : 'a mark only matters against a shape')}</span></div>`;
 }
+// 🎲 THE GENERIC FORK (2026-09-04, build 482). Every class after the Ranger poses its slot ③ fork
+// through ONE flag (`S.forkOn`, per turn, reset beside the others), ONE row (`CLASS.fork.row()`)
+// and ONE toggle — so a sixth class is content, not plumbing. The bot walks the flag as a search
+// dimension and reads the class's own price off `r.klass.botValue`.
+function forkRowHTML() {
+  if (!CLASS.fork || !isAssignPhase()) return '';
+  return CLASS.fork.row() || '';
+}
+function toggleFork() {
+  if (!CLASS.fork || !isAssignPhase()) return;
+  S.forkOn = !S.forkOn;
+  render();
+}
+function kbag() { return (S.k = S.k || {}); }   // the class's own per-hand state, saved and swapped with the hand
 function toggleMark() {
   if (!CLASS.marks || !isAssignPhase()) return;
   S.markArmed = !S.markArmed;
@@ -13835,6 +14039,9 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
+  die:    ['🎲 The Die', 'Rolled before you arrange. It is added to your Blow this turn.'],
+  gamble: ['🎲 Gamble', 'Sure: the card\'s ➕ feeds your Blow. Reckless: roll a second die instead. A 6 rolls again. A 1 costs you the race.'],
+  rage:   ['💢 Rage', 'One per reckless turn, up to your cap. Each point adds 1 to the die you roll at the start of a turn. It fades when the fight ends.'],
   mkward: ['🛡️ Applied by blocking', 'This card applies its effect when you block damage with it.'],
 
   // — what a creature shows —
@@ -14353,7 +14560,7 @@ function startLastMile() {
   // ⚠️ THE FINALE NEVER CALLS nextTurn(), so anything reset there has to be reset here too.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14499,6 +14706,7 @@ function startDuel() {
   // nothing on screen said it. Remember what you arrived with so the race can be drawn.
   S.duelStamina0 = S.deck.length;
   if (!hasCharm('bulwarkheart')) S.wrath = 0;   // 🛡️ the lair is a new fight
+  if (CLASS.onEncounter) CLASS.onEncounter();
   // 🙌 the partner steels themselves too — their own deck, gathered the same way
   if (isTwoHanded()) {
     const cur = S.handIdx; stashHand();
@@ -14570,7 +14778,7 @@ function startDuelBeat() {
   // The Emberguard is once-per-TURN, and without this it was once per BOSS BATTLE.
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false;   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart();   // 🔥 banking / 🔪 ripping are armed per TURN — anything outliving its turn would be a charm
   S.moTarget = null;     // ● where Momentum goes is chosen per TURN
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
   S.phase = 'assign';
@@ -14582,6 +14790,7 @@ function startDuelBeat() {
 
 function resolveDuel() {
   if (!rolesValid()) return;
+  if (CLASS.onResolve) CLASS.onResolve();
   const spell = spellCard();
   const elem = cardById(S.assign.Element);
   const boostC = cardById(S.assign.Boost);
@@ -14645,9 +14854,11 @@ function resolveDuel() {
   if (!kill) { const ms = applyMarks(r); if (ms.length) r.marks = ms; }
   if (!kill && CLASS.afterBlow) CLASS.afterBlow(r, S.dragonState);   // 🔪
 
-  log(`The weave — Spell: ${displayName(spell)} Lv${spell.level} (${r.spellEl}) = ${r.base}` +
-      ` · Catalyst: ${elem ? `${elem.def.name} (${elem.def.wild ? 'Wild' : elOf(elem) || 'colorless'}, Init ${eff(elem).init})` : '—'}` +
-      ` · Surge: ${boostC ? `${boostC.def.name} (+${r.boostEff} → ${S.boostTarget})` : '—'}`);
+  // 🔤 THE WEAVE LINE SPEAKS THE CLASS (482): slot words from SLOT_LABEL, and no element bracket
+  // for a class that has none — it used to print "(null)" and "colorless" at every class after the mage.
+  log(`The weave — ${SLOT_LABEL.Spell}: ${displayName(spell)} Lv${spell.level}${CLASS.pairs ? ` (${r.spellEl})` : ''} = ${r.base}` +
+      ` · ${SLOT_LABEL.Element}: ${elem ? `${elem.def.name} (${CLASS.pairs ? (elem.def.wild ? 'Wild' : elOf(elem) || 'colorless') + ', ' : ''}Init ${eff(elem).init})` : '—'}` +
+      ` · ${SLOT_LABEL.Boost}: ${boostC ? `${boostC.def.name}${CLASS.boosts ? ` (+${r.boostEff})` : ''}` : '—'}`);
 
   // --- staged reveal (mirrors the normal fight) ---
   const L = (text, cls = '') => ({ text, cls });
@@ -14666,6 +14877,7 @@ function resolveDuel() {
   const b1 = [];
   if (r.enhUsed) b1.push(L(attunedLineText(r, spell, 'strike'), 'good'));
   else if (r.rogue) rogueActionLines(r, spell, L, 'Strike').forEach(x => b1.push(x));
+  else if (!CLASS.pairs) b1.push(L(`${SLOT_LABEL.Spell} ${r.base}`));
   else b1.push(L(`Strike ${r.base} — unattuned${elem ? ` (${elem.def.name} is ${elOf(elem)}, not ${r.spellEl})` : ''}`));
   if (r.banks) b1.push(L(`⟳ CHANNELLED — ${boostC.def.name} is held back, ${bankCostPhrase(boostC)}. Next turn every effect you leave on it is <b>×${r.bank + 1}</b>`, 'good'));
   else if (boostC) b1.push(L(`Surge: ${boostC.def.name} +${r.boostEff} → ${r.withBoost}`));
@@ -14711,7 +14923,7 @@ function duelHandReset() {
   S.loseReserve = null; S.afterSoak = 'upgrade'; S.damage = 0; S.damageEl = null;
   S.emberguardUsed = false;
   S.potionFx = { init: 0, value: 0, soak: 0, boost: 0, pace: 0, tpCut: 0, swap: {} }; S.potionPick = null;
-  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.moTarget = null;
+  S.bankArmed = false; S.ripArmed = false; S.guardStance = 'brace'; S.stillArmed = false; S.markArmed = false; S.forkOn = false; if (CLASS.onTurnStart) CLASS.onTurnStart(); S.moTarget = null;
   S.downgraded = new Set(); S.actionSetIds = []; S.reserveId = null;
 }
 function duelTurnStartTwo() {

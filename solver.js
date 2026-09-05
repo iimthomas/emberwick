@@ -491,7 +491,7 @@ function forEachArrangement(hand, o, fn) {
 function searchArrangements(o) {
   let best = null;
   forEachArrangement(o.hand, o, (spell, spark, tinder, ember) => {
-    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) for (const rip of (o.rips || [undefined])) for (const stance of (o.stances || [undefined])) for (const brew of (o.brews || [undefined])) for (const mk of (o.marks || [undefined])) {
+    for (const bt of o.boostTargets) for (const arm of o.arms) for (const t of (o.targets || [undefined])) for (const rip of (o.rips || [undefined])) for (const stance of (o.stances || [undefined])) for (const fk of (o.forks || [undefined])) for (const brew of (o.brews || [undefined])) for (const mk of (o.marks || [undefined])) {
       S.assign = { Spell: spell.id, Element: spark ? spark.id : null,
                    Boost: tinder ? tinder.id : null, Reserve: ember ? ember.id : null };
       S.boostTarget = bt; if (arm !== undefined) S.bankArmed = arm;
@@ -500,10 +500,11 @@ function searchArrangements(o) {
       if (stance !== undefined) S.guardStance = stance;   // 🛡️ the Guardian: brace or taunt
       if (brew !== undefined) S.stillArmed = brew;         // ⚗️ the Alchemist: fire it or throw it in
       if (mk !== undefined) S.markArmed = mk;              // 🏹 the Ranger: loose it or mark with it
+      if (fk !== undefined) S.forkOn = fk;                 // 🎲 the generic fork (Berserker and every class after)
       const r = computeAction(ember); if (!r) continue;
       const sc = o.score(r);
-      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t, rip, stance, brew, mk });
-      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, rip, stance, brew, mk, sc };
+      if (o.collect) o.collect({ r, sc, spell, spark, tinder, ember, bt, arm, t, rip, stance, brew, mk, fk });
+      if (!best || o.better(sc, best.sc)) best = { assign: { ...S.assign }, bt, arm, t, rip, stance, brew, mk, fk, sc };
     }
   });
   return best;
@@ -522,11 +523,13 @@ const RUNSIM = (() => {
   // soaked, exactly like combat damage, so it belongs in the existing penalty term), and being
   // unseen is one rank below that. approachValue/UNSEEN_WEIGHT live at the TOP of this file.
   const scoreOf = r => r.type === 'fight'
-    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + guardDmg(r)), r.value + bankValue(r) + effectValue(r) + targetValue(r) + chainValue(r) + brewValue(r) + markValue(r)]
+    ? [OUT[r.outcome], -((r.early || 0) + (r.combatDmg || 0) + (r.poison || 0) + guardDmg(r)), r.value + bankValue(r) + effectValue(r) + targetValue(r) + chainValue(r) + brewValue(r) + markValue(r) + forkValue(r)]
     : [OUT[r.outcome], -((r.timePenalty || 0) + (r.treacherousDmg || 0) + (r.stormDmg || 0) + (r.rouse || 0)),
        approachValue(r), r.value + bankValue(r) + chainValue(r)];
   // 🏹 the Ranger prices a Mark honestly: what the NEXT blow would have lost to the shape (a bot that scores one encounter still sees this, because the creature is the same creature next turn)
   const markValue = r => (r.ranger && r.ranger.marks && !r.ranger.onMark) ? MARK_WEIGHT * (r.ranger.worth || 0) : 0;
+  // 🎲 a class after the Ranger states its own price for its fork (the Berserker: the race it may lose)
+  const forkValue = r => (r.klass && r.klass.botValue) || 0;
   // ⚗️ the Alchemist prices a reagent thrown in: BREW_WEIGHT, doubled when it completes a brew (the bot cannot price the potion itself — it DRINKS every brew at once, see drinkBrews)
   const brewValue = r => (r.alchemist && r.alchemist.throws) ? BREW_WEIGHT * (r.alchemist.brews ? 2 : 1) : 0;
   // 🛡️ the Guardian prices her fork: a brace TURNS damage, a taunt FEEDS it (WRATH_WEIGHT of it comes back as a blow)
@@ -594,13 +597,14 @@ const RUNSIM = (() => {
       boostTargets: isFight ? ['Attack', 'Initiative'] : ['Move', 'Pace'],
       arms: CLASS.emberwake ? [false, true] : [false], score: scoreOf, better,
       targets: (typeof packTargets === 'function') ? packTargets() : [undefined],
-      rips: CLASS.knives ? [false, true] : [undefined], stances: CLASS.stances ? ['taunt', 'brace'] : [undefined], brews: CLASS.brews ? [false, true] : [undefined], marks: CLASS.marks ? [false, true] : [undefined] });
+      rips: CLASS.knives ? [false, true] : [undefined], stances: CLASS.stances ? ['taunt', 'brace'] : [undefined], brews: CLASS.brews ? [false, true] : [undefined], forks: CLASS.fork ? [false, true] : [undefined], marks: CLASS.marks ? [false, true] : [undefined] });
     S.ripArmed = false;
     if (best && best.t !== undefined) S.foeTarget = best.t;
     if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
     if (best && best.stance !== undefined) S.guardStance = best.stance;
     if (best && best.brew !== undefined) S.stillArmed = !!best.brew;
     if (best && best.mk !== undefined) S.markArmed = !!best.mk;
+    if (best && best.fk !== undefined) S.forkOn = !!best.fk;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
     return best ? best.sc : null;
@@ -658,12 +662,13 @@ const RUNSIM = (() => {
   function chooseBestDuel() {
     const best = searchArrangements({ hand: S.hand, legal: false, duel: true,
       boostTargets: ['Attack', 'Initiative'], arms: CLASS.emberwake ? [false, true] : [false],
-      rips: CLASS.knives ? [false, true] : [undefined], score: evalDuelPlay, better });
+      rips: CLASS.knives ? [false, true] : [undefined], forks: CLASS.fork ? [false, true] : [undefined], score: evalDuelPlay, better });
     S.ripArmed = false;
     if (best && best.rip !== undefined) S.ripArmed = !!best.rip;
     if (best && best.stance !== undefined) S.guardStance = best.stance;
     if (best && best.brew !== undefined) S.stillArmed = !!best.brew;
     if (best && best.mk !== undefined) S.markArmed = !!best.mk;
+    if (best && best.fk !== undefined) S.forkOn = !!best.fk;
     S.bankArmed = false;
     if (best) { S.assign = best.assign; S.boostTarget = best.bt; S.bankArmed = !!best.arm; }
   }
