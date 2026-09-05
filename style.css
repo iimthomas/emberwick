@@ -1917,7 +1917,7 @@ body.shell .stash { max-width: none; }
    at the top of this file — min and max measure the same edges, so they cannot fight.
    ⚠️ Scoped to the Collection on purpose. The menu and the Stash are content-sized and short, and
    a 92vh box around four buttons is a different bug. */
-body.phase-collection #controls-panel { min-height: 92vh; }
+body.phase-collection #controls-panel, body.phase-workshop #controls-panel { min-height: 92vh; }   /* ⚒️ 490: the Workshop too — its tabs change the count inside, never the box (Thomas) */
 @media (max-width: 700px) {
   body.shell #controls-panel { width: 100%; margin: 0; max-height: none;
     border: 0; border-radius: 0; box-shadow: none; padding: 14px 12px 18px; }
