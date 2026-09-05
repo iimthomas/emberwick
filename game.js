@@ -238,22 +238,25 @@ const CARD_DEFS = [
   //   Fire hits harder / guards worse .. Water fuels and endures, never fast
   //   Lightning is speed at the cost of guard .. Stone is armour, slow and dry
   // Row = [value, (dead), init, boost, armor, (dead), costToNextLevel]
+  // ⚔️ VALUE +2 ON EVERY CARD, EVERY LEVEL (2026-09-04, build 481) — the Surge's effect was cut and
+  // the power went back onto the printed number. Swept: attack +2 → finale 15% vs 17% shipped;
+  // boost or Initiative bought half as much. A column edit across all sixteen, never a row.
   { name: 'Emberfall', element: 'Fire', arch: 'FORCE',
-    lv: [[5,null,2,2,1,null,2], [7,null,1,1,1,null,3], [9,null,0,1,1,null,4], [11,null,0,1,1,null,null]] },
+    lv: [[7,null,2,2,1,null,2], [9,null,1,1,1,null,3], [11,null,0,1,1,null,4], [13,null,0,1,1,null,null]] },
   { name: 'Firstlight', element: 'Fire', arch: 'SPARK',
-    lv: [[4,null,5,3,1,null,2], [3,null,8,2,1,null,3], [3,null,11,1,1,null,4], [3,null,14,1,1,null,null]] },
+    lv: [[6,null,5,3,1,null,2], [5,null,8,2,1,null,3], [5,null,11,1,1,null,4], [5,null,14,1,1,null,null]] },
   { name: 'Bellowsbreath', element: 'Fire', arch: 'FLOW',
-    lv: [[4,null,3,3,1,null,2], [3,null,2,6,1,null,3], [3,null,1,9,1,null,4], [3,null,1,12,1,null,null]] },
+    lv: [[6,null,3,3,1,null,2], [5,null,2,6,1,null,3], [5,null,1,9,1,null,4], [5,null,1,12,1,null,null]] },
   { name: 'Hearthwall', element: 'Fire', arch: 'WARD',
-    lv: [[4,null,3,2,2,null,2], [3,null,2,1,3,null,3], [4,null,1,1,4,null,4], [5,null,1,1,5,null,null]] },
+    lv: [[6,null,3,2,2,null,2], [5,null,2,1,3,null,3], [6,null,1,1,4,null,4], [7,null,1,1,5,null,null]] },
   { name: 'Tidebreak', element: 'Water', arch: 'FORCE',
-    lv: [[3,null,1,3,3,null,2], [5,null,0,2,2,null,3], [7,null,0,1,1,null,4], [9,null,0,1,1,null,null]] },
+    lv: [[5,null,1,3,3,null,2], [7,null,0,2,2,null,3], [9,null,0,1,1,null,4], [11,null,0,1,1,null,null]] },
   { name: 'Riverstep', element: 'Water', arch: 'SPARK',
-    lv: [[2,null,4,4,3,null,2], [2,null,7,3,2,null,3], [2,null,10,2,1,null,4], [2,null,13,2,1,null,null]] },
+    lv: [[4,null,4,4,3,null,2], [4,null,7,3,2,null,3], [4,null,10,2,1,null,4], [4,null,13,2,1,null,null]] },
   { name: 'Wellspring', element: 'Water', arch: 'FLOW',
-    lv: [[2,null,2,4,3,null,2], [2,null,1,7,2,null,3], [2,null,0,10,1,null,4], [2,null,0,13,1,null,null]] },
+    lv: [[4,null,2,4,3,null,2], [4,null,1,7,2,null,3], [4,null,0,10,1,null,4], [4,null,0,13,1,null,null]] },
   { name: 'Rimeguard', element: 'Water', arch: 'WARD',
-    lv: [[2,null,2,3,2,null,2], [2,null,1,2,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
+    lv: [[4,null,2,3,2,null,2], [4,null,1,2,3,null,3], [5,null,0,1,4,null,4], [6,null,0,1,5,null,null]] },
   // ⚡ THE ONE MAGE CARD THAT FORKS (2026-08-17, Thomas: *"doesn't feel fair for mage to not have
   // ANY if this is a shape we want to add. maybe its a lightning spell"*). Right, and it is the same
   // argument that softened 🧱 Guard: a shape a class cannot engage with AT ALL is not difficulty.
@@ -266,21 +269,21 @@ const CARD_DEFS = [
   // card, not a better one — which is also the first time an ELEMENT means something in combat
   // beyond its temperament.
   { name: 'Sparkstrike', element: 'Lightning', arch: 'FORCE', hits: 2,
-    lv: [[4,null,4,2,1,null,2], [6,null,3,1,1,null,3], [8,null,2,1,1,null,4], [10,null,2,1,1,null,null]] },
+    lv: [[6,null,4,2,1,null,2], [8,null,3,1,1,null,3], [10,null,2,1,1,null,4], [12,null,2,1,1,null,null]] },
   { name: 'Quickfire', element: 'Lightning', arch: 'SPARK',
-    lv: [[3,null,7,3,1,null,2], [2,null,10,2,1,null,3], [2,null,13,1,1,null,4], [2,null,16,1,1,null,null]] },
+    lv: [[5,null,7,3,1,null,2], [4,null,10,2,1,null,3], [4,null,13,1,1,null,4], [4,null,16,1,1,null,null]] },
   { name: 'Stormglass', element: 'Lightning', arch: 'FLOW',
-    lv: [[3,null,5,3,1,null,2], [2,null,4,6,1,null,3], [2,null,3,9,1,null,4], [2,null,3,12,1,null,null]] },
+    lv: [[5,null,5,3,1,null,2], [4,null,4,6,1,null,3], [4,null,3,9,1,null,4], [4,null,3,12,1,null,null]] },
   { name: 'Staticwall', element: 'Lightning', arch: 'WARD',
-    lv: [[3,null,5,2,2,null,2], [2,null,4,1,3,null,3], [3,null,3,1,4,null,4], [4,null,3,1,5,null,null]] },
+    lv: [[5,null,5,2,2,null,2], [4,null,4,1,3,null,3], [5,null,3,1,4,null,4], [6,null,3,1,5,null,null]] },
   { name: 'Rockfall', element: 'Stone', arch: 'FORCE',
-    lv: [[4,null,1,1,4,null,2], [6,null,0,1,3,null,3], [8,null,0,1,2,null,4], [10,null,0,1,2,null,null]] },
+    lv: [[6,null,1,1,4,null,2], [8,null,0,1,3,null,3], [10,null,0,1,2,null,4], [12,null,0,1,2,null,null]] },
   { name: 'Flintdart', element: 'Stone', arch: 'SPARK',
-    lv: [[3,null,4,2,4,null,2], [2,null,7,1,3,null,3], [2,null,10,1,2,null,4], [2,null,13,1,2,null,null]] },
+    lv: [[5,null,4,2,4,null,2], [4,null,7,1,3,null,3], [4,null,10,1,2,null,4], [4,null,13,1,2,null,null]] },
   { name: 'Deepvein', element: 'Stone', arch: 'FLOW',
-    lv: [[3,null,2,2,4,null,2], [2,null,1,5,3,null,3], [2,null,0,8,2,null,4], [2,null,0,11,2,null,null]] },
+    lv: [[5,null,2,2,4,null,2], [4,null,1,5,3,null,3], [4,null,0,8,2,null,4], [4,null,0,11,2,null,null]] },
   { name: 'Cairnguard', element: 'Stone', arch: 'WARD',
-    lv: [[3,null,2,1,2,null,2], [2,null,1,1,3,null,3], [3,null,0,1,4,null,4], [4,null,0,1,5,null,null]] },
+    lv: [[5,null,2,1,2,null,2], [4,null,1,1,3,null,3], [5,null,0,1,4,null,4], [6,null,0,1,5,null,null]] },
 ];
 
 // ---------- modifiers (source rulebook) ----------
@@ -3454,6 +3457,13 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 481, date: '2026-09-04', title: 'Mage cards are easier to read',
+    changed: [
+      "🌊 <b>A card in the Surge no longer leaves an effect on the creature.</b> The Surge is for its ➕ boost, or for channelling. Only your <b>Spell</b>, your <b>Catalyst</b> and a card that <b>blocks</b> leave Burn, Frost, Daze or Exposed now — at most two a turn.",
+      "⚔️ <b>Every mage card hits for 2 more</b>, at every level, to make up for it.",
+      "🃏 <b>A card's effect number only shows when the card is where it fires.</b> Elsewhere the card just points at the slot it wants.",
+    ] },
+
   { build: 480, date: '2026-09-03', title: 'Online co-op reconnects',
     changed: [
       "🌐 <b>A dropped connection no longer ends an online game.</b> The guest reconnects on its own; if either of you closes the page, the Stages screen offers <b>Rejoin</b> (guest) or <b>Reopen the room</b> (host) with the same code, and the host's save carries the run.",
@@ -6997,18 +7007,24 @@ function statusIdForEl(el) {
 // the mark behaves, uniformly across all four elements. **Still 8 facts, but 16 distinct cards.**
 //   ⚔️ FORCE (Spell)    — hits HARDEST: the mark lands at double magnitude.
 //   💨 SPARK (Catalyst) — TRAVELS: it also lands on the next creature you meet.
-//   🌊 FLOW  (Surge)    — lasts LONGEST: the mark does not decay.
+//   🌊 FLOW  (Surge)    — ❌ CUT 481: fires nothing; the Surge is boost-or-channel only.
 //   🛡️ WARD  (block)    — costs LEAST: unchanged, because its TRIGGER is already unique and it
 //                        is the only mark you pay a card level for.
 // ⚠️ SPARK was going to be *"lands this turn instead of next"* and that was wrong: the race and
 // the blow have both already resolved by the time a mark applies, so three of the four would have
 // done nothing and 🪨 Exposed would have buffed the blow that applied it. **A behaviour that
 // only works for one of four marks is not an archetype rule.**
-const ARCH_HOME = { FORCE: 'Spell', SPARK: 'Element', FLOW: 'Boost', WARD: 'soak' };
+// 🌊 THE SURGE FIRES NO EFFECT (2026-09-04, build 481 — Thomas: *"sometimes having 3 fire off
+// from being in the same slot is a bit tooo much information"*). Slot ③ already poses the mage's
+// fork (boost or channel); a third thing in that seat was the modifier nobody could see — and the
+// most valuable one: cutting it alone cost the finale 17% → 6%, nearly all of it the "never fades"
+// half, which was worth most against the long fights. The value went back onto the PRINTED number
+// instead (attack +2 on every card, every level — his call: "the numbers on the cards"), which
+// measured 15% against 17%, with three-effect turns gone. Two seats, two rules now.
+const ARCH_HOME = { FORCE: 'Spell', SPARK: 'Element', WARD: 'soak' };
 const ARCH_MARK = {
   FORCE: { mult: 2,  note: 'twice as strong' },
   SPARK: { carry: true, note: 'also marks the next creature' },
-  FLOW:  { lasting: true, note: 'never fades' },
   WARD:  { note: '' },   // ⚠️ its `where` already says "when it blocks" — a note here would repeat it
 };
 function archMark(card) { return (card && card.def && ARCH_MARK[card.def.arch]) || {}; }
@@ -13819,7 +13835,6 @@ const TIPS = {
   stance: ['🛡️ Shield', 'Brace: the Shield card blocks with its armour and is not damaged. Taunt: the creature strikes you whatever the race, and all of it becomes Wrath. In Two-Handed a taunted creature spares your partner.'],
   wrath:  ['🛡️ Wrath', 'Damage you took this fight. Your Bulwark hits that much harder. It fades when the fight ends.'],
   mkspark:['→ It carries', 'This card also applies its effect to the next creature you meet.'],
-  mkflow: ['∞ It never ends', 'This card\'s effect is never removed or reduced.'],
   mkward: ['🛡️ Applied by blocking', 'This card applies its effect when you block damage with it.'],
 
   // — what a creature shows —
@@ -14202,7 +14217,10 @@ function cardHTML(card) {
     // just read numbers. The mark broke that grammar on every card, every turn.
     // 🔑 *Flavour belongs where it is read ONCE, never in text re-read every encounter* — and an
     // explanation is flavour the moment you have learned it. The sentence lives in the tooltip.
-    (markLine ? `<span class="s-mark${markLit ? ' mark-live' : canMark ? ' mark-idle' : ' mark-off'}" data-tip="${markLine.tip}">` +
+    // 🔴 481: THE NUMBER PRINTS ONLY WHERE IT FIRES. A hand showed what four cards COULD do in four
+    // other arrangements; now it shows what THIS arrangement does, and the effect appearing when you
+    // seat the card is what teaches the slot rule (Thomas: *"hard to read or understand on the card"*).
+    (markLine && markLit ? `<span class="s-mark mark-live" data-tip="${markLine.tip}">` +
       `${markLine.icon} ${markLine.n}${markLine.suffix}</span>` : '') + `</div>` +
     // 📍 THE EFFECT PRINTS ITS ADDRESS (2026-09-02, Thomas: *"the mage card abilities, when are they
     // active, i thought they had to be in certain slots for it to go off"*). He was right about the
