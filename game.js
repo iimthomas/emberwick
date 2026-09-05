@@ -2021,6 +2021,7 @@ const GUARDIAN = {
   shield(n) {
     const cut = Math.min(n, GUARDIAN.braceValue());
     if (cut > 0) {
+      if (hasArmourRule('bracewrath')) GUARDIAN.onHit(cut);   // 🛡️ Anvilstep Greaves: braced damage still counts
       const sh = cardById(S.assign.Boost);
       log(`🛡️ You brace behind <b>${sh ? sh.def.name : 'your Shield'}</b> — <b>${cut}</b> of the blow is turned.`, 'good');
       if (hasCharm('thornmail') && S.foeState && S.foeState.hp > 0) {
@@ -2033,7 +2034,7 @@ const GUARDIAN = {
   // damage that reached her deck becomes Wrath
   onHit(n) {
     if (!(n > 0)) return;
-    const was = S.wrath || 0; S.wrath = Math.min(WRATH_CAP, was + n);
+    const was = S.wrath || 0; S.wrath = Math.min(WRATH_CAP + (hasArmourRule('wrathwell') ? 4 : 0), was + n);   // 🛡️ Wrathwell Plate
     if (S.wrath > was) log(`🛡️ <b>Wrath ${S.wrath}</b> — your next Bulwark hits +${S.wrath}.`, 'good');
   },
   compose() {
@@ -2166,7 +2167,7 @@ const ALCHEMIST = {
     const d = spellCard(); if (!d) return null;
     const vial = cardById(S.assign.Element), still = cardById(S.assign.Boost);
     const throws = !!(S.stillArmed && still && still.def.reagent);
-    const boost = still && !throws ? eff(still).boost : 0;
+    const boost = still ? (!throws ? eff(still).boost : (hasArmourRule('halfstill') ? Math.floor(eff(still).boost / 2) : 0)) : 0;   // ⚗️ Stillwarden Coat
     return {
       value: Math.max(0, eff(d).value + (duelFx().value || 0)),
       element: null,
@@ -2282,7 +2283,7 @@ const RANGER = {
   afterBlow(r, body) {
     const bag = body && (body.status = body.status || {});
     if (!bag || !r || !r.ranger || !r.ranger.marks || body.hp <= 0) return;
-    bag.mark = Math.max(bag.mark || 0, MARK_LASTING + (hasCharm('twinmark') ? 1 : 0));
+    bag.mark = Math.max(bag.mark || 0, MARK_LASTING + (hasCharm('twinmark') ? 1 : 0) + (hasArmourRule('longmark') ? 1 : 0));   // 🏹 Fletcher's Vest
     if (hasCharm('stalker')) bag.frost = (bag.frost || 0) + 2;
     log(`🏹 <b>${r.ranger.quiverName}</b> marks it — the next blow on it is <b>certain</b>${hasCharm('stalker') ? ', and it is 2 slower' : ''}.`, 'good');
     r.marked = true;
@@ -2361,6 +2362,7 @@ const BERSERKER = {
     if (!inFight) { k.die = 0; return; }
     let d = rollD6();
     if (hasCharm('steadyhand')) d = Math.max(2, d);
+    if (hasArmourRule('steadydie')) d = Math.max(3, d);   // 🎲 Ragehide Jerkin
     const rage = Math.min(k.rage || 0, this.rageCap());
     if (hasCharm('frenzy') && rage >= this.rageCap()) d *= 2;
     k.die = d + rage * RAGE_DIE;
@@ -2373,7 +2375,9 @@ const BERSERKER = {
     if (!(S.forkOn && cardById(S.assign.Boost))) { k.gambleLive = false; return; }
     let total = 0, first = null, rolls = 0, exploded = false;
     for (;;) {
-      const d = rollD6(); rolls++; if (first == null) first = d; total += d;
+      let d = rollD6(); rolls++;
+      if (first == null && d === 1 && hasArmourRule('reroll1')) { d = rollD6(); log('🎲 Loaded Boots — the 1 is rolled again.'); }   // 🎲 never a stumble
+      if (first == null) first = d; total += d;
       const again = d === 6 || (hasCharm('bloodlust') && d === 5);
       if (!again || rolls >= 4) break;
       exploded = true;
@@ -2523,8 +2527,8 @@ const ILLUSIONIST = {
     const cat = cardById(S.assign.Element), fig = cardById(S.assign.Boost);
     const ill = illusions();
     const summons = !!(S.forkOn && fig && fig.def.kind && ill.length < illusionCap());
-    const boost = fig && (!summons || hasCharm('mirrorimage')) ? eff(fig).boost : 0;
-    const blowBonus = ill.filter(i => i.kind === 'blow').reduce((t, i) => t + illusionPower(i), 0);
+    const boost = fig ? ((!summons || hasCharm('mirrorimage')) ? eff(fig).boost : (hasArmourRule('halfveil') ? Math.floor(eff(fig).boost / 2) : 0)) : 0;   // 🎭 Mirrorthread Cloak
+    const blowBonus = ill.filter(i => i.kind === 'blow' || hasArmourRule('swiftblow')).reduce((t, i) => t + (i.kind === 'blow' ? illusionPower(i) : i.power), 0);   // 💨 Phantomstep Boots: swift ones hit too
     const initBonus = ill.filter(i => i.kind === 'init').reduce((t, i) => t + i.power, 0);
     const power = fig ? eff(fig).boost : 0;
     return {
@@ -2630,7 +2634,7 @@ const MERCHANT_SPEC = [
   { role: 'coin', name: 'Escrow',        spike: 'armor', base: [2, 3, 3, 5] },
 ];
 const MERCHANT_DEFS = specDefs(MERCHANT_SPEC, 'merchant');
-function purseStep() { return PURSE_STEP - (hasCharm('deeppockets') ? 2 : 0); }
+function purseStep() { return Math.max(4, PURSE_STEP - (hasCharm('deeppockets') ? 2 : 0) - (hasArmourRule('fastcustom') ? 4 : 0)); }   // 🪙 Countinghouse Boots
 function purseBonus() { return Math.floor(((S.k && S.k.spent) || 0) / purseStep()); }
 function bribeCost() { return Math.max(1, BRIBE_COST - (hasCharm('insurance') ? 2 : 0)); }
 function bribe() {
@@ -2676,7 +2680,7 @@ const MERCHANT = {
     const strike = spellCard(); if (!strike) return null;
     const foot = cardById(S.assign.Element), purse = cardById(S.assign.Boost);
     const base = purse ? eff(purse).boost : 0;
-    const price = base;
+    const price = base > 0 ? Math.max(1, base - (hasArmourRule('cheappay') ? 2 : 0)) : 0;   // 🪙 Ledger Vest
     const pays = !!(S.forkOn && purse && price > 0 && S.coins >= price);
     const boost = pays ? base * (hasCharm('bulkorder') ? 3 : 2) : base;
     return {
@@ -2753,7 +2757,7 @@ const ENGINEER_SPEC = [
 ];
 const ENGINEER_DEFS = specDefs(ENGINEER_SPEC, 'engineer');
 function turretLv() { return (S.k && S.k.turret) || 0; }
-function turretCap() { return TURRET_CAP + (hasCharm('siege') ? 1 : 0); }
+function turretCap() { return TURRET_CAP + (hasCharm('siege') ? 1 : 0) + (hasArmourRule('tallturret') ? 1 : 0); }   // 🏗️ Boltworks Greaves
 function turretDmg() { const lv = turretLv(); return lv ? lv * (TURRET_DMG + (hasCharm('overclock') ? 1 : 0)) : 0; }
 function setBuild(kind) { const k = kbag(); k.build = kind; S.forkOn = true; render(); }
 const ENGINEER = {
@@ -2780,7 +2784,7 @@ const ENGINEER = {
   // 🔩 decay: a level a fight, unless tended (or Oiled Gears); Foundation starts a run's first fight at Lv1
   onEncounter() {
     const k = kbag();
-    if (k.turret > 0 && !hasCharm('oiledgears')) { k.turret--; log(`🔩 Your turret <b>wears</b> — Lv${k.turret}${k.turret ? '' : ', it is scrap'}.`, 'bad'); }
+    if (k.turret > 0 && !hasCharm('oiledgears') && !(hasArmourRule('sparefoundation') && k.turret <= 1)) { k.turret--; log(`🔩 Your turret <b>wears</b> — Lv${k.turret}${k.turret ? '' : ', it is scrap'}.`, 'bad'); }
     if (!k.turret && hasCharm('foundation') && !k.founded) { k.turret = 1; k.founded = true; log('🏗️ Foundation — a Lv1 turret stands ready.', 'good'); }
     k.build = 'turret';
   },
@@ -2896,11 +2900,14 @@ function gardenRes() { const k = kbag(); return (k.res = k.res || { grain: 0, wo
 function gardenBuilds() { const k = kbag(); const b = (k.builds = k.builds || {}); for (const id of Object.keys(BUILDS)) b[id] = b[id] || 0; return b; }
 function plots() { const k = kbag(); return (k.plots = k.plots || []); }
 function plotCap() { return PLOT_CAP + (hasCharm('deeproots') ? 1 : 0); }
-function canBuild(id) { const b = BUILDS[id], res = gardenRes(), t = gardenBuilds(); return !!b && t[id] < BUILD_CAP && Object.entries(b.cost).every(([r, n]) => res[r] >= n); }
+function buildCap() { return BUILD_CAP + (hasArmourRule('tallbuild') ? 1 : 0); }   // 🌱 Deeproot Boots
+// 🧺 Sower's Smock: the first tier of a build costs one crop — the cost is halved, rounded up, at tier 0
+function buildCost(id) { const b = BUILDS[id], t = gardenBuilds(); const first = t[id] === 0 && hasArmourRule('cheapfirst'); const c = {}; for (const [r, n] of Object.entries(b.cost)) c[r] = first ? Math.ceil(n / 2) : n; return c; }
+function canBuild(id) { const b = BUILDS[id], res = gardenRes(), t = gardenBuilds(); return !!b && t[id] < buildCap() && Object.entries(buildCost(id)).every(([r, n]) => res[r] >= n); }
 function garden(id) {
   if (CLASS.id !== 'gardener' || !canBuild(id)) return;
   const b = BUILDS[id], res = gardenRes(), t = gardenBuilds();
-  for (const [r, n] of Object.entries(b.cost)) res[r] -= n;
+  for (const [r, n] of Object.entries(buildCost(id))) res[r] -= n;
   t[id]++;
   log(`${b.icon} You build the <b>${b.name}</b> (tier ${t[id]}) — ${b.text}.`, 'good');
   if (typeof render === 'function' && !BOT_POLICY) render();
@@ -2959,7 +2966,7 @@ const GARDENER = {
     const res = gardenRes(); const have = Object.entries(res).filter(([, n]) => n > 0);
     if (have.length) out.push({ id: 'store', icon: '🧺', name: 'Store', worth: have.map(([c, n]) => `${CROP[c].icon} ${n}`).join(' '), note: 'spend them on a build (the Plot row)' });
     const b = gardenBuilds(); const built = Object.entries(b).filter(([, t]) => t > 0);
-    for (const [id, t] of built) out.push({ id: 'b-' + id, icon: BUILDS[id].icon, name: BUILDS[id].name, count: t, cap: BUILD_CAP, worth: BUILDS[id].text.replace(/per tier/, `(tier ${t})`), note: 'for the run' });
+    for (const [id, t] of built) out.push({ id: 'b-' + id, icon: BUILDS[id].icon, name: BUILDS[id].name, count: t, cap: buildCap(), worth: BUILDS[id].text.replace(/per tier/, `(tier ${t})`), note: 'for the run' });
     return out.length ? out : null;
   },
   canPlace() { return true; },
@@ -4292,6 +4299,14 @@ const BUILD = (() => {
 // ⚠️ History before build 385 is not recorded, and this file does not pretend otherwise.
 // ============================================================
 const PATCH_NOTES = [
+  { build: 489, date: '2026-09-05', title: 'The Workshop in tabs, and gear for every character',
+    added: [
+      "🎭 <b>Two pieces of equipment for every character</b> — a rare chest and a legendary pair of boots each, keyed to what that character does: the Guardian's Wrath, the Alchemist's Still, the Ranger's mark, the Berserker's die, the Illusionist's veil, the Merchant's purse, the Engineer's turret, the Gardener's builds. Forged from shards and shape parts, like the Mage's and the Rogue's.",
+    ],
+    changed: [
+      "⚒️ <b>The Workshop has tabs</b>: Generic, then one for each character. A character's tab shows only their gear; a locked character's tab can still be read.",
+    ] },
+
   { build: 488, date: '2026-09-05', title: 'The Gardener grows faster',
     changed: [
       "🌱 <b>A planted seed ripens at the next fight</b>, not two turns later, and every harvest gives <b>2</b> crops.",
@@ -5285,10 +5300,21 @@ function pieceCardHTML(d, st, equipped) {
 // *"two more to earn"* whenever the count was under 4 and there was no way to earn them — that is
 // the promise this file keeps warning about, and the honest version of it is silence.
 function nextSlotNote() { return ''; }
+// ⚒️ THE WORKSHOP IS TABBED (2026-09-05, build 489 — Thomas: *"we should have a generic tab, and tabs
+// for every class, so its easier to read"*). ⚪ GENERIC holds every piece any class can wear, by zone;
+// each class tab holds that class's own gear. A locked class's tab is still browsable (the Collection
+// rule: a goal you cannot see is not a goal). The tab is remembered for the session on S.wkTab.
+function wkTab() { return (S && S.wkTab && (S.wkTab === 'generic' || CLASSES[S.wkTab])) ? S.wkTab : 'generic'; }
+function setWkTab(t) { S.wkTab = t; render(); }
 function workshopHTML() {
   const st = loadStash(), worn = loadoutIds();
   const slots = Array.from({ length: armourSlotsOpen() }, (_, i) => worn[i] || null);
-  let body = `<div class="wk-loadout"><div class="wk-lab">🛡️ YOUR EQUIPMENT` +
+  const tab = wkTab();
+  const tabs = `<div class="wk-tabs">` +
+    `<button class="wk-tab${tab === 'generic' ? ' on' : ''}" onclick="setWkTab('generic')">⚪ Generic <i>${ARMOUR.filter(a => !a.cls && st.owned.includes(a.id)).length}/${ARMOUR.filter(a => !a.cls).length}</i></button>` +
+    Object.values(CLASSES).map(c => `<button class="wk-tab${tab === c.id ? ' on' : ''}${classUnlocked(c.id) ? '' : ' locked'}" onclick="setWkTab('${c.id}')">${c.mark} ${c.name} <i>${ARMOUR.filter(a => a.cls === c.id && st.owned.includes(a.id)).length}/${ARMOUR.filter(a => a.cls === c.id).length}</i></button>`).join('') +
+    `</div>`;
+  let body = tabs + `<div class="wk-loadout"><div class="wk-lab">🛡️ YOUR EQUIPMENT` +
     `<span class="dim"> · ${armourSlotsOpen()} slots</span></div>` +
     `<div class="wk-slots">` + slots.map(id => {
       if (!id) return `<div class="wk-slot is-empty">empty</div>`;
@@ -5298,9 +5324,12 @@ function workshopHTML() {
         `${u ? ` <span class="wk-plus">+${u}</span>` : ''}</b>` +
         `<span class="dim">blocks ${d.block + e.block}${1 + e.wear > 1 ? ` ×${1 + e.wear}` : ''}</span></div>`;
     }).join('') + `</div></div>`;
+  const onTab = a => tab === 'generic' ? !a.cls : a.cls === tab;
+  if (tab !== 'generic' && !classUnlocked(tab)) body += `<p class="dev-note">${(CLASSES[tab].unlock || '🔒 locked')} — you can read the gear before you earn the character.</p>`;
+  else if (tab !== 'generic' && tab !== CLASS.id) body += `<p class="dev-note">🎭 ${CLASSES[tab].name} gear is worn only when you set out as the ${CLASSES[tab].name}.</p>`;
   for (const slot of Object.keys(ARMOUR_SLOTS)) {
     // ⚠️ sorted by rarity so a zone reads as a ladder rather than as the order I typed them in
-    const list = ARMOUR.filter(a => a.slot === slot)
+    const list = ARMOUR.filter(a => a.slot === slot && onTab(a))
       .slice().sort((x, y) => RARITY_ORDER.indexOf(x.rarity || 'common') - RARITY_ORDER.indexOf(y.rarity || 'common'));
     if (!list.length) continue;
     body += `<div class="stash-tier">${ARMOUR_SLOTS[slot].icon} ${ARMOUR_SLOTS[slot].label}` +
@@ -6752,7 +6781,7 @@ function potionCan(p, card) { return !p.pick || !p.can || p.can(card); }
 function potionTargets(p) { return S.hand.filter(c => potionCan(p, c)); }
 
 // 🧪 drink it. Untargeted potions fire at once; a `pick` potion arms a card picker.
-function potionCap() { return CLASS.brews ? ALCH_CAP + (hasCharm('deepkit') ? 2 : 0) : POTION_CAP; }
+function potionCap() { return CLASS.brews ? ALCH_CAP + (hasCharm('deepkit') ? 2 : 0) + (hasArmourRule('bigkit') ? 3 : 0) : POTION_CAP; }   // 🧪 Bandolier Greaves
 function usePotion(id) {
   if (!isAssignPhase()) return;
   const p = potionById(id); if (!p || !(S.potions || []).includes(id)) return;
@@ -7299,7 +7328,7 @@ function partySight() {
   const lit = !isTwoHanded() ? (S.candle ? 1 : 0)
     : S.hands.reduce((t, h, i) => t + ((i === S.handIdx ? S.candle : h.candle) ? 1 : 0), 0);
   const far = (!isTwoHanded() ? CLASS.foresight : S.hands.some(h => (CLASSES[h.cls] || MAGE).foresight)) ? 1 : 0;   // 🏹 a Ranger in the party
-  return SIGHT_BASE + lit + far + (far && hasCharm('hawkeye') ? 1 : 0);
+  return SIGHT_BASE + lit + far + (far && hasCharm('hawkeye') ? 1 : 0) + (hasArmourRule('farstride') ? 1 : 0);   // 🏹 Hawkstride Boots
 }
 let SIGHT_BASE = 1;   // 🕯️ rows you see with every candle out
 function nodeSeen(n) { return !!(n && (n.seen || n.done || (S && S.tutorial))); }
@@ -10306,6 +10335,50 @@ const ARMOUR = [
   { id: 'quietstep', slot: 'Legs',  name: 'Quietstep Boots',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'rogue',
     ongoing: 'steadymo', text: '🔪 A lost race shakes <b>no knife</b> loose.' },
 
+  // 🎭 CLASS GEAR FOR THE EIGHT (2026-09-05, build 489 — Thomas: *"we should start on armor for all the
+  // other classes now"*). Two per class, the mage/rogue shape: a rare CHEST and a legendary LEGS, each
+  // keyed off the class's OWN rule and nothing generic. Every one is an `ongoing` read at the ONE
+  // place the rule lives, through hasArmourRule(). ❌ None adds a flat number to the blow.
+  // 🛡️ Guardian — Wrath and the brace
+  { id: 'wrathwell',  slot: 'Chest', name: 'Wrathwell Plate',   block: 2, brk: 'worn', rarity: 'rare', cls: 'guardian',
+    ongoing: 'wrathwell', text: '🛡️ Your Wrath cap is <b>4 higher</b>.' },
+  { id: 'bracegreave', slot: 'Legs', name: 'Anvilstep Greaves', block: 1, brk: 'worn', rarity: 'legendary', cls: 'guardian',
+    ongoing: 'bracewrath', text: '🛡️ Damage you <b>brace</b> away still counts as Wrath.' },
+  // ⚗️ Alchemist — the Still and the kit
+  { id: 'stillcoat',  slot: 'Chest', name: 'Stillwarden Coat',  block: 2, brk: 'worn', rarity: 'rare', cls: 'alchemist',
+    ongoing: 'halfstill', text: '⚗️ A reagent thrown in still gives <b>half its ➕</b>.' },
+  { id: 'vialgreave', slot: 'Legs',  name: 'Bandolier Greaves', block: 1, brk: 'worn', rarity: 'legendary', cls: 'alchemist',
+    ongoing: 'bigkit', text: '🧪 Your kit holds <b>3 more</b>.' },
+  // 🏹 Ranger — the Mark and the road
+  { id: 'markvest',   slot: 'Chest', name: 'Fletcher\'s Vest',  block: 2, brk: 'worn', rarity: 'rare', cls: 'ranger',
+    ongoing: 'longmark', text: '🏹 A mark makes <b>one more</b> blow certain.' },
+  { id: 'hawkboots',  slot: 'Legs',  name: 'Hawkstride Boots',  block: 1, brk: 'worn', rarity: 'legendary', cls: 'ranger',
+    ongoing: 'farstride', text: '🕯️ You see <b>one more row</b> of the road.' },
+  // 🎲 Berserker — the die
+  { id: 'ragehide',   slot: 'Chest', name: 'Ragehide Jerkin',   block: 2, brk: 'worn', rarity: 'rare', cls: 'berserker',
+    ongoing: 'steadydie', text: '🎲 Your opening die is never below <b>3</b>.' },
+  { id: 'luckboots',  slot: 'Legs',  name: 'Loaded Boots',      block: 1, brk: 'worn', rarity: 'legendary', cls: 'berserker',
+    ongoing: 'reroll1', text: '🎲 A reckless <b>1</b> is rolled again instead of costing the race.' },
+  // 🎭 Illusionist — the Veil
+  { id: 'mirrorcloak', slot: 'Chest', name: 'Mirrorthread Cloak', block: 2, brk: 'worn', rarity: 'rare', cls: 'illusionist',
+    ongoing: 'halfveil', text: '🎭 Summoning still fires <b>half the card\'s ➕</b>.' },
+  { id: 'phantomstep', slot: 'Legs', name: 'Phantomstep Boots', block: 1, brk: 'worn', rarity: 'legendary', cls: 'illusionist',
+    ongoing: 'swiftblow', text: '💨 Your swift illusions add their power to your <b>Spell</b> too.' },
+  // 🪙 Merchant — the purse
+  { id: 'ledgervest', slot: 'Chest', name: 'Ledger Vest',       block: 2, brk: 'worn', rarity: 'rare', cls: 'merchant',
+    ongoing: 'cheappay', text: '🪙 Paying for a blow costs <b>2 less</b>.' },
+  { id: 'coinboots',  slot: 'Legs',  name: 'Countinghouse Boots', block: 1, brk: 'worn', rarity: 'legendary', cls: 'merchant',
+    ongoing: 'fastcustom', text: '🪙 Your Strike grows every <b>12</b> coins spent, not 16.' },
+  // 🏗️ Engineer — the turret
+  { id: 'gearplate',  slot: 'Chest', name: 'Gearwright Plate',  block: 2, brk: 'worn', rarity: 'rare', cls: 'engineer',
+    ongoing: 'sparefoundation', text: '🏗️ Your turret never wears below <b>Lv1</b>.' },
+  { id: 'boltgreave', slot: 'Legs',  name: 'Boltworks Greaves', block: 1, brk: 'worn', rarity: 'legendary', cls: 'engineer',
+    ongoing: 'tallturret', text: '🏗️ Your turret\'s cap is <b>1 higher</b>.' },
+  // 🌱 Gardener — the plots and the builds
+  { id: 'sowercoat',  slot: 'Chest', name: 'Sower\'s Smock',    block: 2, brk: 'worn', rarity: 'rare', cls: 'gardener',
+    ongoing: 'cheapfirst', text: '🧺 The <b>first tier</b> of every build costs only <b>one</b> crop.' },
+  { id: 'rootboots',  slot: 'Legs',  name: 'Deeproot Boots',    block: 1, brk: 'worn', rarity: 'legendary', cls: 'gardener',
+    ongoing: 'tallbuild', text: '🧺 Your builds\' cap is <b>4</b>.' },
   // 👢 LEGS — speed
   { id: 'toadboots', slot: 'Legs', name: 'Anvil Toad Boots',   block: 1, brk: 'worn', rarity: 'rare',
     uses: 1, use: 'firstlight', text: 'Once a run: you <b>win Initiative</b> this turn, whatever it is.' },
@@ -10379,6 +10452,15 @@ const RECIPE = {
   slowwick:  { mats: { shard: 24, quill: 3, sinew: 2 } },
   bloodcord: { mats: { shard: 18, quill: 3 } },
   quietstep: { mats: { shard: 24, slag: 3, sinew: 2 } },
+  // 🎭 the eight — priced exactly as the mage's and the rogue's: a rare on shards + shape parts, a legendary with sinew
+  wrathwell: { mats: { shard: 18, slag: 3 } },     bracegreave: { mats: { shard: 24, slag: 3, sinew: 2 } },
+  stillcoat: { mats: { shard: 18, quill: 3 } },    vialgreave:  { mats: { shard: 24, quill: 3, sinew: 2 } },
+  markvest:  { mats: { shard: 18, quill: 3 } },    hawkboots:   { mats: { shard: 24, quill: 3, sinew: 2 } },
+  ragehide:  { mats: { shard: 18, slag: 3 } },     luckboots:   { mats: { shard: 24, slag: 3, sinew: 2 } },
+  mirrorcloak: { mats: { shard: 18, quill: 3 } },  phantomstep: { mats: { shard: 24, quill: 3, sinew: 2 } },
+  ledgervest: { mats: { shard: 18, slag: 3 } },    coinboots:   { mats: { shard: 24, slag: 3, sinew: 2 } },
+  gearplate: { mats: { shard: 18, slag: 3 } },     boltgreave:  { mats: { shard: 24, slag: 3, sinew: 2 } },
+  sowercoat: { mats: { shard: 18, quill: 3 } },    rootboots:   { mats: { shard: 24, quill: 3, sinew: 2 } },
   dawncap:   { mats: { shard: 14, 'p:Cairnstag': 1 } },
   boarcoat:  { mats: { shard: 14, 'p:Ashen Boar': 1 } },
   toadboots: { mats: { shard: 16, quill: 2, 'p:Anvil Toad': 1 } },
